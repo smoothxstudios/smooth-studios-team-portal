@@ -1,0 +1,101 @@
+{
+  "items": [
+    {
+      "id": "sample-jan-17",
+      "status": "confirmed",
+      "summary": "Sample Client 01: Studio Rental (Smooth Studios)",
+      "description": "Calendar: Smooth Studios\nName: Sample Client 01\nPrice: $150.00\nPaid Online: $150.00\nAcuityID=sample-001",
+      "start": { "dateTime": "2026-01-17T13:00:00-05:00" },
+      "end": { "dateTime": "2026-01-17T15:00:00-05:00" },
+      "attendees": [{ "email": "akiva@preview.smoothstudios.invalid", "responseStatus": "accepted" }]
+    },
+    {
+      "id": "sample-mar-05",
+      "status": "confirmed",
+      "summary": "Sample Client 02: Studio Rental (Smooth Studios)",
+      "description": "Calendar: Smooth Studios\nName: Sample Client 02\nPrice: $200.00\nPaid Online: $200.00\nAcuityID=sample-002",
+      "start": { "dateTime": "2026-03-05T17:30:00-05:00" },
+      "end": { "dateTime": "2026-03-05T19:30:00-05:00" },
+      "attendees": [
+        { "email": "jordyn@preview.smoothstudios.invalid", "responseStatus": "accepted" },
+        { "email": "rayne@preview.smoothstudios.invalid", "responseStatus": "accepted" }
+      ]
+    },
+    {
+      "id": "sample-may-16",
+      "status": "confirmed",
+      "summary": "Sample Client 03: Quick Studio Rental (Smooth Studios)",
+      "description": "Calendar: Smooth Studios\nName: Sample Client 03\nPrice: $300.00\nPaid Online: $300.00\nAcuityID=sample-003",
+      "start": { "dateTime": "2026-05-16T12:00:00-04:00" },
+      "end": { "dateTime": "2026-05-16T13:00:00-04:00" },
+      "attendees": []
+    },
+    {
+      "id": "sample-aug-10",
+      "status": "confirmed",
+      "summary": "Sample Client 04: Studio Rental (Smooth Studios)",
+      "description": "Calendar: Smooth Studios\nName: Sample Client 04\nPrice: $250.00\nPaid Online: $250.00\nAcuityID=sample-004",
+      "start": { "dateTime": "2026-08-10T18:00:00-04:00" },
+      "end": { "dateTime": "2026-08-10T20:00:00-04:00" },
+      "attendees": [
+        { "email": "akiva@preview.smoothstudios.invalid", "responseStatus": "accepted" },
+        { "email": "jordyn@preview.smoothstudios.invalid", "responseStatus": "accepted" }
+      ]
+    },
+    {
+      "id": "sample-aug-25",
+      "status": "confirmed",
+      "summary": "Sample Client 05: Studio Rental (Smooth Studios)",
+      "description": "Calendar: Smooth Studios\nName: Sample Client 05\nPrice: $180.00\nPaid Online: $90.00\nAcuityID=sample-005",
+      "start": { "dateTime": "2026-08-25T16:00:00-04:00" },
+      "end": { "dateTime": "2026-08-25T18:00:00-04:00" },
+      "attendees": [{ "email": "rayne@preview.smoothstudios.invalid", "responseStatus": "accepted" }]
+    },
+    {
+      "id": "sample-sep-05",
+      "status": "confirmed",
+      "summary": "Sample Client 06: Studio Rental (Smooth Studios)",
+      "description": "Calendar: Smooth Studios\nName: Sample Client 06\nPrice: $200.00\nPaid Online: $200.00\nAcuityID=sample-006",
+      "start": { "dateTime": "2026-09-05T15:00:00-04:00" },
+      "end": { "dateTime": "2026-09-05T17:00:00-04:00" },
+      "attendees": [
+        { "email": "akiva@preview.smoothstudios.invalid", "responseStatus": "accepted" },
+        { "email": "jordyn@preview.smoothstudios.invalid", "responseStatus": "declined" }
+      ]
+    },
+    {
+      "id": "sample-sep-18",
+      "status": "confirmed",
+      "summary": "Sample Client 07: Studio Rental (Smooth Studios)",
+      "description": "Calendar: Smooth Studios\nName: Sample Client 07\nPrice: $350.00\nPaid Online: $350.00\nAcuityID=sample-007",
+      "start": { "dateTime": "2026-09-18T18:30:00-04:00" },
+      "end": { "dateTime": "2026-09-18T21:30:00-04:00" },
+      "attendees": [
+        { "email": "jordyn@preview.smoothstudios.invalid", "responseStatus": "accepted" },
+        { "email": "rayne@preview.smoothstudios.invalid", "responseStatus": "accepted" }
+      ]
+    },
+    {
+      "id": "sample-oct-02",
+      "status": "confirmed",
+      "summary": "Sample Client 08: Quick Studio Rental (Smooth Studios)",
+      "description": "Calendar: Smooth Studios\nName: Sample Client 08\nPrice: $120.00\nPaid Online: $120.00\nAcuityID=sample-008",
+      "start": { "dateTime": "2026-10-02T12:00:00-04:00" },
+      "end": { "dateTime": "2026-10-02T13:00:00-04:00" },
+      "attendees": []
+    },
+    {
+      "id": "sample-nov-09",
+      "status": "confirmed",
+      "summary": "Sample Client 09: Studio Rental (Smooth Studios)",
+      "description": "Calendar: Smooth Studios\nName: Sample Client 09\nPrice: $500.00\nPaid Online: $500.00\nAcuityID=sample-009",
+      "start": { "dateTime": "2026-11-09T16:00:00-05:00" },
+      "end": { "dateTime": "2026-11-09T20:00:00-05:00" },
+      "attendees": [
+        { "email": "akiva@preview.smoothstudios.invalid", "responseStatus": "accepted" },
+        { "email": "jordyn@preview.smoothstudios.invalid", "responseStatus": "accepted" },
+        { "email": "rayne@preview.smoothstudios.invalid", "responseStatus": "accepted" }
+      ]
+    }
+  ]
+}

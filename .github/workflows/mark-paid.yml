@@ -1,0 +1,63 @@
+name: Mark employee earnings paid
+
+on:
+  workflow_dispatch:
+    inputs:
+      paid_through:
+        description: Mark eligible earnings paid through this date (YYYY-MM-DD)
+        required: true
+        type: string
+      employee:
+        description: Employee scope
+        required: true
+        default: all
+        type: choice
+        options: [all, akiva, jordyn, rayne]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  update-build-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/configure-pages@v5
+      - run: npm ci
+      - name: Update payout cutoff
+        run: npm run mark:paid -- --through "${{ inputs.paid_through }}" --employee "${{ inputs.employee }}"
+      - name: Refresh encrypted dashboards
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_CALENDAR_ID: ${{ secrets.GOOGLE_CALENDAR_ID }}
+          EMPLOYEE_EMAIL_AKIVA: ${{ secrets.EMPLOYEE_EMAIL_AKIVA }}
+          EMPLOYEE_EMAIL_JORDYN: ${{ secrets.EMPLOYEE_EMAIL_JORDYN }}
+          EMPLOYEE_EMAIL_RAYNE: ${{ secrets.EMPLOYEE_EMAIL_RAYNE }}
+          DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}
+          DASHBOARD_PASSWORD_AKIVA: ${{ secrets.DASHBOARD_PASSWORD_AKIVA }}
+          DASHBOARD_PASSWORD_JORDYN: ${{ secrets.DASHBOARD_PASSWORD_JORDYN }}
+          DASHBOARD_PASSWORD_RAYNE: ${{ secrets.DASHBOARD_PASSWORD_RAYNE }}
+        run: npm run sync:calendar
+      - name: Save payout and encrypted data
+        run: |
+          git config user.name "smooth-studios-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/payout-ledger.json public/data
+          git commit -m "payout: mark ${{ inputs.employee }} paid through ${{ inputs.paid_through }}"
+          git push
+      - run: npm run build:github-pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+      - name: Deploy updated dashboard
+        id: deployment
+        uses: actions/deploy-pages@v4

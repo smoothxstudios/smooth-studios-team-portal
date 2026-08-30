@@ -1,0 +1,33 @@
+{
+  "studioName": "Smooth Studios",
+  "calendarName": "Smooth Studios",
+  "calendarIdEnvironmentVariable": "GOOGLE_CALENDAR_ID",
+  "timeZone": "America/New_York",
+  "importStart": "2026-01-01T00:00:00-05:00",
+  "commissionRate": 0.3,
+  "repository": "smoothxstudios/smooth-studios-team-portal",
+  "owner": {
+    "id": "owner",
+    "name": "Smooth Studios"
+  },
+  "employees": [
+    {
+      "id": "akiva",
+      "name": "Akiva",
+      "emailEnvironmentVariable": "EMPLOYEE_EMAIL_AKIVA",
+      "accent": "#e10000"
+    },
+    {
+      "id": "jordyn",
+      "name": "Jordyn",
+      "emailEnvironmentVariable": "EMPLOYEE_EMAIL_JORDYN",
+      "accent": "#202024"
+    },
+    {
+      "id": "rayne",
+      "name": "Rayne",
+      "emailEnvironmentVariable": "EMPLOYEE_EMAIL_RAYNE",
+      "accent": "#b21f2d"
+    }
+  ]
+}

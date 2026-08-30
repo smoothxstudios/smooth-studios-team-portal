@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "employees": {
+    "akiva": { "paidThrough": "2026-05-31" },
+    "jordyn": { "paidThrough": "2026-04-30" },
+    "rayne": { "paidThrough": "2026-04-30" }
+  }
+}
