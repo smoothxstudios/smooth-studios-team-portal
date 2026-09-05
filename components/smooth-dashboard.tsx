@@ -176,6 +176,13 @@ function rentalState(rental: Rental, employeeId?: string): RentalState {
   return "earned";
 }
 
+function eligibleForPayout(rental: Rental, paidThrough: string, employeeScope: string) {
+  if (new Date(rental.end) > new Date(`${paidThrough}T23:59:59`) || !customerFullyPaid(rental)) return false;
+  if (employeeScope === "all") return Object.values(rental.employeePayouts).some((payout) => !payout.paid);
+  const payout = rental.employeePayouts[employeeScope];
+  return Boolean(payout && !payout.paid);
+}
+
 function appointmentStatus(rental: Rental, employeeId?: string): AppointmentStatus {
   const paymentState = customerPaymentState(rental);
   if (paymentState === "deposit") return "deposit";
@@ -500,8 +507,10 @@ function PayoutPage({
   monthly,
   onContinue,
   paidThrough,
+  payoutEmployee,
   rentals,
   setPaidThrough,
+  setPayoutEmployee,
 }: {
   employeeId?: string;
   employees: Employee[];
@@ -509,10 +518,15 @@ function PayoutPage({
   monthly: Array<{ month: string; paid: number; owed: number }>;
   onContinue: () => void;
   paidThrough: string;
+  payoutEmployee: string;
   rentals: Rental[];
   setPaidThrough: (value: string) => void;
+  setPayoutEmployee: (value: string) => void;
 }) {
   const isOwner = !employeeId;
+  const selectedEmployee = employees.find((employee) => employee.id === payoutEmployee);
+  const payoutScopeLabel = selectedEmployee?.name ?? "All employees";
+  const eligibleAppointments = rentals.filter((rental) => eligibleForPayout(rental, paidThrough, payoutEmployee)).length;
   return (
     <section className="payout-layout">
       <article className="panel payout-chart-panel">
@@ -536,10 +550,22 @@ function PayoutPage({
           <div className="workflow-icon"><GitBranch size={24} /></div>
           <p className="eyebrow">Smooth action</p>
           <h2>Mark employee earnings paid</h2>
-          <p>Choose the last appointment date covered by your payout. The dashboard will securely update the encrypted ledger and show you when it finishes.</p>
-          <label htmlFor="paid-through">Mark everything paid through</label>
-          <input id="paid-through" max={new Date().toISOString().slice(0, 10)} onChange={(event) => setPaidThrough(event.target.value)} type="date" value={paidThrough} />
-          <div className="workflow-scope"><ReceiptText size={16} /><span>{employees.length} employees · {rentals.filter((rental) => new Date(rental.end) <= new Date(`${paidThrough}T23:59:59`) && customerFullyPaid(rental) && Object.values(rental.employeePayouts).some((payout) => !payout.paid)).length} eligible appointments</span></div>
+          <p>Choose who you paid and the last appointment date covered. The dashboard will update only that payout selection.</p>
+          <div className="payout-control">
+            <label id="payout-employee-label">Employee selection</label>
+            <Select onValueChange={setPayoutEmployee} value={payoutEmployee}>
+              <SelectTrigger aria-labelledby="payout-employee-label" className="payout-employee-select"><SelectValue /></SelectTrigger>
+              <SelectContent position="popper">
+                <SelectItem value="all">All employees</SelectItem>
+                {employees.map((employee) => <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="payout-control">
+            <label htmlFor="paid-through">Mark paid through</label>
+            <input id="paid-through" max={new Date().toISOString().slice(0, 10)} onChange={(event) => setPaidThrough(event.target.value)} type="date" value={paidThrough} />
+          </div>
+          <div className="workflow-scope"><ReceiptText size={16} /><span>{payoutScopeLabel} · {eligibleAppointments} eligible appointment{eligibleAppointments === 1 ? "" : "s"}</span></div>
           <Button className="github-button" onClick={onContinue}>Review and mark paid <ArrowRight size={16} /></Button>
           <small>You will stay inside the dashboard while the workflow runs.</small>
         </article>
@@ -657,6 +683,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [paidThrough, setPaidThrough] = useState(new Date().toISOString().slice(0, 10));
+  const [payoutEmployee, setPayoutEmployee] = useState("all");
   const [paymentOverrideOpen, setPaymentOverrideOpen] = useState(false);
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [workflowRequest, setWorkflowRequest] = useState<OwnerWorkflowRequest | null>(null);
@@ -715,20 +742,20 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
   };
 
   const openPayoutWorkflow = () => {
-    const eligible = rentals.filter((rental) =>
-      new Date(rental.end) <= new Date(`${paidThrough}T23:59:59`)
-      && customerFullyPaid(rental)
-      && Object.values(rental.employeePayouts).some((payout) => !payout.paid),
-    ).length;
+    const selectedEmployee = payload.employees.find((employee) => employee.id === payoutEmployee);
+    const employeeLabel = selectedEmployee?.name ?? `All ${payload.employees.length} employees`;
+    const eligible = rentals.filter((rental) => eligibleForPayout(rental, paidThrough, payoutEmployee)).length;
     openWorkflow({
       workflowId: "mark-paid.yml",
       title: "Mark employee earnings paid",
-      description: "This marks every eligible employee earning paid through the selected date and republishes the encrypted dashboards.",
+      description: selectedEmployee
+        ? `This marks ${selectedEmployee.name}'s eligible earnings paid through the selected date and republishes the encrypted dashboards.`
+        : "This marks every eligible employee earning paid through the selected date and republishes the encrypted dashboards.",
       actionLabel: "Mark earnings paid",
-      inputs: { paid_through: paidThrough, employee: "all" },
+      inputs: { paid_through: paidThrough, employee: payoutEmployee },
       details: [
         { label: "Paid through", value: paidThrough },
-        { label: "Employees", value: `All ${payload.employees.length} employees` },
+        { label: "Employee selection", value: employeeLabel },
         { label: "Eligible appointments", value: String(eligible) },
       ],
     });
@@ -830,7 +857,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
             {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the 30-minute Calendar sync." : "No appointments match the selected filters."} title="No appointments found" />}
           </article>}
           {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} />}
-          {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} rentals={visibleRentals} setPaidThrough={setPaidThrough} />}
+          {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={visibleRentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />}
         </div>
       </SidebarInset>
       {isOwner && (
