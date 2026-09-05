@@ -13,6 +13,43 @@ export type EmployeePayout = {
   paidAt?: string;
 };
 
+export type StripePaymentMatch = {
+  receivedCents: number;
+  grossCents: number;
+  refundedCents: number;
+  feeCents: number;
+  netCents: number;
+  paymentCount: number;
+  matchConfidence: "acuity-id" | "high";
+  disputed: boolean;
+};
+
+export type StripeSummary = {
+  generatedAt: string;
+  paymentCount: number;
+  grossCents: number;
+  refundedCents: number;
+  feeCents: number;
+  netCents: number;
+  bankPayoutCents: number;
+  pendingPayoutCents: number;
+  matchedPaymentCount: number;
+  unmatchedPaymentCount: number;
+  unmatchedCents: number;
+  disputedPaymentCount: number;
+};
+
+export type UnmatchedStripePayment = {
+  reference: string;
+  created: string;
+  amountCents: number;
+  refundedCents: number;
+  customerName: string | null;
+  customerEmail: string | null;
+  description: string | null;
+  disputed: boolean;
+};
+
 export type Rental = {
   id: string;
   title: string;
@@ -23,8 +60,11 @@ export type Rental = {
   end: string;
   priceCents: number;
   paidOnlineCents: number | null;
+  calendarPaidOnlineCents?: number | null;
   tipCents?: number;
   fullyPaid: boolean;
+  paymentSource?: "stripe" | "calendar" | "manual" | "none";
+  stripePayment?: StripePaymentMatch;
   paymentOverride?: boolean;
   assignedEmployeeIds: string[];
   employeePayouts: Record<string, EmployeePayout>;
@@ -35,10 +75,13 @@ export type DashboardPayload = {
   source: "sample" | "google-calendar";
   generatedAt: string;
   calendarName: string;
+  integrations?: { calendar: boolean; stripe: boolean };
   role: DashboardRole;
   user: Employee | { id: "owner"; name: string; accent: string };
   employees: Employee[];
   rentals: Rental[];
+  stripeSummary?: StripeSummary;
+  unmatchedStripePayments?: UnmatchedStripePayment[];
   workflowAccess?: {
     provider: "github";
     repository: string;

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDashboardPayloads, writeEncryptedDashboards } from "./lib/dashboard-data.mjs";
+import { fetchStripeSnapshot } from "./lib/stripe-data.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readJson = async (relativePath) => JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
@@ -99,6 +100,23 @@ if (!ownerWorkflowToken) {
 }
 const accessToken = await googleAccessToken(serviceAccount);
 const calendarEvents = await fetchCalendarEvents(calendarId, accessToken);
-const payloads = buildDashboardPayloads({ calendarEvents, config, ledger, overrides, source: "google-calendar", ownerWorkflowToken });
+const stripeSecretKey = process.env.STRIPE_RESTRICTED_KEY?.trim();
+const stripeSnapshot = stripeSecretKey
+  ? await fetchStripeSnapshot(stripeSecretKey, { importStart: config.importStart })
+  : null;
+if (!stripeSnapshot) {
+  process.stderr.write("STRIPE_RESTRICTED_KEY is not configured; Calendar payment fields will remain the payment source.\n");
+}
+const payloads = buildDashboardPayloads({
+  calendarEvents,
+  config,
+  ledger,
+  overrides,
+  source: "google-calendar",
+  ownerWorkflowToken,
+  stripeSnapshot,
+});
 await writeEncryptedDashboards({ payloads, passwords, outputDirectory: path.join(root, "public/data"), config });
-process.stdout.write(`Encrypted ${calendarEvents.length} Calendar events for ${Object.keys(payloads).length} dashboards.\n`);
+process.stdout.write(
+  `Encrypted ${calendarEvents.length} Calendar events${stripeSnapshot ? ` and ${stripeSnapshot.charges.length} Stripe payments` : ""} for ${Object.keys(payloads).length} dashboards.\n`,
+);

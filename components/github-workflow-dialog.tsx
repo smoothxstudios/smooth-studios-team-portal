@@ -166,9 +166,12 @@ export function GithubWorkflowDialog({
   useEffect(() => {
     if (!open) return;
     controllerRef.current?.abort();
-    setStage("confirm");
-    setError("");
-    setRun(null);
+    const resetTimer = window.setTimeout(() => {
+      setStage("confirm");
+      setError("");
+      setRun(null);
+    }, 0);
+    return () => window.clearTimeout(resetTimer);
   }, [open, request]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);

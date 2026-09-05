@@ -20,10 +20,12 @@ import {
   ChevronDown,
   ChevronRight,
   CircleDollarSign,
+  CreditCard,
   Clock3,
   Eye,
   EyeOff,
   GitBranch,
+  Landmark,
   LayoutDashboard,
   LockKeyhole,
   LogOut,
@@ -33,6 +35,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Sun,
+  TriangleAlert,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -86,6 +89,8 @@ import type {
   Employee,
   EncryptedEnvelope,
   Rental,
+  StripeSummary,
+  UnmatchedStripePayment,
 } from "@/lib/dashboard-types";
 
 const FALLBACK_PROFILES: AccessProfile[] = [
@@ -163,6 +168,7 @@ function recognizedRevenue(rental: Rental) {
 
 function customerPaymentState(rental: Rental): CustomerPaymentState {
   if (customerFullyPaid(rental)) return "paid";
+  if (rental.stripePayment?.disputed) return "review";
   if (new Date(rental.end).getTime() <= Date.now()) return "review";
   if ((rental.paidOnlineCents ?? 0) > 0) return "deposit";
   return "pending";
@@ -388,7 +394,67 @@ function CategoryRevenue({ rentals }: { rentals: Rental[] }) {
   );
 }
 
-function PaymentReview({ rentals, onOpen, onOverride }: { rentals: Rental[]; onOpen: () => void; onOverride: () => void }) {
+function StripeMoneyFlow({
+  summary,
+  unmatchedPayments,
+}: {
+  summary?: StripeSummary;
+  unmatchedPayments: UnmatchedStripePayment[];
+}) {
+  if (!summary) {
+    return (
+      <section className="panel stripe-flow-panel stripe-flow-disconnected">
+        <div className="stripe-flow-intro">
+          <span className="stripe-flow-icon"><CreditCard size={21} /></span>
+          <div><p className="eyebrow">Money flow</p><h2>Stripe is not connected yet</h2><p>Calendar payment fields remain active until the read-only Stripe sync is enabled.</p></div>
+        </div>
+      </section>
+    );
+  }
+
+  const flowItems = [
+    { label: "Gross received", value: summary.grossCents, note: `${summary.paymentCount} successful payment${summary.paymentCount === 1 ? "" : "s"}` },
+    { label: "Refunded", value: summary.refundedCents, note: "Returned to customers" },
+    { label: "Stripe fees", value: summary.feeCents, note: "Processing costs" },
+    { label: "Net after fees", value: summary.netCents, note: "Gross minus refunds and fees" },
+    { label: "Paid to bank", value: summary.bankPayoutCents, note: summary.pendingPayoutCents ? `${dollars(summary.pendingPayoutCents, true)} still moving` : "Completed Stripe payouts" },
+  ];
+
+  return (
+    <section className="panel stripe-flow-panel">
+      <div className="panel-heading stripe-flow-heading">
+        <div><p className="eyebrow">Money flow</p><h2>Stripe reconciliation</h2></div>
+        <span className="stripe-connected"><span /> Updated {formatDate(summary.generatedAt, true)} at {formatTime(summary.generatedAt)}</span>
+      </div>
+      <div className="stripe-flow-grid">
+        {flowItems.map((item, index) => (
+          <article key={item.label}>
+            <span className="stripe-flow-item-icon">{index === 4 ? <Landmark size={16} /> : <CreditCard size={16} />}</span>
+            <div><span>{item.label}</span><strong>{dollars(item.value, true)}</strong><small>{item.note}</small></div>
+          </article>
+        ))}
+      </div>
+      {summary.unmatchedPaymentCount > 0 && (
+        <div className="stripe-unmatched">
+          <div className="stripe-unmatched-heading">
+            <span><TriangleAlert size={17} /></span>
+            <div><strong>{summary.unmatchedPaymentCount} Stripe payment{summary.unmatchedPaymentCount === 1 ? "" : "s"} need matching</strong><small>{dollars(summary.unmatchedCents, true)} was received but could not be safely tied to a Calendar appointment.</small></div>
+          </div>
+          <div className="stripe-unmatched-list">
+            {unmatchedPayments.slice(0, 5).map((payment) => (
+              <div key={`${payment.reference}-${payment.created}`}>
+                <span><strong>{payment.customerName || payment.customerEmail || "Unknown customer"}</strong><small>{formatDate(payment.created, true)} · ref {payment.reference}</small></span>
+                <b>{dollars(payment.amountCents, true)}</b>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PaymentReview({ rentals, onOpen, onOverride, stripeConnected }: { rentals: Rental[]; onOpen: () => void; onOverride: () => void; stripeConnected: boolean }) {
   const appointments = rentals.filter((rental) => customerPaymentState(rental) === "review");
   if (!appointments.length) return null;
   const unrecorded = appointments.reduce((sum, rental) => sum + Math.max(rental.priceCents - (rental.paidOnlineCents ?? 0), 0), 0);
@@ -400,7 +466,7 @@ function PaymentReview({ rentals, onOpen, onOverride }: { rentals: Rental[]; onO
         <div>
           <p className="eyebrow">Payment check</p>
           <h2>{appointments.length} completed appointment{appointments.length === 1 ? "" : "s"} need review</h2>
-          <p>The Calendar event shows a deposit or no checkout payment. Confirm whether the balance is still unpaid or was received by invoice, cash, Apple Pay, or another method.</p>
+          <p>{stripeConnected ? "The Calendar and Stripe records do not confirm the full balance." : "The Calendar event shows a deposit or no checkout payment."} Confirm whether the balance is still unpaid or was received by invoice, cash, Apple Pay, or another method.</p>
         </div>
       </div>
       <div className="payment-review-total"><span>Not recorded on event</span><strong>{dollars(unrecorded)}</strong><small>This may include invoice or other payments.</small></div>
@@ -420,18 +486,25 @@ function PaymentAmount({ rental, showDetails }: { rental: Rental; showDetails: b
   const remaining = Math.max(rental.priceCents - paidOnline, 0);
   let detail = "No online payment recorded";
   let tone = "pending";
+  const source = rental.paymentSource === "stripe" ? "Stripe" : rental.paymentSource === "manual" ? "manual review" : "Calendar";
 
-  if (rental.paymentOverride === true && remaining > 0) {
+  if (rental.paymentOverride === false) {
+    detail = `${paidOnline > 0 ? `${dollars(paidOnline, true)} recorded · ` : ""}marked not fully paid`;
+    tone = "review";
+  } else if (rental.stripePayment?.disputed) {
+    detail = `${dollars(paidOnline, true)} received · dispute needs review`;
+    tone = "review";
+  } else if (rental.paymentOverride === true && remaining > 0) {
     detail = paidOnline > 0 ? `${dollars(paidOnline, true)} online · payment confirmed` : "Payment confirmed manually";
     tone = "paid";
   } else if (tip > 0) {
-    detail = `${dollars(paidOnline, true)} paid · ${dollars(tip, true)} tip`;
+    detail = `${dollars(paidOnline, true)} via ${source} · ${dollars(tip, true)} tip`;
     tone = "tip";
   } else if (remaining > 0 && paidOnline > 0) {
-    detail = `${dollars(paidOnline, true)} paid · ${dollars(remaining, true)} remaining`;
+    detail = `${dollars(paidOnline, true)} via ${source} · ${dollars(remaining, true)} remaining`;
     tone = "deposit";
   } else if (paidOnline >= rental.priceCents) {
-    detail = `${dollars(paidOnline, true)} paid online`;
+    detail = `${dollars(paidOnline, true)} received via ${source}`;
     tone = "paid";
   }
 
@@ -600,12 +673,15 @@ function PaymentOverrideForm({
 
   useEffect(() => {
     if (!open) return;
-    setEventId(reviewRentals[0]?.id ?? "");
-    setPaidStatus("true");
+    const resetTimer = window.setTimeout(() => {
+      setEventId(reviewRentals[0]?.id ?? "");
+      setPaidStatus("true");
+    }, 0);
+    return () => window.clearTimeout(resetTimer);
   }, [open, reviewRentals]);
 
   const selected = reviewRentals.find((rental) => rental.id === eventId);
-  const statusLabels = { true: "Payment received by invoice, cash, or other", false: "Not fully paid", clear: "Use Calendar payment fields" };
+  const statusLabels = { true: "Payment received by invoice, cash, or other", false: "Not fully paid", clear: "Use automatic payment records" };
   const continueToConfirmation = () => {
     if (!selected) return;
     const recorded = selected.paidOnlineCents === null ? "None" : dollars(selected.paidOnlineCents, true);
@@ -617,14 +693,14 @@ function PaymentOverrideForm({
         ? "This confirms that the remaining balance was received by invoice, cash, or another method."
         : paidStatus === "false"
           ? "This records that the appointment is not fully paid."
-          : "This removes the manual decision and returns the appointment to its Calendar payment status.",
+          : "This removes the manual decision and returns the appointment to its automatic Stripe or Calendar payment status.",
       actionLabel: paidStatus === "true" ? "Confirm payment received" : paidStatus === "false" ? "Mark not fully paid" : "Clear manual status",
       inputs: { event_id: selected.id, paid_status: paidStatus },
       details: [
         { label: "Appointment", value: `${selected.customer} · ${selected.title}` },
         { label: "Date", value: `${formatDate(selected.start, true)} at ${formatTime(selected.start)}` },
         { label: "Price", value: dollars(selected.priceCents, true) },
-        { label: "Calendar “Paid Online”", value: recorded },
+        { label: selected.paymentSource === "stripe" ? "Stripe received" : "Calendar “Paid Online”", value: recorded },
         { label: "New status", value: statusLabels[paidStatus] },
       ],
     });
@@ -661,7 +737,7 @@ function PaymentOverrideForm({
             {selected && (
               <div className="payment-override-summary">
                 <div><span>Price</span><strong>{dollars(selected.priceCents, true)}</strong></div>
-                <div><span>Calendar “Paid Online”</span><strong>{selected.paidOnlineCents === null ? "None" : dollars(selected.paidOnlineCents, true)}</strong></div>
+                <div><span>{selected.paymentSource === "stripe" ? "Stripe received" : "Calendar “Paid Online”"}</span><strong>{selected.paidOnlineCents === null ? "None" : dollars(selected.paidOnlineCents, true)}</strong></div>
                 <div><span>Remaining</span><strong>{dollars(Math.max(selected.priceCents - (selected.paidOnlineCents ?? 0), 0), true)}</strong></div>
               </div>
             )}
@@ -698,6 +774,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
   ), [categoryFilter, paymentFilter, visibleRentals]);
   const reviewRentals = useMemo(() => rentals.filter((rental) => customerPaymentState(rental) === "review"), [rentals]);
   const upcoming = useMemo(() => [...visibleRentals].filter((rental) => rentalState(rental, employeeId) === "upcoming").reverse(), [employeeId, visibleRentals]);
+  const stripeConnected = Boolean(payload.integrations?.stripe && payload.stripeSummary);
 
   const metrics = useMemo(() => {
     let revenue = 0;
@@ -763,11 +840,12 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
 
   const openCalendarSync = () => openWorkflow({
     workflowId: "calendar-sync.yml",
-    title: "Sync the Smooth Studios Calendar",
-    description: "This imports the latest Calendar changes, rebuilds every encrypted dashboard, and republishes the portal.",
-    actionLabel: "Start Calendar sync",
+    title: "Sync Calendar and Stripe",
+    description: "This imports the latest appointments and payment activity, reconciles their records, rebuilds every encrypted dashboard, and republishes the portal.",
+    actionLabel: "Start data sync",
     details: [
       { label: "Calendar", value: payload.calendarName },
+      { label: "Payments", value: stripeConnected ? "Stripe connected" : "Calendar fields only" },
       { label: "Import range", value: "January 1, 2026 through today" },
       { label: "Current data generated", value: `${formatDate(payload.generatedAt, true)} at ${formatTime(payload.generatedAt)}` },
     ],
@@ -785,7 +863,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
   return (
     <SidebarProvider>
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
-        <SidebarHeader className="sidebar-brand"><Logo compact /><span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : "Calendar connected"}</span></SidebarHeader>
+        <SidebarHeader className="sidebar-brand"><Logo compact /><span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span></SidebarHeader>
         <SidebarContent>
           <SidebarGroup><SidebarGroupContent><SidebarMenu className="studio-nav">
             {navItems.map((item) => <SidebarMenuItem key={item.key}><SidebarMenuButton isActive={view === item.key} onClick={() => setView(item.key)} tooltip={item.label}><item.icon /><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}
@@ -807,11 +885,12 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
           {view === "overview" && (
             <>
               <section className="kpi-grid">
-                {isOwner ? <><KpiCard icon={CircleDollarSign} label="Total revenue" note="All fully paid appointments" tone="red" value={dollars(metrics.revenue)} /><KpiCard icon={Banknote} label="Payroll owed" note="Earned, not yet paid" tone="amber" value={dollars(metrics.owed)} /><KpiCard icon={ShieldCheck} label="Paid to team" note="Recorded employee payouts" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={`${upcoming.length} accepted assignments`} tone="blue" value={String(upcoming.length)} /></> : <><KpiCard icon={Banknote} label="Earned, not paid" note="Completed + customer paid" tone="red" value={dollars(metrics.owed)} /><KpiCard icon={Clock3} label="Projected earnings" note="From upcoming appointments" tone="amber" value={dollars(metrics.projected)} /><KpiCard icon={ShieldCheck} label="Paid this year" note="Payouts marked complete" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={upcoming[0] ? `Next: ${formatDate(upcoming[0].start, true)}` : "Nothing scheduled"} tone="blue" value={String(upcoming.length)} /></>}
+                {isOwner ? <><KpiCard icon={CircleDollarSign} label="Appointment revenue" note="Fully paid Calendar appointments" tone="red" value={dollars(metrics.revenue)} /><KpiCard icon={Banknote} label="Payroll owed" note="Earned, not yet paid" tone="amber" value={dollars(metrics.owed)} /><KpiCard icon={ShieldCheck} label="Paid to team" note="Recorded employee payouts" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={`${upcoming.length} accepted assignments`} tone="blue" value={String(upcoming.length)} /></> : <><KpiCard icon={Banknote} label="Earned, not paid" note="Completed + customer paid" tone="red" value={dollars(metrics.owed)} /><KpiCard icon={Clock3} label="Projected earnings" note="From upcoming appointments" tone="amber" value={dollars(metrics.projected)} /><KpiCard icon={ShieldCheck} label="Paid this year" note="Payouts marked complete" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={upcoming[0] ? `Next: ${formatDate(upcoming[0].start, true)}` : "Nothing scheduled"} tone="blue" value={String(upcoming.length)} /></>}
               </section>
+              {isOwner && <StripeMoneyFlow summary={payload.stripeSummary} unmatchedPayments={payload.unmatchedStripePayments ?? []} />}
               <PeriodTotals employeeId={employeeId} rentals={visibleRentals} />
               {isOwner && <CategoryRevenue rentals={visibleRentals} />}
-              {isOwner && <PaymentReview onOpen={reviewPayments} onOverride={openPaymentOverride} rentals={visibleRentals} />}
+              {isOwner && <PaymentReview onOpen={reviewPayments} onOverride={openPaymentOverride} rentals={visibleRentals} stripeConnected={stripeConnected} />}
 
               <section className="overview-grid">
                 <article className="panel trend-panel">

@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { categorizeAppointment } from "../../lib/appointment-categories.mjs";
+import { summarizeStripeSnapshot } from "./stripe-data.mjs";
 
 const KDF_ITERATIONS = 310_000;
 
@@ -57,7 +58,141 @@ function dashboardEmployee(employee) {
   return { id: employee.id, name: employee.name, email: employee.email, accent: employee.accent };
 }
 
-export function normalizeCalendarEvent(event, config, ledger, paymentOverrides = {}) {
+function normalizedEmail(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function normalizedName(value) {
+  return typeof value === "string" ? value.toLowerCase().replace(/[^a-z0-9]+/g, "").trim() : "";
+}
+
+function addStripeMatch(assignments, eventId, charge, confidence) {
+  const existing = assignments.get(eventId) ?? [];
+  existing.push({ charge, confidence });
+  assignments.set(eventId, existing);
+}
+
+function assignedStripeTotal(assignments, eventId) {
+  return (assignments.get(eventId) ?? []).reduce((sum, match) => sum + match.charge.receivedCents, 0);
+}
+
+function stripeCandidateScore(candidate, charge, assignments) {
+  if (charge.receivedCents <= 0) return Number.NEGATIVE_INFINITY;
+  const created = new Date(charge.created).getTime();
+  const start = new Date(candidate.start).getTime();
+  const end = new Date(candidate.end).getTime();
+  const earliest = start - 370 * 86400000;
+  const latest = end + 370 * 86400000;
+  if (!Number.isFinite(created) || created < earliest || created > latest) return Number.NEGATIVE_INFINITY;
+
+  const chargeEmail = normalizedEmail(charge.customerEmail);
+  const chargeName = normalizedName(charge.customerName);
+  const eventEmail = normalizedEmail(candidate.parsed.email);
+  const eventName = normalizedName(candidate.parsed.name ?? candidate.customer);
+  const emailMatch = Boolean(eventEmail && chargeEmail && eventEmail === chargeEmail);
+  const nameMatch = Boolean(eventName && chargeName && eventName === chargeName);
+  const nameInStripeText = Boolean(eventName && normalizedName(charge.searchText).includes(eventName));
+  if (!emailMatch && !nameMatch && !nameInStripeText) return Number.NEGATIVE_INFINITY;
+
+  let score = emailMatch ? 120 : 0;
+  if (nameMatch) score += 70;
+  else if (nameInStripeText) score += 28;
+
+  const alreadyReceived = assignedStripeTotal(assignments, candidate.id);
+  const remaining = Math.max(candidate.parsed.priceCents - alreadyReceived, 0);
+  if (charge.receivedCents === remaining && remaining > 0) score += 58;
+  else if (charge.receivedCents === candidate.parsed.priceCents) score += 45;
+  else if (charge.receivedCents < candidate.parsed.priceCents) score += 22;
+  else score += 14;
+
+  const distanceDays = created <= start
+    ? (start - created) / 86400000
+    : (created - end) / 86400000;
+  if (distanceDays <= 7) score += 36;
+  else if (distanceDays <= 45) score += 27;
+  else if (distanceDays <= 180) score += 16;
+  else score += 5;
+
+  return score;
+}
+
+export function reconcileStripePayments(calendarEvents, stripeCharges = []) {
+  const candidates = calendarEvents
+    .filter((event) => event?.status !== "cancelled" && event.start?.dateTime && event.end?.dateTime)
+    .map((event) => {
+      const parsed = parseCalendarDescription(event.description);
+      if (parsed.priceCents === null) return null;
+      return {
+        id: event.id,
+        start: event.start.dateTime,
+        end: event.end.dateTime,
+        customer: parsed.name ?? summaryCustomer(event.summary),
+        parsed,
+      };
+    })
+    .filter(Boolean);
+  const assignments = new Map();
+  const matchedChargeIds = new Set();
+  const charges = stripeCharges
+    .filter((charge) => charge?.id && charge.receivedCents > 0)
+    .sort((a, b) => new Date(a.created).getTime() - new Date(b.created).getTime());
+
+  for (const charge of charges) {
+    const exactCandidates = candidates.filter((candidate) =>
+      candidate.parsed.acuityId && charge.searchText.includes(candidate.parsed.acuityId.toLowerCase()),
+    );
+    if (exactCandidates.length === 1) {
+      addStripeMatch(assignments, exactCandidates[0].id, charge, "acuity-id");
+      matchedChargeIds.add(charge.id);
+    }
+  }
+
+  for (const charge of charges) {
+    if (matchedChargeIds.has(charge.id)) continue;
+    const scored = candidates
+      .map((candidate) => ({ candidate, score: stripeCandidateScore(candidate, charge, assignments) }))
+      .filter((item) => Number.isFinite(item.score))
+      .sort((a, b) => b.score - a.score);
+    const first = scored[0];
+    const second = scored[1];
+    if (!first || first.score < 145 || (second && first.score - second.score < 25)) continue;
+    addStripeMatch(assignments, first.candidate.id, charge, "high");
+    matchedChargeIds.add(charge.id);
+  }
+
+  const paymentsByEventId = Object.fromEntries(
+    [...assignments.entries()].map(([eventId, matches]) => [
+      eventId,
+      {
+        receivedCents: matches.reduce((sum, match) => sum + match.charge.receivedCents, 0),
+        grossCents: matches.reduce((sum, match) => sum + match.charge.capturedCents, 0),
+        refundedCents: matches.reduce((sum, match) => sum + match.charge.refundedCents, 0),
+        feeCents: matches.reduce((sum, match) => sum + match.charge.feeCents, 0),
+        netCents: matches.reduce((sum, match) => sum + match.charge.netCents, 0),
+        paymentCount: matches.length,
+        matchConfidence: matches.every((match) => match.confidence === "acuity-id") ? "acuity-id" : "high",
+        disputed: matches.some((match) => match.charge.disputed),
+      },
+    ]),
+  );
+  const unmatchedPayments = charges
+    .filter((charge) => !matchedChargeIds.has(charge.id))
+    .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
+    .map((charge) => ({
+      reference: charge.id.slice(-8),
+      created: charge.created,
+      amountCents: charge.receivedCents,
+      refundedCents: charge.refundedCents,
+      customerName: charge.customerName,
+      customerEmail: charge.customerEmail,
+      description: charge.description,
+      disputed: charge.disputed,
+    }));
+
+  return { paymentsByEventId, matchedChargeIds, unmatchedPayments };
+}
+
+export function normalizeCalendarEvent(event, config, ledger, paymentOverrides = {}, stripePayment = null) {
   if (!event || event.status === "cancelled") return null;
   const start = event.start?.dateTime;
   const end = event.end?.dateTime;
@@ -66,9 +201,17 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
   const parsed = parseCalendarDescription(event.description);
   if (parsed.priceCents === null) return null;
   const override = paymentOverrides[event.id];
-  const paidAtLeastPrice = parsed.paidOnlineCents !== null && parsed.paidOnlineCents >= parsed.priceCents;
-  const fullyPaid = typeof override === "boolean" ? override : paidAtLeastPrice;
-  const tipCents = parsed.paidOnlineCents === null ? 0 : Math.max(parsed.paidOnlineCents - parsed.priceCents, 0);
+  const recordedPaymentCents = stripePayment?.receivedCents ?? parsed.paidOnlineCents;
+  const paidAtLeastPrice = recordedPaymentCents !== null && recordedPaymentCents >= parsed.priceCents;
+  const fullyPaid = typeof override === "boolean" ? override : paidAtLeastPrice && !stripePayment?.disputed;
+  const tipCents = recordedPaymentCents === null ? 0 : Math.max(recordedPaymentCents - parsed.priceCents, 0);
+  const paymentSource = typeof override === "boolean"
+    ? "manual"
+    : stripePayment
+      ? "stripe"
+      : parsed.paidOnlineCents !== null
+        ? "calendar"
+        : "none";
 
   const acceptedEmails = new Set(
     (event.attendees ?? [])
@@ -102,18 +245,28 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
     start,
     end,
     priceCents: parsed.priceCents,
-    paidOnlineCents: parsed.paidOnlineCents,
+    paidOnlineCents: recordedPaymentCents,
+    calendarPaidOnlineCents: parsed.paidOnlineCents,
     tipCents,
     fullyPaid,
+    paymentSource,
+    ...(stripePayment ? { stripePayment } : {}),
     ...(typeof override === "boolean" ? { paymentOverride: override } : {}),
     assignedEmployeeIds: assignedEmployees.map((employee) => employee.id),
     employeePayouts,
   };
 }
 
-export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, source, ownerWorkflowToken }) {
+export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, source, ownerWorkflowToken, stripeSnapshot = null }) {
+  const reconciliation = reconcileStripePayments(calendarEvents, stripeSnapshot?.charges ?? []);
   const rentals = calendarEvents
-    .map((event) => normalizeCalendarEvent(event, config, ledger, overrides.events ?? {}))
+    .map((event) => normalizeCalendarEvent(
+      event,
+      config,
+      ledger,
+      overrides.events ?? {},
+      reconciliation.paymentsByEventId[event.id] ?? null,
+    ))
     .filter(Boolean)
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
   const generatedAt = new Date().toISOString();
@@ -122,6 +275,7 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
     source,
     generatedAt,
     calendarName: config.calendarName,
+    integrations: { calendar: true, stripe: Boolean(stripeSnapshot) },
   };
   const dashboardEmployees = config.employees.map(dashboardEmployee);
 
@@ -131,6 +285,10 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
     user: { id: "owner", name: config.owner.name, accent: "#e10000" },
     employees: dashboardEmployees,
     rentals,
+    ...(stripeSnapshot ? {
+      stripeSummary: summarizeStripeSnapshot(stripeSnapshot, reconciliation.matchedChargeIds),
+      unmatchedStripePayments: reconciliation.unmatchedPayments,
+    } : {}),
     ...(ownerWorkflowToken ? {
       workflowAccess: {
         provider: "github",
@@ -145,11 +303,16 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
       const visibleEmployee = dashboardEmployee(employee);
       const filteredRentals = rentals
         .filter((rental) => rental.assignedEmployeeIds.includes(employee.id))
-        .map((rental) => ({
-          ...rental,
-          assignedEmployeeIds: [employee.id],
-          employeePayouts: { [employee.id]: rental.employeePayouts[employee.id] },
-        }));
+        .map((rental) => {
+          const employeeRental = { ...rental };
+          delete employeeRental.stripePayment;
+          delete employeeRental.calendarPaidOnlineCents;
+          return {
+            ...employeeRental,
+            assignedEmployeeIds: [employee.id],
+            employeePayouts: { [employee.id]: rental.employeePayouts[employee.id] },
+          };
+        });
       return [employee.id, { ...common, role: "employee", user: visibleEmployee, employees: [visibleEmployee], rentals: filteredRentals }];
     }),
   );

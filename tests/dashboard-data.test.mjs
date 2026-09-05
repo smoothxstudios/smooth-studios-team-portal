@@ -10,7 +10,9 @@ import {
   normalizeCalendarEvent,
   parseCalendarDescription,
   parseMoneyToCents,
+  reconcileStripePayments,
 } from "../scripts/lib/dashboard-data.mjs";
+import { normalizeStripeCharge, summarizeStripeSnapshot } from "../scripts/lib/stripe-data.mjs";
 
 const config = {
   importStart: "2026-01-01T00:00:00-05:00",
@@ -152,6 +154,106 @@ test("treats deposits as partial and payments above price as paid with a tip", (
   assert.equal(overridden.paymentOverride, true);
 });
 
+test("uses a matched Stripe payment instead of a stale Calendar payment amount", () => {
+  const stripeCharge = {
+    id: "ch_stripe_tip",
+    created: "2026-08-20T16:00:00.000Z",
+    currency: "usd",
+    capturedCents: 6200,
+    refundedCents: 0,
+    receivedCents: 6200,
+    feeCents: 210,
+    netCents: 5990,
+    customerEmail: "customer@example.invalid",
+    customerName: "Example Customer",
+    description: "Acuity appointment 1761525698",
+    metadata: {},
+    searchText: "acuity appointment 1761525698 customer@example.invalid",
+    disputed: false,
+  };
+  const reconciliation = reconcileStripePayments([event], [stripeCharge]);
+  assert.equal(reconciliation.paymentsByEventId[event.id].receivedCents, 6200);
+  assert.equal(reconciliation.paymentsByEventId[event.id].matchConfidence, "acuity-id");
+
+  const normalized = normalizeCalendarEvent(
+    { ...event, description: event.description.replace("Paid Online: $50.00", "Paid Online: $25.00") },
+    config,
+    ledger,
+    {},
+    reconciliation.paymentsByEventId[event.id],
+  );
+  assert.equal(normalized.paidOnlineCents, 6200);
+  assert.equal(normalized.calendarPaidOnlineCents, 2500);
+  assert.equal(normalized.paymentSource, "stripe");
+  assert.equal(normalized.fullyPaid, true);
+  assert.equal(normalized.tipCents, 1200);
+});
+
+test("leaves ambiguous Stripe payments unmatched", () => {
+  const duplicate = {
+    ...event,
+    id: "calendar-event-2",
+    start: { dateTime: "2026-08-29T18:00:00-04:00" },
+    end: { dateTime: "2026-08-29T19:00:00-04:00" },
+    description: event.description.replace("AcuityID=1761525698", "AcuityID=1761525700"),
+  };
+  const charge = {
+    id: "ch_ambiguous",
+    created: "2026-08-27T16:00:00.000Z",
+    currency: "usd",
+    capturedCents: 5000,
+    refundedCents: 0,
+    receivedCents: 5000,
+    feeCents: 175,
+    netCents: 4825,
+    customerEmail: "customer@example.invalid",
+    customerName: "Example Customer",
+    description: null,
+    metadata: {},
+    searchText: "customer@example.invalid example customer",
+    disputed: false,
+  };
+  const reconciliation = reconcileStripePayments([event, duplicate], [charge]);
+  assert.equal(Object.keys(reconciliation.paymentsByEventId).length, 0);
+  assert.equal(reconciliation.unmatchedPayments.length, 1);
+});
+
+test("normalizes Stripe refunds, fees, and bank payouts", () => {
+  const charge = normalizeStripeCharge({
+    id: "ch_normalized",
+    status: "succeeded",
+    paid: true,
+    captured: true,
+    amount: 10000,
+    amount_captured: 10000,
+    amount_refunded: 2500,
+    created: 1787850000,
+    currency: "usd",
+    payment_intent: "pi_normalized",
+    billing_details: { email: "client@example.invalid", name: "Client Name" },
+    metadata: { AcuityID: "12345" },
+  }, { id: "pi_normalized", description: "Acuity payment", metadata: {} }, { fee: 320 });
+  assert.equal(charge.receivedCents, 7500);
+  assert.equal(charge.feeCents, 320);
+  assert.equal(charge.netCents, 7180);
+  assert.match(charge.searchText, /12345/);
+
+  const summary = summarizeStripeSnapshot({
+    generatedAt: "2026-08-28T12:00:00.000Z",
+    charges: [charge],
+    payouts: [
+      { id: "po_paid", amountCents: 7000, status: "paid", currency: "usd" },
+      { id: "po_pending", amountCents: 500, status: "pending", currency: "usd" },
+    ],
+  }, new Set([charge.id]));
+  assert.equal(summary.grossCents, 10000);
+  assert.equal(summary.refundedCents, 2500);
+  assert.equal(summary.netCents, 7180);
+  assert.equal(summary.bankPayoutCents, 7000);
+  assert.equal(summary.pendingPayoutCents, 500);
+  assert.equal(summary.unmatchedPaymentCount, 0);
+});
+
 test("never marks commission paid before the appointment is complete", () => {
   const futureEvent = {
     ...event,
@@ -184,6 +286,44 @@ test("employee payloads contain only their own accepted appointments and payout"
   assert.equal(payloads.akiva.workflowAccess, undefined);
   assert.equal(payloads.jordyn.workflowAccess, undefined);
   assert.equal(payloads.rayne.workflowAccess, undefined);
+});
+
+test("Stripe reconciliation details remain only in Smooth's encrypted payload", () => {
+  const stripeSnapshot = {
+    generatedAt: "2026-08-29T12:00:00.000Z",
+    charges: [{
+      id: "ch_owner_only",
+      created: "2026-08-20T16:00:00.000Z",
+      currency: "usd",
+      capturedCents: 5000,
+      refundedCents: 0,
+      receivedCents: 5000,
+      feeCents: 175,
+      netCents: 4825,
+      customerEmail: "customer@example.invalid",
+      customerName: "Example Customer",
+      description: "Acuity appointment 1761525698",
+      metadata: {},
+      searchText: "acuity appointment 1761525698 customer@example.invalid",
+      disputed: false,
+    }],
+    payouts: [{ id: "po_owner_only", amountCents: 4825, status: "paid", currency: "usd" }],
+  };
+  const payloads = buildDashboardPayloads({
+    calendarEvents: [event],
+    config,
+    ledger,
+    overrides: { events: {} },
+    source: "google-calendar",
+    stripeSnapshot,
+  });
+  assert.equal(payloads.owner.integrations.stripe, true);
+  assert.equal(payloads.owner.stripeSummary.grossCents, 5000);
+  assert.equal(payloads.owner.stripeSummary.bankPayoutCents, 4825);
+  assert.equal(payloads.owner.rentals[0].stripePayment.netCents, 4825);
+  assert.equal(payloads.akiva.rentals[0].stripePayment, undefined);
+  assert.equal(payloads.akiva.stripeSummary, undefined);
+  assert.equal(payloads.akiva.unmatchedStripePayments, undefined);
 });
 
 test("AES-GCM envelope decrypts with the correct password", async () => {

@@ -4,12 +4,13 @@ A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and e
 
 ## What it does
 
-- Owner overview: total revenue, revenue by package category, every employee schedule, payroll owed, paid-to-team totals, and period comparisons.
+- Owner overview: appointment revenue, Stripe gross/refunds/fees/net/bank payouts, revenue by package category, every employee schedule, payroll owed, paid-to-team totals, and period comparisons.
 - Employee overview: upcoming appointments, completed history, projected earnings, earned-but-unpaid amount, paid totals, and weekly/monthly/yearly context.
 - Appointment categories: Studio Rentals, Studio Packages, Outside, Graduation, Video, Business, Campaign, and a safe Other fallback. Add-ons inherit the main package category from the event title.
 - Employee assignment: the attendee email must match any email configured for that employee and the attendee response must be `accepted`.
 - Earnings: every accepted employee receives 30% of the full appointment price, whether it is a studio rental or another package. When multiple employees accept, each receives the full 30%.
-- Customer payment: `Paid Online:` equal to or above `Price:` is fully paid. Any amount above the price is recorded as a tip. A lower positive amount is a deposit, and a completed appointment with a remaining balance is flagged for review. Smooth can confirm payment received by invoice, cash, Apple Pay, or another method through the payment-override workflow.
+- Customer payment: matched Stripe payments are the preferred source of truth. Acuity IDs are matched first; high-confidence customer email/name, amount, and date matches are used as a fallback. `Paid Online:` remains the fallback when Stripe is not connected or no Stripe payment can be safely matched. Any amount above the price is recorded as a tip. A lower positive amount is a deposit, and a completed appointment with a remaining balance is flagged for review. Smooth can confirm payment received by invoice, cash, Apple Pay, or another method through the payment-override workflow.
+- Reconciliation safety: Stripe payments that cannot be confidently tied to one Calendar appointment appear only in Smooth's encrypted **Stripe reconciliation** review list. They are never silently attached to an employee commission.
 - Earned timing: commission becomes earned only after both the appointment end time has passed and the customer is fully paid.
 - Employee payout: the owner runs **Mark employee earnings paid** and chooses an employee plus a paid-through date.
 - Owner workflow controls: Smooth can sync the Calendar, mark employee payouts, and update customer payment status directly inside the dashboard while seeing queued, running, and completed states.
@@ -63,6 +64,7 @@ Create `smoothxstudios/smooth-studios-team-portal` as a private repository and p
 |---|---|
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Entire service-account JSON file |
 | `GOOGLE_CALENDAR_ID` | ID of the dedicated Smooth Studios Calendar |
+| `STRIPE_RESTRICTED_KEY` | Live restricted Stripe key with read-only access to Charges, Payment Intents, Balance Transactions, and Payouts |
 | `EMPLOYEE_EMAIL_AKIVA` | Akiva's Google invitation email address(es) |
 | `EMPLOYEE_EMAIL_JORDYN` | Jordyn's Google invitation email address(es) |
 | `EMPLOYEE_EMAIL_RAYNE` | Rayne's Google invitation email address(es) |
@@ -75,6 +77,16 @@ Create `smoothxstudios/smooth-studios-team-portal` as a private repository and p
 The Calendar workflow runs every 30 minutes, refreshes the encrypted payloads, commits them, and deploys the updated GitHub Page.
 
 Each `EMPLOYEE_EMAIL_*` secret accepts one address or multiple comma-separated addresses. Addresses are matched case-insensitively and duplicate entries are ignored. Keep every address in GitHub Secrets rather than committing it to the repository.
+
+### Enable Stripe reconciliation
+
+1. Open the Stripe Dashboard in live mode, then open **Developers → API keys**.
+2. Create a restricted key named **Smooth Studios Team Portal**.
+3. Give it read access only to **Charges**, **Payment Intents**, **Balance Transactions**, and **Payouts**. Leave every write permission disabled.
+4. Save the key as the GitHub Actions secret `STRIPE_RESTRICTED_KEY`. Never place it in the repository or browser code.
+5. Run **Sync Smooth Studios Calendar** once. The owner dashboard will then show Stripe gross payments, refunds, fees, net collections, bank payouts, and unmatched payments.
+
+The Stripe key is optional during deployment. If it is absent, the dashboard continues using the Calendar's `Paid Online:` field exactly as before.
 
 ### Enable owner workflow buttons
 
@@ -102,7 +114,7 @@ Use `npm run provision -- --rotate` only when intentionally rotating every dashb
 
 - **Mark employee earnings paid**: Smooth chooses a paid-through date in the dashboard. It updates the payout ledger, rebuilds encrypted data, and redeploys the site.
 - **Update customer payment**: Smooth chooses an appointment and confirms payment received by invoice, cash, or another method, marks it not fully paid, or clears the manual status.
-- **Sync Smooth Studios Calendar**: runs every 30 minutes and can also be started from the dashboard.
+- **Sync Calendar and Stripe**: runs every 30 minutes and can also be started from the dashboard.
 
 The dashboard verifies that the encrypted workflow token belongs to `smoothxstudios`, triggers the selected GitHub Action, and follows its status through completion. Closing or logging out of the owner dashboard discards the decrypted token from the browser session.
 
