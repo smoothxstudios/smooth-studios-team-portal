@@ -1,6 +1,6 @@
 # Smooth Studios Team Portal
 
-A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and employee earnings. It reads one dedicated Google Calendar on an hourly schedule, assigns appointments only to employees who accepted the event invitation, and publishes a separate encrypted dashboard for Smooth and each employee.
+A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and employee earnings. It reads one dedicated Google Calendar every 30 minutes, assigns appointments only to employees who accepted the event invitation, and publishes a separate encrypted dashboard for Smooth and each employee.
 
 ## What it does
 
@@ -9,7 +9,7 @@ A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and e
 - Appointment categories: Studio Rentals, Studio Packages, Outside, Graduation, Video, Business, Campaign, and a safe Other fallback. Add-ons inherit the main package category from the event title.
 - Employee assignment: the attendee email must match any email configured for that employee and the attendee response must be `accepted`.
 - Earnings: every accepted employee receives 30% of the full appointment price, whether it is a studio rental or another package. When multiple employees accept, each receives the full 30%.
-- Customer payment: `Price:` and `Paid Online:` are parsed as cents and must match exactly. An owner can record an exception through the payment-override GitHub workflow.
+- Customer payment: `Paid Online:` equal to or above `Price:` is fully paid. Any amount above the price is recorded as a tip. A lower positive amount is a deposit, and a completed appointment with a remaining balance is flagged for review. Smooth can record cash, Apple Pay, or another offline payment through the payment-override workflow.
 - Earned timing: commission becomes earned only after both the appointment end time has passed and the customer is fully paid.
 - Employee payout: the owner runs **Mark employee earnings paid** and chooses an employee plus a paid-through date.
 - Theme: Smooth Studios light and dark modes with a persistent local preference.
@@ -68,7 +68,7 @@ Create `smoothxstudios/smooth-studios-team-portal` as a private repository and p
 | `DASHBOARD_PASSWORD_JORDYN` | Generated Jordyn password |
 | `DASHBOARD_PASSWORD_RAYNE` | Generated Rayne password |
 
-The hourly workflow runs at 17 minutes past each hour, refreshes the encrypted payloads, commits them, and deploys the updated GitHub Page.
+The Calendar workflow runs every 30 minutes, refreshes the encrypted payloads, commits them, and deploys the updated GitHub Page.
 
 Each `EMPLOYEE_EMAIL_*` secret accepts one address or multiple comma-separated addresses. Addresses are matched case-insensitively and duplicate entries are ignored. Keep every address in GitHub Secrets rather than committing it to the repository.
 
@@ -86,8 +86,8 @@ Use `npm run provision -- --rotate` only when intentionally rotating every dashb
 ## Owner workflows
 
 - **Mark employee earnings paid**: accepts a paid-through date and either one employee or everyone. It updates the payout ledger, rebuilds encrypted data, and redeploys the site.
-- **Override customer payment status**: accepts a Google Calendar event ID and `true`, `false`, or `clear`. This handles exceptions to the exact `Paid Online` = `Price` rule.
-- **Sync Smooth Studios Calendar**: runs hourly and can also be started manually.
+- **Override customer payment status**: accepts a Google Calendar event ID and `true`, `false`, or `clear`. Use it when the balance was paid through cash, Apple Pay, or another method that Acuity did not add to `Paid Online:`.
+- **Sync Smooth Studios Calendar**: runs every 30 minutes and can also be started manually.
 
 All write actions require the owner to sign into GitHub and have repository workflow permission.
 
