@@ -2,6 +2,8 @@ import { createCipheriv, createHash, pbkdf2Sync, randomBytes } from "node:crypto
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { categorizeAppointment } from "../../lib/appointment-categories.mjs";
+
 const KDF_ITERATIONS = 310_000;
 
 export function parseMoneyToCents(value) {
@@ -77,6 +79,8 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
     employeeInvitationEmails(employee).some((email) => acceptedEmails.has(email)),
   );
   const amountCents = Math.round(parsed.priceCents * config.commissionRate);
+  const title = summaryRentalType(event.summary);
+  const category = categorizeAppointment(title);
   const employeePayouts = Object.fromEntries(
     assignedEmployees.map((employee) => [
       employee.id,
@@ -90,7 +94,9 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
 
   return {
     id: event.id,
-    title: summaryRentalType(event.summary),
+    title,
+    categoryId: category.id,
+    category: category.label,
     customer: parsed.name ?? summaryCustomer(event.summary),
     start,
     end,
