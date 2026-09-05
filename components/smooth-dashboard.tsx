@@ -93,6 +93,9 @@ const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency
 
 type ViewKey = "overview" | "rentals" | "team" | "payouts";
 type RentalState = "upcoming" | "earned" | "paid" | "awaiting";
+type CustomerPaymentState = "paid" | "deposit" | "review" | "pending";
+type AppointmentStatus = RentalState | "customer-paid" | "upcoming-paid" | "deposit" | "review";
+type PaymentFilter = "all" | CustomerPaymentState;
 
 const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ownerOnly?: boolean }[] = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
@@ -129,12 +132,42 @@ function durationLabel(rental: Rental) {
   return Number.isInteger(hours) ? `${hours} hr` : `${hours.toFixed(1)} hrs`;
 }
 
+function customerFullyPaid(rental: Rental) {
+  if (rental.paymentOverride !== undefined) return rental.fullyPaid;
+  return rental.fullyPaid || (rental.paidOnlineCents !== null && rental.paidOnlineCents >= rental.priceCents);
+}
+
+function tipAmount(rental: Rental) {
+  return rental.tipCents ?? Math.max((rental.paidOnlineCents ?? 0) - rental.priceCents, 0);
+}
+
+function recognizedRevenue(rental: Rental) {
+  return customerFullyPaid(rental) ? rental.priceCents + tipAmount(rental) : 0;
+}
+
+function customerPaymentState(rental: Rental): CustomerPaymentState {
+  if (customerFullyPaid(rental)) return "paid";
+  if (new Date(rental.end).getTime() <= Date.now()) return "review";
+  if ((rental.paidOnlineCents ?? 0) > 0) return "deposit";
+  return "pending";
+}
+
 function rentalState(rental: Rental, employeeId?: string): RentalState {
   const ended = new Date(rental.end).getTime() <= Date.now();
   if (!ended) return "upcoming";
-  if (!rental.fullyPaid) return "awaiting";
+  if (!customerFullyPaid(rental)) return "awaiting";
   if (employeeId && rental.employeePayouts[employeeId]?.paid) return "paid";
   return "earned";
+}
+
+function appointmentStatus(rental: Rental, employeeId?: string): AppointmentStatus {
+  const paymentState = customerPaymentState(rental);
+  if (paymentState === "deposit") return "deposit";
+  if (paymentState === "pending") return "awaiting";
+  if (paymentState === "review") return "review";
+  if (new Date(rental.end).getTime() > Date.now()) return "upcoming-paid";
+  if (!employeeId) return "customer-paid";
+  return rentalState(rental, employeeId);
 }
 
 function appointmentCategory(rental: Rental) {
@@ -148,8 +181,17 @@ function CategoryBadge({ rental }: { rental: Rental }) {
   return <span className={`category-badge category-${category.id}`}>{category.label}</span>;
 }
 
-function StatusBadge({ state }: { state: RentalState }) {
-  const labels = { upcoming: "Upcoming", earned: "Earned", paid: "Paid out", awaiting: "Awaiting customer" };
+function StatusBadge({ state }: { state: AppointmentStatus }) {
+  const labels: Record<AppointmentStatus, string> = {
+    upcoming: "Upcoming",
+    "upcoming-paid": "Upcoming · paid",
+    earned: "Earned",
+    paid: "Paid out",
+    awaiting: "Payment pending",
+    deposit: "Deposit paid",
+    review: "Review balance",
+    "customer-paid": "Customer paid",
+  };
   return <span className={`status status-${state}`}><span />{labels[state]}</span>;
 }
 
@@ -254,13 +296,13 @@ function PeriodTotals({ rentals, employeeId }: { rentals: Rental[]; employeeId?:
   ];
   const amountFor = (rental: Rental) => {
     if (employeeId) {
-      if (!rental.fullyPaid || new Date(rental.end) > now) return 0;
+      if (!customerFullyPaid(rental) || new Date(rental.end) > now) return 0;
       return rental.employeePayouts[employeeId]?.amountCents ?? 0;
     }
-    return rental.fullyPaid ? rental.priceCents : 0;
+    return recognizedRevenue(rental);
   };
   const secondaryFor = (rental: Rental) => {
-    if (!rental.fullyPaid || new Date(rental.end) > now) return 0;
+    if (!customerFullyPaid(rental) || new Date(rental.end) > now) return 0;
     if (employeeId) return 1;
     return Object.values(rental.employeePayouts).reduce((sum, payout) => sum + payout.amountCents, 0);
   };
@@ -293,13 +335,13 @@ function PeriodTotals({ rentals, employeeId }: { rentals: Rental[]; employeeId?:
 function CategoryRevenue({ rentals }: { rentals: Rental[] }) {
   const rows = APPOINTMENT_CATEGORIES.map((category) => {
     const appointments = rentals.filter((rental) => appointmentCategory(rental).id === category.id);
-    const fullyPaid = appointments.filter((rental) => rental.fullyPaid);
+    const fullyPaid = appointments.filter(customerFullyPaid);
     return {
       id: category.id,
       label: category.label,
       appointmentCount: appointments.length,
       paidCount: fullyPaid.length,
-      revenue: fullyPaid.reduce((sum, rental) => sum + rental.priceCents, 0),
+      revenue: fullyPaid.reduce((sum, rental) => sum + recognizedRevenue(rental), 0),
     };
   }).filter((category) => category.appointmentCount > 0);
 
@@ -323,26 +365,71 @@ function CategoryRevenue({ rentals }: { rentals: Rental[] }) {
   );
 }
 
+function PaymentReview({ rentals, onOpen, onOverride }: { rentals: Rental[]; onOpen: () => void; onOverride: () => void }) {
+  const appointments = rentals.filter((rental) => customerPaymentState(rental) === "review");
+  if (!appointments.length) return null;
+  const unrecorded = appointments.reduce((sum, rental) => sum + Math.max(rental.priceCents - (rental.paidOnlineCents ?? 0), 0), 0);
+
+  return (
+    <section className="panel payment-review-panel">
+      <div className="payment-review-copy">
+        <span className="payment-review-icon"><ReceiptText size={21} /></span>
+        <div>
+          <p className="eyebrow">Payment check</p>
+          <h2>{appointments.length} completed appointment{appointments.length === 1 ? "" : "s"} need review</h2>
+          <p>Acuity still shows a deposit or no online payment. Confirm whether the balance is still unpaid or was collected through cash, Apple Pay, or another method.</p>
+        </div>
+      </div>
+      <div className="payment-review-total"><span>Not recorded online</span><strong>{dollars(unrecorded)}</strong><small>This may include offline payments.</small></div>
+      <div className="payment-review-actions"><Button onClick={onOpen} size="sm" variant="outline">Review appointments</Button><Button onClick={onOverride} size="sm">Mark offline payment</Button></div>
+    </section>
+  );
+}
+
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return <div className="chart-tooltip"><p>{label}</p>{payload.map((item) => <div key={item.name}><span style={{ background: item.color }} />{item.name}<strong>{dollars(item.value)}</strong></div>)}</div>;
 }
 
+function PaymentAmount({ rental, showDetails }: { rental: Rental; showDetails: boolean }) {
+  const paidOnline = rental.paidOnlineCents ?? 0;
+  const tip = tipAmount(rental);
+  const remaining = Math.max(rental.priceCents - paidOnline, 0);
+  let detail = "No online payment recorded";
+  let tone = "pending";
+
+  if (rental.paymentOverride === true && remaining > 0) {
+    detail = paidOnline > 0 ? `${dollars(paidOnline, true)} online · marked paid` : "Marked paid outside Acuity";
+    tone = "paid";
+  } else if (tip > 0) {
+    detail = `${dollars(paidOnline, true)} paid · ${dollars(tip, true)} tip`;
+    tone = "tip";
+  } else if (remaining > 0 && paidOnline > 0) {
+    detail = `${dollars(paidOnline, true)} paid · ${dollars(remaining, true)} remaining`;
+    tone = "deposit";
+  } else if (paidOnline >= rental.priceCents) {
+    detail = `${dollars(paidOnline, true)} paid online`;
+    tone = "paid";
+  }
+
+  return <div className="payment-amount"><strong>{dollars(rental.priceCents, true)}</strong>{showDetails && <span className={`payment-detail payment-detail-${tone}`}>{detail}</span>}</div>;
+}
+
 function RentalTable({ rentals, employeeId }: { rentals: Rental[]; employeeId?: string }) {
   return (
     <Table className="rental-table">
-      <TableHeader><TableRow><TableHead>Appointment</TableHead><TableHead>Category</TableHead><TableHead>Date & time</TableHead><TableHead>Price</TableHead><TableHead>{employeeId ? "Your 30%" : "Assigned team"}</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>Appointment</TableHead><TableHead>Category</TableHead><TableHead>Date & time</TableHead><TableHead>{employeeId ? "Price" : "Price / recorded payment"}</TableHead><TableHead>{employeeId ? "Your 30%" : "Assigned team"}</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
       <TableBody>
         {rentals.map((rental) => (
           <TableRow key={rental.id}>
             <TableCell><div className="rental-name"><strong>{rental.customer}</strong><span>{rental.title}</span></div></TableCell>
             <TableCell><CategoryBadge rental={rental} /></TableCell>
             <TableCell><div className="rental-date"><strong>{formatDate(rental.start, true)}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div></TableCell>
-            <TableCell className="money-cell">{dollars(rental.priceCents, true)}</TableCell>
+            <TableCell className="money-cell"><PaymentAmount rental={rental} showDetails={!employeeId} /></TableCell>
             <TableCell>
               {employeeId ? <strong className="share-amount">{dollars(rental.employeePayouts[employeeId]?.amountCents ?? 0, true)}</strong> : <div className="avatar-stack">{rental.assignedEmployeeIds.length ? rental.assignedEmployeeIds.map((id) => <span key={id}>{id.slice(0, 1).toUpperCase()}</span>) : <em>Unassigned</em>}</div>}
             </TableCell>
-            <TableCell><StatusBadge state={rentalState(rental, employeeId)} /></TableCell>
+            <TableCell><StatusBadge state={appointmentStatus(rental, employeeId)} /></TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -448,7 +535,7 @@ function PayoutPage({
           <p>You receive 30% of the appointment price for every accepted assignment, including studio rentals and other packages. It becomes earned only when the appointment is complete and the customer is fully paid.</p>
           <div className="rule-check"><Check size={16} /> Invitation accepted</div>
           <div className="rule-check"><Check size={16} /> Appointment completed</div>
-          <div className="rule-check"><Check size={16} /> “Paid Online” matches “Price”</div>
+          <div className="rule-check"><Check size={16} /> “Paid Online” meets or exceeds “Price”</div>
         </article>
       )}
     </section>
@@ -458,13 +545,17 @@ function PayoutPage({
 function DashboardView({ payload, dark, setDark, onLogout }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void }) {
   const [view, setView] = useState<ViewKey>("overview");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [paidThrough, setPaidThrough] = useState(new Date().toISOString().slice(0, 10));
   const isOwner = payload.role === "owner";
   const employeeId = isOwner ? undefined : payload.user.id;
   const rentals = useMemo(() => [...payload.rentals].sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime()), [payload.rentals]);
   const visibleRentals = useMemo(() => employeeId ? rentals.filter((rental) => rental.assignedEmployeeIds.includes(employeeId)) : rentals, [employeeId, rentals]);
   const categoryOptions = useMemo(() => APPOINTMENT_CATEGORIES.filter((category) => visibleRentals.some((rental) => appointmentCategory(rental).id === category.id)), [visibleRentals]);
-  const filteredRentals = useMemo(() => categoryFilter === "all" ? visibleRentals : visibleRentals.filter((rental) => appointmentCategory(rental).id === categoryFilter), [categoryFilter, visibleRentals]);
+  const filteredRentals = useMemo(() => visibleRentals.filter((rental) =>
+    (categoryFilter === "all" || appointmentCategory(rental).id === categoryFilter)
+    && (paymentFilter === "all" || customerPaymentState(rental) === paymentFilter),
+  ), [categoryFilter, paymentFilter, visibleRentals]);
   const upcoming = useMemo(() => [...visibleRentals].filter((rental) => rentalState(rental, employeeId) === "upcoming").reverse(), [employeeId, visibleRentals]);
 
   const metrics = useMemo(() => {
@@ -473,7 +564,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
     let paid = 0;
     let projected = 0;
     for (const rental of visibleRentals) {
-      if (rental.fullyPaid) revenue += rental.priceCents;
+      revenue += recognizedRevenue(rental);
       const payouts = employeeId ? [rental.employeePayouts[employeeId]].filter(Boolean) : Object.values(rental.employeePayouts);
       for (const payout of payouts) {
         const state = rentalState(rental, employeeId);
@@ -489,7 +580,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month) => ({ month, revenue: 0, payroll: 0, paid: 0, owed: 0 }));
     for (const rental of visibleRentals) {
       const month = new Date(rental.start).getUTCMonth();
-      if (rental.fullyPaid) months[month].revenue += rental.priceCents;
+      months[month].revenue += recognizedRevenue(rental);
       const payouts = employeeId ? [rental.employeePayouts[employeeId]].filter(Boolean) : Object.values(rental.employeePayouts);
       for (const payout of payouts) {
         months[month].payroll += payout.amountCents;
@@ -507,6 +598,13 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
   const continueToGithub = () => {
     navigator.clipboard?.writeText(paidThrough).catch(() => undefined);
     window.open(PAYOUT_WORKFLOW_URL, "_blank", "noopener,noreferrer");
+  };
+
+  const openPaymentOverride = () => window.open(PAYMENT_OVERRIDE_WORKFLOW_URL, "_blank", "noopener,noreferrer");
+  const reviewPayments = () => {
+    setCategoryFilter("all");
+    setPaymentFilter("review");
+    setView("rentals");
   };
 
   return (
@@ -538,6 +636,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
               </section>
               <PeriodTotals employeeId={employeeId} rentals={visibleRentals} />
               {isOwner && <CategoryRevenue rentals={visibleRentals} />}
+              {isOwner && <PaymentReview onOpen={reviewPayments} onOverride={openPaymentOverride} rentals={visibleRentals} />}
 
               <section className="overview-grid">
                 <article className="panel trend-panel">
@@ -566,11 +665,21 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
                     {categoryOptions.map((category) => <SelectItem key={category.id} value={category.id}>{category.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <Select onValueChange={(value) => setPaymentFilter(value as PaymentFilter)} value={paymentFilter}>
+                  <SelectTrigger aria-label="Filter appointments by payment status" className="category-select payment-select"><SelectValue placeholder="All payments" /></SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectItem value="all">All payments</SelectItem>
+                    <SelectItem value="paid">Fully paid</SelectItem>
+                    <SelectItem value="deposit">Upcoming deposits</SelectItem>
+                    <SelectItem value="review">Needs payment review</SelectItem>
+                    <SelectItem value="pending">Payment pending</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Badge className="count-badge" variant="secondary">{filteredRentals.length} appointment{filteredRentals.length === 1 ? "" : "s"}</Badge>
-                {isOwner && <Button onClick={() => window.open(PAYMENT_OVERRIDE_WORKFLOW_URL, "_blank", "noopener,noreferrer")} size="sm" variant="outline"><GitBranch size={14} /> Payment override</Button>}
+                {isOwner && <Button onClick={openPaymentOverride} size="sm" variant="outline"><GitBranch size={14} /> Mark offline payment</Button>}
               </div>
             </div>
-            {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" ? "Accepted appointments will appear after the hourly Calendar sync." : "No appointments match this category."} title="No appointments found" />}
+            {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the 30-minute Calendar sync." : "No appointments match the selected filters."} title="No appointments found" />}
           </article>}
           {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} />}
           {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={continueToGithub} paidThrough={paidThrough} rentals={visibleRentals} setPaidThrough={setPaidThrough} />}
