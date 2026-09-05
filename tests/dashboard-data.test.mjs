@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { webcrypto } from "node:crypto";
 import test from "node:test";
 
+import { categorizeAppointment } from "../lib/appointment-categories.mjs";
+
 import {
   buildDashboardPayloads,
   encryptPayload,
@@ -59,6 +61,8 @@ test("parses the exact Calendar description fields", () => {
 
 test("assigns only accepted employees and gives each the full 30 percent", () => {
   const normalized = normalizeCalendarEvent(event, config, ledger, {});
+  assert.equal(normalized.categoryId, "studio-rentals");
+  assert.equal(normalized.category, "Studio Rentals");
   assert.deepEqual(normalized.assignedEmployeeIds, ["akiva"]);
   assert.equal(normalized.employeePayouts.akiva.amountCents, 1500);
   assert.equal(normalized.employeePayouts.jordyn, undefined);
@@ -70,6 +74,54 @@ test("assigns only accepted employees and gives each the full 30 percent", () =>
   const shared = normalizeCalendarEvent(bothAccepted, config, ledger, {});
   assert.equal(shared.employeePayouts.akiva.amountCents, 1500);
   assert.equal(shared.employeePayouts.jordyn.amountCents, 1500);
+});
+
+test("categorizes Acuity packages while keeping studio rentals separate", () => {
+  const cases = [
+    ["Studio Rental + Additional Hour", "studio-rentals"],
+    ["Quick Studio Rental", "studio-rentals"],
+    ["Modeling Package", "studio-packages"],
+    ["Single Picture", "studio-packages"],
+    ["Quick Portrait Package", "studio-packages"],
+    ["Beauty Headshot", "studio-packages"],
+    ["Silver Portrait Package", "studio-packages"],
+    ["Gold Portrait Package", "studio-packages"],
+    ["Platinum Portrait Package", "studio-packages"],
+    ["Quick Lifestyle Portrait Package", "outside"],
+    ["Event Portrait Package", "outside"],
+    ["Outside Portrait Package", "outside"],
+    ["Group Portrait Package", "outside"],
+    ["Half Day Portrait Package", "outside"],
+    ["Full Day Portrait Package", "outside"],
+    ["Composite Editing Package", "graduation"],
+    ["Quick Graduation Package", "graduation"],
+    ["Studio Graduation Package", "graduation"],
+    ["Bronze Graduation Package", "graduation"],
+    ["Silver Graduation Package", "graduation"],
+    ["Gold Graduation Package", "graduation"],
+    ["Graduation Hype Video", "graduation"],
+    ["Campaign Photoshoot", "campaign"],
+    ["Campaign Promo Video", "campaign"],
+    ["Promo Video (In Studio)", "video"],
+    ["Promo Video (Out Of Studio) + Additional Hour", "video"],
+    ["Event Recap Package", "video"],
+    ["Advanced Promo Video (Out Of Studio)", "video"],
+    ["Run & Gun Music Video", "video"],
+    ["Industry Music Video", "video"],
+    ["Professional Digitals", "business"],
+    ["Group Photoshoot", "business"],
+    ["Product Photography (Full Catalog)", "business"],
+    ["Product Photography (Half Catalog)", "business"],
+    ["Venue Photography (Full Catalog)", "business"],
+    ["Venue Photography (Half)", "business"],
+    ["Professional Headshot", "business"],
+    ["Corporate Headshots", "business"],
+    ["Custom Consultation", "other"],
+  ];
+
+  for (const [title, expected] of cases) {
+    assert.equal(categorizeAppointment(title).id, expected, title);
+  }
 });
 
 test("assigns an employee through any accepted invitation email", () => {
@@ -90,7 +142,7 @@ test("requires an exact payment match unless the owner overrides it", () => {
   assert.equal(overridden.paymentOverride, true);
 });
 
-test("never marks commission paid before the rental is complete", () => {
+test("never marks commission paid before the appointment is complete", () => {
   const futureEvent = {
     ...event,
     id: "future-event",
@@ -102,7 +154,7 @@ test("never marks commission paid before the rental is complete", () => {
   assert.equal(normalized.employeePayouts.akiva.paid, false);
 });
 
-test("employee payloads contain only their own accepted rentals and payout", () => {
+test("employee payloads contain only their own accepted appointments and payout", () => {
   const payloads = buildDashboardPayloads({
     calendarEvents: [event],
     config,
