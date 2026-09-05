@@ -39,6 +39,12 @@ export type DashboardPayload = {
   user: Employee | { id: "owner"; name: string; accent: string };
   employees: Employee[];
   rentals: Rental[];
+  workflowAccess?: {
+    provider: "github";
+    repository: string;
+    allowedLogin: string;
+    accessToken: string;
+  };
 };
 
 export type AccessProfile = {

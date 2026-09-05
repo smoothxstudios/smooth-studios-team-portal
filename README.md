@@ -12,6 +12,7 @@ A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and e
 - Customer payment: `Paid Online:` equal to or above `Price:` is fully paid. Any amount above the price is recorded as a tip. A lower positive amount is a deposit, and a completed appointment with a remaining balance is flagged for review. Smooth can record cash, Apple Pay, or another offline payment through the payment-override workflow.
 - Earned timing: commission becomes earned only after both the appointment end time has passed and the customer is fully paid.
 - Employee payout: the owner runs **Mark employee earnings paid** and chooses an employee plus a paid-through date.
+- Owner workflow controls: Smooth can sync the Calendar, mark employee payouts, and update customer payment status directly inside the dashboard while seeing queued, running, and completed states.
 - Theme: Smooth Studios light and dark modes with a persistent local preference.
 
 ## Privacy model
@@ -21,6 +22,8 @@ GitHub Pages serves static files, so it cannot protect Calendar data with a trad
 Use a private repository whenever the GitHub account plan permits private-repository Pages. If Pages requires a public repository, the deployed data remains encrypted and employee emails are still kept in GitHub Secrets, but source code and the public login screen remain visible.
 
 Never commit `.private/`, Google credentials, Calendar IDs, employee email addresses, or dashboard passwords.
+
+The owner workflow token is encrypted only inside Smooth's dashboard payload. It is never included in an employee payload or the public access-profile file. Treat the owner dashboard password as an administrative credential and rotate the token on its expiration date.
 
 ## Calendar description format
 
@@ -67,10 +70,22 @@ Create `smoothxstudios/smooth-studios-team-portal` as a private repository and p
 | `DASHBOARD_PASSWORD_AKIVA` | Generated Akiva password |
 | `DASHBOARD_PASSWORD_JORDYN` | Generated Jordyn password |
 | `DASHBOARD_PASSWORD_RAYNE` | Generated Rayne password |
+| `DASHBOARD_GITHUB_TOKEN` | Fine-grained token limited to this repository with Actions read/write permission |
 
 The Calendar workflow runs every 30 minutes, refreshes the encrypted payloads, commits them, and deploys the updated GitHub Page.
 
 Each `EMPLOYEE_EMAIL_*` secret accepts one address or multiple comma-separated addresses. Addresses are matched case-insensitively and duplicate entries are ignored. Keep every address in GitHub Secrets rather than committing it to the repository.
+
+### Enable owner workflow buttons
+
+1. Open GitHub **Settings → Developer settings → Personal access tokens → Fine-grained tokens**.
+2. Create a token named **Smooth Portal Workflow Trigger** with an expiration date.
+3. Set **Repository access** to **Only select repositories**, then choose `smooth-studios-team-portal`.
+4. Under **Repository permissions**, set **Actions** to **Read and write**. Leave every other optional permission at **No access**.
+5. Copy the token once and save it as the repository secret `DASHBOARD_GITHUB_TOKEN`.
+6. Run **Sync Smooth Studios Calendar** once. The next owner sign-in will include the workflow controls; employee dashboards will not receive the token.
+
+When the token expires, replace only `DASHBOARD_GITHUB_TOKEN` and run one Calendar sync. Dashboard passwords do not need to change.
 
 ## Generate strong passwords
 
@@ -85,11 +100,11 @@ Use `npm run provision -- --rotate` only when intentionally rotating every dashb
 
 ## Owner workflows
 
-- **Mark employee earnings paid**: accepts a paid-through date and either one employee or everyone. It updates the payout ledger, rebuilds encrypted data, and redeploys the site.
-- **Override customer payment status**: accepts a Google Calendar event ID and `true`, `false`, or `clear`. Use it when the balance was paid through cash, Apple Pay, or another method that Acuity did not add to `Paid Online:`.
-- **Sync Smooth Studios Calendar**: runs every 30 minutes and can also be started manually.
+- **Mark employee earnings paid**: Smooth chooses a paid-through date in the dashboard. It updates the payout ledger, rebuilds encrypted data, and redeploys the site.
+- **Update customer payment**: Smooth chooses an appointment and records paid outside Acuity, not fully paid, or clears the manual status.
+- **Sync Smooth Studios Calendar**: runs every 30 minutes and can also be started from the dashboard.
 
-All write actions require the owner to sign into GitHub and have repository workflow permission.
+The dashboard verifies that the encrypted workflow token belongs to `smoothxstudios`, triggers the selected GitHub Action, and follows its status through completion. Closing or logging out of the owner dashboard discards the decrypted token from the browser session.
 
 ## Local development
 

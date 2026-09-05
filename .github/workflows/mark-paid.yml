@@ -19,6 +19,10 @@ permissions:
   pages: write
   id-token: write
 
+concurrency:
+  group: smooth-studios-data-writes
+  cancel-in-progress: false
+
 jobs:
   update-build-deploy:
     environment:
@@ -46,6 +50,7 @@ jobs:
           DASHBOARD_PASSWORD_AKIVA: ${{ secrets.DASHBOARD_PASSWORD_AKIVA }}
           DASHBOARD_PASSWORD_JORDYN: ${{ secrets.DASHBOARD_PASSWORD_JORDYN }}
           DASHBOARD_PASSWORD_RAYNE: ${{ secrets.DASHBOARD_PASSWORD_RAYNE }}
+          DASHBOARD_GITHUB_TOKEN: ${{ secrets.DASHBOARD_GITHUB_TOKEN }}
         run: npm run sync:calendar
       - name: Save payout and encrypted data
         run: |

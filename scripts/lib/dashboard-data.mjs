@@ -111,7 +111,7 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
   };
 }
 
-export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, source }) {
+export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, source, ownerWorkflowToken }) {
   const rentals = calendarEvents
     .map((event) => normalizeCalendarEvent(event, config, ledger, overrides.events ?? {}))
     .filter(Boolean)
@@ -131,6 +131,14 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
     user: { id: "owner", name: config.owner.name, accent: "#e10000" },
     employees: dashboardEmployees,
     rentals,
+    ...(ownerWorkflowToken ? {
+      workflowAccess: {
+        provider: "github",
+        repository: config.repository,
+        allowedLogin: config.repository.split("/")[0],
+        accessToken: ownerWorkflowToken,
+      },
+    } : {}),
   };
   const employeePayloads = Object.fromEntries(
     config.employees.map((employee) => {

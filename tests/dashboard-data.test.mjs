@@ -15,6 +15,7 @@ import {
 const config = {
   importStart: "2026-01-01T00:00:00-05:00",
   calendarName: "Smooth Studios",
+  repository: "smoothxstudios/smooth-studios-team-portal",
   commissionRate: 0.3,
   owner: { name: "Smooth Studios" },
   employees: [
@@ -170,12 +171,19 @@ test("employee payloads contain only their own accepted appointments and payout"
     ledger,
     overrides: { events: {} },
     source: "google-calendar",
+    ownerWorkflowToken: "github_pat_owner_workflow_token_for_test_only",
   });
   assert.equal(payloads.owner.rentals.length, 1);
   assert.equal(payloads.akiva.rentals.length, 1);
   assert.equal(payloads.jordyn.rentals.length, 0);
   assert.deepEqual(Object.keys(payloads.akiva.rentals[0].employeePayouts), ["akiva"]);
   assert.equal(payloads.owner.employees[0].invitationEmails, undefined);
+  assert.equal(payloads.owner.workflowAccess.repository, "smoothxstudios/smooth-studios-team-portal");
+  assert.equal(payloads.owner.workflowAccess.allowedLogin, "smoothxstudios");
+  assert.equal(payloads.owner.workflowAccess.accessToken, "github_pat_owner_workflow_token_for_test_only");
+  assert.equal(payloads.akiva.workflowAccess, undefined);
+  assert.equal(payloads.jordyn.workflowAccess, undefined);
+  assert.equal(payloads.rayne.workflowAccess, undefined);
 });
 
 test("AES-GCM envelope decrypts with the correct password", async () => {

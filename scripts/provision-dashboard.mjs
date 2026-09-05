@@ -40,6 +40,13 @@ if (!credentialFile) {
 }
 
 const passwords = Object.fromEntries(Object.entries(credentialFile.dashboards).map(([id, entry]) => [id, entry.password]));
-const payloads = buildDashboardPayloads({ calendarEvents: sample.items, config, ledger, overrides, source: "sample" });
+const payloads = buildDashboardPayloads({
+  calendarEvents: sample.items,
+  config,
+  ledger,
+  overrides,
+  source: "sample",
+  ownerWorkflowToken: process.env.DASHBOARD_GITHUB_TOKEN?.trim(),
+});
 await writeEncryptedDashboards({ payloads, passwords, outputDirectory: path.join(root, "public/data"), config });
 process.stdout.write(`Encrypted dashboards created. Private credentials: ${credentialsPath}\n`);

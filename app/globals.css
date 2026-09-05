@@ -247,6 +247,49 @@ button { cursor: pointer; }
 .rule-number { font-size:64px; font-weight:850; line-height:1; letter-spacing:-.08em; color:#e10000; text-shadow:5px 5px 0 rgba(20,20,24,.12); }
 .rule-check { display:flex; align-items:center; gap:8px; margin-top:10px; padding:11px 12px; border-radius:10px; color:var(--foreground); background:var(--muted); font-size:10px; } .rule-check svg { color:#1f9d63; }
 
+/* Owner workflow controls */
+.sync-now-button { height:36px; gap:7px; border-radius:10px; color:var(--foreground); background:var(--card); font-size:13px; font-weight:700; }
+.workflow-dialog,.payment-override-dialog { width:min(560px,calc(100vw - 28px)); max-width:560px; gap:20px; padding:26px; border-color:var(--border); border-radius:20px; background:var(--card); box-shadow:0 30px 90px rgba(0,0,0,.24); }
+.workflow-dialog [data-slot="dialog-title"],.payment-override-dialog [data-slot="dialog-title"] { font-size:22px; line-height:1.2; letter-spacing:-.035em; }
+.workflow-dialog [data-slot="dialog-description"],.payment-override-dialog [data-slot="dialog-description"] { font-size:14px; line-height:1.55; }
+.workflow-dialog-icon { width:48px; height:48px; display:grid; place-items:center; margin-bottom:4px; border-radius:14px; color:#fff; background:#171719; box-shadow:4px 4px 0 #e10000; }
+.workflow-dialog-icon svg { width:23px; height:23px; }
+.workflow-dialog-icon.running svg { animation:workflow-spin 1s linear infinite; }
+.workflow-dialog-icon.success { color:#fff; background:#16794b; box-shadow:4px 4px 0 rgba(31,157,99,.22); }
+.workflow-dialog-icon.warning { color:#fff; background:#c90000; box-shadow:4px 4px 0 rgba(225,0,0,.18); }
+.workflow-details { overflow:hidden; border:1px solid var(--border); border-radius:13px; }
+.workflow-details div { display:grid; grid-template-columns:145px minmax(0,1fr); gap:14px; padding:12px 14px; border-bottom:1px solid var(--border); font-size:14px; }
+.workflow-details div:last-child { border-bottom:0; }
+.workflow-details span { color:var(--muted-foreground); }
+.workflow-details strong { overflow-wrap:anywhere; text-align:right; }
+.workflow-security { display:flex; align-items:flex-start; gap:10px; padding:13px 14px; border-radius:12px; color:var(--muted-foreground); background:var(--muted); font-size:13px; line-height:1.5; }
+.workflow-security svg { width:19px; height:19px; flex:0 0 auto; color:#16794b; }
+.workflow-security strong { color:var(--foreground); }
+.workflow-run-button { gap:7px; background:#171719 !important; }
+.workflow-progress { min-height:265px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px 8px; text-align:center; }
+.workflow-progress [data-slot="dialog-description"] { max-width:420px; margin-top:8px; }
+.workflow-progress .eyebrow { margin-top:18px; }
+.workflow-progress-track { width:min(360px,100%); height:7px; margin-top:24px; overflow:hidden; border-radius:999px; background:var(--muted); }
+.workflow-progress-track span { display:block; height:100%; border-radius:inherit; background:#e10000; transition:width .35s ease; }
+.workflow-progress-track .validating { width:22%; }
+.workflow-progress-track .dispatching { width:42%; }
+.workflow-progress-track .queued { width:64%; }
+.workflow-progress-track .running { width:84%; animation:workflow-pulse 1.4s ease-in-out infinite; }
+.workflow-progress > small { margin-top:10px; color:var(--muted-foreground); font-size:12px; }
+.workflow-progress.success [data-slot="dialog-title"] { color:#16794b; }
+.workflow-progress.failure [data-slot="dialog-title"] { color:#c90000; }
+.workflow-form-field { display:grid; gap:8px; }
+.workflow-form-field label { font-size:14px; font-weight:750; }
+.workflow-form-field select { width:100%; min-height:46px; padding:0 38px 0 13px; appearance:none; border:1px solid var(--border); border-radius:11px; outline:none; color:var(--foreground); background:var(--background) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center; font-size:14px; }
+.workflow-form-field select:focus { border-color:#e10000; box-shadow:0 0 0 3px rgba(225,0,0,.09); }
+.payment-override-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.payment-override-summary div { min-width:0; padding:13px; border-radius:11px; background:var(--muted); }
+.payment-override-summary span,.payment-override-summary strong { display:block; }
+.payment-override-summary span { color:var(--muted-foreground); font-size:12px; }
+.payment-override-summary strong { margin-top:5px; font-size:15px; }
+@keyframes workflow-spin { to { transform:rotate(360deg); } }
+@keyframes workflow-pulse { 50% { opacity:.55; } }
+
 @media (max-width: 1180px) {
   .kpi-grid { grid-template-columns:repeat(2,1fr); } .team-strip { grid-template-columns:1fr; }
   .team-strip-heading { border-right:0; border-bottom:1px solid var(--border); } .team-strip-grid { grid-template-columns:repeat(3,1fr); }
@@ -266,9 +309,10 @@ button { cursor: pointer; }
   .rental-table th,.rental-table td { padding-left:12px; padding-right:12px; } .payout-summary { grid-template-columns:1fr; }
   .login-card { padding:28px 22px; } .period-strip { grid-template-columns:1fr; } .period-total { border-right:0; border-bottom:1px solid var(--border); } .category-revenue-grid { grid-template-columns:1fr; padding:7px 12px 16px; }
   .payment-review-panel { grid-template-columns:1fr; gap:15px; padding:17px; } .payment-review-total { padding:13px 0 0; border-top:1px solid var(--border); border-left:0; } .payment-review-actions { grid-column:auto; justify-content:flex-start; flex-wrap:wrap; }
+  .workflow-dialog,.payment-override-dialog { padding:22px 18px; border-radius:17px; } .workflow-details div { grid-template-columns:1fr; gap:4px; } .workflow-details strong { text-align:left; } .payment-override-summary { grid-template-columns:1fr; }
 }
 @media (max-width: 480px) {
   .login-shell { padding:18px 12px; } .login-card { padding:30px 22px; }
-  .kpi-grid { grid-template-columns:1fr; } .topbar-actions { display:none; }
+  .kpi-grid { grid-template-columns:1fr; } .topbar-actions .sample-badge { display:none; } .sync-now-button { width:38px; padding:0; } .sync-now-button span { display:none; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition-duration:.01ms !important; animation-duration:.01ms !important; } }

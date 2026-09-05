@@ -93,8 +93,12 @@ const passwords = {
   owner: requiredEnvironment("DASHBOARD_PASSWORD_OWNER"),
   ...Object.fromEntries(config.employees.map((employee) => [employee.id, requiredEnvironment(`DASHBOARD_PASSWORD_${employee.id.toUpperCase()}`)])),
 };
+const ownerWorkflowToken = process.env.DASHBOARD_GITHUB_TOKEN?.trim();
+if (!ownerWorkflowToken) {
+  process.stderr.write("DASHBOARD_GITHUB_TOKEN is not configured; owner workflow controls will remain disabled.\n");
+}
 const accessToken = await googleAccessToken(serviceAccount);
 const calendarEvents = await fetchCalendarEvents(calendarId, accessToken);
-const payloads = buildDashboardPayloads({ calendarEvents, config, ledger, overrides, source: "google-calendar" });
+const payloads = buildDashboardPayloads({ calendarEvents, config, ledger, overrides, source: "google-calendar", ownerWorkflowToken });
 await writeEncryptedDashboards({ payloads, passwords, outputDirectory: path.join(root, "public/data"), config });
 process.stdout.write(`Encrypted ${calendarEvents.length} Calendar events for ${Object.keys(payloads).length} dashboards.\n`);

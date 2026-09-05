@@ -30,6 +30,7 @@ import {
   Menu,
   Moon,
   ReceiptText,
+  RefreshCw,
   ShieldCheck,
   Sun,
   Users,
@@ -38,6 +39,14 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -70,6 +79,7 @@ import {
 } from "@/components/ui/table";
 import { decryptDashboard } from "@/lib/dashboard-crypto";
 import { APPOINTMENT_CATEGORIES, categorizeAppointment } from "@/lib/appointment-categories.mjs";
+import { GithubWorkflowDialog, type OwnerWorkflowRequest } from "@/components/github-workflow-dialog";
 import type {
   AccessProfile,
   DashboardPayload,
@@ -84,9 +94,6 @@ const FALLBACK_PROFILES: AccessProfile[] = [
   { id: "jordyn", label: "Jordyn", role: "employee" },
   { id: "rayne", label: "Rayne", role: "employee" },
 ];
-const REPOSITORY_URL = "https://github.com/smoothxstudios/smooth-studios-team-portal";
-const PAYOUT_WORKFLOW_URL = `${REPOSITORY_URL}/actions/workflows/mark-paid.yml`;
-const PAYMENT_OVERRIDE_WORKFLOW_URL = `${REPOSITORY_URL}/actions/workflows/override-payment.yml`;
 const STUDIO_TIME_ZONE = "America/New_York";
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
@@ -520,12 +527,12 @@ function PayoutPage({
           <div className="workflow-icon"><GitBranch size={24} /></div>
           <p className="eyebrow">Smooth action</p>
           <h2>Mark employee earnings paid</h2>
-          <p>Choose the last appointment date covered by your payout. GitHub will authenticate you and securely update the encrypted ledger.</p>
+          <p>Choose the last appointment date covered by your payout. The dashboard will securely update the encrypted ledger and show you when it finishes.</p>
           <label htmlFor="paid-through">Mark everything paid through</label>
           <input id="paid-through" max={new Date().toISOString().slice(0, 10)} onChange={(event) => setPaidThrough(event.target.value)} type="date" value={paidThrough} />
-          <div className="workflow-scope"><ReceiptText size={16} /><span>{employees.length} employees · {rentals.filter((rental) => new Date(rental.end) <= new Date(`${paidThrough}T23:59:59`)).length} eligible appointments</span></div>
-          <Button className="github-button" onClick={onContinue}>Continue in GitHub <ArrowRight size={16} /></Button>
-          <small>The selected date is copied for the workflow form. GitHub sign-in is required.</small>
+          <div className="workflow-scope"><ReceiptText size={16} /><span>{employees.length} employees · {rentals.filter((rental) => new Date(rental.end) <= new Date(`${paidThrough}T23:59:59`) && customerFullyPaid(rental) && Object.values(rental.employeePayouts).some((payout) => !payout.paid)).length} eligible appointments</span></div>
+          <Button className="github-button" onClick={onContinue}>Review and mark paid <ArrowRight size={16} /></Button>
+          <small>You will stay inside the dashboard while the workflow runs.</small>
         </article>
       ) : (
         <article className="panel payout-rule-card">
@@ -542,11 +549,103 @@ function PayoutPage({
   );
 }
 
+function PaymentOverrideForm({
+  open,
+  onOpenChange,
+  onContinue,
+  rentals,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onContinue: (request: OwnerWorkflowRequest) => void;
+  rentals: Rental[];
+}) {
+  const reviewRentals = useMemo(() => rentals.filter((rental) => customerPaymentState(rental) === "review"), [rentals]);
+  const [eventId, setEventId] = useState("");
+  const [paidStatus, setPaidStatus] = useState<"true" | "false" | "clear">("true");
+
+  useEffect(() => {
+    if (!open) return;
+    setEventId(reviewRentals[0]?.id ?? rentals[0]?.id ?? "");
+    setPaidStatus("true");
+  }, [open, rentals, reviewRentals]);
+
+  const selected = rentals.find((rental) => rental.id === eventId);
+  const statusLabels = { true: "Paid outside Acuity", false: "Not fully paid", clear: "Use Calendar payment" };
+  const continueToConfirmation = () => {
+    if (!selected) return;
+    const recorded = selected.paidOnlineCents === null ? "None" : dollars(selected.paidOnlineCents, true);
+    onOpenChange(false);
+    onContinue({
+      workflowId: "override-payment.yml",
+      title: "Update customer payment",
+      description: paidStatus === "true"
+        ? "This confirms that the remaining balance was collected outside Acuity."
+        : paidStatus === "false"
+          ? "This records that the appointment is not fully paid."
+          : "This removes the manual decision and returns the appointment to its Calendar payment status.",
+      actionLabel: paidStatus === "true" ? "Mark customer paid" : paidStatus === "false" ? "Mark not fully paid" : "Clear manual status",
+      inputs: { event_id: selected.id, paid_status: paidStatus },
+      details: [
+        { label: "Appointment", value: `${selected.customer} · ${selected.title}` },
+        { label: "Date", value: `${formatDate(selected.start, true)} at ${formatTime(selected.start)}` },
+        { label: "Price", value: dollars(selected.priceCents, true) },
+        { label: "Recorded online", value: recorded },
+        { label: "New status", value: statusLabels[paidStatus] },
+      ],
+    });
+  };
+
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="payment-override-dialog">
+        <DialogHeader>
+          <p className="eyebrow">Payment review</p>
+          <DialogTitle>Update customer payment</DialogTitle>
+          <DialogDescription>Choose the appointment and tell the dashboard how its balance was handled.</DialogDescription>
+        </DialogHeader>
+        <div className="workflow-form-field">
+          <label htmlFor="payment-event">Appointment</label>
+          <select id="payment-event" onChange={(event) => setEventId(event.target.value)} value={eventId}>
+            {rentals.map((rental) => (
+              <option key={rental.id} value={rental.id}>
+                {customerPaymentState(rental) === "review" ? "Needs review · " : ""}{formatDate(rental.start, true)} · {rental.customer} · {dollars(rental.priceCents, true)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="workflow-form-field">
+          <label htmlFor="payment-status">Payment decision</label>
+          <select id="payment-status" onChange={(event) => setPaidStatus(event.target.value as "true" | "false" | "clear")} value={paidStatus}>
+            <option value="true">Paid outside Acuity</option>
+            <option value="false">Not fully paid</option>
+            <option value="clear">Clear manual status</option>
+          </select>
+        </div>
+        {selected && (
+          <div className="payment-override-summary">
+            <div><span>Price</span><strong>{dollars(selected.priceCents, true)}</strong></div>
+            <div><span>Recorded online</span><strong>{selected.paidOnlineCents === null ? "None" : dollars(selected.paidOnlineCents, true)}</strong></div>
+            <div><span>Remaining</span><strong>{dollars(Math.max(selected.priceCents - (selected.paidOnlineCents ?? 0), 0), true)}</strong></div>
+          </div>
+        )}
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} variant="outline">Cancel</Button>
+          <Button className="workflow-run-button" disabled={!selected} onClick={continueToConfirmation}>Continue</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DashboardView({ payload, dark, setDark, onLogout }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void }) {
   const [view, setView] = useState<ViewKey>("overview");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [paidThrough, setPaidThrough] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentOverrideOpen, setPaymentOverrideOpen] = useState(false);
+  const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [workflowRequest, setWorkflowRequest] = useState<OwnerWorkflowRequest | null>(null);
   const isOwner = payload.role === "owner";
   const employeeId = isOwner ? undefined : payload.user.id;
   const rentals = useMemo(() => [...payload.rentals].sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime()), [payload.rentals]);
@@ -595,12 +694,44 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
   const navItems = NAV_ITEMS.filter((item) => !item.ownerOnly || isOwner);
   const displayName = payload.user.name;
 
-  const continueToGithub = () => {
-    navigator.clipboard?.writeText(paidThrough).catch(() => undefined);
-    window.open(PAYOUT_WORKFLOW_URL, "_blank", "noopener,noreferrer");
+  const openWorkflow = (request: OwnerWorkflowRequest) => {
+    setWorkflowRequest(request);
+    window.setTimeout(() => setWorkflowOpen(true), 0);
   };
 
-  const openPaymentOverride = () => window.open(PAYMENT_OVERRIDE_WORKFLOW_URL, "_blank", "noopener,noreferrer");
+  const openPayoutWorkflow = () => {
+    const eligible = rentals.filter((rental) =>
+      new Date(rental.end) <= new Date(`${paidThrough}T23:59:59`)
+      && customerFullyPaid(rental)
+      && Object.values(rental.employeePayouts).some((payout) => !payout.paid),
+    ).length;
+    openWorkflow({
+      workflowId: "mark-paid.yml",
+      title: "Mark employee earnings paid",
+      description: "This marks every eligible employee earning paid through the selected date and republishes the encrypted dashboards.",
+      actionLabel: "Mark earnings paid",
+      inputs: { paid_through: paidThrough, employee: "all" },
+      details: [
+        { label: "Paid through", value: paidThrough },
+        { label: "Employees", value: `All ${payload.employees.length} employees` },
+        { label: "Eligible appointments", value: String(eligible) },
+      ],
+    });
+  };
+
+  const openCalendarSync = () => openWorkflow({
+    workflowId: "calendar-sync.yml",
+    title: "Sync the Smooth Studios Calendar",
+    description: "This imports the latest Calendar changes, rebuilds every encrypted dashboard, and republishes the portal.",
+    actionLabel: "Start Calendar sync",
+    details: [
+      { label: "Calendar", value: payload.calendarName },
+      { label: "Import range", value: "January 1, 2026 through today" },
+      { label: "Current data generated", value: `${formatDate(payload.generatedAt, true)} at ${formatTime(payload.generatedAt)}` },
+    ],
+  });
+
+  const openPaymentOverride = () => setPaymentOverrideOpen(true);
   const reviewPayments = () => {
     setCategoryFilter("all");
     setPaymentFilter("review");
@@ -625,7 +756,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
       <SidebarInset className="dashboard-main">
         <header className="dashboard-topbar">
           <div className="topbar-title"><SidebarTrigger className="mobile-menu-trigger"><Menu /></SidebarTrigger><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : "evening"}, ${displayName}` : NAV_ITEMS.find((item) => item.key === view)?.label}</h1></div></div>
-          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<div className="date-chip"><CalendarDays size={15} /><span>Jan–Dec 2026</span></div></div>
+          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}{isOwner && <Button className="sync-now-button" onClick={openCalendarSync} size="sm" variant="outline"><RefreshCw size={15} /><span>Sync now</span></Button>}<div className="date-chip"><CalendarDays size={15} /><span>Jan–Dec 2026</span></div></div>
         </header>
 
         <div className="dashboard-content">
@@ -682,9 +813,15 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
             {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the 30-minute Calendar sync." : "No appointments match the selected filters."} title="No appointments found" />}
           </article>}
           {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} />}
-          {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={continueToGithub} paidThrough={paidThrough} rentals={visibleRentals} setPaidThrough={setPaidThrough} />}
+          {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} rentals={visibleRentals} setPaidThrough={setPaidThrough} />}
         </div>
       </SidebarInset>
+      {isOwner && (
+        <>
+          <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={setPaymentOverrideOpen} open={paymentOverrideOpen} rentals={rentals} />
+          <GithubWorkflowDialog access={payload.workflowAccess} onOpenChange={setWorkflowOpen} open={workflowOpen} request={workflowRequest} />
+        </>
+      )}
     </SidebarProvider>
   );
 }
