@@ -6,7 +6,7 @@ A GitHub-hosted dashboard for Smooth Studios rental schedules, studio revenue, a
 
 - Owner overview: all rental revenue, every employee schedule, payroll owed, paid versus unpaid earnings, and period comparisons.
 - Employee overview: upcoming rentals, completed history, projected earnings, earned-but-unpaid amount, paid totals, and weekly/monthly/yearly context.
-- Employee assignment: the attendee email must match the configured employee email and the attendee response must be `accepted`.
+- Employee assignment: the attendee email must match any email configured for that employee and the attendee response must be `accepted`.
 - Earnings: every accepted employee receives 30% of the full rental price. When multiple employees accept, each receives the full 30%.
 - Customer payment: `Price:` and `Paid Online:` are parsed as cents and must match exactly. An owner can record an exception through the payment-override GitHub workflow.
 - Earned timing: commission becomes earned only after both the rental end time has passed and the customer is fully paid.
@@ -59,15 +59,17 @@ Create `smoothxstudios/smooth-studios-team-portal` as a private repository and p
 |---|---|
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Entire service-account JSON file |
 | `GOOGLE_CALENDAR_ID` | ID of the dedicated Smooth Studios Calendar |
-| `EMPLOYEE_EMAIL_AKIVA` | Akiva's Google invitation email |
-| `EMPLOYEE_EMAIL_JORDYN` | Jordyn's Google invitation email |
-| `EMPLOYEE_EMAIL_RAYNE` | Rayne's Google invitation email |
+| `EMPLOYEE_EMAIL_AKIVA` | Akiva's Google invitation email address(es) |
+| `EMPLOYEE_EMAIL_JORDYN` | Jordyn's Google invitation email address(es) |
+| `EMPLOYEE_EMAIL_RAYNE` | Rayne's Google invitation email address(es) |
 | `DASHBOARD_PASSWORD_OWNER` | Generated owner password |
 | `DASHBOARD_PASSWORD_AKIVA` | Generated Akiva password |
 | `DASHBOARD_PASSWORD_JORDYN` | Generated Jordyn password |
 | `DASHBOARD_PASSWORD_RAYNE` | Generated Rayne password |
 
 The hourly workflow runs at 17 minutes past each hour, refreshes the encrypted payloads, commits them, and deploys the updated GitHub Page.
+
+Each `EMPLOYEE_EMAIL_*` secret accepts one address or multiple comma-separated addresses. Addresses are matched case-insensitively and duplicate entries are ignored. Keep every address in GitHub Secrets rather than committing it to the repository.
 
 ## Generate strong passwords
 
