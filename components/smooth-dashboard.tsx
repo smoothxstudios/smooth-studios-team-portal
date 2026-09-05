@@ -39,6 +39,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -62,6 +69,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { decryptDashboard } from "@/lib/dashboard-crypto";
+import { APPOINTMENT_CATEGORIES, categorizeAppointment } from "@/lib/appointment-categories.mjs";
 import type {
   AccessProfile,
   DashboardPayload,
@@ -88,7 +96,7 @@ type RentalState = "upcoming" | "earned" | "paid" | "awaiting";
 
 const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ownerOnly?: boolean }[] = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
-  { key: "rentals", label: "Rentals", icon: CalendarDays },
+  { key: "rentals", label: "Appointments", icon: CalendarDays },
   { key: "team", label: "Team", icon: Users, ownerOnly: true },
   { key: "payouts", label: "Payouts", icon: WalletCards },
 ];
@@ -127,6 +135,17 @@ function rentalState(rental: Rental, employeeId?: string): RentalState {
   if (!rental.fullyPaid) return "awaiting";
   if (employeeId && rental.employeePayouts[employeeId]?.paid) return "paid";
   return "earned";
+}
+
+function appointmentCategory(rental: Rental) {
+  if (rental.categoryId && rental.category) return { id: rental.categoryId, label: rental.category };
+  const category = categorizeAppointment(rental.title);
+  return { id: category.id, label: category.label };
+}
+
+function CategoryBadge({ rental }: { rental: Rental }) {
+  const category = appointmentCategory(rental);
+  return <span className={`category-badge category-${category.id}`}>{category.label}</span>;
 }
 
 function StatusBadge({ state }: { state: RentalState }) {
@@ -262,11 +281,44 @@ function PeriodTotals({ rentals, employeeId }: { rentals: Rental[]; employeeId?:
           <div className="period-total" key={period.label}>
             <span>{period.label}</span>
             <strong>{dollars(total)}</strong>
-            <small>{employeeId ? `${secondary} completed rental${secondary === 1 ? "" : "s"}` : `${dollars(secondary)} earned payroll`}</small>
+            <small>{employeeId ? `${secondary} completed appointment${secondary === 1 ? "" : "s"}` : `${dollars(secondary)} earned payroll`}</small>
             <em className={change !== null && change < 0 ? "down" : ""}>{change === null ? "No prior comparison" : `${change >= 0 ? "+" : ""}${change}% vs prior`}</em>
           </div>
         );
       })}
+    </section>
+  );
+}
+
+function CategoryRevenue({ rentals }: { rentals: Rental[] }) {
+  const rows = APPOINTMENT_CATEGORIES.map((category) => {
+    const appointments = rentals.filter((rental) => appointmentCategory(rental).id === category.id);
+    const fullyPaid = appointments.filter((rental) => rental.fullyPaid);
+    return {
+      id: category.id,
+      label: category.label,
+      appointmentCount: appointments.length,
+      paidCount: fullyPaid.length,
+      revenue: fullyPaid.reduce((sum, rental) => sum + rental.priceCents, 0),
+    };
+  }).filter((category) => category.appointmentCount > 0);
+
+  if (!rows.length) return null;
+  return (
+    <section className="panel category-revenue-panel">
+      <div className="panel-heading">
+        <div><p className="eyebrow">Business mix</p><h2>Revenue by category</h2></div>
+        <span className="category-revenue-note">Fully paid appointments</span>
+      </div>
+      <div className="category-revenue-grid">
+        {rows.map((category) => (
+          <article className="category-revenue-card" key={category.id}>
+            <span className={`category-marker category-${category.id}`} />
+            <div><strong>{category.label}</strong><small>{category.paidCount} of {category.appointmentCount} paid</small></div>
+            <b>{dollars(category.revenue)}</b>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
@@ -279,11 +331,12 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 function RentalTable({ rentals, employeeId }: { rentals: Rental[]; employeeId?: string }) {
   return (
     <Table className="rental-table">
-      <TableHeader><TableRow><TableHead>Rental</TableHead><TableHead>Date & time</TableHead><TableHead>Rental price</TableHead><TableHead>{employeeId ? "Your 30%" : "Assigned team"}</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+      <TableHeader><TableRow><TableHead>Appointment</TableHead><TableHead>Category</TableHead><TableHead>Date & time</TableHead><TableHead>Price</TableHead><TableHead>{employeeId ? "Your 30%" : "Assigned team"}</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
       <TableBody>
         {rentals.map((rental) => (
           <TableRow key={rental.id}>
             <TableCell><div className="rental-name"><strong>{rental.customer}</strong><span>{rental.title}</span></div></TableCell>
+            <TableCell><CategoryBadge rental={rental} /></TableCell>
             <TableCell><div className="rental-date"><strong>{formatDate(rental.start, true)}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div></TableCell>
             <TableCell className="money-cell">{dollars(rental.priceCents, true)}</TableCell>
             <TableCell>
@@ -328,8 +381,8 @@ function TeamPage({ employees, rentals }: { employees: Employee[]; rentals: Rent
         return (
           <article className="panel employee-card" key={employee.id}>
             <div className="employee-card-head"><span className="employee-avatar large" style={{ background: employee.accent }}>{employee.name.slice(0, 1)}</span><div><h2>{employee.name}</h2><p>{employee.email}</p></div><StatusBadge state={next ? "upcoming" : "paid"} /></div>
-            <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>Still owed</span><strong>{dollars(owed)}</strong></div><div><span>Rentals</span><strong>{assigned.length}</strong></div></div>
-            <div className="employee-next"><CalendarDays size={16} /><span>Next accepted rental</span><strong>{next ? formatDate(next.start, true) : "None scheduled"}</strong></div>
+            <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>Still owed</span><strong>{dollars(owed)}</strong></div><div><span>Appointments</span><strong>{assigned.length}</strong></div></div>
+            <div className="employee-next"><CalendarDays size={16} /><span>Next accepted appointment</span><strong>{next ? formatDate(next.start, true) : "None scheduled"}</strong></div>
           </article>
         );
       })}
@@ -360,8 +413,8 @@ function PayoutPage({
   return (
     <section className="payout-layout">
       <article className="panel payout-chart-panel">
-        <div className="panel-heading"><div><p className="eyebrow">Weekly · monthly · yearly</p><h2>{isOwner ? "Paid versus unpaid earnings" : "My payout history"}</h2></div></div>
-        <div className="payout-summary"><div><span>Paid</span><strong>{dollars(metrics.paid)}</strong></div><div><span>Earned, unpaid</span><strong>{dollars(metrics.owed)}</strong></div><div><span>Projected</span><strong>{dollars(metrics.projected)}</strong></div></div>
+        <div className="panel-heading"><div><p className="eyebrow">Weekly · monthly · yearly</p><h2>{isOwner ? "Team payouts" : "My payout history"}</h2></div></div>
+        <div className="payout-summary"><div><span>{isOwner ? "Paid to team" : "Paid"}</span><strong>{dollars(metrics.paid)}</strong></div><div><span>Earned, unpaid</span><strong>{dollars(metrics.owed)}</strong></div><div><span>Projected</span><strong>{dollars(metrics.projected)}</strong></div></div>
         <div className="bar-chart-wrap">
           <ResponsiveContainer height="100%" width="100%">
             <BarChart data={monthly} margin={{ left: -20, right: 0 }}>
@@ -378,12 +431,12 @@ function PayoutPage({
       {isOwner ? (
         <article className="panel mark-paid-card">
           <div className="workflow-icon"><GitBranch size={24} /></div>
-          <p className="eyebrow">Owner action</p>
+          <p className="eyebrow">Smooth action</p>
           <h2>Mark employee earnings paid</h2>
-          <p>Choose the last rental date covered by your payout. GitHub will authenticate you and securely update the encrypted ledger.</p>
+          <p>Choose the last appointment date covered by your payout. GitHub will authenticate you and securely update the encrypted ledger.</p>
           <label htmlFor="paid-through">Mark everything paid through</label>
           <input id="paid-through" max={new Date().toISOString().slice(0, 10)} onChange={(event) => setPaidThrough(event.target.value)} type="date" value={paidThrough} />
-          <div className="workflow-scope"><ReceiptText size={16} /><span>{employees.length} employees · {rentals.filter((rental) => new Date(rental.end) <= new Date(`${paidThrough}T23:59:59`)).length} eligible rentals</span></div>
+          <div className="workflow-scope"><ReceiptText size={16} /><span>{employees.length} employees · {rentals.filter((rental) => new Date(rental.end) <= new Date(`${paidThrough}T23:59:59`)).length} eligible appointments</span></div>
           <Button className="github-button" onClick={onContinue}>Continue in GitHub <ArrowRight size={16} /></Button>
           <small>The selected date is copied for the workflow form. GitHub sign-in is required.</small>
         </article>
@@ -392,9 +445,9 @@ function PayoutPage({
           <div className="rule-number">30%</div>
           <p className="eyebrow">Your earning rule</p>
           <h2>Simple, consistent commission</h2>
-          <p>You receive 30% of the rental price for every accepted assignment. It becomes earned only when the rental is complete and the customer is fully paid.</p>
+          <p>You receive 30% of the appointment price for every accepted assignment, including studio rentals and other packages. It becomes earned only when the appointment is complete and the customer is fully paid.</p>
           <div className="rule-check"><Check size={16} /> Invitation accepted</div>
-          <div className="rule-check"><Check size={16} /> Rental completed</div>
+          <div className="rule-check"><Check size={16} /> Appointment completed</div>
           <div className="rule-check"><Check size={16} /> “Paid Online” matches “Price”</div>
         </article>
       )}
@@ -404,11 +457,14 @@ function PayoutPage({
 
 function DashboardView({ payload, dark, setDark, onLogout }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void }) {
   const [view, setView] = useState<ViewKey>("overview");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [paidThrough, setPaidThrough] = useState(new Date().toISOString().slice(0, 10));
   const isOwner = payload.role === "owner";
   const employeeId = isOwner ? undefined : payload.user.id;
   const rentals = useMemo(() => [...payload.rentals].sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime()), [payload.rentals]);
   const visibleRentals = useMemo(() => employeeId ? rentals.filter((rental) => rental.assignedEmployeeIds.includes(employeeId)) : rentals, [employeeId, rentals]);
+  const categoryOptions = useMemo(() => APPOINTMENT_CATEGORIES.filter((category) => visibleRentals.some((rental) => appointmentCategory(rental).id === category.id)), [visibleRentals]);
+  const filteredRentals = useMemo(() => categoryFilter === "all" ? visibleRentals : visibleRentals.filter((rental) => appointmentCategory(rental).id === categoryFilter), [categoryFilter, visibleRentals]);
   const upcoming = useMemo(() => [...visibleRentals].filter((rental) => rentalState(rental, employeeId) === "upcoming").reverse(), [employeeId, visibleRentals]);
 
   const metrics = useMemo(() => {
@@ -464,13 +520,13 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
           <ThemeControl dark={dark} onChange={setDark} />
-          <div className="sidebar-user"><span className="user-avatar">{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio owner" : "Team member"}</span></div><button aria-label="Log out" onClick={onLogout}><LogOut size={16} /></button></div>
+          <div className="sidebar-user"><span className="user-avatar">{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" onClick={onLogout}><LogOut size={16} /></button></div>
         </SidebarFooter>
       </Sidebar>
 
       <SidebarInset className="dashboard-main">
         <header className="dashboard-topbar">
-          <div className="topbar-title"><SidebarTrigger className="mobile-menu-trigger"><Menu /></SidebarTrigger><div><p>{isOwner ? "Owner dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : "evening"}, ${displayName}` : NAV_ITEMS.find((item) => item.key === view)?.label}</h1></div></div>
+          <div className="topbar-title"><SidebarTrigger className="mobile-menu-trigger"><Menu /></SidebarTrigger><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : "evening"}, ${displayName}` : NAV_ITEMS.find((item) => item.key === view)?.label}</h1></div></div>
           <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<div className="date-chip"><CalendarDays size={15} /><span>Jan–Dec 2026</span></div></div>
         </header>
 
@@ -478,9 +534,10 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
           {view === "overview" && (
             <>
               <section className="kpi-grid">
-                {isOwner ? <><KpiCard icon={CircleDollarSign} label="Paid rental revenue" note="All fully paid rentals" tone="red" value={dollars(metrics.revenue)} /><KpiCard icon={Banknote} label="Payroll owed" note="Earned, not yet paid" tone="amber" value={dollars(metrics.owed)} /><KpiCard icon={ShieldCheck} label="Paid to team" note="Recorded employee payouts" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming rentals" note={`${upcoming.length} accepted assignments`} tone="blue" value={String(upcoming.length)} /></> : <><KpiCard icon={Banknote} label="Earned, not paid" note="Completed + customer paid" tone="red" value={dollars(metrics.owed)} /><KpiCard icon={Clock3} label="Projected earnings" note="From upcoming rentals" tone="amber" value={dollars(metrics.projected)} /><KpiCard icon={ShieldCheck} label="Paid this year" note="Payouts marked complete" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming rentals" note={upcoming[0] ? `Next: ${formatDate(upcoming[0].start, true)}` : "Nothing scheduled"} tone="blue" value={String(upcoming.length)} /></>}
+                {isOwner ? <><KpiCard icon={CircleDollarSign} label="Total revenue" note="All fully paid appointments" tone="red" value={dollars(metrics.revenue)} /><KpiCard icon={Banknote} label="Payroll owed" note="Earned, not yet paid" tone="amber" value={dollars(metrics.owed)} /><KpiCard icon={ShieldCheck} label="Paid to team" note="Recorded employee payouts" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={`${upcoming.length} accepted assignments`} tone="blue" value={String(upcoming.length)} /></> : <><KpiCard icon={Banknote} label="Earned, not paid" note="Completed + customer paid" tone="red" value={dollars(metrics.owed)} /><KpiCard icon={Clock3} label="Projected earnings" note="From upcoming appointments" tone="amber" value={dollars(metrics.projected)} /><KpiCard icon={ShieldCheck} label="Paid this year" note="Payouts marked complete" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={upcoming[0] ? `Next: ${formatDate(upcoming[0].start, true)}` : "Nothing scheduled"} tone="blue" value={String(upcoming.length)} /></>}
               </section>
               <PeriodTotals employeeId={employeeId} rentals={visibleRentals} />
+              {isOwner && <CategoryRevenue rentals={visibleRentals} />}
 
               <section className="overview-grid">
                 <article className="panel trend-panel">
@@ -489,16 +546,32 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
                 </article>
                 <article className="panel upcoming-panel">
                   <div className="panel-heading"><div><p className="eyebrow">On the calendar</p><h2>Coming up</h2></div><button onClick={() => setView("rentals")}>View all <ChevronRight size={15} /></button></div>
-                  <div className="upcoming-list">{upcoming.length ? upcoming.slice(0, 4).map((rental) => <div className="upcoming-item" key={rental.id}><div className="date-block"><strong>{new Date(rental.start).getDate()}</strong><span>{formatDate(rental.start, true).slice(0, 3)}</span></div><div className="upcoming-copy"><strong>{rental.customer}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div><div className="upcoming-value"><strong>{dollars(employeeId ? rental.employeePayouts[employeeId]?.amountCents ?? 0 : rental.priceCents)}</strong><span>{employeeId ? "your 30%" : "rental"}</span></div></div>) : <EmptyState copy="Accepted Calendar assignments will appear here." title="No upcoming rentals" />}</div>
+                  <div className="upcoming-list">{upcoming.length ? upcoming.slice(0, 4).map((rental) => <div className="upcoming-item" key={rental.id}><div className="date-block"><strong>{new Date(rental.start).getDate()}</strong><span>{formatDate(rental.start, true).slice(0, 3)}</span></div><div className="upcoming-copy"><strong>{rental.customer}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div><div className="upcoming-value"><strong>{dollars(employeeId ? rental.employeePayouts[employeeId]?.amountCents ?? 0 : rental.priceCents)}</strong><span>{employeeId ? "your 30%" : "appointment"}</span></div></div>) : <EmptyState copy="Accepted Calendar assignments will appear here." title="No upcoming appointments" />}</div>
                 </article>
               </section>
 
               {isOwner && <TeamSnapshot employees={payload.employees} rentals={rentals} />}
-              <article className="panel rentals-panel"><div className="panel-heading"><div><p className="eyebrow">Latest activity</p><h2>Rental history</h2></div><button onClick={() => setView("rentals")}>View all <ChevronRight size={15} /></button></div>{recent.length ? <RentalTable employeeId={employeeId} rentals={recent} /> : <EmptyState copy="Calendar rentals will appear after the first sync." title="No rental history yet" />}</article>
+              <article className="panel rentals-panel"><div className="panel-heading"><div><p className="eyebrow">Latest activity</p><h2>Appointment history</h2></div><button onClick={() => setView("rentals")}>View all <ChevronRight size={15} /></button></div>{recent.length ? <RentalTable employeeId={employeeId} rentals={recent} /> : <EmptyState copy="Calendar appointments will appear after the first sync." title="No appointment history yet" />}</article>
             </>
           )}
 
-          {view === "rentals" && <article className="panel page-panel"><div className="panel-heading page-heading"><div><p className="eyebrow">Beginning January 1, 2026</p><h2>{isOwner ? "Every studio rental" : "My accepted rentals"}</h2><p>{isOwner ? "Revenue includes every fully paid rental—even when no employee is assigned." : "Only invitations accepted from your Google email appear here."}</p></div><div className="page-actions"><Badge className="count-badge" variant="secondary">{visibleRentals.length} rentals</Badge>{isOwner && <Button onClick={() => window.open(PAYMENT_OVERRIDE_WORKFLOW_URL, "_blank", "noopener,noreferrer")} size="sm" variant="outline"><GitBranch size={14} /> Payment override</Button>}</div></div>{visibleRentals.length ? <RentalTable employeeId={employeeId} rentals={visibleRentals} /> : <EmptyState copy="Your accepted rentals will appear after the hourly Calendar sync." title="No rentals found" />}</article>}
+          {view === "rentals" && <article className="panel page-panel">
+            <div className="panel-heading page-heading">
+              <div><p className="eyebrow">Beginning January 1, 2026</p><h2>{isOwner ? "All appointments" : "My accepted appointments"}</h2><p>{isOwner ? "Revenue includes every fully paid appointment—even when no employee is assigned." : "Only appointments accepted from one of your Google emails appear here."}</p></div>
+              <div className="page-actions">
+                <Select onValueChange={setCategoryFilter} value={categoryFilter}>
+                  <SelectTrigger aria-label="Filter appointments by category" className="category-select"><SelectValue placeholder="All categories" /></SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectItem value="all">All categories</SelectItem>
+                    {categoryOptions.map((category) => <SelectItem key={category.id} value={category.id}>{category.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Badge className="count-badge" variant="secondary">{filteredRentals.length} appointment{filteredRentals.length === 1 ? "" : "s"}</Badge>
+                {isOwner && <Button onClick={() => window.open(PAYMENT_OVERRIDE_WORKFLOW_URL, "_blank", "noopener,noreferrer")} size="sm" variant="outline"><GitBranch size={14} /> Payment override</Button>}
+              </div>
+            </div>
+            {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" ? "Accepted appointments will appear after the hourly Calendar sync." : "No appointments match this category."} title="No appointments found" />}
+          </article>}
           {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} />}
           {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={continueToGithub} paidThrough={paidThrough} rentals={visibleRentals} setPaidThrough={setPaidThrough} />}
         </div>
