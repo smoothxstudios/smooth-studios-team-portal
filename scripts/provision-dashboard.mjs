@@ -8,10 +8,10 @@ const readJson = async (relativePath) => JSON.parse(await readFile(path.join(roo
 const rawConfig = await readJson("config/studio.config.json");
 const config = {
   ...rawConfig,
-  employees: rawConfig.employees.map((employee) => ({
-    ...employee,
-    email: `${employee.id}@preview.smoothstudios.invalid`,
-  })),
+  employees: rawConfig.employees.map((employee) => {
+    const email = `${employee.id}@preview.smoothstudios.invalid`;
+    return { ...employee, email, invitationEmails: [email] };
+  }),
 };
 const sample = await readJson("data/sample-calendar.json");
 const ledger = await readJson("data/payout-ledger.json");
