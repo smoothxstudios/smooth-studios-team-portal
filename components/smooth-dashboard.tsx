@@ -562,24 +562,23 @@ function PaymentOverrideForm({
   open,
   onOpenChange,
   onContinue,
-  rentals,
+  reviewRentals,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onContinue: (request: OwnerWorkflowRequest) => void;
-  rentals: Rental[];
+  reviewRentals: Rental[];
 }) {
-  const reviewRentals = useMemo(() => rentals.filter((rental) => customerPaymentState(rental) === "review"), [rentals]);
   const [eventId, setEventId] = useState("");
   const [paidStatus, setPaidStatus] = useState<"true" | "false" | "clear">("true");
 
   useEffect(() => {
     if (!open) return;
-    setEventId(reviewRentals[0]?.id ?? rentals[0]?.id ?? "");
+    setEventId(reviewRentals[0]?.id ?? "");
     setPaidStatus("true");
-  }, [open, rentals, reviewRentals]);
+  }, [open, reviewRentals]);
 
-  const selected = rentals.find((rental) => rental.id === eventId);
+  const selected = reviewRentals.find((rental) => rental.id === eventId);
   const statusLabels = { true: "Paid outside Acuity", false: "Not fully paid", clear: "Use Calendar payment" };
   const continueToConfirmation = () => {
     if (!selected) return;
@@ -611,36 +610,42 @@ function PaymentOverrideForm({
         <DialogHeader>
           <p className="eyebrow">Payment review</p>
           <DialogTitle>Update customer payment</DialogTitle>
-          <DialogDescription>Choose the appointment and tell the dashboard how its balance was handled.</DialogDescription>
+          <DialogDescription>Only completed appointments with an unresolved balance appear here.</DialogDescription>
         </DialogHeader>
-        <div className="workflow-form-field">
-          <label htmlFor="payment-event">Appointment</label>
-          <select id="payment-event" onChange={(event) => setEventId(event.target.value)} value={eventId}>
-            {rentals.map((rental) => (
-              <option key={rental.id} value={rental.id}>
-                {customerPaymentState(rental) === "review" ? "Needs review · " : ""}{formatDate(rental.start, true)} · {rental.customer} · {dollars(rental.priceCents, true)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="workflow-form-field">
-          <label htmlFor="payment-status">Payment decision</label>
-          <select id="payment-status" onChange={(event) => setPaidStatus(event.target.value as "true" | "false" | "clear")} value={paidStatus}>
-            <option value="true">Paid outside Acuity</option>
-            <option value="false">Not fully paid</option>
-            <option value="clear">Clear manual status</option>
-          </select>
-        </div>
-        {selected && (
-          <div className="payment-override-summary">
-            <div><span>Price</span><strong>{dollars(selected.priceCents, true)}</strong></div>
-            <div><span>Recorded online</span><strong>{selected.paidOnlineCents === null ? "None" : dollars(selected.paidOnlineCents, true)}</strong></div>
-            <div><span>Remaining</span><strong>{dollars(Math.max(selected.priceCents - (selected.paidOnlineCents ?? 0), 0), true)}</strong></div>
-          </div>
+        {reviewRentals.length ? (
+          <>
+            <div className="workflow-form-field">
+              <label htmlFor="payment-event">Appointment needing review</label>
+              <select id="payment-event" onChange={(event) => setEventId(event.target.value)} value={eventId}>
+                {reviewRentals.map((rental) => (
+                  <option key={rental.id} value={rental.id}>
+                    {formatDate(rental.start, true)} · {rental.customer} · {dollars(rental.priceCents, true)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="workflow-form-field">
+              <label htmlFor="payment-status">Payment decision</label>
+              <select id="payment-status" onChange={(event) => setPaidStatus(event.target.value as "true" | "false" | "clear")} value={paidStatus}>
+                <option value="true">Paid outside Acuity</option>
+                <option value="false">Not fully paid</option>
+                <option value="clear">Clear manual status</option>
+              </select>
+            </div>
+            {selected && (
+              <div className="payment-override-summary">
+                <div><span>Price</span><strong>{dollars(selected.priceCents, true)}</strong></div>
+                <div><span>Recorded online</span><strong>{selected.paidOnlineCents === null ? "None" : dollars(selected.paidOnlineCents, true)}</strong></div>
+                <div><span>Remaining</span><strong>{dollars(Math.max(selected.priceCents - (selected.paidOnlineCents ?? 0), 0), true)}</strong></div>
+              </div>
+            )}
+          </>
+        ) : (
+          <EmptyState copy="Every completed appointment currently has its full payment recorded." title="No payment review needed" />
         )}
         <DialogFooter>
-          <Button onClick={() => onOpenChange(false)} variant="outline">Cancel</Button>
-          <Button className="workflow-run-button" disabled={!selected} onClick={continueToConfirmation}>Continue</Button>
+          <Button onClick={() => onOpenChange(false)} variant="outline">{selected ? "Cancel" : "Close"}</Button>
+          {selected && <Button className="workflow-run-button" onClick={continueToConfirmation}>Continue</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -664,6 +669,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
     (categoryFilter === "all" || appointmentCategory(rental).id === categoryFilter)
     && (paymentFilter === "all" || customerPaymentState(rental) === paymentFilter),
   ), [categoryFilter, paymentFilter, visibleRentals]);
+  const reviewRentals = useMemo(() => rentals.filter((rental) => customerPaymentState(rental) === "review"), [rentals]);
   const upcoming = useMemo(() => [...visibleRentals].filter((rental) => rentalState(rental, employeeId) === "upcoming").reverse(), [employeeId, visibleRentals]);
 
   const metrics = useMemo(() => {
@@ -740,7 +746,9 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
     ],
   });
 
-  const openPaymentOverride = () => setPaymentOverrideOpen(true);
+  const openPaymentOverride = () => {
+    if (reviewRentals.length) setPaymentOverrideOpen(true);
+  };
   const reviewPayments = () => {
     setCategoryFilter("all");
     setPaymentFilter("review");
@@ -816,7 +824,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
                   </SelectContent>
                 </Select>
                 <Badge className="count-badge" variant="secondary">{filteredRentals.length} appointment{filteredRentals.length === 1 ? "" : "s"}</Badge>
-                {isOwner && <Button onClick={openPaymentOverride} size="sm" variant="outline"><GitBranch size={14} /> Mark offline payment</Button>}
+                {isOwner && reviewRentals.length > 0 && <Button onClick={openPaymentOverride} size="sm" variant="outline"><GitBranch size={14} /> Mark offline payment</Button>}
               </div>
             </div>
             {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the 30-minute Calendar sync." : "No appointments match the selected filters."} title="No appointments found" />}
@@ -827,7 +835,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
       </SidebarInset>
       {isOwner && (
         <>
-          <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={setPaymentOverrideOpen} open={paymentOverrideOpen} rentals={rentals} />
+          <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={setPaymentOverrideOpen} open={paymentOverrideOpen} reviewRentals={reviewRentals} />
           <GithubWorkflowDialog access={payload.workflowAccess} onOpenChange={setWorkflowOpen} open={workflowOpen} request={workflowRequest} />
         </>
       )}
