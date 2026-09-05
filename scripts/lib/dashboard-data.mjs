@@ -161,7 +161,7 @@ export function encryptPayload(payload, password) {
 export async function writeEncryptedDashboards({ payloads, passwords, outputDirectory, config }) {
   await mkdir(outputDirectory, { recursive: true });
   const profiles = [
-    { id: "owner", label: "Owner", role: "owner" },
+    { id: "owner", label: "Smooth", role: "owner" },
     ...config.employees.map((employee) => ({ id: employee.id, label: employee.name, role: "employee" })),
   ];
   for (const profile of profiles) {
