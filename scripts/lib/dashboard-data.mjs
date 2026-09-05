@@ -66,8 +66,9 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
   const parsed = parseCalendarDescription(event.description);
   if (parsed.priceCents === null) return null;
   const override = paymentOverrides[event.id];
-  const exactMatch = parsed.paidOnlineCents !== null && parsed.paidOnlineCents === parsed.priceCents;
-  const fullyPaid = typeof override === "boolean" ? override : exactMatch;
+  const paidAtLeastPrice = parsed.paidOnlineCents !== null && parsed.paidOnlineCents >= parsed.priceCents;
+  const fullyPaid = typeof override === "boolean" ? override : paidAtLeastPrice;
+  const tipCents = parsed.paidOnlineCents === null ? 0 : Math.max(parsed.paidOnlineCents - parsed.priceCents, 0);
 
   const acceptedEmails = new Set(
     (event.attendees ?? [])
@@ -102,8 +103,9 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
     end,
     priceCents: parsed.priceCents,
     paidOnlineCents: parsed.paidOnlineCents,
+    tipCents,
     fullyPaid,
-    ...(typeof override === "boolean" ? { paymentOverride: true } : {}),
+    ...(typeof override === "boolean" ? { paymentOverride: override } : {}),
     assignedEmployeeIds: assignedEmployees.map((employee) => employee.id),
     employeePayouts,
   };
