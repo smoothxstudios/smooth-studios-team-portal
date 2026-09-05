@@ -94,6 +94,11 @@ const FALLBACK_PROFILES: AccessProfile[] = [
   { id: "jordyn", label: "Jordyn", role: "employee" },
   { id: "rayne", label: "Rayne", role: "employee" },
 ];
+const TEAM_ACCENTS: Record<string, string> = {
+  akiva: "rgb(225, 0, 0)",
+  jordyn: "rgb(0, 126, 87)",
+  rayne: "rgb(37, 99, 235)",
+};
 const STUDIO_TIME_ZONE = "America/New_York";
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
@@ -113,6 +118,10 @@ const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ow
 
 function dollars(cents: number, exact = false) {
   return (exact ? MONEY_EXACT : MONEY).format(cents / 100);
+}
+
+function teamAccent(id: string, fallback = "#242428") {
+  return TEAM_ACCENTS[id.toLowerCase()] ?? fallback;
 }
 
 function formatDate(value: string, compact = false) {
@@ -434,7 +443,7 @@ function RentalTable({ rentals, employeeId }: { rentals: Rental[]; employeeId?: 
             <TableCell><div className="rental-date"><strong>{formatDate(rental.start, true)}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div></TableCell>
             <TableCell className="money-cell"><PaymentAmount rental={rental} showDetails={!employeeId} /></TableCell>
             <TableCell>
-              {employeeId ? <strong className="share-amount">{dollars(rental.employeePayouts[employeeId]?.amountCents ?? 0, true)}</strong> : <div className="avatar-stack">{rental.assignedEmployeeIds.length ? rental.assignedEmployeeIds.map((id) => <span key={id}>{id.slice(0, 1).toUpperCase()}</span>) : <em>Unassigned</em>}</div>}
+              {employeeId ? <strong className="share-amount">{dollars(rental.employeePayouts[employeeId]?.amountCents ?? 0, true)}</strong> : <div className="avatar-stack">{rental.assignedEmployeeIds.length ? rental.assignedEmployeeIds.map((id) => <span key={id} style={{ background: teamAccent(id) }}>{id.slice(0, 1).toUpperCase()}</span>) : <em>Unassigned</em>}</div>}
             </TableCell>
             <TableCell><StatusBadge state={appointmentStatus(rental, employeeId)} /></TableCell>
           </TableRow>
@@ -457,7 +466,7 @@ function TeamSnapshot({ employees, rentals }: { employees: Employee[]; rentals: 
           const assigned = rentals.filter((rental) => rental.assignedEmployeeIds.includes(employee.id));
           const owed = assigned.reduce((sum, rental) => sum + (rentalState(rental, employee.id) === "earned" ? rental.employeePayouts[employee.id]?.amountCents ?? 0 : 0), 0);
           const upcoming = assigned.filter((rental) => rentalState(rental, employee.id) === "upcoming").length;
-          return <div className="employee-pulse" key={employee.id}><span className="employee-avatar" style={{ background: employee.accent }}>{employee.name.slice(0, 1)}</span><div><strong>{employee.name}</strong><span>{upcoming} upcoming</span></div><div><strong>{dollars(owed)}</strong><span>owed</span></div></div>;
+          return <div className="employee-pulse" key={employee.id}><span className="employee-avatar" style={{ background: teamAccent(employee.id, employee.accent) }}>{employee.name.slice(0, 1)}</span><div><strong>{employee.name}</strong><span>{upcoming} upcoming</span></div><div><strong>{dollars(owed)}</strong><span>owed</span></div></div>;
         })}
       </div>
     </section>
@@ -474,7 +483,7 @@ function TeamPage({ employees, rentals }: { employees: Employee[]; rentals: Rent
         const next = assigned.find((rental) => rentalState(rental, employee.id) === "upcoming");
         return (
           <article className="panel employee-card" key={employee.id}>
-            <div className="employee-card-head"><span className="employee-avatar large" style={{ background: employee.accent }}>{employee.name.slice(0, 1)}</span><div><h2>{employee.name}</h2><p>{employee.email}</p></div><StatusBadge state={next ? "upcoming" : "paid"} /></div>
+            <div className="employee-card-head"><span className="employee-avatar large" style={{ background: teamAccent(employee.id, employee.accent) }}>{employee.name.slice(0, 1)}</span><div><h2>{employee.name}</h2><p>{employee.email}</p></div><StatusBadge state={next ? "upcoming" : "paid"} /></div>
             <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>Still owed</span><strong>{dollars(owed)}</strong></div><div><span>Appointments</span><strong>{assigned.length}</strong></div></div>
             <div className="employee-next"><CalendarDays size={16} /><span>Next accepted appointment</span><strong>{next ? formatDate(next.start, true) : "None scheduled"}</strong></div>
           </article>
@@ -749,7 +758,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
           <ThemeControl dark={dark} onChange={setDark} />
-          <div className="sidebar-user"><span className="user-avatar">{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" onClick={onLogout}><LogOut size={16} /></button></div>
+          <div className="sidebar-user"><span className="user-avatar" style={{ background: teamAccent(payload.user.id, payload.user.accent) }}>{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" onClick={onLogout}><LogOut size={16} /></button></div>
         </SidebarFooter>
       </Sidebar>
 

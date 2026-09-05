@@ -15,19 +15,19 @@
       "id": "akiva",
       "name": "Akiva",
       "emailEnvironmentVariable": "EMPLOYEE_EMAIL_AKIVA",
-      "accent": "#e10000"
+      "accent": "rgb(225, 0, 0)"
     },
     {
       "id": "jordyn",
       "name": "Jordyn",
       "emailEnvironmentVariable": "EMPLOYEE_EMAIL_JORDYN",
-      "accent": "#202024"
+      "accent": "rgb(0, 126, 87)"
     },
     {
       "id": "rayne",
       "name": "Rayne",
       "emailEnvironmentVariable": "EMPLOYEE_EMAIL_RAYNE",
-      "accent": "#b21f2d"
+      "accent": "rgb(37, 99, 235)"
     }
   ]
 }
