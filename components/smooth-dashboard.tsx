@@ -400,11 +400,11 @@ function PaymentReview({ rentals, onOpen, onOverride }: { rentals: Rental[]; onO
         <div>
           <p className="eyebrow">Payment check</p>
           <h2>{appointments.length} completed appointment{appointments.length === 1 ? "" : "s"} need review</h2>
-          <p>Acuity still shows a deposit or no online payment. Confirm whether the balance is still unpaid or was collected through cash, Apple Pay, or another method.</p>
+          <p>The Calendar event shows a deposit or no checkout payment. Confirm whether the balance is still unpaid or was received by invoice, cash, Apple Pay, or another method.</p>
         </div>
       </div>
-      <div className="payment-review-total"><span>Not recorded online</span><strong>{dollars(unrecorded)}</strong><small>This may include offline payments.</small></div>
-      <div className="payment-review-actions"><Button onClick={onOpen} size="sm" variant="outline">Review appointments</Button><Button onClick={onOverride} size="sm">Mark offline payment</Button></div>
+      <div className="payment-review-total"><span>Not recorded on event</span><strong>{dollars(unrecorded)}</strong><small>This may include invoice or other payments.</small></div>
+      <div className="payment-review-actions"><Button onClick={onOpen} size="sm" variant="outline">Review appointments</Button><Button onClick={onOverride} size="sm">Record payment received</Button></div>
     </section>
   );
 }
@@ -422,7 +422,7 @@ function PaymentAmount({ rental, showDetails }: { rental: Rental; showDetails: b
   let tone = "pending";
 
   if (rental.paymentOverride === true && remaining > 0) {
-    detail = paidOnline > 0 ? `${dollars(paidOnline, true)} online · marked paid` : "Marked paid outside Acuity";
+    detail = paidOnline > 0 ? `${dollars(paidOnline, true)} online · payment confirmed` : "Payment confirmed manually";
     tone = "paid";
   } else if (tip > 0) {
     detail = `${dollars(paidOnline, true)} paid · ${dollars(tip, true)} tip`;
@@ -605,7 +605,7 @@ function PaymentOverrideForm({
   }, [open, reviewRentals]);
 
   const selected = reviewRentals.find((rental) => rental.id === eventId);
-  const statusLabels = { true: "Paid outside Acuity", false: "Not fully paid", clear: "Use Calendar payment" };
+  const statusLabels = { true: "Payment received by invoice, cash, or other", false: "Not fully paid", clear: "Use Calendar payment fields" };
   const continueToConfirmation = () => {
     if (!selected) return;
     const recorded = selected.paidOnlineCents === null ? "None" : dollars(selected.paidOnlineCents, true);
@@ -614,17 +614,17 @@ function PaymentOverrideForm({
       workflowId: "override-payment.yml",
       title: "Update customer payment",
       description: paidStatus === "true"
-        ? "This confirms that the remaining balance was collected outside Acuity."
+        ? "This confirms that the remaining balance was received by invoice, cash, or another method."
         : paidStatus === "false"
           ? "This records that the appointment is not fully paid."
           : "This removes the manual decision and returns the appointment to its Calendar payment status.",
-      actionLabel: paidStatus === "true" ? "Mark customer paid" : paidStatus === "false" ? "Mark not fully paid" : "Clear manual status",
+      actionLabel: paidStatus === "true" ? "Confirm payment received" : paidStatus === "false" ? "Mark not fully paid" : "Clear manual status",
       inputs: { event_id: selected.id, paid_status: paidStatus },
       details: [
         { label: "Appointment", value: `${selected.customer} · ${selected.title}` },
         { label: "Date", value: `${formatDate(selected.start, true)} at ${formatTime(selected.start)}` },
         { label: "Price", value: dollars(selected.priceCents, true) },
-        { label: "Recorded online", value: recorded },
+        { label: "Calendar “Paid Online”", value: recorded },
         { label: "New status", value: statusLabels[paidStatus] },
       ],
     });
@@ -653,7 +653,7 @@ function PaymentOverrideForm({
             <div className="workflow-form-field">
               <label htmlFor="payment-status">Payment decision</label>
               <select id="payment-status" onChange={(event) => setPaidStatus(event.target.value as "true" | "false" | "clear")} value={paidStatus}>
-                <option value="true">Paid outside Acuity</option>
+                <option value="true">Payment received by invoice, cash, or other</option>
                 <option value="false">Not fully paid</option>
                 <option value="clear">Clear manual status</option>
               </select>
@@ -661,7 +661,7 @@ function PaymentOverrideForm({
             {selected && (
               <div className="payment-override-summary">
                 <div><span>Price</span><strong>{dollars(selected.priceCents, true)}</strong></div>
-                <div><span>Recorded online</span><strong>{selected.paidOnlineCents === null ? "None" : dollars(selected.paidOnlineCents, true)}</strong></div>
+                <div><span>Calendar “Paid Online”</span><strong>{selected.paidOnlineCents === null ? "None" : dollars(selected.paidOnlineCents, true)}</strong></div>
                 <div><span>Remaining</span><strong>{dollars(Math.max(selected.priceCents - (selected.paidOnlineCents ?? 0), 0), true)}</strong></div>
               </div>
             )}
@@ -851,7 +851,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
                   </SelectContent>
                 </Select>
                 <Badge className="count-badge" variant="secondary">{filteredRentals.length} appointment{filteredRentals.length === 1 ? "" : "s"}</Badge>
-                {isOwner && reviewRentals.length > 0 && <Button onClick={openPaymentOverride} size="sm" variant="outline"><GitBranch size={14} /> Mark offline payment</Button>}
+                {isOwner && reviewRentals.length > 0 && <Button onClick={openPaymentOverride} size="sm" variant="outline"><GitBranch size={14} /> Record payment received</Button>}
               </div>
             </div>
             {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the 30-minute Calendar sync." : "No appointments match the selected filters."} title="No appointments found" />}
