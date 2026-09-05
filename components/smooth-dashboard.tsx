@@ -71,7 +71,7 @@ import type {
 } from "@/lib/dashboard-types";
 
 const FALLBACK_PROFILES: AccessProfile[] = [
-  { id: "owner", label: "Owner", role: "owner" },
+  { id: "owner", label: "Smooth", role: "owner" },
   { id: "akiva", label: "Akiva", role: "employee" },
   { id: "jordyn", label: "Jordyn", role: "employee" },
   { id: "rayne", label: "Rayne", role: "employee" },
