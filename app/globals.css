@@ -140,6 +140,17 @@ button { cursor: pointer; }
 .category-revenue-card small { margin-top:4px; color:var(--muted-foreground); font-size:10px; }
 .category-revenue-card b { font-size:15px; letter-spacing:-.03em; }
 .category-marker { width:5px; height:34px; border-radius:999px; background:var(--category-color); }
+.payment-review-panel { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:22px; margin-top:15px; padding:19px 22px; border-left:4px solid #e10000; }
+.payment-review-copy { min-width:0; display:flex; align-items:flex-start; gap:14px; }
+.payment-review-icon { width:42px; height:42px; display:grid; place-items:center; flex:0 0 auto; border-radius:12px; color:#c90000; background:rgba(225,0,0,.09); }
+.payment-review-copy h2 { margin:0; font-size:16px; letter-spacing:-.02em; }
+.payment-review-copy > div > p:last-child { max-width:720px; margin:5px 0 0; color:var(--muted-foreground); font-size:12px; line-height:1.5; }
+.payment-review-total { min-width:150px; padding-left:20px; border-left:1px solid var(--border); }
+.payment-review-total span,.payment-review-total strong,.payment-review-total small { display:block; }
+.payment-review-total span { color:var(--muted-foreground); font-size:11px; font-weight:700; }
+.payment-review-total strong { margin-top:3px; font-size:22px; letter-spacing:-.04em; }
+.payment-review-total small { margin-top:2px; color:var(--muted-foreground); font-size:10px; }
+.payment-review-actions { display:flex; align-items:center; gap:8px; }
 .overview-grid { display: grid; grid-template-columns: minmax(0,1.65fr) minmax(300px,.75fr); gap: 15px; margin-top: 15px; }
 .panel { border: 1px solid var(--border); border-radius: 18px; background: var(--card); box-shadow: 0 8px 26px rgba(20,20,24,.035); }
 .panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 21px 22px 11px; }
@@ -179,12 +190,22 @@ button { cursor: pointer; }
 .rental-table td { height: 62px; padding: 10px 16px; }
 .rental-name strong,.rental-name span,.rental-date strong,.rental-date span { display:block; } .rental-name strong,.rental-date strong { font-size: 11px; } .rental-name span,.rental-date span { margin-top: 4px; color: var(--muted-foreground); font-size: 9px; }
 .money-cell,.share-amount { font-size: 11px; font-weight: 750; } .share-amount { color: #e10000; }
+.payment-amount strong,.payment-amount span { display:block; }
+.payment-amount strong { font-size:11px; }
+.payment-detail { margin-top:4px; color:var(--muted-foreground); font-size:9px; font-weight:600; white-space:nowrap; }
+.payment-detail-tip { color:#16794b; }
+.payment-detail-deposit { color:#a55d00; }
+.payment-detail-paid { color:#16794b; }
 .status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 999px; font-size: 9px; font-weight: 750; white-space: nowrap; }
 .status span { width: 6px; height: 6px; border-radius: 50%; }
 .status-upcoming { color: #2664bb; background: rgba(66,133,244,.11); } .status-upcoming span { background:#4285f4; }
+.status-upcoming-paid { color:#16794b; background:rgba(31,157,99,.11); } .status-upcoming-paid span { background:#1f9d63; }
 .status-earned { color: #b36700; background: rgba(239,170,32,.12); } .status-earned span { background:#efaa20; }
 .status-paid { color: #16794b; background: rgba(31,157,99,.11); } .status-paid span { background:#1f9d63; }
-.status-awaiting { color: #b50000; background: rgba(225,0,0,.09); } .status-awaiting span { background:#e10000; }
+.status-customer-paid { color:#16794b; background:rgba(31,157,99,.11); } .status-customer-paid span { background:#1f9d63; }
+.status-deposit { color:#a55d00; background:rgba(239,170,32,.13); } .status-deposit span { background:#efaa20; }
+.status-awaiting { color:#62626c; background:rgba(113,113,122,.12); } .status-awaiting span { background:#71717a; }
+.status-review { color:#b50000; background:rgba(225,0,0,.09); } .status-review span { background:#e10000; }
 .category-badge { display:inline-flex; align-items:center; padding:6px 9px; border-radius:999px; color:var(--category-color); background:var(--category-bg); font-size:9px; font-weight:800; white-space:nowrap; }
 .category-studio-rentals { --category-color:#c90000; --category-bg:rgba(225,0,0,.10); }
 .category-studio-packages { --category-color:#8d3fc7; --category-bg:rgba(141,63,199,.11); }
@@ -200,6 +221,7 @@ button { cursor: pointer; }
 .page-panel { overflow:hidden; } .page-heading { align-items:center; padding-bottom:20px; } .page-heading > div > p:not(.eyebrow) { margin:6px 0 0; color:var(--muted-foreground); font-size:10px; } .count-badge { font-size:10px; }
 .page-actions { display:flex; align-items:center; justify-content:flex-end; gap:9px; flex-wrap:wrap; }
 .panel-heading .category-select { width:180px; height:36px; justify-content:space-between; padding:0 11px; border:1px solid var(--border); border-radius:10px; color:var(--foreground); background:var(--card); font-size:12px; font-weight:650; }
+.panel-heading .payment-select { width:190px; }
 .team-page-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:15px; }
 .employee-card { padding:21px; } .employee-card-head { display:grid; grid-template-columns:50px minmax(0,1fr) auto; align-items:center; gap:12px; } .employee-avatar.large { width:50px; height:50px; border-radius:15px; font-size:17px; }
 .employee-card-head h2 { margin:0; font-size:17px; } .employee-card-head p { overflow:hidden; margin:4px 0 0; color:var(--muted-foreground); font-size:9px; text-overflow:ellipsis; }
@@ -230,6 +252,7 @@ button { cursor: pointer; }
   .team-strip-heading { border-right:0; border-bottom:1px solid var(--border); } .team-strip-grid { grid-template-columns:repeat(3,1fr); }
   .team-page-grid { grid-template-columns:1fr; } .period-strip { grid-template-columns:1fr repeat(3,1fr); } .category-revenue-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .period-strip-title { grid-column:1 / -1; border-right:0; border-bottom:1px solid var(--border); }
+  .payment-review-panel { grid-template-columns:minmax(0,1fr) auto; } .payment-review-actions { grid-column:1 / -1; justify-content:flex-end; }
 }
 @media (max-width: 900px) {
   .overview-grid,.payout-layout { grid-template-columns:1fr; } .dashboard-topbar { min-height:72px; }
@@ -242,6 +265,7 @@ button { cursor: pointer; }
   .topbar-actions .date-chip { display:none; } .panel-heading { padding:18px 16px 10px; } .chart-legend { display:none; }
   .rental-table th,.rental-table td { padding-left:12px; padding-right:12px; } .payout-summary { grid-template-columns:1fr; }
   .login-card { padding:28px 22px; } .period-strip { grid-template-columns:1fr; } .period-total { border-right:0; border-bottom:1px solid var(--border); } .category-revenue-grid { grid-template-columns:1fr; padding:7px 12px 16px; }
+  .payment-review-panel { grid-template-columns:1fr; gap:15px; padding:17px; } .payment-review-total { padding:13px 0 0; border-top:1px solid var(--border); border-left:0; } .payment-review-actions { grid-column:auto; justify-content:flex-start; flex-wrap:wrap; }
 }
 @media (max-width: 480px) {
   .login-shell { padding:18px 12px; } .login-card { padding:30px 22px; }
