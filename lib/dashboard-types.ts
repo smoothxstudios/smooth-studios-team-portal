@@ -16,6 +16,8 @@ export type EmployeePayout = {
 export type Rental = {
   id: string;
   title: string;
+  categoryId?: string;
+  category?: string;
   customer: string;
   start: string;
   end: string;
