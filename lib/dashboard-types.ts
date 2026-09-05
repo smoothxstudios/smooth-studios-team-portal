@@ -23,6 +23,7 @@ export type Rental = {
   end: string;
   priceCents: number;
   paidOnlineCents: number | null;
+  tipCents?: number;
   fullyPaid: boolean;
   paymentOverride?: boolean;
   assignedEmployeeIds: string[];
