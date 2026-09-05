@@ -17,6 +17,7 @@ import {
   Banknote,
   CalendarDays,
   Check,
+  ChevronDown,
   ChevronRight,
   CircleDollarSign,
   Clock3,
@@ -168,42 +169,25 @@ function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[]; onUnlo
 
   return (
     <main className="login-shell">
-      <section className="login-brand-panel">
-        <div className="login-brand-content">
-          <Logo />
-          <p className="eyebrow light">Team rental operations</p>
-          <h1>Your studios.<br />Your team.<br /><span>One clean view.</span></h1>
-          <p className="login-intro">Schedules, rental revenue, and earnings—updated from the Smooth Studios calendar.</p>
+      <div className="login-card">
+        <Logo />
+        <div className="login-heading">
+          <p className="eyebrow">Team portal</p>
+          <h1>Sign in</h1>
         </div>
-        <div className="brand-orbit brand-orbit-one" />
-        <div className="brand-orbit brand-orbit-two" />
-        <div className="login-security"><ShieldCheck size={17} /> Encrypted before it reaches GitHub Pages</div>
-      </section>
-      <section className="login-form-panel">
-        <div className="login-card">
-          <div className="login-heading">
-            <div className="lock-tile"><LockKeyhole size={21} /></div>
-            <div><p className="eyebrow">Secure access</p><h2>Welcome back</h2></div>
+        <form onSubmit={submit}>
+          <label className="select-label" htmlFor="dashboard-profile">Dashboard</label>
+          <div className="select-field">
+            <Users aria-hidden="true" size={17} />
+            <select
+              id="dashboard-profile"
+              onChange={(event) => { setSelectedId(event.target.value); setError(""); }}
+              value={selectedId}
+            >
+              {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.label}</option>)}
+            </select>
+            <ChevronDown aria-hidden="true" size={17} />
           </div>
-          <p className="login-copy">Choose your dashboard and enter the private password provided by Smooth Studios.</p>
-          <form onSubmit={submit}>
-            <fieldset>
-              <legend>Dashboard</legend>
-              <div className="profile-grid">
-                {profiles.map((profile) => (
-                  <button
-                    className={selectedId === profile.id ? "profile-choice active" : "profile-choice"}
-                    key={profile.id}
-                    onClick={() => { setSelectedId(profile.id); setError(""); }}
-                    type="button"
-                  >
-                    <span className="profile-avatar">{profile.label.slice(0, 1)}</span>
-                    <span>{profile.label}</span>
-                    {selectedId === profile.id && <Check size={14} />}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
             <label className="password-label" htmlFor="dashboard-password">Password</label>
             <div className="password-field">
               <LockKeyhole size={17} />
@@ -221,12 +205,10 @@ function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[]; onUnlo
             </div>
             {error && <p className="login-error" role="alert">{error}</p>}
             <Button className="unlock-button" disabled={!password || loading} size="lg" type="submit">
-              {loading ? "Decrypting…" : "Unlock dashboard"}<ArrowRight size={17} />
+              {loading ? "Signing in…" : "Sign in"}<ArrowRight size={17} />
             </Button>
-          </form>
-          <p className="privacy-note"><ShieldCheck size={15} /> Your password never leaves this device.</p>
-        </div>
-      </section>
+        </form>
+      </div>
     </main>
   );
 }
