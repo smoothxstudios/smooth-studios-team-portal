@@ -63,12 +63,28 @@ function requiredEnvironment(name) {
   return value;
 }
 
+function parseInvitationEmails(value, environmentName) {
+  const emails = [...new Set(
+    value
+      .split(/[,;\r\n]+/)
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  )];
+  if (!emails.length || emails.some((email) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) {
+    throw new Error(`${environmentName} must contain one or more valid email addresses separated by commas`);
+  }
+  return emails;
+}
+
 const config = {
   ...rawConfig,
-  employees: rawConfig.employees.map((employee) => ({
-    ...employee,
-    email: requiredEnvironment(employee.emailEnvironmentVariable),
-  })),
+  employees: rawConfig.employees.map((employee) => {
+    const invitationEmails = parseInvitationEmails(
+      requiredEnvironment(employee.emailEnvironmentVariable),
+      employee.emailEnvironmentVariable,
+    );
+    return { ...employee, email: invitationEmails[0], invitationEmails };
+  }),
 };
 
 const serviceAccount = JSON.parse(requiredEnvironment("GOOGLE_SERVICE_ACCOUNT_JSON"));
