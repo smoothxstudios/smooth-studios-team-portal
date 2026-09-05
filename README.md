@@ -1,21 +1,22 @@
 # Smooth Studios Team Portal
 
-A GitHub-hosted dashboard for Smooth Studios rental schedules, studio revenue, and employee earnings. It reads one dedicated Google Calendar on an hourly schedule, assigns rentals only to employees who accepted the event invitation, and publishes a separate encrypted dashboard for the owner and each employee.
+A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and employee earnings. It reads one dedicated Google Calendar on an hourly schedule, assigns appointments only to employees who accepted the event invitation, and publishes a separate encrypted dashboard for Smooth and each employee.
 
 ## What it does
 
-- Owner overview: all rental revenue, every employee schedule, payroll owed, paid versus unpaid earnings, and period comparisons.
-- Employee overview: upcoming rentals, completed history, projected earnings, earned-but-unpaid amount, paid totals, and weekly/monthly/yearly context.
+- Owner overview: total revenue, revenue by package category, every employee schedule, payroll owed, paid-to-team totals, and period comparisons.
+- Employee overview: upcoming appointments, completed history, projected earnings, earned-but-unpaid amount, paid totals, and weekly/monthly/yearly context.
+- Appointment categories: Studio Rentals, Studio Packages, Outside, Graduation, Video, Business, Campaign, and a safe Other fallback. Add-ons inherit the main package category from the event title.
 - Employee assignment: the attendee email must match any email configured for that employee and the attendee response must be `accepted`.
-- Earnings: every accepted employee receives 30% of the full rental price. When multiple employees accept, each receives the full 30%.
+- Earnings: every accepted employee receives 30% of the full appointment price, whether it is a studio rental or another package. When multiple employees accept, each receives the full 30%.
 - Customer payment: `Price:` and `Paid Online:` are parsed as cents and must match exactly. An owner can record an exception through the payment-override GitHub workflow.
-- Earned timing: commission becomes earned only after both the rental end time has passed and the customer is fully paid.
+- Earned timing: commission becomes earned only after both the appointment end time has passed and the customer is fully paid.
 - Employee payout: the owner runs **Mark employee earnings paid** and chooses an employee plus a paid-through date.
 - Theme: Smooth Studios light and dark modes with a persistent local preference.
 
 ## Privacy model
 
-GitHub Pages serves static files, so it cannot protect Calendar data with a traditional server session. This project therefore encrypts each dashboard separately with AES-256-GCM before publication. Password keys are derived in the browser with PBKDF2-SHA256 (310,000 iterations). Only encrypted rental payloads are placed in `public/data`.
+GitHub Pages serves static files, so it cannot protect Calendar data with a traditional server session. This project therefore encrypts each dashboard separately with AES-256-GCM before publication. Password keys are derived in the browser with PBKDF2-SHA256 (310,000 iterations). Only encrypted appointment payloads are placed in `public/data`.
 
 Use a private repository whenever the GitHub account plan permits private-repository Pages. If Pages requires a public repository, the deployed data remains encrypted and employee emails are still kept in GitHub Secrets, but source code and the public login screen remain visible.
 
