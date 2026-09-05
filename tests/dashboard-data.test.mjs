@@ -134,9 +134,18 @@ test("assigns an employee through any accepted invitation email", () => {
   assert.equal(normalized.employeePayouts.akiva.amountCents, 1500);
 });
 
-test("requires an exact payment match unless the owner overrides it", () => {
+test("treats deposits as partial and payments above price as paid with a tip", () => {
   const partial = { ...event, description: event.description.replace("Paid Online: $50.00", "Paid Online: $49.99") };
-  assert.equal(normalizeCalendarEvent(partial, config, ledger, {}).fullyPaid, false);
+  const partialRental = normalizeCalendarEvent(partial, config, ledger, {});
+  assert.equal(partialRental.fullyPaid, false);
+  assert.equal(partialRental.tipCents, 0);
+
+  const tipped = { ...event, id: "tipped-event", description: event.description.replace("Paid Online: $50.00", "Paid Online: $62.00") };
+  const tippedRental = normalizeCalendarEvent(tipped, config, ledger, {});
+  assert.equal(tippedRental.fullyPaid, true);
+  assert.equal(tippedRental.tipCents, 1200);
+  assert.equal(tippedRental.employeePayouts.akiva.amountCents, 1500);
+
   const overridden = normalizeCalendarEvent(partial, config, ledger, { "calendar-event-1": true });
   assert.equal(overridden.fullyPaid, true);
   assert.equal(overridden.paymentOverride, true);
