@@ -46,6 +46,15 @@ function paidByCutoff(end, cutoff) {
   return end.slice(0, 10) <= cutoff;
 }
 
+function employeeInvitationEmails(employee) {
+  const configured = Array.isArray(employee.invitationEmails) ? employee.invitationEmails : [employee.email];
+  return configured.map((email) => email?.trim().toLowerCase()).filter(Boolean);
+}
+
+function dashboardEmployee(employee) {
+  return { id: employee.id, name: employee.name, email: employee.email, accent: employee.accent };
+}
+
 export function normalizeCalendarEvent(event, config, ledger, paymentOverrides = {}) {
   if (!event || event.status === "cancelled") return null;
   const start = event.start?.dateTime;
@@ -64,7 +73,9 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
       .map((attendee) => attendee.email?.trim().toLowerCase())
       .filter(Boolean),
   );
-  const assignedEmployees = config.employees.filter((employee) => acceptedEmails.has(employee.email.toLowerCase()));
+  const assignedEmployees = config.employees.filter((employee) =>
+    employeeInvitationEmails(employee).some((email) => acceptedEmails.has(email)),
+  );
   const amountCents = Math.round(parsed.priceCents * config.commissionRate);
   const employeePayouts = Object.fromEntries(
     assignedEmployees.map((employee) => [
@@ -104,16 +115,18 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
     generatedAt,
     calendarName: config.calendarName,
   };
+  const dashboardEmployees = config.employees.map(dashboardEmployee);
 
   const owner = {
     ...common,
     role: "owner",
     user: { id: "owner", name: config.owner.name, accent: "#e10000" },
-    employees: config.employees,
+    employees: dashboardEmployees,
     rentals,
   };
   const employeePayloads = Object.fromEntries(
     config.employees.map((employee) => {
+      const visibleEmployee = dashboardEmployee(employee);
       const filteredRentals = rentals
         .filter((rental) => rental.assignedEmployeeIds.includes(employee.id))
         .map((rental) => ({
@@ -121,7 +134,7 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
           assignedEmployeeIds: [employee.id],
           employeePayouts: { [employee.id]: rental.employeePayouts[employee.id] },
         }));
-      return [employee.id, { ...common, role: "employee", user: employee, employees: [employee], rentals: filteredRentals }];
+      return [employee.id, { ...common, role: "employee", user: visibleEmployee, employees: [visibleEmployee], rentals: filteredRentals }];
     }),
   );
   return { owner, ...employeePayloads };
