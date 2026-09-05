@@ -20,7 +20,7 @@ export type StripePaymentMatch = {
   feeCents: number;
   netCents: number;
   paymentCount: number;
-  matchConfidence: "acuity-id" | "high";
+  matchConfidence: "manual" | "acuity-id" | "high";
   disputed: boolean;
 };
 
@@ -40,6 +40,7 @@ export type StripeSummary = {
 };
 
 export type UnmatchedStripePayment = {
+  matchKey: string;
   reference: string;
   created: string;
   amountCents: number;
@@ -52,6 +53,7 @@ export type UnmatchedStripePayment = {
 
 export type Rental = {
   id: string;
+  stripeMatchKey?: string;
   title: string;
   categoryId?: string;
   category?: string;

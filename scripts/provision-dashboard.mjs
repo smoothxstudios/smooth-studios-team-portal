@@ -16,6 +16,7 @@ const config = {
 const sample = await readJson("data/sample-calendar.json");
 const ledger = await readJson("data/payout-ledger.json");
 const overrides = await readJson("data/payment-overrides.json");
+const stripeMatches = await readJson("data/stripe-payment-matches.json");
 const privateDirectory = path.join(root, ".private");
 const credentialsPath = path.join(privateDirectory, "smooth-studios-passwords.json");
 const rotate = process.argv.includes("--rotate");
@@ -45,6 +46,7 @@ const payloads = buildDashboardPayloads({
   config,
   ledger,
   overrides,
+  stripeMatches,
   source: "sample",
   ownerWorkflowToken: process.env.DASHBOARD_GITHUB_TOKEN?.trim(),
 });

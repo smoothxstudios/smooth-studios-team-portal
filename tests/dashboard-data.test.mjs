@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { webcrypto } from "node:crypto";
+import { createHash, webcrypto } from "node:crypto";
 import test from "node:test";
 
 import { categorizeAppointment } from "../lib/appointment-categories.mjs";
@@ -216,6 +216,36 @@ test("leaves ambiguous Stripe payments unmatched", () => {
   const reconciliation = reconcileStripePayments([event, duplicate], [charge]);
   assert.equal(Object.keys(reconciliation.paymentsByEventId).length, 0);
   assert.equal(reconciliation.unmatchedPayments.length, 1);
+  assert.equal(reconciliation.unmatchedPayments[0].matchKey, createHash("sha256").update("ch_ambiguous").digest("hex"));
+});
+
+test("uses an owner-confirmed Stripe payment match before automatic matching", () => {
+  const charge = {
+    id: "ch_manual_match",
+    created: "2026-02-01T16:00:00.000Z",
+    currency: "usd",
+    capturedCents: 2500,
+    refundedCents: 0,
+    receivedCents: 2500,
+    feeCents: 100,
+    netCents: 2400,
+    customerEmail: "payer-with-different-name@example.invalid",
+    customerName: "Different Cardholder",
+    description: "Invoice payment",
+    metadata: {},
+    searchText: "invoice payment different cardholder",
+    disputed: false,
+  };
+  const reconciliation = reconcileStripePayments(
+    [event],
+    [charge],
+    { version: 1, charges: {
+      [createHash("sha256").update("ch_manual_match").digest("hex")]: createHash("sha256").update(event.id).digest("hex"),
+    } },
+  );
+  assert.equal(reconciliation.unmatchedPayments.length, 0);
+  assert.equal(reconciliation.paymentsByEventId[event.id].receivedCents, 2500);
+  assert.equal(reconciliation.paymentsByEventId[event.id].matchConfidence, "manual");
 });
 
 test("normalizes Stripe refunds, fees, and bank payouts", () => {

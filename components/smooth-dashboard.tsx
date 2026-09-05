@@ -27,12 +27,14 @@ import {
   GitBranch,
   Landmark,
   LayoutDashboard,
+  Link2,
   LockKeyhole,
   LogOut,
   Menu,
   Moon,
   ReceiptText,
   RefreshCw,
+  Search,
   ShieldCheck,
   Sun,
   TriangleAlert,
@@ -42,6 +44,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -397,9 +400,11 @@ function CategoryRevenue({ rentals }: { rentals: Rental[] }) {
 function StripeMoneyFlow({
   summary,
   unmatchedPayments,
+  onMatch,
 }: {
   summary?: StripeSummary;
   unmatchedPayments: UnmatchedStripePayment[];
+  onMatch: (paymentId?: string) => void;
 }) {
   if (!summary) {
     return (
@@ -438,14 +443,19 @@ function StripeMoneyFlow({
         <div className="stripe-unmatched">
           <div className="stripe-unmatched-heading">
             <span><TriangleAlert size={17} /></span>
-            <div><strong>{summary.unmatchedPaymentCount} Stripe payment{summary.unmatchedPaymentCount === 1 ? "" : "s"} need matching</strong><small>{dollars(summary.unmatchedCents, true)} was received but could not be safely tied to a Calendar appointment.</small></div>
+            <div>
+              <strong>{summary.unmatchedPaymentCount} Stripe payment{summary.unmatchedPaymentCount === 1 ? "" : "s"} need matching</strong>
+              <small>{dollars(summary.unmatchedCents, true)} was received but could not be safely tied to a Calendar appointment.</small>
+              <Button onClick={() => onMatch()} size="sm" variant="outline"><Link2 size={14} /> Match payments</Button>
+            </div>
           </div>
           <div className="stripe-unmatched-list">
             {unmatchedPayments.slice(0, 5).map((payment) => (
-              <div key={`${payment.reference}-${payment.created}`}>
+              <button aria-label={`Match ${payment.customerName || payment.customerEmail || "unknown customer"} payment of ${dollars(payment.amountCents, true)}`} disabled={!payment.matchKey} key={`${payment.matchKey || payment.reference}-${payment.created}`} onClick={() => onMatch(payment.matchKey)} type="button">
                 <span><strong>{payment.customerName || payment.customerEmail || "Unknown customer"}</strong><small>{formatDate(payment.created, true)} · ref {payment.reference}</small></span>
                 <b>{dollars(payment.amountCents, true)}</b>
-              </div>
+                <em>Match</em>
+              </button>
             ))}
           </div>
         </div>
@@ -754,6 +764,158 @@ function PaymentOverrideForm({
   );
 }
 
+function normalizedMatchText(value: string | null | undefined) {
+  return (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function stripeAppointmentScore(payment: UnmatchedStripePayment, rental: Rental) {
+  const paymentName = normalizedMatchText(payment.customerName);
+  const customer = normalizedMatchText(rental.customer);
+  let score = 0;
+  if (paymentName && customer && paymentName === customer) score += 100;
+  else if (paymentName && customer && (paymentName.includes(customer) || customer.includes(paymentName))) score += 45;
+  if (payment.amountCents === rental.priceCents) score += 50;
+  else if (payment.amountCents < rental.priceCents) score += 22;
+  const distance = Math.abs(new Date(rental.start).getTime() - new Date(payment.created).getTime()) / 86_400_000;
+  if (distance <= 7) score += 35;
+  else if (distance <= 45) score += 20;
+  else if (distance <= 180) score += 8;
+  return score;
+}
+
+function StripeMatchForm({
+  open,
+  onOpenChange,
+  onContinue,
+  payments,
+  rentals,
+  initialPaymentId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onContinue: (request: OwnerWorkflowRequest) => void;
+  payments: UnmatchedStripePayment[];
+  rentals: Rental[];
+  initialPaymentId: string;
+}) {
+  const [paymentId, setPaymentId] = useState("");
+  const [eventId, setEventId] = useState("");
+  const [query, setQuery] = useState("");
+  const matchablePayments = useMemo(() => payments.filter((payment) => Boolean(payment.matchKey)), [payments]);
+
+  useEffect(() => {
+    if (!open) return;
+    const resetTimer = window.setTimeout(() => {
+      setPaymentId(initialPaymentId || matchablePayments[0]?.matchKey || "");
+      setEventId("");
+      setQuery("");
+    }, 0);
+    return () => window.clearTimeout(resetTimer);
+  }, [initialPaymentId, matchablePayments, open]);
+
+  const selectedPayment = matchablePayments.find((payment) => payment.matchKey === paymentId);
+  const sortedRentals = useMemo(() => {
+    if (!selectedPayment) return [];
+    return [...rentals].sort((a, b) => {
+      const scoreDifference = stripeAppointmentScore(selectedPayment, b) - stripeAppointmentScore(selectedPayment, a);
+      return scoreDifference || new Date(b.start).getTime() - new Date(a.start).getTime();
+    });
+  }, [rentals, selectedPayment]);
+  const matchingRentals = useMemo(() => {
+    const words = normalizedMatchText(query).split(" ").filter(Boolean);
+    const filtered = words.length
+      ? sortedRentals.filter((rental) => {
+        const searchable = normalizedMatchText(`${rental.customer} ${rental.title} ${rental.category ?? ""} ${formatDate(rental.start)} ${dollars(rental.priceCents, true)}`);
+        return words.every((word) => searchable.includes(word));
+      })
+      : sortedRentals;
+    return filtered.slice(0, 16);
+  }, [query, sortedRentals]);
+  const selectedRental = rentals.find((rental) => rental.id === eventId);
+
+  const changePayment = (nextPaymentId: string) => {
+    setPaymentId(nextPaymentId);
+    setEventId("");
+    setQuery("");
+  };
+
+  const continueToConfirmation = () => {
+    if (!selectedPayment || !selectedRental?.stripeMatchKey) return;
+    onOpenChange(false);
+    onContinue({
+      workflowId: "match-stripe-payment.yml",
+      title: "Match Stripe payment",
+      description: "This links this Stripe charge to the selected Calendar appointment. Deposits, final payments, and tips can each be linked to the same appointment.",
+      actionLabel: "Save payment match",
+      inputs: { charge_key: selectedPayment.matchKey, event_key: selectedRental.stripeMatchKey ?? "" },
+      details: [
+        { label: "Stripe payment", value: `${selectedPayment.customerName || selectedPayment.customerEmail || "Unknown customer"} · ${dollars(selectedPayment.amountCents, true)}` },
+        { label: "Payment date", value: `${formatDate(selectedPayment.created, true)} · ref ${selectedPayment.reference}` },
+        { label: "Calendar appointment", value: `${selectedRental.customer} · ${selectedRental.title}` },
+        { label: "Appointment date", value: `${formatDate(selectedRental.start, true)} at ${formatTime(selectedRental.start)}` },
+        { label: "Appointment price", value: dollars(selectedRental.priceCents, true) },
+      ],
+    });
+  };
+
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="stripe-match-dialog">
+        <DialogHeader>
+          <p className="eyebrow">Stripe reconciliation</p>
+          <DialogTitle>Match payment to appointment</DialogTitle>
+          <DialogDescription>Select the Stripe payment, then choose the Calendar appointment it belongs to. Leave unrelated payments unmatched—they still count in Stripe totals.</DialogDescription>
+        </DialogHeader>
+        {matchablePayments.length ? (
+          <>
+            <div className="workflow-form-field">
+              <label htmlFor="stripe-payment">Stripe payment</label>
+              <select id="stripe-payment" onChange={(event) => changePayment(event.target.value)} value={paymentId}>
+                {matchablePayments.map((payment) => (
+                  <option key={payment.matchKey} value={payment.matchKey}>
+                    {formatDate(payment.created, true)} · {payment.customerName || payment.customerEmail || "Unknown customer"} · {dollars(payment.amountCents, true)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedPayment && (
+              <div className="stripe-payment-summary">
+                <div><span>Customer</span><strong>{selectedPayment.customerName || selectedPayment.customerEmail || "Unknown"}</strong></div>
+                <div><span>Received</span><strong>{dollars(selectedPayment.amountCents, true)}</strong></div>
+                <div><span>Reference</span><strong>{selectedPayment.reference}</strong></div>
+              </div>
+            )}
+            <div className="stripe-appointment-picker">
+              <label htmlFor="appointment-search">Calendar appointment</label>
+              <div className="stripe-search-field"><Search size={17} /><Input autoComplete="off" id="appointment-search" onChange={(event) => setQuery(event.target.value)} placeholder="Search customer, package, date, or price" type="search" value={query} /></div>
+              <div aria-label="Calendar appointment choices" className="stripe-appointment-list" role="listbox">
+                {matchingRentals.length ? matchingRentals.map((rental, index) => {
+                  const selected = rental.id === eventId;
+                  const likely = !query && index < 3 && selectedPayment && stripeAppointmentScore(selectedPayment, rental) >= 80;
+                  return (
+                    <button aria-selected={selected} className={selected ? "selected" : ""} key={rental.id} onClick={() => setEventId(rental.id)} role="option" type="button">
+                      <span className="stripe-appointment-date"><strong>{formatDate(rental.start, true)}</strong><small>{formatTime(rental.start)}</small></span>
+                      <span className="stripe-appointment-copy"><strong>{rental.customer}</strong><small>{rental.title}</small></span>
+                      {likely && <Badge variant="secondary">Possible match</Badge>}
+                      <span className="stripe-appointment-amount"><strong>{dollars(rental.priceCents, true)}</strong><small>{rental.paidOnlineCents === null ? "No payment linked" : `${dollars(rental.paidOnlineCents, true)} recorded`}</small></span>
+                      <span className="stripe-appointment-check">{selected && <Check size={16} />}</span>
+                    </button>
+                  );
+                }) : <EmptyState copy="Try the customer's last name, package name, month, or price." title="No appointments found" />}
+              </div>
+              {!query && sortedRentals.length > matchingRentals.length && <small className="stripe-picker-note">Showing the closest possibilities first. Search to find any other 2026 appointment.</small>}
+            </div>
+          </>
+        ) : <EmptyState copy={payments.length ? "Run Sync now once to prepare these payments for manual matching." : "The next Stripe sync will add any payments that still need matching."} title={payments.length ? "One more sync needed" : "No unmatched payments"} />}
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} variant="outline">Cancel</Button>
+          <Button className="workflow-run-button" disabled={!selectedPayment || !selectedRental?.stripeMatchKey} onClick={continueToConfirmation}>Continue</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DashboardView({ payload, dark, setDark, onLogout }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void }) {
   const [view, setView] = useState<ViewKey>("overview");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -761,6 +923,8 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
   const [paidThrough, setPaidThrough] = useState(new Date().toISOString().slice(0, 10));
   const [payoutEmployee, setPayoutEmployee] = useState("all");
   const [paymentOverrideOpen, setPaymentOverrideOpen] = useState(false);
+  const [stripeMatchOpen, setStripeMatchOpen] = useState(false);
+  const [stripeMatchPaymentId, setStripeMatchPaymentId] = useState("");
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [workflowRequest, setWorkflowRequest] = useState<OwnerWorkflowRequest | null>(null);
   const isOwner = payload.role === "owner";
@@ -854,6 +1018,10 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
   const openPaymentOverride = () => {
     if (reviewRentals.length) setPaymentOverrideOpen(true);
   };
+  const openStripeMatch = (paymentId = "") => {
+    setStripeMatchPaymentId(paymentId);
+    setStripeMatchOpen(true);
+  };
   const reviewPayments = () => {
     setCategoryFilter("all");
     setPaymentFilter("review");
@@ -887,7 +1055,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
               <section className="kpi-grid">
                 {isOwner ? <><KpiCard icon={CircleDollarSign} label="Appointment revenue" note="Fully paid Calendar appointments" tone="red" value={dollars(metrics.revenue)} /><KpiCard icon={Banknote} label="Payroll owed" note="Earned, not yet paid" tone="amber" value={dollars(metrics.owed)} /><KpiCard icon={ShieldCheck} label="Paid to team" note="Recorded employee payouts" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={`${upcoming.length} accepted assignments`} tone="blue" value={String(upcoming.length)} /></> : <><KpiCard icon={Banknote} label="Earned, not paid" note="Completed + customer paid" tone="red" value={dollars(metrics.owed)} /><KpiCard icon={Clock3} label="Projected earnings" note="From upcoming appointments" tone="amber" value={dollars(metrics.projected)} /><KpiCard icon={ShieldCheck} label="Paid this year" note="Payouts marked complete" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={upcoming[0] ? `Next: ${formatDate(upcoming[0].start, true)}` : "Nothing scheduled"} tone="blue" value={String(upcoming.length)} /></>}
               </section>
-              {isOwner && <StripeMoneyFlow summary={payload.stripeSummary} unmatchedPayments={payload.unmatchedStripePayments ?? []} />}
+              {isOwner && <StripeMoneyFlow onMatch={openStripeMatch} summary={payload.stripeSummary} unmatchedPayments={payload.unmatchedStripePayments ?? []} />}
               <PeriodTotals employeeId={employeeId} rentals={visibleRentals} />
               {isOwner && <CategoryRevenue rentals={visibleRentals} />}
               {isOwner && <PaymentReview onOpen={reviewPayments} onOverride={openPaymentOverride} rentals={visibleRentals} stripeConnected={stripeConnected} />}
@@ -942,6 +1110,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
       {isOwner && (
         <>
           <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={setPaymentOverrideOpen} open={paymentOverrideOpen} reviewRentals={reviewRentals} />
+          <StripeMatchForm initialPaymentId={stripeMatchPaymentId} onContinue={openWorkflow} onOpenChange={setStripeMatchOpen} open={stripeMatchOpen} payments={payload.unmatchedStripePayments ?? []} rentals={rentals} />
           <GithubWorkflowDialog access={payload.workflowAccess} onOpenChange={setWorkflowOpen} open={workflowOpen} request={workflowRequest} />
         </>
       )}

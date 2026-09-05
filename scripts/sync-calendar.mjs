@@ -10,6 +10,7 @@ const readJson = async (relativePath) => JSON.parse(await readFile(path.join(roo
 const rawConfig = await readJson("config/studio.config.json");
 const ledger = await readJson("data/payout-ledger.json");
 const overrides = await readJson("data/payment-overrides.json");
+const stripeMatches = await readJson("data/stripe-payment-matches.json");
 
 function base64url(value) {
   return Buffer.from(value).toString("base64url");
@@ -112,6 +113,7 @@ const payloads = buildDashboardPayloads({
   config,
   ledger,
   overrides,
+  stripeMatches,
   source: "google-calendar",
   ownerWorkflowToken,
   stripeSnapshot,

@@ -10,7 +10,7 @@ A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and e
 - Employee assignment: the attendee email must match any email configured for that employee and the attendee response must be `accepted`.
 - Earnings: every accepted employee receives 30% of the full appointment price, whether it is a studio rental or another package. When multiple employees accept, each receives the full 30%.
 - Customer payment: matched Stripe payments are the preferred source of truth. Acuity IDs are matched first; high-confidence customer email/name, amount, and date matches are used as a fallback. `Paid Online:` remains the fallback when Stripe is not connected or no Stripe payment can be safely matched. Any amount above the price is recorded as a tip. A lower positive amount is a deposit, and a completed appointment with a remaining balance is flagged for review. Smooth can confirm payment received by invoice, cash, Apple Pay, or another method through the payment-override workflow.
-- Reconciliation safety: Stripe payments that cannot be confidently tied to one Calendar appointment appear only in Smooth's encrypted **Stripe reconciliation** review list. They are never silently attached to an employee commission.
+- Reconciliation safety: Stripe payments that cannot be confidently tied to one Calendar appointment appear only in Smooth's encrypted **Stripe reconciliation** review list. Smooth can select a payment, search for its Calendar appointment, and confirm the match from the dashboard. Unmatched payments are never silently attached to an employee commission.
 - Earned timing: commission becomes earned only after both the appointment end time has passed and the customer is fully paid.
 - Employee payout: the owner runs **Mark employee earnings paid** and chooses an employee plus a paid-through date.
 - Owner workflow controls: Smooth can sync the Calendar, mark employee payouts, and update customer payment status directly inside the dashboard while seeing queued, running, and completed states.
@@ -114,6 +114,7 @@ Use `npm run provision -- --rotate` only when intentionally rotating every dashb
 
 - **Mark employee earnings paid**: Smooth chooses a paid-through date in the dashboard. It updates the payout ledger, rebuilds encrypted data, and redeploys the site.
 - **Update customer payment**: Smooth chooses an appointment and confirms payment received by invoice, cash, or another method, marks it not fully paid, or clears the manual status.
+- **Match Stripe payment**: Smooth selects an unmatched Stripe charge and the Calendar appointment it belongs to. The saved match is reused on every future sync, and multiple charges can be linked to one appointment for deposits and final payments.
 - **Sync Calendar and Stripe**: runs every 30 minutes and can also be started from the dashboard.
 
 The dashboard verifies that the encrypted workflow token belongs to `smoothxstudios`, triggers the selected GitHub Action, and follows its status through completion. Closing or logging out of the owner dashboard discards the decrypted token from the browser session.

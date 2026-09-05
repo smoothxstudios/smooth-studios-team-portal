@@ -66,6 +66,10 @@ function normalizedName(value) {
   return typeof value === "string" ? value.toLowerCase().replace(/[^a-z0-9]+/g, "").trim() : "";
 }
 
+function privateIdFingerprint(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
+}
+
 function addStripeMatch(assignments, eventId, charge, confidence) {
   const existing = assignments.get(eventId) ?? [];
   existing.push({ charge, confidence });
@@ -116,7 +120,7 @@ function stripeCandidateScore(candidate, charge, assignments) {
   return score;
 }
 
-export function reconcileStripePayments(calendarEvents, stripeCharges = []) {
+export function reconcileStripePayments(calendarEvents, stripeCharges = [], manualStripeMatches = {}) {
   const candidates = calendarEvents
     .filter((event) => event?.status !== "cancelled" && event.start?.dateTime && event.end?.dateTime)
     .map((event) => {
@@ -133,11 +137,22 @@ export function reconcileStripePayments(calendarEvents, stripeCharges = []) {
     .filter(Boolean);
   const assignments = new Map();
   const matchedChargeIds = new Set();
+  const candidatesById = new Map(candidates.map((candidate) => [privateIdFingerprint(candidate.id), candidate]));
+  const configuredMatches = manualStripeMatches?.charges ?? manualStripeMatches ?? {};
   const charges = stripeCharges
     .filter((charge) => charge?.id && charge.receivedCents > 0)
     .sort((a, b) => new Date(a.created).getTime() - new Date(b.created).getTime());
 
   for (const charge of charges) {
+    const eventKey = configuredMatches[privateIdFingerprint(charge.id)];
+    const candidate = typeof eventKey === "string" ? candidatesById.get(eventKey) : null;
+    if (!candidate) continue;
+    addStripeMatch(assignments, candidate.id, charge, "manual");
+    matchedChargeIds.add(charge.id);
+  }
+
+  for (const charge of charges) {
+    if (matchedChargeIds.has(charge.id)) continue;
     const exactCandidates = candidates.filter((candidate) =>
       candidate.parsed.acuityId && charge.searchText.includes(candidate.parsed.acuityId.toLowerCase()),
     );
@@ -170,7 +185,11 @@ export function reconcileStripePayments(calendarEvents, stripeCharges = []) {
         feeCents: matches.reduce((sum, match) => sum + match.charge.feeCents, 0),
         netCents: matches.reduce((sum, match) => sum + match.charge.netCents, 0),
         paymentCount: matches.length,
-        matchConfidence: matches.every((match) => match.confidence === "acuity-id") ? "acuity-id" : "high",
+        matchConfidence: matches.some((match) => match.confidence === "manual")
+          ? "manual"
+          : matches.every((match) => match.confidence === "acuity-id")
+            ? "acuity-id"
+            : "high",
         disputed: matches.some((match) => match.charge.disputed),
       },
     ]),
@@ -179,6 +198,7 @@ export function reconcileStripePayments(calendarEvents, stripeCharges = []) {
     .filter((charge) => !matchedChargeIds.has(charge.id))
     .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
     .map((charge) => ({
+      matchKey: privateIdFingerprint(charge.id),
       reference: charge.id.slice(-8),
       created: charge.created,
       amountCents: charge.receivedCents,
@@ -238,6 +258,7 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
 
   return {
     id: event.id,
+    stripeMatchKey: privateIdFingerprint(event.id),
     title,
     categoryId: category.id,
     category: category.label,
@@ -257,8 +278,8 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
   };
 }
 
-export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, source, ownerWorkflowToken, stripeSnapshot = null }) {
-  const reconciliation = reconcileStripePayments(calendarEvents, stripeSnapshot?.charges ?? []);
+export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, stripeMatches = {}, source, ownerWorkflowToken, stripeSnapshot = null }) {
+  const reconciliation = reconcileStripePayments(calendarEvents, stripeSnapshot?.charges ?? [], stripeMatches);
   const rentals = calendarEvents
     .map((event) => normalizeCalendarEvent(
       event,
@@ -306,6 +327,7 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
         .map((rental) => {
           const employeeRental = { ...rental };
           delete employeeRental.stripePayment;
+          delete employeeRental.stripeMatchKey;
           delete employeeRental.calendarPaidOnlineCents;
           return {
             ...employeeRental,
