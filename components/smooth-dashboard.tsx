@@ -611,7 +611,7 @@ function PayoutPage({
   const payoutScopeLabel = selectedEmployee?.name ?? "All employees";
   const eligibleAppointments = rentals.filter((rental) => eligibleForPayout(rental, paidThrough, payoutEmployee)).length;
   return (
-    <section className="payout-layout">
+    <section className={`payout-layout${isOwner ? "" : " employee-payout-layout"}`}>
       <article className="panel payout-chart-panel">
         <div className="panel-heading"><div><p className="eyebrow">Weekly · monthly · yearly</p><h2>{isOwner ? "Team payouts" : "My payout history"}</h2></div></div>
         <div className="payout-summary"><div><span>{isOwner ? "Paid to team" : "Paid"}</span><strong>{dollars(metrics.paid)}</strong></div><div><span>Earned, unpaid</span><strong>{dollars(metrics.owed)}</strong></div><div><span>Projected</span><strong>{dollars(metrics.projected)}</strong></div></div>
@@ -628,7 +628,7 @@ function PayoutPage({
           </ResponsiveContainer>
         </div>
       </article>
-      {isOwner ? (
+      {isOwner && (
         <article className="panel mark-paid-card">
           <div className="workflow-icon"><GitBranch size={24} /></div>
           <p className="eyebrow">Smooth action</p>
@@ -651,16 +651,6 @@ function PayoutPage({
           <div className="workflow-scope"><ReceiptText size={16} /><span>{payoutScopeLabel} · {eligibleAppointments} eligible appointment{eligibleAppointments === 1 ? "" : "s"}</span></div>
           <Button className="github-button" onClick={onContinue}>Review and mark paid <ArrowRight size={16} /></Button>
           <small>You will stay inside the dashboard while the workflow runs.</small>
-        </article>
-      ) : (
-        <article className="panel payout-rule-card">
-          <div className="rule-number">30%</div>
-          <p className="eyebrow">Your earning rule</p>
-          <h2>Simple, consistent commission</h2>
-          <p>You receive 30% of the appointment price for every accepted assignment, including studio rentals and other packages. It becomes earned only when the appointment is complete and the customer is fully paid.</p>
-          <div className="rule-check"><Check size={16} /> Invitation accepted</div>
-          <div className="rule-check"><Check size={16} /> Appointment completed</div>
-          <div className="rule-check"><Check size={16} /> “Paid Online” meets or exceeds “Price”</div>
         </article>
       )}
     </section>

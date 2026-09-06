@@ -266,21 +266,20 @@ button { cursor: pointer; }
 
 /* Payouts */
 .payout-layout { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(310px,.55fr); gap:15px; }
+.employee-payout-layout { grid-template-columns:1fr; }
 .payout-chart-panel { min-height:520px; }
 .payout-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:14px 22px 5px; }
 .payout-summary div { padding:14px; border-radius:12px; background:var(--muted); } .payout-summary span,.payout-summary strong { display:block; } .payout-summary span { color:var(--muted-foreground); font-size:9px; } .payout-summary strong { margin-top:5px; font-size:20px; }
 .bar-chart-wrap { height:330px; padding:20px 14px; }
-.mark-paid-card,.payout-rule-card { align-self:start; padding:27px; }
+.mark-paid-card { align-self:start; padding:27px; }
 .workflow-icon { width:49px; height:49px; display:grid; place-items:center; margin-bottom:22px; border-radius:15px; color:#fff; background:#171719; box-shadow:5px 5px 0 #e10000; }
-.mark-paid-card h2,.payout-rule-card h2 { margin:4px 0 11px; font-size:22px; line-height:1.15; letter-spacing:-.04em; }
-.mark-paid-card > p:not(.eyebrow),.payout-rule-card > p:not(.eyebrow) { margin:0 0 23px; color:var(--muted-foreground); font-size:11px; line-height:1.65; }
+.mark-paid-card h2 { margin:4px 0 11px; font-size:22px; line-height:1.15; letter-spacing:-.04em; }
+.mark-paid-card > p:not(.eyebrow) { margin:0 0 23px; color:var(--muted-foreground); font-size:11px; line-height:1.65; }
 .mark-paid-card label { display:block; } .mark-paid-card input { width:100%; height:44px; padding:0 12px; border:1px solid var(--border); border-radius:10px; color:var(--foreground); background:var(--background); font-size:12px; }
 .payout-control + .payout-control { margin-top:14px; } .payout-employee-select { width:100%; height:44px; border-radius:10px; color:var(--foreground); background:var(--background); font-size:12px; }
 .workflow-scope { display:flex; align-items:center; gap:8px; margin:14px 0; padding:12px; border-radius:10px; color:var(--muted-foreground); background:var(--muted); font-size:9px; }
 .workflow-scope svg { color:#e10000; } .github-button { width:100%; height:44px; border-radius:10px; background:#171719 !important; }
 .mark-paid-card small { display:block; margin-top:12px; color:var(--muted-foreground); font-size:8px; line-height:1.5; text-align:center; }
-.rule-number { font-size:64px; font-weight:850; line-height:1; letter-spacing:-.08em; color:#e10000; text-shadow:5px 5px 0 rgba(20,20,24,.12); }
-.rule-check { display:flex; align-items:center; gap:8px; margin-top:10px; padding:11px 12px; border-radius:10px; color:var(--foreground); background:var(--muted); font-size:10px; } .rule-check svg { color:#1f9d63; }
 
 /* Owner workflow controls */
 .sync-now-button { height:36px; gap:7px; border-radius:10px; color:var(--foreground); background:var(--card); font-size:13px; font-weight:700; }
