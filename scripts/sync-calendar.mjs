@@ -2,7 +2,7 @@ import { createSign } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildDashboardPayloads, writeEncryptedDashboards } from "./lib/dashboard-data.mjs";
+import { buildDashboardPayloads, decryptPayload, writeEncryptedDashboards } from "./lib/dashboard-data.mjs";
 import { fetchStripeSnapshot } from "./lib/stripe-data.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -95,6 +95,15 @@ const passwords = {
   owner: requiredEnvironment("DASHBOARD_PASSWORD_OWNER"),
   ...Object.fromEntries(config.employees.map((employee) => [employee.id, requiredEnvironment(`DASHBOARD_PASSWORD_${employee.id.toUpperCase()}`)])),
 };
+let rulebook;
+try {
+  const existingOwnerEnvelope = await readJson("public/data/owner.json");
+  rulebook = decryptPayload(existingOwnerEnvelope, passwords.owner).rulebook;
+} catch (error) {
+  if (error?.code !== "ENOENT") {
+    throw new Error("The existing owner dashboard could not be decrypted, so the Studio Guide was not overwritten", { cause: error });
+  }
+}
 const ownerWorkflowToken = process.env.DASHBOARD_GITHUB_TOKEN?.trim();
 if (!ownerWorkflowToken) {
   process.stderr.write("DASHBOARD_GITHUB_TOKEN is not configured; owner workflow controls will remain disabled.\n");
@@ -117,6 +126,7 @@ const payloads = buildDashboardPayloads({
   source: "google-calendar",
   ownerWorkflowToken,
   stripeSnapshot,
+  rulebook,
 });
 await writeEncryptedDashboards({ payloads, passwords, outputDirectory: path.join(root, "public/data"), config });
 process.stdout.write(

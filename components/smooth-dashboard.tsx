@@ -15,6 +15,7 @@ import {
 import {
   ArrowRight,
   Banknote,
+  BookOpen,
   CalendarDays,
   Check,
   ChevronDown,
@@ -84,8 +85,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { decryptDashboard } from "@/lib/dashboard-crypto";
+import { encryptWorkflowPayload } from "@/lib/dashboard-crypto";
 import { APPOINTMENT_CATEGORIES, categorizeAppointment } from "@/lib/appointment-categories.mjs";
 import { GithubWorkflowDialog, type OwnerWorkflowRequest } from "@/components/github-workflow-dialog";
+import { StudioGuidePage } from "@/components/studio-guide";
 import type {
   AccessProfile,
   DashboardPayload,
@@ -93,6 +96,7 @@ import type {
   EncryptedEnvelope,
   Rental,
   StripeSummary,
+  StudioGuideline,
   UnmatchedStripePayment,
 } from "@/lib/dashboard-types";
 
@@ -111,7 +115,7 @@ const STUDIO_TIME_ZONE = "America/New_York";
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 
-type ViewKey = "overview" | "rentals" | "team" | "payouts";
+type ViewKey = "overview" | "rentals" | "team" | "payouts" | "guide";
 type RentalState = "upcoming" | "earned" | "paid" | "awaiting";
 type CustomerPaymentState = "paid" | "deposit" | "review" | "pending";
 type AppointmentStatus = RentalState | "customer-paid" | "upcoming-paid" | "deposit" | "review";
@@ -122,6 +126,7 @@ const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ow
   { key: "rentals", label: "Appointments", icon: CalendarDays },
   { key: "team", label: "Team", icon: Users, ownerOnly: true },
   { key: "payouts", label: "Payouts", icon: WalletCards },
+  { key: "guide", label: "Studio Guide", icon: BookOpen },
 ];
 
 function dollars(cents: number, exact = false) {
@@ -906,7 +911,7 @@ function StripeMatchForm({
   );
 }
 
-function DashboardView({ payload, dark, setDark, onLogout }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void }) {
+function DashboardView({ payload, dark, setDark, onLogout, sessionPassword }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string }) {
   const [view, setView] = useState<ViewKey>("overview");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
@@ -1005,6 +1010,27 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
     ],
   });
 
+  const publishStudioGuide = async (entries: StudioGuideline[]) => {
+    if (!isOwner || !sessionPassword) throw new Error("Unlock the Smooth dashboard again before publishing the Studio Guide.");
+    const submittedGuide = { version: 1, entries };
+    if (new TextEncoder().encode(JSON.stringify(submittedGuide)).length > 40_000) {
+      throw new Error("The Studio Guide is too large to publish. Shorten a few guidelines and try again.");
+    }
+    const encryptedGuide = await encryptWorkflowPayload(submittedGuide, sessionPassword);
+    openWorkflow({
+      workflowId: "update-guidelines.yml",
+      title: "Publish Studio Guide",
+      description: "This updates the shared rulebook in every encrypted team dashboard and republishes the portal.",
+      actionLabel: "Publish guide",
+      inputs: { guide_envelope: JSON.stringify(encryptedGuide) },
+      details: [
+        { label: "Guidelines", value: String(entries.length) },
+        { label: "Categories", value: String(new Set(entries.map((entry) => entry.category)).size) },
+        { label: "Visibility", value: "Every logged-in team dashboard" },
+      ],
+    });
+  };
+
   const openPaymentOverride = () => {
     if (reviewRentals.length) setPaymentOverrideOpen(true);
   };
@@ -1095,6 +1121,7 @@ function DashboardView({ payload, dark, setDark, onLogout }: { payload: Dashboar
           </article>}
           {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} />}
           {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={visibleRentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />}
+          {view === "guide" && <StudioGuidePage isOwner={isOwner} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
         </div>
       </SidebarInset>
       {isOwner && (
@@ -1112,6 +1139,7 @@ export function SmoothDashboard() {
   const [profiles, setProfiles] = useState<AccessProfile[]>(FALLBACK_PROFILES);
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [dark, setDark] = useState(false);
+  const [sessionPassword, setSessionPassword] = useState("");
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("smooth-theme");
@@ -1132,9 +1160,10 @@ export function SmoothDashboard() {
     const envelope = await response.json() as EncryptedEnvelope;
     const unlocked = await decryptDashboard(envelope, password);
     if (unlocked.user.id !== profile.id || unlocked.role !== profile.role) throw new Error("Invalid dashboard payload");
+    setSessionPassword(profile.role === "owner" ? password : "");
     setPayload(unlocked);
   };
 
   if (!payload) return <LoginScreen onUnlock={unlock} profiles={profiles} />;
-  return <DashboardView dark={dark} onLogout={() => setPayload(null)} payload={payload} setDark={setDark} />;
+  return <DashboardView dark={dark} onLogout={() => { setPayload(null); setSessionPassword(""); }} payload={payload} sessionPassword={sessionPassword} setDark={setDark} />;
 }

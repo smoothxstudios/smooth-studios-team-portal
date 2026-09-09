@@ -51,6 +51,20 @@ export type UnmatchedStripePayment = {
   disputed: boolean;
 };
 
+export type StudioGuideline = {
+  id: string;
+  title: string;
+  category: string;
+  body: string;
+  tags: string[];
+};
+
+export type StudioRulebook = {
+  version: 1;
+  updatedAt: string | null;
+  entries: StudioGuideline[];
+};
+
 export type Rental = {
   id: string;
   stripeMatchKey?: string;
@@ -84,6 +98,7 @@ export type DashboardPayload = {
   rentals: Rental[];
   stripeSummary?: StripeSummary;
   unmatchedStripePayments?: UnmatchedStripePayment[];
+  rulebook?: StudioRulebook;
   workflowAccess?: {
     provider: "github";
     repository: string;

@@ -6,8 +6,10 @@ import { categorizeAppointment } from "../lib/appointment-categories.mjs";
 
 import {
   buildDashboardPayloads,
+  decryptPayload,
   encryptPayload,
   normalizeCalendarEvent,
+  normalizeRulebook,
   parseCalendarDescription,
   parseMoneyToCents,
   reconcileStripePayments,
@@ -318,6 +320,46 @@ test("employee payloads contain only their own accepted appointments and payout"
   assert.equal(payloads.rayne.workflowAccess, undefined);
 });
 
+test("shares the same Studio Guide with every encrypted dashboard", () => {
+  const rulebook = {
+    version: 1,
+    updatedAt: "2026-09-09T12:00:00.000Z",
+    entries: [{
+      id: "guide-arrival",
+      title: "What should happen before arrival?",
+      category: "Before the rental",
+      body: "Review the appointment details before the renter arrives.",
+      tags: ["arrival", "calendar"],
+    }],
+  };
+  const payloads = buildDashboardPayloads({
+    calendarEvents: [event],
+    config,
+    ledger,
+    overrides: { events: {} },
+    source: "google-calendar",
+    rulebook,
+  });
+  assert.deepEqual(payloads.owner.rulebook, rulebook);
+  assert.deepEqual(payloads.akiva.rulebook, rulebook);
+  assert.deepEqual(payloads.jordyn.rulebook, rulebook);
+  assert.deepEqual(payloads.rayne.rulebook, rulebook);
+});
+
+test("normalizes imported Studio Guide fields and generates stable IDs", () => {
+  const normalized = normalizeRulebook({ entries: [{
+    title: "  Closing checklist  ",
+    category: "",
+    body: "  Reset the studio.  ",
+    tags: ["cleanup", "Cleanup", "lights"],
+  }] }, { updatedAt: "2026-09-09T12:00:00.000Z" });
+  assert.match(normalized.entries[0].id, /^guide-/);
+  assert.equal(normalized.entries[0].category, "General");
+  assert.equal(normalized.entries[0].body, "Reset the studio.");
+  assert.deepEqual(normalized.entries[0].tags, ["cleanup", "lights"]);
+  assert.equal(normalized.updatedAt, "2026-09-09T12:00:00.000Z");
+});
+
 test("Stripe reconciliation details remain only in Smooth's encrypted payload", () => {
   const stripeSnapshot = {
     generatedAt: "2026-08-29T12:00:00.000Z",
@@ -363,4 +405,5 @@ test("AES-GCM envelope decrypts with the correct password", async () => {
   const key = await webcrypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: Buffer.from(envelope.salt, "base64"), iterations: envelope.iterations }, passwordKey, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
   const plaintext = await webcrypto.subtle.decrypt({ name: "AES-GCM", iv: Buffer.from(envelope.iv, "base64") }, key, Buffer.from(envelope.ciphertext, "base64"));
   assert.deepEqual(JSON.parse(new TextDecoder().decode(plaintext)), original);
+  assert.deepEqual(decryptPayload(envelope, "correct horse battery studio"), original);
 });

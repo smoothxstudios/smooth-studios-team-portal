@@ -1,4 +1,4 @@
-import { createCipheriv, createHash, pbkdf2Sync, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, pbkdf2Sync, randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -6,6 +6,64 @@ import { categorizeAppointment } from "../../lib/appointment-categories.mjs";
 import { summarizeStripeSnapshot } from "./stripe-data.mjs";
 
 const KDF_ITERATIONS = 310_000;
+const RULEBOOK_LIMITS = {
+  entries: 50,
+  title: 120,
+  category: 50,
+  body: 5_000,
+  tags: 8,
+  tag: 30,
+};
+
+function cleanRulebookText(value, limit) {
+  return typeof value === "string"
+    ? value.replace(/\r\n?/g, "\n").replace(/\u0000/g, "").trim().slice(0, limit)
+    : "";
+}
+
+export function normalizeRulebook(input, { updatedAt } = {}) {
+  const source = Array.isArray(input) ? { entries: input } : (input && typeof input === "object" ? input : {});
+  const rawEntries = Array.isArray(source.entries) ? source.entries : [];
+  if (rawEntries.length > RULEBOOK_LIMITS.entries) {
+    throw new Error(`Studio guide supports up to ${RULEBOOK_LIMITS.entries} guidelines`);
+  }
+
+  const usedIds = new Set();
+  const entries = rawEntries.map((entry, index) => {
+    if (!entry || typeof entry !== "object") throw new Error(`Guideline ${index + 1} is invalid`);
+    const title = cleanRulebookText(entry.title, RULEBOOK_LIMITS.title);
+    const category = cleanRulebookText(entry.category, RULEBOOK_LIMITS.category) || "General";
+    const body = cleanRulebookText(entry.body, RULEBOOK_LIMITS.body);
+    if (!title || !body) throw new Error(`Guideline ${index + 1} needs a title and instructions`);
+
+    let id = cleanRulebookText(entry.id, 80).replace(/[^a-zA-Z0-9_-]/g, "");
+    if (!id || usedIds.has(id)) {
+      id = `guide-${createHash("sha256").update(`${title}|${body}|${index}`).digest("hex").slice(0, 16)}`;
+    }
+    usedIds.add(id);
+
+    const tags = [];
+    const seenTags = new Set();
+    for (const value of Array.isArray(entry.tags) ? entry.tags : []) {
+      const tag = cleanRulebookText(value, RULEBOOK_LIMITS.tag);
+      const key = tag.toLowerCase();
+      if (!tag || seenTags.has(key)) continue;
+      tags.push(tag);
+      seenTags.add(key);
+      if (tags.length === RULEBOOK_LIMITS.tags) break;
+    }
+    return { id, title, category, body, tags };
+  });
+
+  const sourceUpdatedAt = typeof source.updatedAt === "string" && Number.isFinite(Date.parse(source.updatedAt))
+    ? new Date(source.updatedAt).toISOString()
+    : null;
+  return {
+    version: 1,
+    updatedAt: updatedAt === undefined ? sourceUpdatedAt : updatedAt,
+    entries,
+  };
+}
 
 export function parseMoneyToCents(value) {
   if (typeof value !== "string") return null;
@@ -278,7 +336,7 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
   };
 }
 
-export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, stripeMatches = {}, source, ownerWorkflowToken, stripeSnapshot = null }) {
+export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, stripeMatches = {}, source, ownerWorkflowToken, stripeSnapshot = null, rulebook }) {
   const reconciliation = reconcileStripePayments(calendarEvents, stripeSnapshot?.charges ?? [], stripeMatches);
   const rentals = calendarEvents
     .map((event) => normalizeCalendarEvent(
@@ -297,6 +355,7 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
     generatedAt,
     calendarName: config.calendarName,
     integrations: { calendar: true, stripe: Boolean(stripeSnapshot) },
+    rulebook: normalizeRulebook(rulebook),
   };
   const dashboardEmployees = config.employees.map(dashboardEmployee);
 
@@ -357,6 +416,24 @@ export function encryptPayload(payload, password) {
     iv: iv.toString("base64"),
     ciphertext: ciphertext.toString("base64"),
   };
+}
+
+export function decryptPayload(envelope, password) {
+  if (!envelope || envelope.version !== 1 || envelope.algorithm !== "AES-GCM" || envelope.kdf !== "PBKDF2-SHA256") {
+    throw new Error("Unsupported encrypted dashboard format");
+  }
+  const salt = Buffer.from(envelope.salt, "base64");
+  const iv = Buffer.from(envelope.iv, "base64");
+  const ciphertext = Buffer.from(envelope.ciphertext, "base64");
+  if (ciphertext.length <= 16) throw new Error("Encrypted dashboard is incomplete");
+  const key = pbkdf2Sync(password, salt, envelope.iterations, 32, "sha256");
+  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(ciphertext.subarray(ciphertext.length - 16));
+  const plaintext = Buffer.concat([
+    decipher.update(ciphertext.subarray(0, ciphertext.length - 16)),
+    decipher.final(),
+  ]);
+  return JSON.parse(plaintext.toString("utf8"));
 }
 
 export async function writeEncryptedDashboards({ payloads, passwords, outputDirectory, config }) {
