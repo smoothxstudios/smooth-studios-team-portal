@@ -2,6 +2,77 @@
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
 
+/* Team scheduling: scoped to preserve the existing finance dashboard. */
+.team-scheduling { display: grid; gap: 22px; min-width: 0; }
+.schedule-intro, .schedule-toolbar, .schedule-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.schedule-intro h2 { font-size: clamp(24px, 3vw, 34px); font-weight: 650; letter-spacing: -.04em; margin: 7px 0 10px; }
+.schedule-intro p:not(.schedule-eyebrow), .schedule-panel p { color: var(--muted-foreground); line-height: 1.6; }
+.schedule-eyebrow { color: var(--primary); font-weight: 750; font-size: 11px; letter-spacing: .2em; }
+.schedule-panel { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 24px; min-width: 0; }
+.schedule-panel h3 { display: flex; align-items: center; gap: 9px; font-size: 18px; font-weight: 650; margin-bottom: 7px; }
+.schedule-section-heading { margin-bottom: 20px; }
+.schedule-section-heading p, .schedule-small { font-size: 13px; color: var(--muted-foreground); line-height: 1.65; }
+.schedule-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.schedule-actions button { white-space: normal; }
+.schedule-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--muted-foreground); }
+.schedule-filter select, .schedule-modal select { min-height: 44px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 32px 10px 12px; font-size: 16px; background: var(--card); color: var(--foreground); max-width: 100%; }
+.schedule-person { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.schedule-person i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; border: 1px solid #ffffff55; }
+.schedule-notice { display: flex; align-items: flex-start; gap: 10px; border-radius: 12px; background: var(--muted); padding: 15px 18px; font-size: 13px; line-height: 1.6; }
+.schedule-notice svg { flex-shrink: 0; margin-top: 2px; }
+.schedule-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 9px; }
+.schedule-day { min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--background); padding: 10px; }
+.schedule-day h4 { font-size: 12px; font-weight: 700; padding: 2px 0 12px; }
+.schedule-empty-day { font-size: 11px; opacity: .75; }
+.schedule-entry { display: grid; gap: 6px; background: var(--card); border: 1px solid var(--border); border-left: 3px solid #2563eb; border-radius: 8px; padding: 10px; margin-bottom: 9px; overflow-wrap: anywhere; }
+.schedule-entry strong { font-size: 12px; font-weight: 600; line-height: 1.45; }
+.schedule-entry span:not(.schedule-person), .schedule-entry small { font-size: 11px; color: var(--muted-foreground); }
+.schedule-entry.blocked { border-left-color: #737380; background: var(--muted); }
+.schedule-entry.pending { border-left-color: #d59615; }
+.schedule-entry.accepted { border-left-color: #169966; }
+.schedule-entry button { text-align: left; color: var(--primary); font-size: 12px; padding-top: 6px; }
+.schedule-offers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.schedule-offer { border: 1px solid var(--border); border-radius: 14px; padding: 18px; min-width: 0; overflow-wrap: anywhere; }
+.schedule-offer h3 { margin-top: 16px; font-size: 16px; }
+.schedule-offer p { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; }
+.schedule-offer .schedule-small { font-size: 12px; }
+.schedule-instructions { white-space: pre-wrap; }
+.schedule-status { font-size: 11px; font-weight: 650; text-transform: capitalize; padding: 5px 9px; border-radius: 30px; background: var(--muted); }
+.schedule-status.pending { color: #966000; background: #e6a41b20; }
+.schedule-status.accepted { color: #118653; background: #18945c20; }
+.schedule-count { font-size: 12px; background: var(--muted); color: var(--muted-foreground); border-radius: 30px; padding: 4px 9px; }
+.schedule-error, .schedule-warning { background: #d8991516; color: #956014; border: 1px solid #d8991545; border-radius: 10px; padding: 13px 16px; font-size: 14px; line-height: 1.5; }
+.dark .schedule-error, .dark .schedule-warning, .dark .schedule-status.pending { color: #ebbd6c; }
+.dark .schedule-status.accepted { color: #71d1a5; }
+.schedule-success { border: 1px solid #15965e40; background: #15965e12; border-radius: 10px; padding: 13px 16px; color: var(--foreground); font-size: 14px; }
+.schedule-empty { padding: 16px 0; font-size: 14px; }
+.schedule-blocks { display: grid; gap: 12px; }
+.schedule-block { border-top: 1px solid var(--border); padding-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.schedule-block strong { display: block; margin: 8px 0 3px; font-size: 15px; }
+.schedule-block small { color: var(--muted-foreground); font-size: 12px; }
+.schedule-block button { flex-shrink: 0; }
+.schedule-push { display: grid; gap: 16px; }
+.schedule-history { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 16px; font-size: 13px; }
+.schedule-history summary { cursor: pointer; font-weight: 600; }
+.schedule-history > div { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding: 12px 0; }
+.schedule-modal { max-height: calc(100dvh - 32px); overflow-y: auto; width: calc(100vw - 32px); max-width: 600px; }
+.schedule-modal form { display: grid; gap: 17px; min-width: 0; }
+.schedule-modal label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; min-width: 0; }
+.schedule-modal input:not([type=checkbox]), .schedule-modal textarea, .schedule-modal select { font-size: 16px; width: 100%; min-width: 0; min-height: 44px; }
+.schedule-form-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.schedule-modal .schedule-check { display: flex; align-items: center; gap: 10px; font-weight: 450; }
+.schedule-check input { width: 18px; height: 18px; accent-color: var(--primary); }
+@media (max-width: 1250px) { .schedule-week { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .schedule-week, .schedule-offers, .schedule-form-pair { grid-template-columns: minmax(0, 1fr); }
+  .schedule-panel { padding: 18px; }
+  .schedule-day { padding: 12px; }
+  .schedule-entry strong { font-size: 14px; }
+  .schedule-entry span:not(.schedule-person), .schedule-entry small, .schedule-empty-day { font-size: 12px; }
+  .schedule-filter { width: 100%; }
+  .schedule-filter select { flex: 1; }
+  .schedule-modal { padding: 22px 18px; }
+}
 @custom-variant dark (&:where(.dark, .dark *));
 
 @utility scrollbar-thin { scrollbar-width: thin; }

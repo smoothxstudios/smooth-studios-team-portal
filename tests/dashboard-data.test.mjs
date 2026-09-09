@@ -55,6 +55,34 @@ AcuityID=1761525698`,
   ],
 };
 
+test("accepted portal rentals merge without duplicate commissions or cross-employee data", () => {
+  const common = { calendarEvents: [event], config, ledger, overrides: { events: {} }, source: "google-calendar" };
+  const portalAssignments = [
+    { appointmentId: event.id, employeeId: "jordyn", start: event.start.dateTime, end: event.end.dateTime },
+    { appointmentId: event.id, employeeId: "akiva", start: event.start.dateTime, end: event.end.dateTime },
+    { appointmentId: event.id, employeeId: "owner", start: event.start.dateTime, end: event.end.dateTime },
+    { appointmentId: event.id, employeeId: "rayne", start: "2026-08-29T18:00:00-04:00", end: event.end.dateTime },
+    { appointmentId: "custom-task", employeeId: "rayne", start: event.start.dateTime, end: event.end.dateTime },
+  ];
+  const payloads = buildDashboardPayloads({ ...common, portalAssignments });
+  assert.deepEqual(payloads.owner.rentals[0].assignedEmployeeIds, ["akiva", "jordyn"]);
+  assert.equal(payloads.owner.rentals[0].employeePayouts.jordyn.amountCents, 1500);
+  assert.equal(payloads.owner.rentals[0].employeePayouts.akiva.amountCents, 1500);
+  assert.equal(payloads.jordyn.rentals.length, 1);
+  assert.deepEqual(payloads.jordyn.rentals[0].assignedEmployeeIds, ["jordyn"]);
+  assert.equal(payloads.jordyn.rentals[0].employeePayouts.akiva, undefined);
+  assert.equal(payloads.rayne.rentals.length, 0);
+});
+
+test("portal acceptance preserves the fully-paid requirement before payroll can be paid", () => {
+  const depositEvent = { ...event, description: event.description.replace("Paid Online: $50.00", "Paid Online: $25.00"), attendees: [] };
+  const portalAssignments = [{ appointmentId: event.id, employeeId: "jordyn", start: event.start.dateTime, end: event.end.dateTime }];
+  const payloads = buildDashboardPayloads({ calendarEvents: [depositEvent], config,
+    ledger: { employees: { jordyn: { paidThrough: "2026-09-09" } } }, overrides: { events: {} }, source: "google-calendar", portalAssignments });
+  assert.equal(payloads.owner.rentals[0].fullyPaid, false);
+  assert.equal(payloads.owner.rentals[0].employeePayouts.jordyn.paid, false);
+});
+
 test("parses the exact Calendar description fields", () => {
   const parsed = parseCalendarDescription(event.description);
   assert.equal(parsed.name, "Example Customer");

@@ -89,6 +89,9 @@ import { encryptWorkflowPayload } from "@/lib/dashboard-crypto";
 import { APPOINTMENT_CATEGORIES, categorizeAppointment } from "@/lib/appointment-categories.mjs";
 import { GithubWorkflowDialog, type OwnerWorkflowRequest } from "@/components/github-workflow-dialog";
 import { StudioGuidePage } from "@/components/studio-guide";
+import { TeamSchedulingPage } from "@/components/team-scheduling";
+import { teamToken } from "@/lib/team-auth.mjs";
+import { disableTeamPush } from "@/lib/team-api";
 import type {
   AccessProfile,
   DashboardPayload,
@@ -115,13 +118,14 @@ const STUDIO_TIME_ZONE = "America/New_York";
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 
-type ViewKey = "overview" | "rentals" | "team" | "payouts" | "guide";
+type ViewKey = "overview" | "rentals" | "team" | "payouts" | "guide" | "scheduling";
 type RentalState = "upcoming" | "earned" | "paid" | "awaiting";
 type CustomerPaymentState = "paid" | "deposit" | "review" | "pending";
 type AppointmentStatus = RentalState | "customer-paid" | "upcoming-paid" | "deposit" | "review";
 type PaymentFilter = "all" | CustomerPaymentState;
 
 const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ownerOnly?: boolean }[] = [
+  { key: "scheduling", label: "Team Schedule", icon: CalendarDays },
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "rentals", label: "Appointments", icon: CalendarDays },
   { key: "team", label: "Team", icon: Users, ownerOnly: true },
@@ -911,8 +915,14 @@ function StripeMatchForm({
   );
 }
 
-function DashboardView({ payload, dark, setDark, onLogout, sessionPassword }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string }) {
+function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string; schedulingToken: string }) {
   const [view, setView] = useState<ViewKey>("overview");
+  useEffect(() => {
+    const openSchedule = () => { if (window.location.hash === "#scheduling") setView("scheduling"); };
+    openSchedule();
+    window.addEventListener("hashchange", openSchedule);
+    return () => window.removeEventListener("hashchange", openSchedule);
+  }, []);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [paidThrough, setPaidThrough] = useState(new Date().toISOString().slice(0, 10));
@@ -1122,6 +1132,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword }: { 
           {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} />}
           {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={visibleRentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />}
           {view === "guide" && <StudioGuidePage isOwner={isOwner} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
+          {view === "scheduling" && <TeamSchedulingPage isOwner={isOwner} token={schedulingToken} userId={payload.user.id} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, create its database tables, and import Calendar appointments. No invitations or assignment notifications are sent during initial setup.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
         </div>
       </SidebarInset>
       {isOwner && (
@@ -1140,6 +1151,7 @@ export function SmoothDashboard() {
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [dark, setDark] = useState(false);
   const [sessionPassword, setSessionPassword] = useState("");
+  const [schedulingToken, setSchedulingToken] = useState("");
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("smooth-theme");
@@ -1160,10 +1172,11 @@ export function SmoothDashboard() {
     const envelope = await response.json() as EncryptedEnvelope;
     const unlocked = await decryptDashboard(envelope, password);
     if (unlocked.user.id !== profile.id || unlocked.role !== profile.role) throw new Error("Invalid dashboard payload");
+    setSchedulingToken(await teamToken(password, profile.id));
     setSessionPassword(profile.role === "owner" ? password : "");
     setPayload(unlocked);
   };
 
   if (!payload) return <LoginScreen onUnlock={unlock} profiles={profiles} />;
-  return <DashboardView dark={dark} onLogout={() => { setPayload(null); setSessionPassword(""); }} payload={payload} sessionPassword={sessionPassword} setDark={setDark} />;
+  return <DashboardView dark={dark} onLogout={() => { void disableTeamPush(schedulingToken).catch(() => {}); setPayload(null); setSessionPassword(""); setSchedulingToken(""); }} payload={payload} sessionPassword={sessionPassword} schedulingToken={schedulingToken} setDark={setDark} />;
 }

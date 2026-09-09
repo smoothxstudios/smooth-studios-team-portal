@@ -336,7 +336,7 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
   };
 }
 
-export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, stripeMatches = {}, source, ownerWorkflowToken, stripeSnapshot = null, rulebook }) {
+export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, stripeMatches = {}, source, ownerWorkflowToken, stripeSnapshot = null, rulebook, portalAssignments = [] }) {
   const reconciliation = reconcileStripePayments(calendarEvents, stripeSnapshot?.charges ?? [], stripeMatches);
   const rentals = calendarEvents
     .map((event) => normalizeCalendarEvent(
@@ -348,6 +348,23 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
     ))
     .filter(Boolean)
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  for (const rental of rentals) {
+    for (const assignment of portalAssignments) {
+      // Server export contains accepted offers only. The Calendar, never a
+      // custom task or a client-supplied price, remains the payroll authority.
+      if (assignment.appointmentId !== rental.id ||
+          Date.parse(assignment.start) !== Date.parse(rental.start) || Date.parse(assignment.end) !== Date.parse(rental.end) ||
+          !config.employees.some(employee => employee.id === assignment.employeeId) ||
+          rental.assignedEmployeeIds.includes(assignment.employeeId)) continue;
+      const id = assignment.employeeId;
+      rental.assignedEmployeeIds.push(id);
+      rental.employeePayouts[id] = {
+        amountCents: Math.round(rental.priceCents * config.commissionRate),
+        paid: rental.fullyPaid && Date.parse(rental.end) <= Date.now() && paidByCutoff(rental.end, ledger.employees?.[id]?.paidThrough),
+        ...(ledger.employees?.[id]?.paidThrough ? { paidAt: ledger.employees[id].paidThrough } : {}),
+      };
+    }
+  }
   const generatedAt = new Date().toISOString();
   const common = {
     version: 1,

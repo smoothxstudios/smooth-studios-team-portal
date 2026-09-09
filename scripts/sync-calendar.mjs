@@ -1,9 +1,10 @@
 import { createSign } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDashboardPayloads, decryptPayload, writeEncryptedDashboards } from "./lib/dashboard-data.mjs";
 import { fetchStripeSnapshot } from "./lib/stripe-data.mjs";
+import { syncTeamSchedule } from "./lib/team-api.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readJson = async (relativePath) => JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
@@ -117,7 +118,7 @@ const stripeSnapshot = stripeSecretKey
 if (!stripeSnapshot) {
   process.stderr.write("STRIPE_RESTRICTED_KEY is not configured; Calendar payment fields will remain the payment source.\n");
 }
-const payloads = buildDashboardPayloads({
+const payloadOptions = {
   calendarEvents,
   config,
   ledger,
@@ -127,8 +128,20 @@ const payloads = buildDashboardPayloads({
   ownerWorkflowToken,
   stripeSnapshot,
   rulebook,
-});
+};
+let payloads = buildDashboardPayloads(payloadOptions);
+let teamEnabled = process.env.TEAM_API_BOOTSTRAP === "true";
+try {
+  teamEnabled ||= (await readJson("public/data/team-api.json")).enabled === true;
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
+}
+if (teamEnabled) {
+  const portalAssignments = await syncTeamSchedule(payloads.owner.rentals, passwords.owner);
+  payloads = buildDashboardPayloads({ ...payloadOptions, portalAssignments });
+}
 await writeEncryptedDashboards({ payloads, passwords, outputDirectory: path.join(root, "public/data"), config });
+if (teamEnabled) await writeFile(path.join(root, "public/data/team-api.json"), `${JSON.stringify({ version: 1, enabled: true })}\n`);
 process.stdout.write(
   `Encrypted ${calendarEvents.length} Calendar events${stripeSnapshot ? ` and ${stripeSnapshot.charges.length} Stripe payments` : ""} for ${Object.keys(payloads).length} dashboards.\n`,
 );
