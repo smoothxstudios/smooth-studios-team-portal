@@ -33,7 +33,15 @@ await wrangler(['deploy']);
 const secretsPath=prefix+'/workers/scripts/'+config.name+'/secrets';const secrets=await cf(secretsPath);
 if(!secrets.some(s=>s.name==='BETTER_AUTH_SECRET'))await cf(secretsPath,'PUT',{name:'BETTER_AUTH_SECRET',text:crypto.randomUUID()+crypto.randomUUID(),type:'secret_text'});
 const origin=config.vars.APP_ORIGIN;
-const health=await fetch(origin+'/api/health',{signal:AbortSignal.timeout(30000)});if(!health.ok||!(await health.json()).accountsReady)throw new Error('The production service did not pass its readiness check.');
+let ready=false,healthStatus=0,healthDetail='';
+for(let attempt=0;attempt<5;attempt++){
+ if(attempt)await new Promise(resolve=>setTimeout(resolve,attempt*2000));
+ const health=await fetch(origin+'/api/health',{signal:AbortSignal.timeout(15000)});
+ healthStatus=health.status;const body=await health.text();healthDetail=body.slice(0,300);
+ try{ready=health.ok&&JSON.parse(body).accountsReady===true;}catch{}
+ if(ready)break;
+}
+if(!ready)throw new Error('The production readiness check failed ('+healthStatus+'): '+healthDetail);
 // A read-only sign-in check uses the existing owner credential only while the
 // account still matches its initial password. Changed passwords are preserved.
 const accountRow=(await query('SELECT password FROM account WHERE userId=\'owner\' AND providerId=\'credential\''))[0].results[0];
