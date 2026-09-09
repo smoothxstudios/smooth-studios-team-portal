@@ -29,7 +29,15 @@ try{
  function client(ip){let cookies=new Map();return async(path,method='GET',body,extra={})=>{
   const headers={Origin:origin,'cf-connecting-ip':ip,...extra};if(cookies.size)headers.Cookie=Array.from(cookies).map(([k,v])=>k+'='+v).join('; ');
   if(body&&!(body instanceof FormData))headers['Content-Type']='application/json';
-  const response=await mf.dispatchFetch(origin+path,{method,headers,body:body?body instanceof FormData?body:JSON.stringify(body):undefined});
+  let payload=body?JSON.stringify(body):undefined;
+  if(body instanceof FormData){
+   // Serialize with the same Fetch implementation that created FormData;
+   // Miniflare and Node use separate undici versions.
+   const upload=new Request(origin+path,{method,body});
+   headers['Content-Type']=upload.headers.get('Content-Type');
+   payload=new Uint8Array(await upload.arrayBuffer());
+  }
+  const response=await mf.dispatchFetch(origin+path,{method,headers,body:payload});
   for(const value of response.headers.getSetCookie()){const part=value.split(';')[0],i=part.indexOf('=');cookies.set(part.slice(0,i),part.slice(i+1));}
   return response;
  };}
