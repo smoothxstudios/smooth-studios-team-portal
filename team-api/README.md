@@ -8,23 +8,26 @@ Repository Actions secrets must include `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCO
 
 After publishing this code, unlock the owner dashboard → **Team Schedule → Activate team scheduling**. Alternatively run **Deploy team scheduling backend** on `main` in GitHub Actions.
 
+Changes to the Worker, shared scheduling modules, or deployment workflow also redeploy automatically on `main`.
+
 The workflow:
 
 1. Tests the code, applies additive D1 migrations to the existing `DB` binding, and deploys `smooth-studios-team-api`.
 2. Stores server-side authentication hashes and creates a VAPID signing key only if none exists. Redeployments preserve that key so existing devices continue to work.
 3. Imports sanitized Calendar appointments. Only after successful import does it write the public `data/team-api.json` activation flag and republish encrypted dashboards.
 
-The Worker URL is fixed in `lib/team-schedule.mjs`. Its only allowed browser origins are the existing GitHub Pages origin and the existing Sites origin. No new paid plan, SMS service, DNS change, or Google write permission is enabled.
+The Worker URL is fixed in `lib/team-schedule.mjs`. Its only allowed browser origins are the existing GitHub Pages origin and the existing Sites origin. Rental team notes use the existing Google service account through GitHub Actions; share the dedicated Calendar with that account using **Make changes to events**. No Google credentials are copied into the Worker.
 
 ## Use
 
-- All four profiles can block their own time. Smooth can also enter blocks for a selected person. A weekly series uses Eastern local time and has an explicit final date; add separate series for separate class days. Delete and replace a series to edit it.
-- Only Smooth creates or cancels upcoming offers. Pick one employee and either a Calendar rental or a custom task. Known conflicts block the offer. No conflict is not a guarantee of availability.
-- Only the selected employee can accept/decline. Acceptance is required before the appointment starts. A new conflicting class block prevents acceptance but never cancels already agreed work silently.
-- A Calendar time change resets an active offer to pending (or cancels it when moved into the past). Missing Calendar appointments cancel their offers. Review notifications in the portal.
+- All four profiles can block their own time. Smooth can also enter blocks for a selected person. A weekly series uses Eastern local time and has an explicit final date; add separate series for separate class days. A series may start in the past if an upcoming meeting remains. Delete and replace a series to edit it.
+- Only Smooth creates or cancels upcoming offers. Known conflicts block the offer unless Smooth explicitly selects **Allow this time conflict**. Existing offers also have an **Allow time conflict** action. The server records the owner approval and its appointment time; duplicate offers and existing Calendar acceptance cannot be bypassed.
+- Only the selected employee can accept/decline. Acceptance is required before the appointment starts, even when Smooth approved a conflict. A new conflicting class block prevents acceptance unless the time has an owner override; it never silently cancels agreed work.
+- A Calendar time change clears conflict approval and resets an active offer to pending (or cancels it when moved into the past). Missing Calendar appointments cancel their offers. Review notifications in the portal.
 - The original Calendar attendee acceptance remains valid. Portal actions never send, remove, or modify Calendar invitations. Reassignment of an accepted Calendar invite still needs that original invitation updated in Calendar.
 - Custom tasks are scheduling-only. They never receive automatic rental commissions. Accepted, time-matched portal rentals are merged into the next encrypted sync and deduplicated against Calendar acceptance. Existing 30%, completion, customer payment, and payout-cutoff rules remain in place. Past earnings cannot be cancelled through scheduling.
-- Scheduling responses are live; financial dashboards refresh on the existing 30-minute sync. Once activated, a failed team sync stops encrypted data publication instead of dropping portal-earned work.
+- Scheduling responses are live; Calendar, Stripe, rental team notes, and financial dashboard syncing is scheduled every 5 minutes. GitHub may delay scheduled runs. Once activated, a failed team import stops encrypted publication instead of dropping portal-earned work. A Calendar note write failure is reported separately without dropping payroll data.
+- Studio rental offers are mirrored as a marked description section in the original Calendar event. Pending and accepted states are explicit, cancelled/declined offers are removed, and other appointment categories/custom tasks stay in the portal. Notes contain only employee names and response status, with no class reasons or private instructions. Description patches use `sendUpdates=none` and conditional ETags, preserving booking details and all attendees.
 
 ## Notifications
 

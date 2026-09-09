@@ -92,6 +92,13 @@ export type DashboardPayload = {
   generatedAt: string;
   calendarName: string;
   integrations?: { calendar: boolean; stripe: boolean };
+  calendarAssignmentSync?: {
+    status: "synced" | "needs_access" | "retrying";
+    updated: number;
+    failed: number;
+    checkedAt: string;
+    serviceAccountEmail?: string;
+  };
   role: DashboardRole;
   user: Employee | { id: "owner"; name: string; accent: string };
   employees: Employee[];

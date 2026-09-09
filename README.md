@@ -1,13 +1,13 @@
 # Smooth Studios Team Portal
 
-A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and employee earnings. It reads one dedicated Google Calendar every 30 minutes, assigns appointments only to employees who accepted the event invitation, and publishes a separate encrypted dashboard for Smooth and each employee.
+A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and employee earnings. Calendar and Stripe syncing is scheduled every 5 minutes. Employees confirm work by accepting an existing Calendar invitation or an owner-created portal offer, and each person receives a separate encrypted dashboard.
 
 ## What it does
 
 - Owner overview: appointment revenue, Stripe gross/refunds/fees/net/bank payouts, revenue by package category, every employee schedule, payroll owed, paid-to-team totals, and period comparisons.
 - Employee overview: upcoming appointments, completed history, projected earnings, earned-but-unpaid amount, paid totals, and weekly/monthly/yearly context.
 - Appointment categories: Studio Rentals, Studio Packages, Outside, Graduation, Video, Business, Campaign, and a safe Other fallback. Add-ons inherit the main package category from the event title.
-- Employee assignment: the attendee email must match any email configured for that employee and the attendee response must be `accepted`.
+- Employee assignment: an accepted Calendar invitation must match a configured employee email; accepted portal offers are merged by appointment ID and time without duplicate commission. Pending offers never count as accepted.
 - Earnings: every accepted employee receives 30% of the full appointment price, whether it is a studio rental or another package. When multiple employees accept, each receives the full 30%.
 - Customer payment: matched Stripe payments are the preferred source of truth. Acuity IDs are matched first; high-confidence customer email/name, amount, and date matches are used as a fallback. `Paid Online:` remains the fallback when Stripe is not connected or no Stripe payment can be safely matched. Any amount above the price is recorded as a tip. A lower positive amount is a deposit, and a completed appointment with a remaining balance is flagged for review. Smooth can confirm payment received by invoice, cash, Apple Pay, or another method through the payment-override workflow.
 - Reconciliation safety: Stripe payments that cannot be confidently tied to one Calendar appointment appear only in Smooth's encrypted **Stripe reconciliation** review list. Smooth can select a payment, search for its Calendar appointment, and confirm the match from the dashboard. Unmatched payments are never silently attached to an employee commission.
@@ -46,10 +46,10 @@ Extra form questions and Acuity text after these fields are ignored. Dollar sign
 1. In Google Cloud, create a project and enable the Google Calendar API.
 2. Create a service account and download its JSON key.
 3. Open the dedicated **Smooth Studios** Calendar settings.
-4. Share that Calendar with the service account email using **See all event details** access. Do not give write access.
+4. Share that Calendar with the service account email using **Make changes to events** access so the portal can add studio rental team notes. **See all event details** is sufficient for importing only, but cannot write assignment notes.
 5. Copy the Calendar ID from **Integrate calendar**.
 
-The service account is read-only. It does not need access to any other Google Calendar.
+The service account only needs this dedicated Calendar. Once team scheduling is active, the sync requests the `calendar.events` scope and patches only its marked rental-team section in event descriptions, with `sendUpdates=none`. It never adds guests or changes event titles, times, prices, or RSVP status. Google Calendar notes show pending versus accepted portal offers; cancelled or declined offers are removed. Custom tasks and other appointment categories are not mirrored. Booking text outside the marked section is preserved, and ETag checks protect concurrent edits. Missing edit access is reported inside Smooth's encrypted dashboard without interrupting payroll imports.
 
 ## GitHub repository setup
 
@@ -74,7 +74,7 @@ Create `smoothxstudios/smooth-studios-team-portal` as a private repository and p
 | `DASHBOARD_PASSWORD_RAYNE` | Generated Rayne password |
 | `DASHBOARD_GITHUB_TOKEN` | Fine-grained token limited to this repository with Actions read/write permission |
 
-The Calendar workflow runs every 30 minutes, refreshes the encrypted payloads, commits them, and deploys the updated GitHub Page.
+The Calendar workflow is scheduled every 5 minutes, refreshes the encrypted payloads and rental team notes, commits the encrypted data, and deploys the updated GitHub Page. GitHub can delay scheduled workflows; the dashboard shows the actual last sync time, and **Sync now** remains available.
 
 Each `EMPLOYEE_EMAIL_*` secret accepts one address or multiple comma-separated addresses. Addresses are matched case-insensitively and duplicate entries are ignored. Keep every address in GitHub Secrets rather than committing it to the repository.
 
@@ -115,7 +115,7 @@ Use `npm run provision -- --rotate` only when intentionally rotating every dashb
 - **Mark employee earnings paid**: Smooth chooses a paid-through date in the dashboard. It updates the payout ledger, rebuilds encrypted data, and redeploys the site.
 - **Update customer payment**: Smooth chooses an appointment and confirms payment received by invoice, cash, or another method, marks it not fully paid, or clears the manual status.
 - **Match Stripe payment**: Smooth selects an unmatched Stripe charge and the Calendar appointment it belongs to. The saved match is reused on every future sync, and multiple charges can be linked to one appointment for deposits and final payments.
-- **Sync Calendar and Stripe**: runs every 30 minutes and can also be started from the dashboard.
+- **Sync Calendar and Stripe**: scheduled every 5 minutes and can also be started from the dashboard.
 
 The dashboard verifies that the encrypted workflow token belongs to `smoothxstudios`, triggers the selected GitHub Action, and follows its status through completion. Closing or logging out of the owner dashboard discards the decrypted token from the browser session.
 

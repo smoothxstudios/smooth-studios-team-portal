@@ -1,5 +1,5 @@
 import { tokenHash } from "../lib/team-auth.mjs";
-import { TEAM, localInstant as parseLocalInstant, addLocalDays, assignmentConflicts } from "../lib/team-schedule.mjs";
+import { TEAM, localInstant as parseLocalInstant, addLocalDays, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
 import { flushAlerts, publicPushKey, pushEndpoint } from "./push.mjs";
 
 const users = TEAM.map(p => p.id);
@@ -98,6 +98,9 @@ function checkConflicts(employeeId, period, s, excludeId = "") {
   const conflicts = assignmentConflicts(employeeId, period, s.blocks, s.assignments, s.appointments, excludeId);
   if (conflicts.length) fail(409, `This time conflicts with ${conflicts.slice(0, 3).join("; ")}. Choose another person or time.`);
 }
+function approveConflict(period) {
+  return { approvedBy: "owner", approvedAt: new Date().toISOString(), start: period.start, end: period.end };
+}
 
 async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
@@ -123,9 +126,13 @@ async function route(request, env, ctx) {
     };
   }
   if (request.method === "GET" && url.pathname === "/sync/accepted") {
-    return { assignments: (await jsonRows(db, "SELECT data FROM team_assignments"))
+    const assignments = await jsonRows(db, "SELECT data FROM team_assignments");
+    return { assignments: assignments
       .filter(a => a.status === "accepted" && a.appointmentId)
-      .map(({ appointmentId, employeeId, start, end }) => ({ appointmentId, employeeId, start, end })) };
+      .map(({ appointmentId, employeeId, start, end }) => ({ appointmentId, employeeId, start, end })),
+      calendarAssignments: assignments.filter(a => a.appointmentId)
+        .map(({ appointmentId, employeeId, start, end, status }) => ({ appointmentId, employeeId, start, end, status })),
+    };
   }
   if (request.method === "POST" && url.pathname === "/sync/import") {
     const input = await body(request), generation = text(input.generation, 80);
@@ -158,7 +165,7 @@ async function route(request, env, ctx) {
         notify.push(a.employeeId);
       } else if (Date.parse(a.start) !== Date.parse(appointment.start) || Date.parse(a.end) !== Date.parse(appointment.end)) {
         const status = Date.parse(appointment.start) > Date.now() ? "pending" : "cancelled";
-        changes.push({ ...a, start: appointment.start, end: appointment.end, status,
+        changes.push({ ...a, start: appointment.start, end: appointment.end, status, conflictOverride: undefined,
           note: status === "pending" ? "Calendar time changed. Please accept the new time." : "Time changed to a past appointment. Smooth must review it.", updatedAt: new Date().toISOString() });
         notify.push(a.employeeId);
       }
@@ -180,16 +187,18 @@ async function route(request, env, ctx) {
     const userId = user === "owner" ? person(input.userId) : user;
     const startLocal = text(input.startLocal, 16), endLocal = text(input.endLocal, 16);
     const start = localInstant(startLocal), end = localInstant(endLocal);
-    futurePeriod(start, end);
     const repeatUntil = input.repeatUntil ? text(input.repeatUntil, 10) : null;
     if (repeatUntil) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(repeatUntil) || !Number.isFinite(Date.parse(`${repeatUntil}T12:00Z`)) || repeatUntil < startLocal.slice(0, 10) ||
           repeatUntil > addLocalDays(startLocal, 364).slice(0, 10) || new Date(`${repeatUntil}T12:00Z`).toISOString().slice(0, 10) !== repeatUntil ||
-          Date.parse(end) - Date.parse(start) > 86400_000) fail(400, "Weekly blocks need an end date within one year and a duration of at most 24 hours.");
+          Date.parse(end) <= Date.parse(start) || Date.parse(end) - Date.parse(start) > 86400_000 ||
+          Date.parse(start) > Date.now() + 366 * 86400_000) fail(400, "Weekly blocks need an end date within one year and a duration of at most 24 hours.");
+      let lastEnd = end;
       for (let d = 7; addLocalDays(startLocal, d).slice(0, 10) <= repeatUntil; d += 7) {
-        localInstant(addLocalDays(startLocal, d)); localInstant(addLocalDays(endLocal, d));
+        localInstant(addLocalDays(startLocal, d)); lastEnd = localInstant(addLocalDays(endLocal, d));
       }
-    }
+      if (Date.parse(lastEnd) <= Date.now()) fail(400, "This weekly series has ended. Choose an end date with an upcoming class meeting.");
+    } else futurePeriod(start, end);
     if (s.blocks.filter(b => b.userId === userId).length >= 200) fail(400, "Remove an old block before adding more (200 per person).");
     const item = { id: crypto.randomUUID(), userId, startLocal, endLocal, repeatUntil,
       reason: text(input.reason, 120), createdAt: new Date().toISOString() };
@@ -217,15 +226,20 @@ async function route(request, env, ctx) {
     const appointment = appointmentId && s.appointments.find(a => a.id === appointmentId);
     if (appointmentId && !appointment) fail(404, "Appointment not found. Refresh the calendar first.");
     if (appointment && appointment.acceptedEmployeeIds.includes(employeeId)) fail(409, "This person already accepted the Calendar invitation.");
+    if (appointmentId && s.assignments.some(a => active(a) && a.appointmentId === appointmentId && a.employeeId === employeeId)) {
+      fail(409, "This person already has an active offer for this appointment.");
+    }
     const start = appointment ? appointment.start : localInstant(input.startLocal);
     const end = appointment ? appointment.end : localInstant(input.endLocal);
     futurePeriod(start, end);
     if (s.assignments.filter(a => active(a) && Date.parse(a.end) > Date.now()).length >= 200) fail(400, "There are already 200 active offers. Finish or cancel old offers first.");
-    checkConflicts(employeeId, { start, end, appointmentId }, s);
+    if (input.overrideConflicts !== undefined && typeof input.overrideConflicts !== "boolean") fail(400, "Choose whether to allow time conflicts.");
+    if (!input.overrideConflicts) checkConflicts(employeeId, { start, end, appointmentId }, s);
     const item = { id: crypto.randomUUID(), employeeId, appointmentId,
       title: appointment ? appointment.title : text(input.title, 160),
       instructions: text(input.instructions ?? "", 2000, false), start, end,
-      status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      ...(input.overrideConflicts ? { conflictOverride: approveConflict({ start, end }) } : {}) };
     await commit(db, s.state, mutation => [saveAssignment(db, item, mutation)], [employeeId]);
     ctx.waitUntil(flushAlerts(env));
     return { saved: true, notification: "Queued for enabled devices; delivery is not guaranteed. The offer is visible in the portal now." };
@@ -235,6 +249,16 @@ async function route(request, env, ctx) {
     expectedRevision(input, s.state);
     const item = s.assignments.find(a => a.id === url.pathname.slice(13));
     if (!item || (user !== "owner" && item.employeeId !== user)) fail(404, "Assignment not found.");
+    if (input.overrideConflicts !== undefined) {
+      owner(user);
+      if (input.overrideConflicts !== true || input.status !== undefined) fail(400, "Approve the time conflict separately from an assignment response.");
+      if (!active(item) || Date.parse(item.start) <= Date.now()) fail(409, "Only upcoming active offers can receive a conflict override.");
+      await commit(db, s.state, mutation => [saveAssignment(db, {
+        ...item, conflictOverride: approveConflict(item), updatedAt: new Date().toISOString(),
+      }, mutation)], [item.employeeId]);
+      ctx.waitUntil(flushAlerts(env));
+      return { saved: true, notification: "Time conflict approved. The employee can now accept this offer; their response is still required." };
+    }
     if (input.status === "cancelled") {
       owner(user);
       if (!active(item) || Date.parse(item.start) <= Date.now()) fail(409, "Only upcoming offers can be cancelled here. Past earnings are not changed.");
@@ -243,7 +267,7 @@ async function route(request, env, ctx) {
       if (Date.parse(item.start) <= Date.now()) fail(409, "This offer has started or ended. Ask Smooth to review it.");
       if (input.status === "accepted") {
         if (!s.state.synced_at || Date.now() - Date.parse(s.state.synced_at) > 2 * 3600_000) fail(409, "Ask Smooth to sync Calendar before accepting this offer.");
-        checkConflicts(user, item, s, item.id);
+        if (!hasConflictOverride(item)) checkConflicts(user, item, s, item.id);
       }
     }
     await commit(db, s.state, mutation => [saveAssignment(db, { ...item, status: input.status, updatedAt: new Date().toISOString() }, mutation)],

@@ -23,6 +23,6 @@ export async function syncTeamSchedule(rentals, ownerPassword) {
   }
   await request("/sync/commit", { generation, count: appointments.length });
   const result = await request("/sync/accepted");
-  if (!Array.isArray(result.assignments)) throw new Error("The team API returned an invalid acceptance list. Dashboards were not overwritten.");
-  return result.assignments;
+  if (!Array.isArray(result.assignments) || !Array.isArray(result.calendarAssignments)) throw new Error("Deploy the updated team API before syncing Calendar assignment notes. Dashboards were not overwritten.");
+  return { assignments: result.assignments, calendarAssignments: result.calendarAssignments };
 }

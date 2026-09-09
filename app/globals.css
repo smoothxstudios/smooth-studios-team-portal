@@ -30,6 +30,9 @@
 .schedule-entry.blocked { border-left-color: #737380; background: var(--muted); }
 .schedule-entry.pending { border-left-color: #d59615; }
 .schedule-entry.accepted { border-left-color: #169966; }
+.schedule-entry .schedule-calendar-accepted { display: flex; align-items: flex-start; gap: 5px; color: #087c43; background: #15965e12; border-radius: 6px; padding: 6px; font-size: 14px; font-weight: 700; }
+.schedule-calendar-accepted svg { flex-shrink: 0; margin-top: 2px; }
+.dark .schedule-entry .schedule-calendar-accepted { color: #7de2b2; background: #15965e20; }
 .schedule-entry button { text-align: left; color: var(--primary); font-size: 12px; padding-top: 6px; }
 .schedule-offers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .schedule-offer { border: 1px solid var(--border); border-radius: 14px; padding: 18px; min-width: 0; overflow-wrap: anywhere; }
@@ -42,6 +45,7 @@
 .schedule-status.accepted { color: #118653; background: #18945c20; }
 .schedule-count { font-size: 12px; background: var(--muted); color: var(--muted-foreground); border-radius: 30px; padding: 4px 9px; }
 .schedule-error, .schedule-warning { background: #d8991516; color: #956014; border: 1px solid #d8991545; border-radius: 10px; padding: 13px 16px; font-size: 14px; line-height: 1.5; }
+.schedule-warning { overflow-wrap: anywhere; }
 .dark .schedule-error, .dark .schedule-warning, .dark .schedule-status.pending { color: #ebbd6c; }
 .dark .schedule-status.accepted { color: #71d1a5; }
 .schedule-success { border: 1px solid #15965e40; background: #15965e12; border-radius: 10px; padding: 13px 16px; color: var(--foreground); font-size: 14px; }

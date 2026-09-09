@@ -1,6 +1,13 @@
 name: Deploy team scheduling backend
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "team-api/**"
+      - "lib/team-*.mjs"
+      - "scripts/deploy-team-api.mjs"
+      - ".github/workflows/deploy-team-api.yml"
   workflow_dispatch:
 
 permissions:

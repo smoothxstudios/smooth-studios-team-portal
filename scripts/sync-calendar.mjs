@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { buildDashboardPayloads, decryptPayload, writeEncryptedDashboards } from "./lib/dashboard-data.mjs";
 import { fetchStripeSnapshot } from "./lib/stripe-data.mjs";
 import { syncTeamSchedule } from "./lib/team-api.mjs";
+import { syncCalendarAssignmentNotes } from "./lib/calendar-assignments.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readJson = async (relativePath) => JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
@@ -17,12 +18,12 @@ function base64url(value) {
   return Buffer.from(value).toString("base64url");
 }
 
-async function googleAccessToken(serviceAccount) {
+async function googleAccessToken(serviceAccount, writeAssignments) {
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claim = base64url(JSON.stringify({
     iss: serviceAccount.client_email,
-    scope: "https://www.googleapis.com/auth/calendar.readonly",
+    scope: writeAssignments ? "https://www.googleapis.com/auth/calendar.events" : "https://www.googleapis.com/auth/calendar.readonly",
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
     exp: now + 3600,
@@ -109,7 +110,13 @@ const ownerWorkflowToken = process.env.DASHBOARD_GITHUB_TOKEN?.trim();
 if (!ownerWorkflowToken) {
   process.stderr.write("DASHBOARD_GITHUB_TOKEN is not configured; owner workflow controls will remain disabled.\n");
 }
-const accessToken = await googleAccessToken(serviceAccount);
+let teamEnabled = process.env.TEAM_API_BOOTSTRAP === "true";
+try {
+  teamEnabled ||= (await readJson("public/data/team-api.json")).enabled === true;
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
+}
+const accessToken = await googleAccessToken(serviceAccount, teamEnabled);
 const calendarEvents = await fetchCalendarEvents(calendarId, accessToken);
 const stripeSecretKey = process.env.STRIPE_RESTRICTED_KEY?.trim();
 const stripeSnapshot = stripeSecretKey
@@ -130,15 +137,16 @@ const payloadOptions = {
   rulebook,
 };
 let payloads = buildDashboardPayloads(payloadOptions);
-let teamEnabled = process.env.TEAM_API_BOOTSTRAP === "true";
-try {
-  teamEnabled ||= (await readJson("public/data/team-api.json")).enabled === true;
-} catch (error) {
-  if (error?.code !== "ENOENT") throw error;
-}
 if (teamEnabled) {
-  const portalAssignments = await syncTeamSchedule(payloads.owner.rentals, passwords.owner);
-  payloads = buildDashboardPayloads({ ...payloadOptions, portalAssignments });
+  const portal = await syncTeamSchedule(payloads.owner.rentals, passwords.owner);
+  const calendarAssignmentSync = await syncCalendarAssignmentNotes({ calendarId, accessToken, calendarEvents,
+    rentals: payloads.owner.rentals, assignments: portal.calendarAssignments });
+  payloads = buildDashboardPayloads({ ...payloadOptions, portalAssignments: portal.assignments });
+  // Owner-only, encrypted setup feedback. Failed note writes do not discard
+  // accepted work or stop Calendar/Stripe and payroll refreshes.
+  payloads.owner.calendarAssignmentSync = { ...calendarAssignmentSync,
+    ...(calendarAssignmentSync.status === "needs_access" ? { serviceAccountEmail: serviceAccount.client_email } : {}) };
+  process.stdout.write(`Calendar assignment notes: ${calendarAssignmentSync.status}; ${calendarAssignmentSync.updated} updated; ${calendarAssignmentSync.failed} need attention.\n`);
 }
 await writeEncryptedDashboards({ payloads, passwords, outputDirectory: path.join(root, "public/data"), config });
 if (teamEnabled) await writeFile(path.join(root, "public/data/team-api.json"), `${JSON.stringify({ version: 1, enabled: true })}\n`);

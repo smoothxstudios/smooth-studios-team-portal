@@ -5,7 +5,7 @@ import { createHmac } from "node:crypto";
 import test, { mock } from "node:test";
 import worker from "../team-api/worker.mjs";
 import { teamToken, tokenHash, unbase64url } from "../lib/team-auth.mjs";
-import { addLocalDays, blockOccurrences, localInstant, assignmentConflicts } from "../lib/team-schedule.mjs";
+import { addLocalDays, blockOccurrences, localInstant, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
 import { deliverPush, publicPushKey, pushEndpoint, vapidAuthorization, flushAlerts } from "../team-api/push.mjs";
 
 const schema = await readFile(new URL("../team-api/migrations/0000_brief_ravenous.sql", import.meta.url), "utf8");
@@ -121,6 +121,43 @@ test("stale and racing writes cannot partially save or double-book a person", as
   assert.equal((await f.snapshot()).assignments.length, 1);
   assert.equal((await f.call("owner", "/blocks", { ...block, revision })).status, 409);
   assert.equal((await f.snapshot()).blocks.length, 0);
+});
+test("ongoing classes can start in the past, but expired series and past one-time blocks are rejected", async () => {
+  const f = fixture();
+  const ongoing = { ...block, startLocal: "2026-09-07T12:00", endLocal: "2026-09-07T13:00", repeatUntil: "2026-12-16" };
+  assert.equal((await f.call("owner", "/blocks", { ...ongoing, revision: 0 })).status, 200);
+  const saved = (await f.snapshot()).blocks[0];
+  assert.equal(saved.startLocal, ongoing.startLocal);
+  assert.equal(blockOccurrences(saved, "2026-09-14T00:00Z", "2026-09-15T00:00Z")[0].start, "2026-09-14T16:00:00.000Z");
+  assert.equal((await f.call("jordyn", "/blocks", { ...ongoing, repeatUntil: null, revision: 1 })).status, 400);
+  assert.equal((await f.call("jordyn", "/blocks", { ...ongoing, repeatUntil: "2026-09-08", revision: 1 })).status, 400);
+});
+test("owner conflict approval permits an offer and employee response without duplicate assignments", async () => {
+  const f = fixture(); await f.importCalendar();
+  await f.call("jordyn", "/blocks", { ...block, revision: (await f.snapshot()).revision });
+  const data = { employeeId: "jordyn", appointmentId: rental.id, overrideConflicts: true };
+  assert.equal((await f.call("rayne", "/assignments", { ...data, revision: (await f.snapshot()).revision })).status, 403);
+  assert.equal((await f.call("owner", "/assignments", { ...data, revision: (await f.snapshot()).revision })).status, 200);
+  const item = (await f.snapshot()).assignments[0];
+  assert.equal(item.status, "pending");
+  assert.equal(hasConflictOverride(item), true);
+  assert.equal((await f.call("sync", "/sync/accepted")).data.assignments.length, 0);
+  assert.equal((await f.call("sync", "/sync/accepted")).data.calendarAssignments[0].status, "pending");
+  assert.equal((await f.call("owner", "/assignments", { ...data, revision: (await f.snapshot()).revision })).status, 409);
+  assert.equal((await f.call("jordyn", `/assignments/${item.id}`, { status: "accepted", revision: (await f.snapshot()).revision })).status, 200);
+  assert.equal((await f.call("sync", "/sync/accepted")).data.assignments.length, 1);
+});
+test("only the owner can approve an existing conflict, and moving the event clears approval", async () => {
+  const f = fixture(); await f.importCalendar(); const item = await offer(f);
+  await f.call("jordyn", "/blocks", { ...block, revision: (await f.snapshot()).revision });
+  assert.equal((await f.call("jordyn", `/assignments/${item.id}`, { overrideConflicts: true, status: "accepted", revision: (await f.snapshot()).revision })).status, 403);
+  assert.equal((await f.call("owner", `/assignments/${item.id}`, { overrideConflicts: true, revision: (await f.snapshot()).revision })).status, 200);
+  assert.equal((await f.snapshot()).assignments[0].status, "pending");
+  assert.equal((await f.call("jordyn", `/assignments/${item.id}`, { status: "accepted", revision: (await f.snapshot()).revision })).status, 200);
+  await f.importCalendar([{ ...rental, start: "2026-10-12T13:00:00Z", end: "2026-10-12T14:00:00Z" }]);
+  assert.equal((await f.snapshot()).assignments[0].status, "pending");
+  assert.equal(hasConflictOverride((await f.snapshot()).assignments[0]), false);
+  assert.equal((await f.call("jordyn", `/assignments/${item.id}`, { status: "accepted", revision: (await f.snapshot()).revision })).status, 409);
 });
 test("blocks and accepted calendar work prevent conflicting offers", async () => {
   const f = fixture(); await f.importCalendar();
