@@ -1061,6 +1061,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
         <SidebarContent>
           <SidebarGroup><SidebarGroupContent><SidebarMenu className="studio-nav">
             {navItems.map((item) => <SidebarMenuItem key={item.key}><SidebarMenuButton isActive={view === item.key} onClick={() => setView(item.key)} tooltip={item.label}><item.icon /><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}
+            <SidebarMenuItem><SidebarMenuButton asChild tooltip="Production dashboard"><a href="https://smooth-shot-list.felixhansley.chatgpt.site" target="_blank" rel="noopener noreferrer"><Link2 /><span>Productions</span></a></SidebarMenuButton></SidebarMenuItem>
           </SidebarMenu></SidebarGroupContent></SidebarGroup>
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
