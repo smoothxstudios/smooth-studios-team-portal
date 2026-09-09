@@ -252,7 +252,7 @@ test("VAPID signatures verify, with correct audience and an empty private payloa
   assert.equal(payload.exp, Math.floor(now / 1000) + 43200);
   assert.equal(unbase64url(publicPushKey(jwk)).length, 65);
   const result = await deliverPush(endpoint, jwk, async (_url, options) => {
-    assert.equal(options.body.length, 0); assert.equal(options.redirect, "error");
+    assert.equal(options.body.length, 0); assert.equal(options.redirect, "manual");
     assert.equal(options.headers.TTL, "86400"); return new Response(null, { status: 201 });
   });
   assert.equal(result.accepted, true);

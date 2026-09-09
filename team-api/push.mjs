@@ -32,7 +32,9 @@ export async function vapidAuthorization(endpoint, jwk, now = Date.now()) {
 export async function deliverPush(endpoint, jwk, send = fetch) {
   const url = pushEndpoint(endpoint);
   const response = await send(url, {
-    method: "POST", redirect: "error", body: new Uint8Array(0),
+    // Workerd rejects redirect: "error" before sending. Manual mode returns
+    // redirects as rejected deliveries without forwarding VAPID credentials.
+    method: "POST", redirect: "manual", body: new Uint8Array(0),
     headers: { Authorization: await vapidAuthorization(url, jwk), TTL: "86400", Urgency: "high", Topic: "smooth-schedule" },
     signal: AbortSignal.timeout(8000),
   });
