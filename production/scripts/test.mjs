@@ -16,7 +16,7 @@ if(process.env.LOCAL_NODE_TEST==='1'){
  // The alias's database is shared with the bundled Worker through this export.
  const exported=await import('../.work/test-worker.mjs');
  mf={getD1Database:async()=>exported.testEnv.DB,dispatchFetch:(url,init)=>worker.fetch(new Request(url,init)),dispose:async()=>{}};
-}else mf=new Miniflare({modules:[{type:'ESModule',path:'.work/worker/worker.js'}],compatibilityDate:'2026-09-09',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],bindings:{APP_ORIGIN:origin,BETTER_AUTH_SECRET:'test-only-secret-with-more-than-32-characters'},serviceBindings:{ASSETS:()=>new Response('Test assets')}});
+}else mf=new Miniflare({modules:[{type:'ESModule',path:'.work/worker/worker.js'}],compatibilityDate:'2026-05-22',cf:false,host:'127.0.0.1',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],bindings:{APP_ORIGIN:origin,BETTER_AUTH_SECRET:'test-only-secret-with-more-than-32-characters'},serviceBindings:{ASSETS:()=>new Response('Test assets')}});
 try{
  const db=await mf.getD1Database('DB');
  for(const name of (await readdir('drizzle')).filter(n=>n.endsWith('.sql')).sort()){
