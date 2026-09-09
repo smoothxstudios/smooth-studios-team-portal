@@ -24,5 +24,9 @@ export async function syncTeamSchedule(rentals, ownerPassword) {
   await request("/sync/commit", { generation, count: appointments.length });
   const result = await request("/sync/accepted");
   if (!Array.isArray(result.assignments) || !Array.isArray(result.calendarAssignments)) throw new Error("Deploy the updated team API before syncing Calendar assignment notes. Dashboards were not overwritten.");
+  const push = result.pushDiagnostics;
+  if (push && [push.registeredDevices, push.queuedAlerts, push.retryingAlerts].every(Number.isSafeInteger)) {
+    process.stdout.write(`Push setup: ${push.registeredDevices} registered device(s); ${push.queuedAlerts} alerts queued; ${push.retryingAlerts} alerts retrying.\n`);
+  }
   return { assignments: result.assignments, calendarAssignments: result.calendarAssignments };
 }

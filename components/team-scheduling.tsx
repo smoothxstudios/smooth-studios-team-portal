@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { enableTeamPush, disableTeamPush, teamRequest, type TeamSchedule, type TeamAssignment, type TimeBlock } from "@/lib/team-api";
+import { enableTeamPush, disableTeamPush, teamPushIsEnabled, testTeamPush, teamRequest, type TeamSchedule, type TeamAssignment, type TimeBlock } from "@/lib/team-api";
 import type { DashboardPayload } from "@/lib/dashboard-types";
 import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps } from "@/lib/team-schedule.mjs";
 
@@ -39,6 +39,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
   const [assignment, setAssignment] = useState({ employeeId: "akiva", appointmentId: "", title: "", instructions: "", overrideConflicts: false, ...initialPeriod() });
   const [pushSupported, setPushSupported] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushFeedback, setPushFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
     const result = await teamRequest<TeamSchedule>(token, "/schedule");
@@ -56,6 +57,12 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         if (ready) {
           const result = await teamRequest<TeamSchedule>(token, "/schedule");
           if (!disposed) { setSchedule(result); setError(""); }
+          try {
+            const registered = await teamPushIsEnabled(token, result.pushPublicKey);
+            if (!disposed) setPushEnabled(registered);
+          } catch {
+            if (!disposed) { setPushEnabled(false); setPushFeedback({ ok: false, text: "Couldn’t verify notifications on this device. Use Enable on this device to reconnect, then Send test." }); }
+          }
         }
       } catch { if (!disposed) setError("Couldn’t refresh scheduling. Check your connection and try Refresh; the last view may be out of date."); }
       finally { if (!disposed) setLoading(false); }
@@ -64,8 +71,6 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 60_000);
     const onFocus = () => void refresh();
     window.addEventListener("focus", onFocus);
-    if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistration(new URL("./", window.location.href).href)
-      .then(r => r?.pushManager.getSubscription()).then(s => { if (!disposed) setPushEnabled(Boolean(s)); }).catch(() => {});
     return () => { disposed = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); };
   }, [token]);
 
@@ -85,19 +90,21 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     if (busy) return;
     // Permission must be requested directly from the tap, before any network I/O.
     const permission = action === "enable" && pushSupported ? Notification.requestPermission() : null;
-    setBusy(true); setError(""); setMessage("");
+    setBusy(true); setPushFeedback(null);
     try {
       if (action === "enable") {
         if (!schedule?.pushPublicKey || !permission) throw new Error("Open this dashboard from your Home Screen to enable iPhone notifications.");
         await enableTeamPush(token, schedule.pushPublicKey, await permission); setPushEnabled(true);
-        setMessage("Notifications enabled on this device. Use Send test to check delivery.");
+        setPushFeedback({ ok: true, text: "Notifications enabled on this device. Use Send test to check delivery." });
       } else if (action === "disable") {
-        await disableTeamPush(token); setPushEnabled(false); setMessage("Notifications disabled on this device.");
+        await disableTeamPush(token); setPushEnabled(false); setPushFeedback({ ok: true, text: "Notifications disabled on this device." });
       } else {
-        await teamRequest(token, "/push/test", {}); setMessage("Test queued. Look for a Smooth Studios schedule alert; delivery depends on your device settings.");
+        const result = await testTeamPush(token, schedule?.pushPublicKey ?? null);
+        if (result.expired) setPushEnabled(false);
+        setPushFeedback({ ok: result.accepted, text: result.message });
       }
-      await load();
-    } catch (e) { setError(e instanceof Error ? e.message : "Notification setup failed."); }
+      try { await load(); } catch { /* Keep the actual notification result visible. */ }
+    } catch (e) { setPushFeedback({ ok: false, text: e instanceof Error ? e.message : "Notification setup failed." }); }
     finally { setBusy(false); }
   }
 
@@ -185,9 +192,9 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         {blocks.length ? <div className="schedule-blocks">{blocks.map(b => <div className="schedule-block" key={b.id}><div><Person id={b.userId} /><strong>{b.reason}</strong><p>{date(localInstant(b.startLocal))} · {time(localInstant(b.startLocal))}–{time(localInstant(b.endLocal))}{b.endLocal.slice(0, 10) !== b.startLocal.slice(0, 10) ? ` (${date(localInstant(b.endLocal))})` : ""}</p><small>{b.repeatUntil ? `Weekly through ${date(localInstant(`${b.repeatUntil}T12:00`))}` : "One-time block"}</small></div><Button aria-label={`Remove ${b.reason} block for ${personName(b.userId)}`} size="icon" variant="outline" disabled={busy} onClick={() => setConfirm({ path: `/blocks/${b.id}`, method: "DELETE", data: {}, description: `Remove ${b.reason}${b.repeatUntil ? " and all its weekly occurrences" : ""} for ${personName(b.userId)}? Existing assignments will not change.` })}><Trash2 size={16} /></Button></div>)}</div> : <p className="schedule-empty">No time blocks added yet.</p>}
       </article>
 
-      <article className="schedule-panel schedule-push"><div><h3><Bell size={20} />Schedule notifications</h3><p>Receive a general alert, tap it, unlock your dashboard, and accept or decline here. No texts are sent.</p><p className="schedule-small">On iPhone: Safari → Share → Add to Home Screen. Open that icon, unlock, then enable notifications. Locking the dashboard turns off notifications on this device.</p>{!pushSupported && <p className="schedule-warning">This browser session does not support push. Use the Home Screen app on iPhone or a supported browser.</p>}</div><div className="schedule-actions">
+      <article className="schedule-panel schedule-push"><div><h3><Bell size={20} />Schedule notifications</h3><p>Receive a general alert, tap it, unlock your dashboard, and accept or decline here. No texts are sent.</p><p className="schedule-small">On iPhone: Safari → Share → Add to Home Screen. Open that icon, unlock, then enable notifications. Closing the app or locking your phone keeps alerts on. Using Log out in the dashboard disables them on this device.</p>{!pushSupported && <p className="schedule-warning">This browser session does not support push. Use the Home Screen app on iPhone or a supported browser.</p>}</div><div className="schedule-actions">
         {pushEnabled ? <><Button variant="outline" disabled={busy} onClick={() => void pushAction("test")}>Send test</Button><Button variant="outline" disabled={busy} onClick={() => void pushAction("disable")}>Disable this device</Button></> : <Button disabled={busy || !pushSupported || !schedule.pushPublicKey} onClick={() => void pushAction("enable")}><Bell size={16} />Enable on this device</Button>}
-      </div>{isOwner && <p className="schedule-small">Registered devices: {TEAM.map(p => `${p.name} ${schedule.devices[p.id] ?? 0}`).join(" · ")}. Registration does not guarantee delivery; focus mode and device settings can suppress alerts.</p>}</article>
+      </div>{pushFeedback && <p className={pushFeedback.ok ? "schedule-success" : "schedule-warning"} role={pushFeedback.ok ? "status" : "alert"}>{pushFeedback.text}</p>}{isOwner && <p className="schedule-small">Registered devices: {TEAM.map(p => `${p.name} ${schedule.devices[p.id] ?? 0}`).join(" · ")}. Registration does not guarantee delivery; focus mode and device settings can suppress alerts.</p>}</article>
       <p className="schedule-small">Studio rental offers and acceptances are listed in the Google Calendar event’s description after syncing. Existing Calendar invitations remain valid. Custom tasks stay in this dashboard.</p>
     </>}
 
@@ -210,7 +217,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         {(conflicts.length > 0 || alreadyInvited || alreadyOffered) && <p className="schedule-warning">{alreadyInvited ? "This person already accepted the Calendar invitation." : alreadyOffered ? "This person already has an active offer for this appointment." : conflicts.join("; ")}</p>}
         {isOwner && conflicts.length > 0 && !alreadyInvited && !alreadyOffered && <label className="schedule-check"><input type="checkbox" checked={assignment.overrideConflicts} onChange={e => setAssignment({ ...assignment, overrideConflicts: e.target.checked })} />Allow this time conflict. The employee still needs to accept.</label>}
         <label>Instructions (optional)<Textarea maxLength={2000} rows={3} value={assignment.instructions} onChange={e => setAssignment({ ...assignment, instructions: e.target.value })} placeholder="Arrival instructions, responsibilities, anything to prepare…" /></label>
-        <p className="schedule-small">A push alert is queued if this employee has enabled notifications. The offer appears in the portal even if the alert cannot be delivered.</p>
+        <p className="schedule-small">{schedule?.devices[assignment.employeeId] ? `${personName(assignment.employeeId)} has notifications enabled on ${schedule.devices[assignment.employeeId]} device(s). A push alert will be queued when you save.` : `${personName(assignment.employeeId)} has not enabled notifications on any device yet. They can still view and accept the offer in their dashboard.`}</p>
         {error && <p className="schedule-error" role="alert">{error}</p>}
         <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={() => setAssignmentOpen(false)}>Cancel</Button><Button disabled={busy || (conflicts.length > 0 && !assignment.overrideConflicts) || alreadyInvited || alreadyOffered || !period} type="submit">{busy ? "Sending…" : "Send assignment offer"}</Button></DialogFooter>
       </form></DialogContent></Dialog>

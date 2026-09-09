@@ -35,6 +35,8 @@ Each person explicitly enables notifications on each device. iPhone/iPad users n
 
 Only generic schedule alerts are sent. No customer details, schedule contents, or class reasons are placed on lock screens or sent in push payloads. Tapping opens the portal, which must be unlocked; accept/decline happens there, not by text. Logging out disables push on that device. Closing the app is fine and does not log out its push subscription.
 
+**Send test** checks only the current device and waits for its push provider’s response. The result appears beside the notification controls, including an HTTP status when rejected; provider acceptance is not proof that the phone displayed the alert. Expired subscriptions are removed, and enabling again repairs subscriptions created with an old push key. The enabled state checks both browser permission and the device registration for the unlocked profile. Assignment forms show whether the selected employee has any devices registered. Calendar sync logs only aggregate registration and retry counts, never endpoints or private notification contents.
+
 The API supports standard Apple, Chrome/FCM, Firefox, and Windows push endpoints. Three devices per profile are allowed. A coalesced durable alert retries transient failures up to four attempts using a five-minute cron. Expired subscriptions are removed. Provider acceptance is not proof of device delivery. The dashboard remains the source of truth even if push is disabled, delayed, or suppressed.
 
 ## Security and maintenance

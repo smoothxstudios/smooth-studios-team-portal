@@ -6,6 +6,7 @@ self.addEventListener("push", event => {
     body: "Open your team dashboard to review your latest schedule and assignment offers.",
     icon: new URL("smooth-studios-logo.png", self.registration.scope).href,
     tag: "smooth-schedule",
+    renotify: true,
     data: { url: new URL("./#scheduling", self.registration.scope).href },
   }));
 });

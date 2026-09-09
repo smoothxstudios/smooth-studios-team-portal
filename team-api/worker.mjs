@@ -1,6 +1,6 @@
 import { tokenHash } from "../lib/team-auth.mjs";
 import { TEAM, localInstant as parseLocalInstant, addLocalDays, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
-import { flushAlerts, publicPushKey, pushEndpoint } from "./push.mjs";
+import { deliverPush, flushAlerts, publicPushKey, pushDeliveryMessage, pushEndpoint } from "./push.mjs";
 
 const users = TEAM.map(p => p.id);
 const origins = new Set(["https://smoothxstudios.github.io", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
@@ -127,11 +127,14 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/sync/accepted") {
     const assignments = await jsonRows(db, "SELECT data FROM team_assignments");
+    const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices").first();
+    const alerts = await db.prepare("SELECT COUNT(*) AS count, COALESCE(SUM(CASE WHEN attempts > 0 THEN 1 ELSE 0 END), 0) AS retrying FROM team_alerts").first();
     return { assignments: assignments
       .filter(a => a.status === "accepted" && a.appointmentId)
       .map(({ appointmentId, employeeId, start, end }) => ({ appointmentId, employeeId, start, end })),
       calendarAssignments: assignments.filter(a => a.appointmentId)
         .map(({ appointmentId, employeeId, start, end, status }) => ({ appointmentId, employeeId, start, end, status })),
+      pushDiagnostics: { registeredDevices: devices.count, queuedAlerts: alerts.count, retryingAlerts: alerts.retrying },
     };
   }
   if (request.method === "POST" && url.pathname === "/sync/import") {
@@ -240,9 +243,12 @@ async function route(request, env, ctx) {
       instructions: text(input.instructions ?? "", 2000, false), start, end,
       status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       ...(input.overrideConflicts ? { conflictOverride: approveConflict({ start, end }) } : {}) };
+    const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices WHERE user_id = ?").bind(employeeId).first();
     await commit(db, s.state, mutation => [saveAssignment(db, item, mutation)], [employeeId]);
     ctx.waitUntil(flushAlerts(env));
-    return { saved: true, notification: "Queued for enabled devices; delivery is not guaranteed. The offer is visible in the portal now." };
+    return { saved: true, notification: devices.count
+      ? "Offer saved. A notification was queued for their enabled devices."
+      : "Offer saved. This employee has no devices enabled for notifications yet; they can see and accept it in their dashboard." };
   }
   if (request.method === "POST" && url.pathname.startsWith("/assignments/")) {
     const input = await body(request), s = await snapshot(db);
@@ -275,6 +281,13 @@ async function route(request, env, ctx) {
     ctx.waitUntil(flushAlerts(env));
     return { saved: true };
   }
+  if (request.method === "POST" && url.pathname === "/push/device/status") {
+    const input = await body(request);
+    let endpoint;
+    try { endpoint = pushEndpoint(input.endpoint); } catch { fail(400, "This push endpoint is invalid or unsupported."); }
+    const device = await db.prepare("SELECT id FROM team_devices WHERE id = ? AND user_id = ?").bind(await tokenHash(endpoint), user).first();
+    return { registered: Boolean(device) };
+  }
   if (["POST", "DELETE"].includes(request.method) && url.pathname === "/push/device") {
     const input = await body(request);
     let endpoint;
@@ -294,14 +307,19 @@ async function route(request, env, ctx) {
     return { registered: true };
   }
   if (request.method === "POST" && url.pathname === "/push/test") {
-    await body(request);
-    const device = await db.prepare("SELECT id FROM team_devices WHERE user_id = ? LIMIT 1").bind(user).first();
+    const input = await body(request);
+    if (!env.VAPID_JWK) fail(503, "Push notifications have not been configured.");
+    if (!input.endpoint) fail(400, "Refresh the dashboard, then use Send test on the device you want to check.");
+    let endpoint;
+    try { endpoint = pushEndpoint(input.endpoint); } catch { fail(400, "This push endpoint is invalid or unsupported."); }
+    const id = await tokenHash(endpoint);
+    const device = await db.prepare("SELECT id FROM team_devices WHERE id = ? AND user_id = ?").bind(id, user).first();
     if (!device) fail(409, "Enable notifications on this device first.");
-    await db.prepare(`INSERT INTO team_alerts (user_id, id, attempts, due_at) VALUES (?, ?, 0, ?)
-      ON CONFLICT(user_id) DO UPDATE SET id = excluded.id, attempts = 0, due_at = excluded.due_at WHERE team_alerts.due_at < ?`)
-      .bind(user, crypto.randomUUID(), Date.now(), Date.now() - 60_000).run();
-    ctx.waitUntil(flushAlerts(env));
-    return { queued: true };
+    let result;
+    try { result = await deliverPush(endpoint, JSON.parse(env.VAPID_JWK)); }
+    catch { fail(502, "The notification service could not be reached. Try again shortly."); }
+    if (result.expired) await db.prepare("DELETE FROM team_devices WHERE id = ? AND user_id = ?").bind(id, user).run();
+    return { ...result, message: pushDeliveryMessage(result) };
   }
   fail(404, "Endpoint not found.");
 }

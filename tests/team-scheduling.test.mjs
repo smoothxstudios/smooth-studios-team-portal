@@ -276,3 +276,79 @@ test("push retry queue removes expired subscriptions without leaking endpoint da
   assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_devices").get().n, 0);
   assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_alerts").get().n, 0);
 });
+
+test("notification status and tests are restricted to this profile's registered device", async t => {
+  const f = fixture();
+  const keys = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  f.env.VAPID_JWK = JSON.stringify(await crypto.subtle.exportKey("jwk", keys.privateKey));
+  const own = { endpoint: "https://web.push.apple.com/synthetic-own-device" };
+  const second = { endpoint: "https://fcm.googleapis.com/synthetic-other-device" };
+  await f.call("jordyn", "/push/device", own);
+  await f.call("jordyn", "/push/device", second);
+  assert.equal((await f.call("jordyn", "/push/device/status", own)).data.registered, true);
+  assert.equal((await f.call("rayne", "/push/device/status", own)).data.registered, false);
+  const deliveries = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    deliveries.push(url); assert.equal(options.headers.Urgency, "high");
+    return new Response(null, { status: 201 });
+  });
+  assert.equal((await f.call("rayne", "/push/test", own)).status, 409);
+  assert.equal((await f.call("jordyn", "/push/test", {})).status, 400);
+  assert.equal(deliveries.length, 0);
+  const result = await f.call("jordyn", "/push/test", own);
+  assert.equal(result.status, 200);
+  assert.equal(result.data.accepted, true);
+  assert.equal(result.data.provider, "Apple");
+  assert.equal(result.data.status, 201);
+  assert.match(result.data.message, /Apple accepted/);
+  assert.deepEqual(deliveries, [own.endpoint]);
+  assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_alerts").get().n, 0);
+});
+
+test("test reports provider rejection, removes expired devices, and preserves unrelated queued alerts", async t => {
+  const f = fixture();
+  const keys = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  f.env.VAPID_JWK = JSON.stringify(await crypto.subtle.exportKey("jwk", keys.privateKey));
+  const data = { endpoint: "https://web.push.apple.com/synthetic-device" };
+  await f.call("jordyn", "/push/device", data);
+  f.DB.sqlite.prepare("INSERT INTO team_alerts (user_id, id, due_at) VALUES (?, ?, ?)").run("jordyn", "real-offer", now);
+  let code = 403;
+  t.mock.method(globalThis, "fetch", async () => new Response("private provider response not exposed", { status: code }));
+  const rejected = await f.call("jordyn", "/push/test", data);
+  assert.equal(rejected.data.accepted, false);
+  assert.match(rejected.data.message, /HTTP 403/);
+  assert.doesNotMatch(JSON.stringify(rejected.data), /synthetic-device|private provider response/);
+  assert.equal((await f.call("jordyn", "/push/device/status", data)).data.registered, true);
+  code = 410;
+  const expired = await f.call("jordyn", "/push/test", data);
+  assert.equal(expired.data.expired, true);
+  assert.match(expired.data.message, /expired/);
+  assert.equal((await f.call("jordyn", "/push/device/status", data)).data.registered, false);
+  assert.equal(f.DB.sqlite.prepare("SELECT id FROM team_alerts").get().id, "real-offer");
+});
+
+test("push test reports network failure and refuses a missing push configuration", async t => {
+  const f = fixture();
+  assert.equal((await f.call("owner", "/push/test", {})).status, 503);
+  const keys = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  f.env.VAPID_JWK = JSON.stringify(await crypto.subtle.exportKey("jwk", keys.privateKey));
+  const data = { endpoint: "https://fcm.googleapis.com/synthetic-device" };
+  await f.call("owner", "/push/device", data);
+  t.mock.method(globalThis, "fetch", async () => { throw new Error("synthetic private error"); });
+  const result = await f.call("owner", "/push/test", data);
+  assert.equal(result.status, 502);
+  assert.match(result.data.error, /could not be reached/);
+  assert.doesNotMatch(result.data.error, /synthetic/);
+});
+
+test("assignment warns when employee has no notification devices; sync diagnostics expose only counts", async () => {
+  const f = fixture();
+  await f.importCalendar();
+  const result = await f.call("owner", "/assignments", { revision: (await f.snapshot()).revision,
+    employeeId: "jordyn", appointmentId: rental.id });
+  assert.equal(result.status, 200);
+  assert.match(result.data.notification, /no devices enabled/);
+  const diagnostic = await f.call("sync", "/sync/accepted");
+  assert.deepEqual(diagnostic.data.pushDiagnostics, { registeredDevices: 0, queuedAlerts: 1, retryingAlerts: 0 });
+  assert.equal((await f.call("owner", "/sync/accepted")).status, 403);
+});

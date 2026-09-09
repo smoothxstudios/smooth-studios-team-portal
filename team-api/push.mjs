@@ -33,12 +33,22 @@ export async function deliverPush(endpoint, jwk, send = fetch) {
   const url = pushEndpoint(endpoint);
   const response = await send(url, {
     method: "POST", redirect: "error", body: new Uint8Array(0),
-    headers: { Authorization: await vapidAuthorization(url, jwk), TTL: "86400", Urgency: "normal", Topic: "smooth-schedule" },
+    headers: { Authorization: await vapidAuthorization(url, jwk), TTL: "86400", Urgency: "high", Topic: "smooth-schedule" },
     signal: AbortSignal.timeout(8000),
   });
   if (response.body) await response.body.cancel();
-  return { accepted: response.status === 201 || response.status === 202,
+  const host = new URL(url).hostname;
+  const provider = host === "web.push.apple.com" ? "Apple" : host === "fcm.googleapis.com" ? "Google" : host === "updates.push.services.mozilla.com" ? "Firefox" : "Windows";
+  return { status: response.status, provider, accepted: response.status === 201 || response.status === 202,
     expired: response.status === 404 || response.status === 410 };
+}
+
+export function pushDeliveryMessage(result) {
+  if (result.accepted) return `${result.provider} accepted the test for this device. If no alert appears, check this app’s notification settings and Focus / Do Not Disturb.`;
+  if (result.expired) return "This device’s notification subscription expired. Enable notifications again, then send another test.";
+  if ([401, 403].includes(result.status)) return `${result.provider} rejected notification authorization (HTTP ${result.status}). Disable this device, enable it again, and retry.`;
+  if (result.status === 429) return `${result.provider} is limiting notifications. Wait a minute, then try again.`;
+  return `${result.provider} could not accept the notification (HTTP ${result.status}). Please share this message with Smooth so delivery can be checked.`;
 }
 
 export async function flushAlerts(env, send = fetch) {

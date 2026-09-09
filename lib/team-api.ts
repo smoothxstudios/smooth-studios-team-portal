@@ -5,6 +5,7 @@ export type TimeBlock = { id: string; userId: string; reason: string; startLocal
 export type TeamAppointment = { id: string; title: string; customer: string; start: string; end: string; priceCents: number; acceptedEmployeeIds: string[] };
 export type TeamAssignment = { id: string; employeeId: string; appointmentId: string | null; title: string; instructions: string; start: string; end: string; status: "pending" | "accepted" | "declined" | "cancelled"; createdAt: string; updatedAt: string; note?: string; conflictOverride?: { approvedBy: "owner"; approvedAt: string; start: string; end: string } };
 export type TeamSchedule = { revision: number; syncedAt: string | null; appointments: TeamAppointment[]; blocks: TimeBlock[]; assignments: TeamAssignment[]; devices: Record<string, number>; pushPublicKey: string | null };
+export type PushTestResult = { accepted: boolean; expired: boolean; status: number; provider: string; message: string };
 
 export async function teamRequest<T>(token: string, path: string, data?: unknown, method?: string): Promise<T> {
   const response = await fetch(`${TEAM_API_URL}${path}`, {
@@ -31,14 +32,48 @@ export async function teamWorker() {
   return registration;
 }
 
+function matchesPushKey(subscription: PushSubscription, key: string) {
+  const current = subscription.options.applicationServerKey;
+  if (!current) return false;
+  const actual = new Uint8Array(current), expected = unbase64url(key);
+  return actual.length === expected.length && actual.every((value, index) => value === expected[index]);
+}
+
+async function currentTeamSubscription() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window) || Notification.permission !== "granted") return null;
+  const registration = await navigator.serviceWorker.getRegistration(new URL("./", window.location.href).href);
+  return (await registration?.pushManager.getSubscription()) ?? null;
+}
+
+export async function teamPushIsEnabled(token: string, key: string | null) {
+  const subscription = await currentTeamSubscription();
+  if (!subscription || !key || !matchesPushKey(subscription, key)) return false;
+  const result = await teamRequest<{ registered: boolean }>(token, "/push/device/status", { endpoint: subscription.endpoint });
+  return result.registered;
+}
+
 export async function enableTeamPush(token: string, key: string, permission: NotificationPermission) {
   if (permission !== "granted") throw new Error("Notifications were not allowed. You can still view and accept assignments in the portal.");
   const registration = await teamWorker();
   let subscription = await registration.pushManager.getSubscription();
+  if (subscription && !matchesPushKey(subscription, key)) {
+    await teamRequest(token, "/push/device", { endpoint: subscription.endpoint }, "DELETE");
+    await subscription.unsubscribe();
+    subscription = null;
+  }
   if (!subscription) subscription = await registration.pushManager.subscribe({
     userVisibleOnly: true, applicationServerKey: unbase64url(key),
   });
   await teamRequest(token, "/push/device", { endpoint: subscription.endpoint });
+}
+
+export async function testTeamPush(token: string, key: string | null) {
+  await teamWorker();
+  const subscription = await currentTeamSubscription();
+  if (!subscription || !key || !matchesPushKey(subscription, key)) throw new Error("Enable notifications on this device again before testing.");
+  const result = await teamRequest<PushTestResult>(token, "/push/test", { endpoint: subscription.endpoint });
+  if (result.expired) await subscription.unsubscribe();
+  return result;
 }
 
 export async function disableTeamPush(token: string) {
