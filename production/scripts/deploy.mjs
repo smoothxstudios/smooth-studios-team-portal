@@ -24,10 +24,10 @@ for(const person of initial){
  const email=process.env['EMPLOYEE_EMAIL_'+person.id.toUpperCase()]?.trim().toLowerCase()||person.id+'@production.invalid';
  const now=new Date().toISOString(),hash=await hashPassword(password);
  // Only initialize missing accounts. Redeployments never reset changed passwords.
- await cf(prefix+'/d1/database/'+database.uuid+'/query','POST',[
+ await cf(prefix+'/d1/database/'+database.uuid+'/query','POST',{batch:[
   {sql:'INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt,username,displayUsername,enabled,mustChangePassword) VALUES(?,?,?,0,?,?,?,?,1,0)',params:[person.id,person.name,email,now,now,person.username,person.username]},
   {sql:'INSERT INTO account(id,userId,accountId,providerId,password,createdAt,updatedAt) VALUES(?,?,?,\'credential\',?,?,?)',params:[crypto.randomUUID(),person.id,person.id,hash,now,now]}
- ]);
+ ]});
 }
 await wrangler(['deploy']);
 const secretsPath=prefix+'/workers/scripts/'+config.name+'/secrets';const secrets=await cf(secretsPath);
