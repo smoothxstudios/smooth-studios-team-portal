@@ -21,13 +21,13 @@
       "id": "jordyn",
       "name": "Jordyn",
       "emailEnvironmentVariable": "EMPLOYEE_EMAIL_JORDYN",
-      "accent": "rgb(0, 126, 87)"
+      "accent": "rgb(37, 99, 235)"
     },
     {
       "id": "rayne",
       "name": "Rayne",
       "emailEnvironmentVariable": "EMPLOYEE_EMAIL_RAYNE",
-      "accent": "rgb(37, 99, 235)"
+      "accent": "rgb(147, 51, 234)"
     }
   ]
 }

@@ -363,6 +363,7 @@ button { cursor: pointer; }
   .stripe-unmatched { grid-template-columns:1fr; }
 }
 @media (max-width: 700px) {
+  input,select,textarea { font-size:16px !important; }
   .dashboard-content { padding:16px 12px 35px; } .kpi-grid { grid-template-columns:1fr 1fr; gap:10px; }
   .kpi-card { min-height:128px; padding:15px; } .kpi-card strong { font-size:25px; } .team-strip-grid { grid-template-columns:1fr; }
   .employee-pulse { border-right:0; border-bottom:1px solid var(--border); } .employee-pulse:last-child { border-bottom:0; }

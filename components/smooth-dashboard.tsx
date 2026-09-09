@@ -104,8 +104,8 @@ const FALLBACK_PROFILES: AccessProfile[] = [
 ];
 const TEAM_ACCENTS: Record<string, string> = {
   akiva: "rgb(225, 0, 0)",
-  jordyn: "rgb(0, 126, 87)",
-  rayne: "rgb(37, 99, 235)",
+  jordyn: "rgb(37, 99, 235)",
+  rayne: "rgb(147, 51, 234)",
 };
 const STUDIO_TIME_ZONE = "America/New_York";
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
