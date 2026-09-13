@@ -2,6 +2,7 @@ import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 
 import {Clapperboard,Loader2,LockKeyhole,LogOut,KeyRound,Plus,Copy,UserRound,ShieldCheck,Users} from 'lucide-react';
 import {Button} from './ui/button';
 import {Input} from './ui/input';
+import {Tabs,TabsList,TabsTrigger,TabsContent} from './ui/tabs';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from './ui/dialog';
 import {AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter,AlertDialogCancel,AlertDialogAction} from './ui/alert-dialog';
 import {FormField,errorText,request} from './production-ui';
@@ -16,11 +17,12 @@ async function authRequest(path:string,body:unknown){const r=await fetch('/api/a
 export function AccountGate({children}:{children:ReactNode}){
  const entry=useRef(studioEntry(typeof window==='undefined'?'':window.location.search));
  const [user,setUser]=useState<SessionUser|null>(null),[loading,setLoading]=useState(true),[problem,setProblem]=useState(''),[busy,setBusy]=useState(false),[username,setUsername]=useState(entry.current?.username||''),[password,setPassword]=useState('');
+ const [mode,setMode]=useState('sign-in'),[name,setName]=useState(''),[confirmPassword,setConfirmPassword]=useState('');
  const activeUser=useRef<SessionUser|null>(null),requestId=useRef(0),channel=useRef<BroadcastChannel|null>(null);
  function setAccount(next:SessionUser|null){activeUser.current=next;setRequestAccount(next?.id||null);setUser(next);}
  function announce(){channel.current?.postMessage('account-changed');}
  function clearEntry(){entry.current=null;const url=new URL(window.location.href);if(url.searchParams.get('from')==='studio'){url.searchParams.delete('from');url.searchParams.delete('account');window.history.replaceState(window.history.state,'',url.pathname+url.search+url.hash);}}
- function closeAccount(message:string){++requestId.current;setAccount(null);setPassword('');setLoading(false);setProblem(message);}
+ function closeAccount(message:string){++requestId.current;setAccount(null);setPassword('');setConfirmPassword('');setMode('sign-in');setLoading(false);setProblem(message);}
  async function refresh(){
   const seq=++requestId.current;
   try{
@@ -40,11 +42,12 @@ export function AccountGate({children}:{children:ReactNode}){
  }
  async function signOut(){closeAccount('');try{await authRequest('sign-out',{});announce();}catch(e){setProblem(errorText(e));}}
  async function signIn(){
+  if(mode==='sign-up'&&password!==confirmPassword){setProblem('The passwords do not match.');return;}
   const seq=++requestId.current,submittedUsername=username.trim().toLowerCase();setBusy(true);setProblem('');
   try{
-   await authRequest('sign-in/username',{username:submittedUsername,password});
+   await authRequest(mode==='sign-up'?'sign-up/email':'sign-in/username',mode==='sign-up'?{name:name.trim(),username:submittedUsername,password}:{username:submittedUsername,password});
    if(seq!==requestId.current)return;
-   setPassword('');entry.current={username:submittedUsername};announce();await refresh();
+   setPassword('');setConfirmPassword('');entry.current={username:submittedUsername};announce();await refresh();
   }catch(e){if(seq===requestId.current)setProblem(errorText(e));}
   finally{setBusy(false);}
  }
@@ -59,7 +62,7 @@ export function AccountGate({children}:{children:ReactNode}){
  },[]);
  const context={user,refresh,signOut};
  if(loading)return <div className="workspace-loading"><Loader2 className="spin"/>Opening your workspace…</div>;
- if(!user)return <AccountContext value={context}><div className="account-gate"><div className="login-brand"><span><Clapperboard/></span><div><strong>Production Dashboard</strong><small>SMOOTH STUDIOS</small></div></div><form className="login-card" onSubmit={e=>{e.preventDefault();void signIn();}}><span className="login-icon"><LockKeyhole/></span><h1>Sign in to productions</h1><p>Your projects. Your crew. Your next shoot.</p><FormField label="Username"><Input autoComplete="username" aria-label="Username" value={username} onChange={e=>setUsername(e.target.value)} required autoFocus/></FormField><FormField label="Password"><Input type="password" autoComplete="current-password" aria-label="Password" value={password} onChange={e=>setPassword(e.target.value)} required/></FormField>{problem&&<p className="login-error" role="alert">{problem}</p>}<Button type="submit" disabled={busy}>{busy?<Loader2 className="spin"/>:<LockKeyhole size={16}/>}Sign in</Button><small>Need an account or a password reset? Contact Smooth.</small></form><a className="login-rentals" href="https://smoothxstudios.github.io/smooth-studios-team-portal/">Studio Dashboard</a></div></AccountContext>;
+ if(!user)return <AccountContext value={context}><div className="account-gate"><div className="login-brand"><span><Clapperboard/></span><div><strong>Production Dashboard</strong><small>SMOOTH STUDIOS</small></div></div><Tabs className="login-card" value={mode} onValueChange={value=>{if(!busy){setMode(value);setProblem('');setPassword('');setConfirmPassword('');}}}><TabsList className="login-tabs" aria-label="Production account"><TabsTrigger value="sign-in" disabled={busy}>Sign in</TabsTrigger><TabsTrigger value="sign-up" disabled={busy}>Sign up</TabsTrigger></TabsList><TabsContent value={mode}><form className="login-form" onSubmit={e=>{e.preventDefault();void signIn();}}><span className="login-icon">{mode==='sign-up'?<UserRound/>:<LockKeyhole/>}</span><h1>{mode==='sign-up'?'Create your account':'Sign in to productions'}</h1><p>{mode==='sign-up'?'Create your own productions and join projects you’re tagged in.':'Your projects. Your crew. Your next shoot.'}</p>{mode==='sign-up'&&<FormField label="Full name"><Input autoComplete="name" aria-label="Full name" maxLength={120} value={name} onChange={e=>setName(e.target.value)} required autoFocus disabled={busy}/></FormField>}<FormField label="Username" hint={mode==='sign-up'?'3–30 letters, numbers, underscores, or periods.':undefined}><Input autoComplete="username" autoCapitalize="none" spellCheck={false} aria-label="Username" minLength={mode==='sign-up'?3:undefined} maxLength={30} pattern={mode==='sign-up'?'[a-zA-Z0-9_.]{3,30}':undefined} value={username} onChange={e=>setUsername(e.target.value)} required autoFocus={mode==='sign-in'} disabled={busy}/></FormField><FormField label="Password" hint={mode==='sign-up'?'At least 12 characters. A short phrase works well.':undefined}><Input type="password" autoComplete={mode==='sign-up'?'new-password':'current-password'} aria-label="Password" minLength={mode==='sign-up'?12:undefined} maxLength={128} value={password} onChange={e=>setPassword(e.target.value)} required disabled={busy}/></FormField>{mode==='sign-up'&&<FormField label="Confirm password"><Input type="password" autoComplete="new-password" aria-label="Confirm password" maxLength={128} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required disabled={busy}/></FormField>}{problem&&<p className="login-error" role="alert">{problem}</p>}<Button type="submit" disabled={busy}>{busy?<Loader2 className="spin"/>:mode==='sign-up'?<UserRound size={16}/>:<LockKeyhole size={16}/>} {busy?mode==='sign-up'?'Creating account…':'Signing in…':mode==='sign-up'?'Create account':'Sign in'}</Button><small>{mode==='sign-up'?'You’ll start with an empty project list. Smooth can access all productions.':'Need a password reset? Contact Smooth.'}</small></form></TabsContent></Tabs><a className="login-rentals" href="https://smoothxstudios.github.io/smooth-studios-team-portal/">Studio Dashboard</a></div></AccountContext>;
  if(user.mustChangePassword)return <AccountContext value={context}><div className="account-gate"><div className="login-card"><h1>Make this account yours</h1><p>Set a password for your production account before continuing.</p><PasswordForm forced/><Button variant="ghost" onClick={signOut}>Sign out</Button></div></div></AccountContext>;
  return <AccountContext key={user.id} value={context}>{children}</AccountContext>;
 }

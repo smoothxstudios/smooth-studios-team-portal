@@ -11,6 +11,7 @@ import * as images from './app/api/images/route';
 import * as image from './app/api/images/[id]/route';
 import * as team from './app/api/team/route';
 import * as imageUploads from './lib/image-uploads';
+import {registrationRequest} from './lib/registration';
 type Route=Record<string,(r:Request,c:any)=>Promise<Response>>;
 const routes:[RegExp,Route][]=[[/^\/api\/image-uploads$/,{POST:imageUploads.start}],[/^\/api\/image-uploads\/([^/]+)$/,{PUT:imageUploads.part,POST:imageUploads.finish,DELETE:imageUploads.cancel}],[/^\/api\/session$/,session],[/^\/api\/team$/,team],[/^\/api\/projects$/,projects],[/^\/api\/projects\/([^/]+)\/crew$/,crew],[/^\/api\/projects\/([^/]+)\/files$/,files],[/^\/api\/projects\/([^/]+)$/,project],[/^\/api\/files\/([^/]+)$/,file],[/^\/api\/images$/,images],[/^\/api\/images\/([^/]+)$/,image]];
 export default {async fetch(request:Request){
@@ -22,8 +23,9 @@ export default {async fetch(request:Request){
    if(!['GET','HEAD'].includes(request.method)&&request.headers.get('origin')!==url.origin)return json({error:'Please reload the page before saving.'},403);
    if(Number(request.headers.get('content-length'))>22*1024*1024)return json({error:'This upload is too large.'},413);
    if(url.pathname.startsWith('/api/auth/')){
-    const allowed:Record<string,string>={'/api/auth/sign-in/username':'POST','/api/auth/sign-out':'POST','/api/auth/get-session':'GET','/api/auth/change-password':'POST'};
+    const allowed:Record<string,string>={'/api/auth/sign-in/username':'POST','/api/auth/sign-up/email':'POST','/api/auth/sign-out':'POST','/api/auth/get-session':'GET','/api/auth/change-password':'POST'};
     if(allowed[url.pathname]!==request.method)return json({error:'Not found.'},404);
+    if(url.pathname==='/api/auth/sign-up/email')return auth().handler(await registrationRequest(request));
     if(url.pathname==='/api/auth/change-password'){
      const me=await identity(request,true);const body=await request.json() as Record<string,unknown>;
      const result=await auth().handler(new Request(request,{body:JSON.stringify({...body,revokeOtherSessions:true})}));
