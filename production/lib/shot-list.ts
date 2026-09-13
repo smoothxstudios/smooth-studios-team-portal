@@ -2,8 +2,8 @@ export type Field = { key: string; label: string; group: string; type: "text" | 
 export type Reference = { id: string; name: string; caption: string };
 export type Shot = { id: string; scene: string; number: string; description: string; order: number; status: string; priority: string; setup: number; duration: number; references: Reference[]; values: Record<string, string> };
 import {defaultProduction,productionOf,type ProductionData,type ProductionModule} from "./production";
-export type Project = { id: string; title: string; client: string; date: string; brief: string; shots: Shot[]; fields: Field[]; revision: number; updatedAt?: number; columns?: string[]; production?:ProductionData;canEdit?:boolean };
-export type ProjectSummary = { id: string; title: string; updatedAt: number; shots: number;client?:string;date?:string;stage?:string;due?:string;taskCount?:number;tasksDone?:number;modules?:ProductionModule[];canEdit?:boolean };
+export type Project = { id: string; title: string; client: string; date: string; brief: string; shots: Shot[]; fields: Field[]; revision: number; updatedAt?: number; columns?: string[]; production?:ProductionData;canEdit?:boolean;canManage?:boolean;isOwner?:boolean };
+export type ProjectSummary = { id: string; title: string; updatedAt: number; shots: number;client?:string;date?:string;stage?:string;due?:string;taskCount?:number;tasksDone?:number;modules?:ProductionModule[];canEdit?:boolean;canManage?:boolean;isOwner?:boolean };
 export const STATUS = ["Planned", "Ready", "In progress", "Complete", "Skipped"];
 export const PRIORITY = ["Must have", "Standard", "If time"];
 export const GROUPS = ["Framing & movement", "Production", "Lighting & sound", "Notes"];
@@ -45,5 +45,5 @@ export function exampleProject():Project {
   ].map(s=>({...s,id:uid(),references:[],values:Object.fromEntries(Object.entries(s.values).filter((entry):entry is [string,string]=>typeof entry[1]==="string"))}));
   return p;
 }
-export function summarize(p:Project):ProjectSummary{return {id:p.id,title:p.title,canEdit:p.canEdit,updatedAt:p.updatedAt||Date.now(),shots:p.shots.length,client:p.client,date:p.date,stage:p.production?.stage||"Pre-production",due:p.production?.due||"",modules:productionOf(p).modules,taskCount:p.production?.tasks.length||0,tasksDone:p.production?.tasks.filter(t=>t.status==="Done").length||0};}
+export function summarize(p:Project):ProjectSummary{return {id:p.id,title:p.title,canEdit:p.canEdit,canManage:p.canManage,isOwner:p.isOwner,updatedAt:p.updatedAt||Date.now(),shots:p.shots.length,client:p.client,date:p.date,stage:p.production?.stage||"Pre-production",due:p.production?.due||"",modules:productionOf(p).modules,taskCount:p.production?.tasks.length||0,tasksDone:p.production?.tasks.filter(t=>t.status==="Done").length||0};}
 export function timeLabel(seconds:number){ if(!seconds)return "—"; return `${Math.floor(seconds/60)}:${String(Math.round(seconds%60)).padStart(2,"0")}`; }

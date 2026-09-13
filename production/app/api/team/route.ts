@@ -1,8 +1,14 @@
 import {z} from 'zod';
 import {hashPassword} from 'better-auth/crypto';
-import {api,admin,db,json,readJSON,RequestError} from '@/lib/server';
+import {api,admin,identity,db,json,readJSON,RequestError} from '@/lib/server';
 const input=z.object({name:z.string().trim().min(1).max(120),username:z.string().trim().toLowerCase().regex(/^[a-z0-9_.]{3,30}$/),password:z.string().min(12).max(128),email:z.string().trim().toLowerCase().email().or(z.literal('')).default('')});
-export async function GET(request:Request){return api(async()=>{await admin(request);const r=await db().prepare('SELECT id,name,username,email,enabled,mustChangePassword FROM user ORDER BY name').all();return json({accounts:r.results.map((x:any)=>({...x,enabled:!!x.enabled,mustChangePassword:!!x.mustChangePassword,email:x.email.endsWith('@production.invalid')?'':x.email}))});});}
+export async function GET(request:Request){return api(async()=>{
+ if(new URL(request.url).searchParams.get('directory')==='1'){
+  await identity(request);const r=await db().prepare('SELECT id,name,username,email FROM user WHERE enabled=1 ORDER BY name').all();
+  return json({accounts:r.results.map((x:any)=>({...x,enabled:true,email:x.email.endsWith('@production.invalid')?'':x.email}))});
+ }
+ await admin(request);const r=await db().prepare('SELECT id,name,username,email,enabled,mustChangePassword FROM user ORDER BY name').all();return json({accounts:r.results.map((x:any)=>({...x,enabled:!!x.enabled,mustChangePassword:!!x.mustChangePassword,email:x.email.endsWith('@production.invalid')?'':x.email}))});
+});}
 export async function POST(request:Request){return api(async()=>{
  await admin(request);const p=input.parse(await readJSON(request,4000));const email=p.email||p.username+'@production.invalid';
  if(await db().prepare('SELECT id FROM user WHERE username=? OR email=?').bind(p.username,email).first())throw new RequestError('That username or email is already in use.',409);

@@ -1,4 +1,4 @@
-import {api,db,identity,admin,json,readJSON,requireProject,RequestError} from "@/lib/server";
+import {api,db,identity,json,readJSON,requireProject,RequestError} from "@/lib/server";
 import {crewSchema} from "@/lib/production-schema";
 type Context={params:Promise<{id:string}>};
 export async function GET(request:Request,c:Context){return api(async()=>{
@@ -7,7 +7,7 @@ export async function GET(request:Request,c:Context){return api(async()=>{
  return json({crew:rows.results});
 });}
 export async function POST(request:Request,c:Context){return api(async()=>{
- const u=await admin(request),{id}=await c.params;await requireProject(id,u);let body=await readJSON(request,10000);
+ const u=await identity(request),{id}=await c.params;await requireProject(id,u,'manage');let body=await readJSON(request,10000);
  if(typeof body.accountId==='string'){
   const account=await db().prepare('SELECT name,email FROM user WHERE id=? AND enabled=1').bind(body.accountId).first<{name:string;email:string}>();
   if(!account)throw new RequestError('Choose an active team account.');
@@ -23,6 +23,6 @@ export async function POST(request:Request,c:Context){return api(async()=>{
  return json({member:{...member,id:memberId,projectId:id}});
 });}
 export async function DELETE(request:Request,c:Context){return api(async()=>{
- const u=await admin(request),{id}=await c.params;await requireProject(id,u);const body=await readJSON(request,2000);if(typeof body.memberId!=="string")throw new RequestError("Select a crew member.");
+ const u=await identity(request),{id}=await c.params;await requireProject(id,u,'manage');const body=await readJSON(request,2000);if(typeof body.memberId!=="string")throw new RequestError("Select a crew member.");
  await db().prepare("DELETE FROM project_members WHERE id=? AND project_id=?").bind(body.memberId,id).run();return json({ok:true});
 });}
