@@ -7,7 +7,7 @@ export async function GET(request:Request,c:Context){return api(async()=>{
  return json({files:r.results});
 });}
 export async function POST(request:Request,c:Context){return api(async()=>{
- const u=await identity(request),{id}=await c.params;await requireProject(id,u);
+ const u=await identity(request),{id}=await c.params;await requireProject(id,u,"edit");
  if(Number(request.headers.get("content-length"))>21*1024*1024)throw new RequestError("Files must be 20 MB or smaller.",413);
  const form=await request.formData(),file=form.get("file"),category=String(form.get("category")||"Reference");
  if(!(file instanceof File)||!file.size)throw new RequestError("Choose a file to upload.");

@@ -4,7 +4,7 @@ export async function POST(request:Request){return api(async()=>{
   if(Number(request.headers.get("content-length"))>13*1024*1024)throw new RequestError("Use an image smaller than 12 MB.",413);
   const form=await request.formData();const file=form.get("file");
   const projectId=String(form.get("projectId")||"");
-  if(projectId)await requireProject(projectId,user);else if(!user.admin)throw new RequestError("Choose an assigned project before uploading an image.",403);
+  if(projectId)await requireProject(projectId,user,"edit");else if(!user.admin)throw new RequestError("Choose an assigned project before uploading an image.",403);
   if(!(file instanceof File)||file.size===0)throw new RequestError("Choose an image to upload.");
   if(file.size>12*1024*1024)throw new RequestError("Use an image smaller than 12 MB.",413);
   const allowed=["image/jpeg","image/png","image/webp","image/gif"];

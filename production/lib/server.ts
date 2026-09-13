@@ -18,10 +18,12 @@ export async function identity(request:Request,allowPasswordChange=false):Promis
  return {id:session.user.id,email:session.user.email,name:session.user.name,username:row.username,admin:session.user.id==="owner",mustChangePassword:!!row.mustChangePassword};
 }
 export async function admin(request:Request){const u=await identity(request);if(!u.admin)throw new RequestError("Only Smooth can manage projects and team accounts.",403);return u;}
-export type ProjectRow={id:string;owner:string;data:string;revision:number;updated_at:number};
-export async function requireProject(id:string,u:SessionUser):Promise<ProjectRow>{
-  const row=await db().prepare("SELECT p.* FROM projects p WHERE p.id = ? AND (p.owner = ? OR ? = 1 OR EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id AND m.email = ?))").bind(id,u.id,u.admin?1:0,u.email).first<ProjectRow>();
-  if(!row)throw new RequestError("This project is not available to your account.",404);return row;
+export type ProjectRow={id:string;owner:string;data:string;revision:number;updated_at:number;can_edit:number};
+export async function requireProject(id:string,u:SessionUser,access:"read"|"edit"="read"):Promise<ProjectRow>{
+  const row=await db().prepare("SELECT p.*, (p.owner = ? OR ? = 1 OR EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id AND m.email = ?)) AS can_edit FROM projects p WHERE p.id = ?").bind(u.id,u.admin?1:0,u.email,id).first<ProjectRow>();
+  if(!row)throw new RequestError("Project not found.",404);
+  if(access==="edit"&&!row.can_edit)throw new RequestError("You can view this production. Only assigned team members can edit it.",403);
+  return row;
 }
 export async function readJSON(request:Request,limit=1000000){const raw=await request.text();if(raw.length>limit)throw new RequestError("This update is too large.",413);try{return JSON.parse(raw);}catch{throw new RequestError("Invalid request data.");}}
 export async function api(fn:()=>Promise<Response>){try{return await fn();}catch(e){
@@ -53,4 +55,4 @@ export async function checkImages(p:Project,user:SessionUser,previous?:Project){
     if(rows.results.length!==chunk.length||rows.results.some(r=>!user.admin&&!prior.has(r.id)&&!(r.project_id?allowed.has(r.project_id):r.owner===user.id)))throw new RequestError("A reference image is unavailable to this project. Remove it or upload a new copy.");
   }
 }
-export function readProject(row:{data:string;revision:number;updated_at:number}):Project{return {...JSON.parse(row.data),revision:row.revision,updatedAt:row.updated_at};}
+export function readProject(row:{data:string;revision:number;updated_at:number;can_edit?:number}):Project{return {...JSON.parse(row.data),revision:row.revision,updatedAt:row.updated_at,canEdit:!!row.can_edit};}

@@ -4,7 +4,7 @@ Standalone production dashboard with individual username/password accounts, proj
 
 ## Accounts
 
-The owner username is `smooth`. The initial existing team accounts are `akiva`, `jordyn`, and `rayne`. The deployment initializes missing accounts from the existing studio portal's protected password secrets; it never resets existing production passwords. There is no public registration. The owner creates accounts, resets temporary passwords, enables or disables accounts, and assigns project access. New accounts and reset passwords require a password change. Password changes sign out other devices. Disabling accounts revokes sessions. The owner's account cannot be disabled from the dashboard.
+The owner username is `smooth`. The initial existing team accounts are `akiva`, `jordyn`, and `rayne`. The deployment initializes missing accounts from the existing studio portal's protected password secrets; it never resets existing production passwords. There is no public registration. The owner creates accounts, resets temporary passwords, enables or disables accounts, and assigns project editing permissions. Every enabled team account can view the workspace and saved productions. New accounts and reset passwords require a password change. Password changes sign out other devices. Disabling accounts revokes sessions. The owner's account cannot be disabled from the dashboard.
 
 Better Auth 1.7.3 supplies scrypt password hashing, signed HTTP-only session cookies, origin protection, and database-backed login rate limiting. Project APIs enforce authorization on every request. Legacy ChatGPT headers are ignored. Account roles are determined by the immutable owner account ID; client profile fields cannot grant owner permissions. Contact emails are optional; internal placeholder identifiers ending in `.invalid` are never used for messages. No invitations or emails are sent automatically.
 
@@ -14,7 +14,7 @@ This folder is stored as `production/` in the studio portal repository. Its dedi
 
 `wrangler.jsonc` contains a placeholder local database ID. The deployment script resolves the real database and writes ignored `wrangler.deploy.json`. Never replace the rental dashboard's database or Worker. Do not expose private project records, uploaded files, user records, password hashes, or session secrets in the public repository.
 
-Run `npm ci`, `npm run typecheck`, `npm run build`, then `npm test`. Tests run the actual Worker in Miniflare and exercise authentication, password changes, account management, access isolation, rate limiting, CSRF rejection, and shared files.
+Run `npm ci`, `npm run typecheck`, `npm run build`, then `npm test`. Tests run the actual Worker in Miniflare and exercise authentication, password changes, account management, team-wide viewing and assigned-project editing, rate limiting, CSRF rejection, and shared files.
 
 The first deployment uses the account's Workers URL. A custom production subdomain can be added once its DNS/zone is available; update `APP_ORIGIN` to match the chosen origin. No Squarespace or rental domain records are changed by this deployment.
 
@@ -22,7 +22,7 @@ The first deployment uses the account's Workers URL. A custom production subdoma
 
 New productions include the shot list and opt in to Crew & Tasks, Scripts & Files, Scheduling & Call Sheet, and Budget & Expenses. Existing productions without a saved section selection retain all sections. Project details can change the selection later; hidden sections keep their data. The studio time zone remains in scheduling data and is no longer a required setup field.
 
-Account administration and the Studio Dashboard link are under Settings. Owners can tag existing active team accounts when creating a project or from Project overview. Tags use the existing project membership records and grant assigned-project access even when Crew & Tasks is off. Removing a tag removes that project's access. No notifications or invitations are sent by tagging.
+Account administration and the Studio Dashboard link are under Settings. Owners can tag existing active team accounts when creating a project or from Project overview. Tags link team members to productions and grant editing permission even when Crew & Tasks is off. Every signed-in, enabled team account can browse all saved productions, open reference images and project files, and export PDFs. Removing a tag removes editing permission while preserving viewing. Project updates, image and file uploads, and file deletion require an assignment (or owner access). No notifications or invitations are sent by tagging.
 
 On phones, shot lists use stacked cards with expandable details; a project section selector replaces horizontal navigation. Filters collapse behind a button, and expense rows become labeled cards. Desktop tables remain available.
 

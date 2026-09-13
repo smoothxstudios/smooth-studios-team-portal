@@ -407,3 +407,14 @@ h1 { font-size: clamp(1.5rem,2.2vw,2rem); line-height: 1.3; letter-spacing: -.04
 
 .project-dialog { display:flex; flex-direction:column; overflow:hidden; gap:20px; }.project-dialog-scroll { overflow-y:auto; min-height:0; padding:2px 4px 6px; }.project-dialog [data-slot=dialog-header],.project-dialog [data-slot=dialog-footer] { flex-shrink:0; }
 @media(max-width:767px) { .project-actions .new-production-action { display:none; }.project-actions { flex-wrap:nowrap; } }
+
+/* Readable project details for teammates who are viewing. */
+.view-only-fields {border:0;margin:0;padding:0;min-width:0;width:100%;}
+.view-only-fields:disabled :disabled {opacity:1;cursor:default;}
+.view-only-fields:disabled input,.view-only-fields:disabled textarea,.view-only-fields:disabled button {color:var(--foreground);}
+.project-access-label {display:inline-block;font-size:12px;font-weight:600;color:#686873;margin-bottom:12px;}
+.project-view-notice {margin:0 28px 16px;align-items:flex-start;}
+.project-view-notice>svg {flex:none;margin-top:2px;}
+.project-view-notice p {margin:0;line-height:1.5;}
+.project-view-notice strong {display:block;font-size:13px;}
+@media(max-width:767px){.project-view-notice{margin:0 16px 16px;}}
