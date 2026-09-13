@@ -35,10 +35,10 @@ const short=z.string().max(500);
 const fieldSchema=z.object({key:z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/),label:z.string().trim().min(1).max(80),group:z.string().min(1).max(60),type:z.enum(["text","textarea","select","number"]),options:z.array(z.string().trim().min(1).max(160)).max(100).optional(),visible:z.boolean(),custom:z.boolean().optional()});
 const shotSchema=z.object({id:z.string().uuid(),scene:short.min(1),number:short.min(1),description:z.string().max(12000),order:z.number().int().min(1).max(100000),status:z.enum(["Planned","Ready","In progress","Complete","Skipped"]),priority:z.enum(["Must have","Standard","If time"]),setup:z.number().min(0).max(10000),duration:z.number().min(0).max(100000),references:z.array(z.object({id:z.string().uuid(),name:short,caption:z.string().max(2000)})).max(8),values:z.record(z.string().max(12000))});
 const projectSchema=z.object({id:z.string().uuid(),title:z.string().trim().min(1).max(160),client:short,date:z.string().max(10),brief:z.string().max(12000),shots:z.array(shotSchema).max(1500),fields:z.array(fieldSchema).max(60),revision:z.number().int().min(0),columns:z.array(z.string().max(80)).max(60).optional(),updatedAt:z.number().optional(),production:productionSchema});
-export async function projectBody(request:Request):Promise<Project>{
+export async function projectBody(request:Request):Promise<Project & {teamAccountIds?:string[]}>{
   const raw=await request.text();if(raw.length>1000000)throw new RequestError("This project is too large. Split it into separate shoot days.",413);
   let data;try{data=JSON.parse(raw);}catch{throw new RequestError("Invalid project data.");}
-  const p=projectSchema.parse(data);
+  const p=projectSchema.extend({teamAccountIds:z.array(z.string().min(1).max(80)).max(100).optional()}).parse(data);
   if(new Set(p.shots.map(s=>s.id)).size!==p.shots.length||new Set(p.fields.map(f=>f.key)).size!==p.fields.length)throw new RequestError("Duplicate shot or category IDs.");
   if(p.fields.some(f=>f.type==="select"&&(!f.options?.length||new Set(f.options).size!==f.options.length)))throw new RequestError("Dropdowns need unique options.");
   return p;

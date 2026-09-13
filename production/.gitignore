@@ -7,3 +7,4 @@ dist/
 .work/
 *.tsbuildinfo
 wrangler.deploy.json
+tmp/

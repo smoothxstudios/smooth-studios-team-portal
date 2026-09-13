@@ -7,7 +7,13 @@ export async function GET(request:Request,c:Context){return api(async()=>{
  return json({crew:rows.results});
 });}
 export async function POST(request:Request,c:Context){return api(async()=>{
- const u=await admin(request),{id}=await c.params;await requireProject(id,u);const member=crewSchema.parse(await readJSON(request,10000));
+ const u=await admin(request),{id}=await c.params;await requireProject(id,u);let body=await readJSON(request,10000);
+ if(typeof body.accountId==='string'){
+  const account=await db().prepare('SELECT name,email FROM user WHERE id=? AND enabled=1').bind(body.accountId).first<{name:string;email:string}>();
+  if(!account)throw new RequestError('Choose an active team account.');
+  body={...account,role:'Team member',phone:'',callTime:''};
+ }
+ const member=crewSchema.parse(body);
  if(!await db().prepare("SELECT id FROM user WHERE email=? AND enabled=1").bind(member.email).first())throw new RequestError("Choose an active team account. Create new logins in Team accounts first.");
  const duplicate=await db().prepare("SELECT id FROM project_members WHERE project_id=? AND email=?").bind(id,member.email).first<{id:string}>();
  if(duplicate&&duplicate.id!==member.id)throw new RequestError("That email is already assigned to this project.",409);

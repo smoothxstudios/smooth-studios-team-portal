@@ -1,9 +1,9 @@
 export type Field = { key: string; label: string; group: string; type: "text" | "textarea" | "select" | "number"; options?: string[]; visible: boolean; custom?: boolean };
 export type Reference = { id: string; name: string; caption: string };
 export type Shot = { id: string; scene: string; number: string; description: string; order: number; status: string; priority: string; setup: number; duration: number; references: Reference[]; values: Record<string, string> };
-import type {ProductionData} from "./production";
+import {defaultProduction,productionOf,type ProductionData,type ProductionModule} from "./production";
 export type Project = { id: string; title: string; client: string; date: string; brief: string; shots: Shot[]; fields: Field[]; revision: number; updatedAt?: number; columns?: string[]; production?:ProductionData };
-export type ProjectSummary = { id: string; title: string; updatedAt: number; shots: number;client?:string;date?:string;stage?:string;due?:string;taskCount?:number;tasksDone?:number };
+export type ProjectSummary = { id: string; title: string; updatedAt: number; shots: number;client?:string;date?:string;stage?:string;due?:string;taskCount?:number;tasksDone?:number;modules?:ProductionModule[] };
 export const STATUS = ["Planned", "Ready", "In progress", "Complete", "Skipped"];
 export const PRIORITY = ["Must have", "Standard", "If time"];
 export const GROUPS = ["Framing & movement", "Production", "Lighting & sound", "Notes"];
@@ -31,7 +31,7 @@ export function blankShot(shots: Shot[] = [], scene = "1"): Shot {
   return {id:uid(),scene,number:String(Math.max(0,...numbers)+1),description:"",order:Math.max(0,...shots.map(s=>s.order))+1,status:"Planned",priority:"Standard",setup:0,duration:0,references:[],values:{}};
 }
 export function blankProject(title="Untitled shoot",fields:Field[]=FIELDS):Project {
-  return {id:uid(),title,client:"",date:"",brief:"",shots:[],fields:structuredClone(fields),revision:0,columns:[...DEFAULT_COLUMNS]};
+  return {id:uid(),title,client:"",date:"",brief:"",shots:[],fields:structuredClone(fields),revision:0,columns:[...DEFAULT_COLUMNS],production:defaultProduction()};
 }
 export function exampleProject():Project {
   const p=blankProject("First light — example shoot");
@@ -45,5 +45,5 @@ export function exampleProject():Project {
   ].map(s=>({...s,id:uid(),references:[],values:Object.fromEntries(Object.entries(s.values).filter((entry):entry is [string,string]=>typeof entry[1]==="string"))}));
   return p;
 }
-export function summarize(p:Project):ProjectSummary{return {id:p.id,title:p.title,updatedAt:p.updatedAt||Date.now(),shots:p.shots.length,client:p.client,date:p.date,stage:p.production?.stage||"Pre-production",due:p.production?.due||"",taskCount:p.production?.tasks.length||0,tasksDone:p.production?.tasks.filter(t=>t.status==="Done").length||0};}
+export function summarize(p:Project):ProjectSummary{return {id:p.id,title:p.title,updatedAt:p.updatedAt||Date.now(),shots:p.shots.length,client:p.client,date:p.date,stage:p.production?.stage||"Pre-production",due:p.production?.due||"",modules:productionOf(p).modules,taskCount:p.production?.tasks.length||0,tasksDone:p.production?.tasks.filter(t=>t.status==="Done").length||0};}
 export function timeLabel(seconds:number){ if(!seconds)return "—"; return `${Math.floor(seconds/60)}:${String(Math.round(seconds%60)).padStart(2,"0")}`; }

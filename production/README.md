@@ -17,3 +17,15 @@ This folder is stored as `production/` in the studio portal repository. Its dedi
 Run `npm ci`, `npm run typecheck`, `npm run build`, then `npm test`. Tests run the actual Worker in Miniflare and exercise authentication, password changes, account management, access isolation, rate limiting, CSRF rejection, and shared files.
 
 The first deployment uses the account's Workers URL. A custom production subdomain can be added once its DNS/zone is available; update `APP_ORIGIN` to match the chosen origin. No Squarespace or rental domain records are changed by this deployment.
+
+## Project setup, team tags, mobile, and PDF exports
+
+New productions include the shot list and opt in to Crew & Tasks, Scripts & Files, Scheduling & Call Sheet, and Budget & Expenses. Existing productions without a saved section selection retain all sections. Project details can change the selection later; hidden sections keep their data. The studio time zone remains in scheduling data and is no longer a required setup field.
+
+Account administration and the Studio Dashboard link are under Settings. Owners can tag existing active team accounts when creating a project or from Project overview. Tags use the existing project membership records and grant assigned-project access even when Crew & Tasks is off. Removing a tag removes that project's access. No notifications or invitations are sent by tagging.
+
+On phones, shot lists use stacked cards with expandable details; a project section selector replaces horizontal navigation. Filters collapse behind a button, and expense rows become labeled cards. Desktop tables remain available.
+
+PDF export can combine selected productions, produce one PDF per production, or export selected project sections separately. Enabled sections, written scripts, crew, schedules, call sheets, expenses, and optional reference images are included. Uploaded documents are listed by filename; their contents remain separate. The export runs in the signed-in browser and downloads authenticated references without sending project data to another service. PDF libraries and bundled fonts load only when exporting. Font license is in `public/fonts/LICENSE.txt`.
+
+`npm test` checks server permissions, atomic project creation with tags, optional section persistence, and PDF generation with long text, Unicode names, reference images, and multiple projects.

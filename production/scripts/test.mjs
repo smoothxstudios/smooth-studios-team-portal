@@ -54,6 +54,27 @@ try{
  await expect(await crew('/api/projects'),403);
  await expect(await crew('/api/auth/change-password','POST',{currentPassword:'temporary-team-password',newPassword:'new-private-crew-password'}),200);
  assert.equal((await expect(await crew('/api/session'),200)).user.mustChangePassword,false);
+ // Optional modules and account tags must work independently of Crew & Tasks.
+ const taggedDraft=blankProject('Tagged production');
+ assert.deepEqual(taggedDraft.production.modules,[]);
+ taggedDraft.production.tasks=[{id:crypto.randomUUID(),title:'Preserved task',assignee:'',department:'Pre-production',due:'',status:'To do',notes:'Keep this content'}];
+ let tagged=(await expect(await owner('/api/projects','POST',{...taggedDraft,teamAccountIds:[camera.id]}),201)).project;
+ await expect(await crew('/api/projects/'+tagged.id),200);
+ assert.deepEqual((await expect(await owner('/api/projects'),200)).projects.find(p=>p.id===tagged.id).modules,[]);
+ tagged=(await expect(await crew('/api/projects/'+tagged.id,'PUT',{...tagged,production:{...tagged.production,modules:['crew']}}),200)).project;
+ tagged=(await expect(await crew('/api/projects/'+tagged.id,'PUT',{...tagged,production:{...tagged.production,modules:[]}}),200)).project;
+ assert.equal(tagged.production.tasks[0].title,'Preserved task');
+ await expect(await crew('/api/projects/'+tagged.id,'PUT',{...tagged,teamAccountIds:['owner']}),403);
+ await expect(await crew('/api/projects/'+tagged.id+'/crew','POST',{accountId:'owner'}),403);
+ const taggedMember=(await expect(await owner('/api/projects/'+tagged.id+'/crew'),200)).crew[0];
+ await expect(await owner('/api/projects/'+tagged.id+'/crew','DELETE',{memberId:taggedMember.id}),200);
+ await expect(await crew('/api/projects/'+tagged.id),404);
+ await expect(await owner('/api/projects/'+tagged.id+'/crew','POST',{accountId:camera.id}),200);
+ await expect(await crew('/api/projects/'+tagged.id),200);
+ const invalidTag=blankProject('Invalid tagged account');
+ await expect(await owner('/api/projects','POST',{...invalidTag,teamAccountIds:['missing-account']}),400);
+ await expect(await owner('/api/projects/'+invalidTag.id),404);
+ await expect(await owner('/api/projects/'+tagged.id,'PUT',{...tagged,production:{...tagged.production,modules:['unknown']}}),400);
  const draft=blankProject('Permission check');draft.shots=[blankShot()];let p=(await expect(await owner('/api/projects','POST',draft),201)).project;
  await expect(await crew('/api/projects/'+p.id),404);
  await expect(await owner('/api/projects/'+p.id+'/crew','POST',{name:'Camera Crew',email:'camera@example.invalid',role:'DP'}),200);
