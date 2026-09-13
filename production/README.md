@@ -26,7 +26,7 @@ Account administration and the Studio Dashboard link are under Settings. Owners 
 
 On phones, shot lists use stacked cards with expandable details; a project section selector replaces horizontal navigation. Filters collapse behind a button, and expense rows become labeled cards. Desktop tables remain available.
 
-PDF export can combine selected productions, produce one PDF per production, or export selected project sections separately. Enabled sections, written scripts, crew, schedules, call sheets, expenses, and optional reference images are included. Uploaded documents are listed by filename; their contents remain separate. The export runs in the signed-in browser and downloads authenticated references without sending project data to another service. PDF libraries and bundled fonts load only when exporting. Font license is in `public/fonts/LICENSE.txt`.
+PDF export can combine selected productions, produce one PDF per production, or export selected project sections separately. Enabled sections, written scripts, crew, schedules, call sheets, expenses, and optional reference images are included. Uploaded documents are listed by filename; their contents remain separate. The export runs in the signed-in browser and downloads authenticated references without sending project data to another service. The PDF engine loads with the dashboard so open tabs keep working after deployments. Bundled fonts load when exporting. HTML revalidates on refresh; missing assets return 404 rather than the app HTML. Font license is in `public/fonts/LICENSE.txt`.
 
 `npm test` checks server permissions, atomic project creation with tags, optional section persistence, and PDF generation with long text, Unicode names, reference images, and multiple projects.
 
@@ -35,3 +35,7 @@ PDF export can combine selected productions, produce one PDF per production, or 
 Create project offers standard categories, the current project's categories, or a custom setup. Build fields, choose text/notes/dropdown/number types, edit choices, and choose columns before creating the project. The setup stays in the creation draft until saved.
 
 Reference pictures upload in authenticated 128 KiB parts, with ownership and project editing checks on each request. Retried parts and completion are idempotent. MIME types are detected from bytes, original image bytes are preserved, and failed parts can retry without restarting the entire file. Incomplete uploads expire after 24 hours. Pending parts stay inaccessible until completion. Existing image and file URLs remain valid. Database file reads stream bounded pages, and legacy file writes use bounded batches. Upload failures display clear errors and retain the shot draft.
+
+## First AD shot sheet
+
+PDF exports default to a landscape first AD sheet in shooting order. Multiple shots share each page, with repeated column headings, scene/shot IDs, completion checkboxes, camera and production details, setup/duration, small reference images, and writing lines for takes. Long fields continue with their shot ID instead of being clipped. Export options also offer scene/shot ordering and the existing detailed portrait breakdown. Other selected project sections retain their own readable pages.

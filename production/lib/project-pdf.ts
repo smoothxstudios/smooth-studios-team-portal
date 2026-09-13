@@ -2,9 +2,10 @@ import {PDFDocument,PDFFont,PDFPage,rgb,type RGB} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import {hasModule,productionOf,dateLabel,clockLabel,money,expenseTotals,type CrewMember,type ProjectFile} from './production';
 import {timeLabel,type Project} from './shot-list';
+import {orderedShots,renderShotSheet} from './shot-sheet';
 
 import {PDF_SECTIONS,type PdfSection,type ExportProject} from './export-model';
-export type PdfOptions={sections:PdfSection[];images:boolean;regularFont:Uint8Array;boldFont:Uint8Array;loadImage?:(id:string)=>Promise<{bytes:Uint8Array;mime:string}>;onProgress?:(text:string)=>void};
+export type PdfOptions={sections:PdfSection[];images:boolean;shotLayout?:'sheet'|'detail';shotOrder?:'shooting'|'scene';regularFont:Uint8Array;boldFont:Uint8Array;loadImage?:(id:string)=>Promise<{bytes:Uint8Array;mime:string}>;onProgress?:(text:string)=>void};
 const ink=rgb(.12,.18,.28),muted=rgb(.40,.47,.57),blue=rgb(.25,.39,.64),line=rgb(.85,.89,.94);
 const W=612,H=792,M=48,BOTTOM=54,WIDTH=W-2*M;
 
@@ -41,7 +42,7 @@ class Pages {
    row.forEach((_,col)=>{const x=M+col*(width+22);labels[col].forEach((label,j)=>this.page.drawText(label,{x,y:this.y-9-j*12,size:8,font:this.bold,color:muted}));lines[col].forEach((s,j)=>this.page.drawText(s,{x,y:this.y-labelHeight-16-j*15,size:10,font:this.font,color:ink}));});this.y-=height+10;
   }
  }
- finish(){const pages=this.doc.getPages();pages.forEach((p,i)=>{p.drawLine({start:{x:M,y:38},end:{x:W-M,y:38},thickness:.6,color:line});p.drawText('SMOOTH STUDIOS',{x:M,y:24,size:8,font:this.bold,color:muted});const num=(i+1)+' / '+pages.length;p.drawText(num,{x:W-M-this.font.widthOfTextAtSize(num,8),y:24,size:8,font:this.font,color:muted});});}
+ finish(){const pages=this.doc.getPages();pages.forEach((p,i)=>{const w=p.getWidth(),m=w>W?28:M;p.drawLine({start:{x:m,y:34},end:{x:w-m,y:34},thickness:.6,color:line});p.drawText('SMOOTH STUDIOS',{x:m,y:21,size:8,font:this.bold,color:muted});const num=(i+1)+' / '+pages.length;p.drawText(num,{x:w-m-this.font.widthOfTextAtSize(num,8),y:21,size:8,font:this.font,color:muted});});}
 }
 
 export async function createProjectPdf(entries:ExportProject[],options:PdfOptions){
@@ -50,12 +51,14 @@ export async function createProjectPdf(entries:ExportProject[],options:PdfOption
  const font=await doc.embedFont(options.regularFont,{subset:true}),bold=await doc.embedFont(options.boldFont,{subset:true});
  const warnings=new Set<string>(),p=new Pages(doc,font,bold,warnings);
  doc.setTitle(entries.length===1?entries[0].project.title+' - Production':'Smooth Studios - Productions');doc.setAuthor('Smooth Studios');doc.setCreator('Production Dashboard');
- if(entries.length>1){p.newPage();p.title('Production collection');p.text(entries.length+' productions',12,muted);p.gap(20);for(const {project}of entries){p.heading(project.title);p.text([project.client,dateLabel(project.date),productionOf(project).stage].filter(Boolean).join(' / '));}}
+ if(entries.length>1&&options.sections.some(s=>s!=='shots')){p.newPage();p.title('Production collection');p.text(entries.length+' productions',12,muted);p.gap(20);for(const {project}of entries){p.heading(project.title);p.text([project.client,dateLabel(project.date),productionOf(project).stage].filter(Boolean).join(' / '));}}
  for(const entry of entries){
   const {project,crew,files}=entry,pd=productionOf(project);
   const sections=PDF_SECTIONS.filter(s=>options.sections.includes(s.key)&&hasModule(project,s.key));
   if(!sections.length){warnings.add(project.title+': none of the selected sections are enabled.');continue;}
-  for(const section of sections){p.projectTitle=project.title;p.sectionTitle=section.label;p.newPage();p.title(project.title);p.text(section.label,13,blue,true);p.gap(18);options.onProgress?.(project.title+' / '+section.label);
+  for(const section of sections){
+   if(section.key==='shots'&&options.shotLayout!=='detail'){await renderShotSheet(project,options,doc,font,bold,p,warnings);continue;}
+   p.projectTitle=project.title;p.sectionTitle=section.label;p.newPage();p.title(project.title);p.text(section.label,13,blue,true);p.gap(18);options.onProgress?.(project.title+' / '+section.label);
    if(section.key==='overview'){
     p.facts([['Client',project.client||'Smooth Studios'],['Shoot date',dateLabel(project.date)],['Stage',pd.stage],['Deadline',pd.due?dateLabel(pd.due):'Not set'],['Shots',project.shots.length],['Team members',crew.length]]);
     if(project.brief){p.heading('Project notes');p.text(project.brief);}
@@ -63,7 +66,7 @@ export async function createProjectPdf(entries:ExportProject[],options:PdfOption
     p.heading('Included project sections');p.text(PDF_SECTIONS.filter(s=>hasModule(project,s.key)).map(s=>s.label).join('\n'));
    }
    if(section.key==='shots'){
-    const shots=[...project.shots].sort((a,b)=>a.scene.localeCompare(b.scene,undefined,{numeric:true})||a.number.localeCompare(b.number,undefined,{numeric:true}));
+    const shots=orderedShots(project,options.shotOrder);
     if(!shots.length)p.text('No shots added yet.');
     for(const shot of shots){const facts:[string,string|number][]=[['Shooting order',shot.order],['Setup',shot.setup+' min'],['Duration',timeLabel(shot.duration)],...project.fields.filter(f=>shot.values[f.key]).map(f=>[f.label,shot.values[f.key]] as [string,string])];
      const estimate=90+p.wrap(shot.description,11).length*17+Math.ceil(facts.length/2)*55+(options.images?shot.references.length*255:0);

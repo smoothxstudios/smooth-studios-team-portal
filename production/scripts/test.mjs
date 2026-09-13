@@ -4,6 +4,7 @@ import {readFile,readdir} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 import {hashPassword} from 'better-auth/crypto';
 import {build} from 'esbuild';
+import {testAssets} from './mock-assets.mjs';
 const bundle=spawnSync(process.execPath,['node_modules/wrangler/bin/wrangler.js','deploy','--dry-run','--outdir','.work/worker'],{encoding:'utf8',env:{...process.env,WRANGLER_SEND_METRICS:'false'}});
 if(bundle.status!==0)throw new Error(bundle.stdout+bundle.stderr);
 await build({entryPoints:['lib/shot-list.ts'],bundle:true,platform:'node',format:'esm',outfile:'.work/shot-list.mjs'});
@@ -16,7 +17,7 @@ if(process.env.LOCAL_NODE_TEST==='1'){
  // The alias's database is shared with the bundled Worker through this export.
  const exported=await import('../.work/test-worker.mjs');
  mf={getD1Database:async()=>exported.testEnv.DB,dispatchFetch:(url,init)=>worker.fetch(new Request(url,init)),dispose:async()=>{}};
-}else mf=new Miniflare({modules:[{type:'ESModule',path:'.work/worker/worker.js'}],compatibilityDate:'2026-05-22',cf:false,host:'127.0.0.1',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],bindings:{APP_ORIGIN:origin,BETTER_AUTH_SECRET:'test-only-secret-with-more-than-32-characters'},serviceBindings:{ASSETS:()=>new Response('Test assets')}});
+}else mf=new Miniflare({modules:[{type:'ESModule',path:'.work/worker/worker.js'}],compatibilityDate:'2026-05-22',cf:false,host:'127.0.0.1',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],bindings:{APP_ORIGIN:origin,BETTER_AUTH_SECRET:'test-only-secret-with-more-than-32-characters'},serviceBindings:{ASSETS:testAssets}});
 try{
  const db=await mf.getD1Database('DB');
  for(const name of (await readdir('drizzle')).filter(n=>n.endsWith('.sql')).sort()){
@@ -44,6 +45,9 @@ try{
  };}
  async function expect(response,status){const text=await response.text();assert.equal(response.status,status,text);try{return JSON.parse(text);}catch{return text;}}
  const owner=client('198.51.100.1'),crew=client('198.51.100.2'),stranger=client('198.51.100.3');
+ const shell=await stranger('/');assert.equal(shell.status,200);assert.equal(shell.headers.get('cache-control'),'no-cache');
+ for(const path of ['/assets/previous-export.js','/fonts/missing.ttf']){const missing=await stranger(path);assert.equal(missing.status,404);assert.equal(missing.headers.get('cache-control'),'no-store');assert.match(missing.headers.get('content-type'),/text\/plain/);}
+ const currentAsset=await stranger('/assets/current.js');assert.equal(currentAsset.status,200);assert.match(currentAsset.headers.get('content-type'),/javascript/);assert.match(currentAsset.headers.get('cache-control'),/immutable/);
  await expect(await stranger('/api/projects','GET',undefined,{'oai-authenticated-user-id':'owner','oai-authenticated-user-email':'owner@production.invalid'}),401);
  const login=await owner('/api/auth/sign-in/username','POST',{username:'smooth',password});assert.equal(login.status,200,await login.clone().text());assert.ok(login.headers.getSetCookie().some(c=>c.includes('HttpOnly')&&c.includes('Secure')));
  assert.equal((await expect(await owner('/api/session'),200)).user.admin,true);

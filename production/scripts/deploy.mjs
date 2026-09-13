@@ -42,6 +42,22 @@ for(let attempt=0;attempt<5;attempt++){
  if(ready)break;
 }
 if(!ready)throw new Error('The production readiness check failed ('+healthStatus+'): '+healthDetail);
+// Verify the actual asset binding, including an old tab's missing export module.
+const expectedShell=await readFile('dist/client/index.html','utf8');
+const expectedScript=expectedShell.match(/<script[^>]+src="([^"]+)"/)?.[1];
+let assetsReady=false;
+for(let attempt=0;attempt<4;attempt++){
+ if(attempt)await new Promise(resolve=>setTimeout(resolve,2000));
+ const [shell,missing,script]=await Promise.all([
+  fetch(origin+'/',{cache:'no-cache',signal:AbortSignal.timeout(15000)}),
+  fetch(origin+'/assets/__previous_export_readiness__.js',{signal:AbortSignal.timeout(15000)}),
+  fetch(origin+expectedScript,{method:'HEAD',signal:AbortSignal.timeout(15000)})
+ ]);
+ assetsReady=!!expectedScript&&shell.ok&&(await shell.text()).includes(expectedScript)&&shell.headers.get('cache-control')?.includes('no-cache')&&missing.status===404&&!missing.headers.get('content-type')?.includes('text/html')&&script.ok&&/javascript/.test(script.headers.get('content-type')||'');
+ if(assetsReady)break;
+}
+if(!assetsReady)throw new Error('The production asset readiness check failed.');
+console.log('Production assets verified: current JavaScript, revalidated HTML, and missing asset 404 responses.');
 // A read-only sign-in check uses the existing owner credential only while the
 // account still matches its initial password. Changed passwords are preserved.
 const accountRow=(await query('SELECT password FROM account WHERE userId=\'owner\' AND providerId=\'credential\''))[0].results[0];

@@ -34,10 +34,14 @@ export default {async fetch(request:Request){
    for(const [pattern,module] of routes){const match=url.pathname.match(pattern);if(match){const handler=module[request.method];return handler?handler(request,{params:Promise.resolve({id:match[1]})}):json({error:'Method not allowed.'},405);}}
    return json({error:'Not found.'},404);
   }
-  return env.ASSETS.fetch(request);
+  const asset=await env.ASSETS.fetch(request);
+  // Missing scripts and fonts must never be replaced by the SPA's HTML.
+  if((url.pathname.startsWith('/assets/')||url.pathname.startsWith('/fonts/'))&&asset.headers.get('Content-Type')?.includes('text/html'))return new Response('Asset unavailable. Refresh the production dashboard.',{status:404,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'}});
+  return asset;
  });
  const headers=new Headers(response.headers);headers.set('X-Content-Type-Options','nosniff');headers.set('Referrer-Policy','same-origin');headers.set('X-Frame-Options','DENY');headers.set('Permissions-Policy','camera=(), microphone=(), geolocation=()');
  if(url.pathname.startsWith('/api/'))headers.set('Cache-Control','private, no-store');
+ if(headers.get('Content-Type')?.includes('text/html'))headers.set('Cache-Control','no-cache');
  headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
  return new Response(response.body,{status:response.status,headers});
 }};
