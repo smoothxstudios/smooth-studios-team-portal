@@ -10,10 +10,10 @@ permissions:
   contents: read
 concurrency:
   group: smooth-studios-production-deployment
-  cancel-in-progress: true
+  cancel-in-progress: ${{ startsWith(github.event.head_commit.message, 'Retry queued privacy deployment') }}
 jobs:
   deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04-arm
     defaults:
       run:
         working-directory: production
