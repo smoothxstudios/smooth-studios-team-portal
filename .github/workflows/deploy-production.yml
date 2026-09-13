@@ -10,10 +10,10 @@ permissions:
   contents: read
 concurrency:
   group: smooth-studios-production-deployment
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     defaults:
       run:
         working-directory: production
