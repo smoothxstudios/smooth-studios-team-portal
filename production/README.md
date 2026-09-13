@@ -51,3 +51,9 @@ Notes use real multiline AcroForm fields with embedded fonts, default form resou
 ## Automatic shot numbering
 
 Saving a new Shot # inserts the shot at that position within its scene and renumbers the scene consecutively. Moving a shot between scenes closes the old gap. Numbers beyond the last position place the shot at the end. Shot IDs, reference images, saved notes, and schedule links are preserved. The shot also moves beside its new scene neighbor in filming order unless an explicit filming order was edited. Changes save together under the existing project revision check. Editing other shot details leaves numbering alone.
+
+## Opening Production from Studio Dashboard
+
+The Studio Dashboard links to Production with the signed-in Studio profile's username (`owner` maps to `smooth`). This is a sign-in hint only: Production always verifies its own server session and still enforces project tags. A saved Production session for another username is signed out before the workspace loads. The teammate then enters their own Production password; a matching verified session can continue directly. Missing or malformed account hints require fresh sign-in.
+
+Account changes clear open Production workspaces in other tabs through a same-origin broadcast. Open tabs also recheck their session on focus and periodically, and stale session responses cannot restore a previous account. Data requests carry the tab's verified account ID; the server rejects requests if a different account's cookie becomes active. The sidebar shows the signed-in person's name.

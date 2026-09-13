@@ -9,6 +9,8 @@ const bundle=spawnSync(process.execPath,['node_modules/wrangler/bin/wrangler.js'
 if(bundle.status!==0)throw new Error(bundle.stdout+bundle.stderr);
 await build({entryPoints:['lib/shot-list.ts'],bundle:true,platform:'node',format:'esm',outfile:'.work/shot-list.mjs'});
 const {blankProject,blankShot}=await import('../.work/shot-list.mjs');
+await build({entryPoints:['lib/account-session.ts'],bundle:true,platform:'node',format:'esm',outfile:'.work/account-session.mjs'});
+const {studioEntry,linkedAccount}=await import('../.work/account-session.mjs');
 const origin='https://test.invalid';
 let mf;
 if(process.env.LOCAL_NODE_TEST==='1'){
@@ -109,6 +111,33 @@ try{
   await expect(await account('/api/projects/'+p.id,'PUT',{...p,canEdit:true,title:'Unauthorized change'}),404);
  }
  assert.equal((await expect(await owner('/api/projects'),200)).projects.length,3);
+ // A Studio account hint never grants access or reuses another person's session.
+ assert.equal(studioEntry('?account=smooth'),null);
+ assert.deepEqual(studioEntry('?from=studio&account=%20CAMERA%20'),{username:'camera'});
+ assert.deepEqual(studioEntry('?from=studio&account=bad%2Fname'),{username:''});
+ const sharedBrowser=client('198.51.100.45');
+ assert.equal(await linkedAccount(null,studioEntry('?from=studio&account=smooth'),async()=>{throw new Error('No session to revoke');}),null);
+ await expect(await sharedBrowser('/api/projects?from=studio&account=smooth'),401);
+ await expect(await sharedBrowser('/api/auth/sign-in/username','POST',{username:'smooth',password}),200);
+ const ownerSession=(await expect(await sharedBrowser('/api/session'),200)).user;
+ let revoked=0;
+ assert.equal(await linkedAccount(ownerSession,studioEntry('?from=studio&account=camera'),async()=>{await expect(await sharedBrowser('/api/auth/sign-out','POST',{}),200);revoked++;}),null);
+ assert.equal(revoked,1);await expect(await sharedBrowser('/api/session'),401);await expect(await sharedBrowser('/api/projects/'+p.id),401);
+ await expect(await sharedBrowser('/api/auth/sign-in/username','POST',{username:'camera',password:'new-private-crew-password'}),200);
+ const cameraSession=(await expect(await sharedBrowser('/api/session'),200)).user;
+ assert.equal((await linkedAccount(cameraSession,studioEntry('?from=studio&account=camera'),async()=>{throw new Error('A matching session should stay signed in');})).id,camera.id);
+ assert.equal((await expect(await sharedBrowser('/api/session'),200)).user.admin,false);
+ // A stale tab cannot fetch or save as a different account after cookies change.
+ await expect(await sharedBrowser('/api/projects','GET',undefined,{'X-Production-Account':'owner'}),401);
+ await expect(await owner('/api/projects','GET',undefined,{'X-Production-Account':camera.id}),401);
+ await expect(await owner('/api/projects/'+p.id,'PUT',{...p,title:'Wrong account write'},{'X-Production-Account':camera.id}),401);
+ assert.equal((await expect(await owner('/api/projects/'+p.id),200)).project.title,p.title);
+ assert.deepEqual((await expect(await sharedBrowser('/api/projects','GET',undefined,{'X-Production-Account':camera.id}),200)).projects.map(x=>x.id),[tagged.id]);
+ assert.deepEqual((await expect(await sharedBrowser('/api/projects?account=smooth'),200)).projects.map(x=>x.id),[tagged.id]);
+ await expect(await sharedBrowser('/api/projects/'+p.id),404);await expect(await sharedBrowser('/api/projects/'+soundProject.id),404);
+ await assert.rejects(linkedAccount(ownerSession,studioEntry('?from=studio&account=camera'),async()=>{throw new Error('Sign-out unavailable');}),/Sign-out unavailable/);
+ assert.equal(await linkedAccount(cameraSession,studioEntry('?from=studio'),async()=>{await expect(await sharedBrowser('/api/auth/sign-out','POST',{}),200);}),null);
+ await expect(await sharedBrowser('/api/projects'),401);
  assert.equal((await expect(await owner('/api/projects/'+p.id),200)).project.title,p.title);
  await expect(await stranger('/api/projects/'+p.id),401);
  await expect(await owner('/api/projects/'+p.id+'/crew','POST',{name:'Camera Crew',email:'camera@example.invalid',role:'DP'}),200);
@@ -224,5 +253,5 @@ try{
  await expect(await owner('/api/projects/'+p.id,'PUT',p,{Origin:'https://attacker.invalid'}),403);
  await expect(await owner('/api/auth/sign-out','POST',{}),200);await expect(await owner('/api/projects'),401);
  const probe=client('198.51.100.44');for(let i=0;i<5;i++)await probe('/api/auth/sign-in/username','POST',{username:'nobody',password:'invalid-password'});await expect(await probe('/api/auth/sign-in/username','POST',{username:'nobody',password:'invalid-password'}),429);
- console.log('Passed: standalone password sign-in, secure sessions, owner account management, forced password changes, disabled accounts, password reset revocation, sign-out, closed registration, rate limiting, CSRF protection, tag-restricted project lists and direct access, isolated teammate projects, immediate revocation and re-tagging, protected files and images, copied-reference access, private drafts, multi-part picture uploads and retries, byte-exact downloads, custom project categories, shared file and image storage.');
+ console.log('Passed: Studio account handoff, mismatched-session revocation, pinned account reads and writes, standalone password sign-in, secure sessions, owner account management, forced password changes, disabled accounts, password reset revocation, sign-out, closed registration, rate limiting, CSRF protection, tag-restricted project lists and direct access, isolated teammate projects, immediate revocation and re-tagging, protected files and images, copied-reference access, private drafts, multi-part picture uploads and retries, byte-exact downloads, custom project categories, shared file and image storage.');
 }finally{await mf.dispose();}

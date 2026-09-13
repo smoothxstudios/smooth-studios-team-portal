@@ -12,6 +12,8 @@ export function bucket(){return storage();}
 export async function identity(request:Request,allowPasswordChange=false):Promise<SessionUser>{
  const session=await auth().api.getSession({headers:request.headers});
  if(!session)throw new RequestError("Sign in to open your productions.",401);
+ const expected=request.headers.get('X-Production-Account');
+ if(expected&&expected!==session.user.id)throw new RequestError("Your production account changed. Sign in again.",401);
  const row=await db().prepare('SELECT enabled,mustChangePassword,username FROM user WHERE id=?').bind(session.user.id).first<{enabled:number;mustChangePassword:number;username:string}>();
  if(!row?.enabled)throw new RequestError("This account is disabled. Contact Smooth.",403);
  if(row.mustChangePassword&&!allowPasswordChange&&new URL(request.url).pathname!=="/api/session")throw new RequestError("Set your own password before opening productions.",403);

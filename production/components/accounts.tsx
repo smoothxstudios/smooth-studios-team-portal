@@ -1,4 +1,4 @@
-import {createContext,useContext,useEffect,useState,type ReactNode} from 'react';
+import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
 import {Clapperboard,Loader2,LockKeyhole,LogOut,KeyRound,Plus,Copy,UserRound,ShieldCheck,Users} from 'lucide-react';
 import {Button} from './ui/button';
 import {Input} from './ui/input';
@@ -7,20 +7,61 @@ import {AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertD
 import {FormField,errorText,request} from './production-ui';
 import {toast} from 'sonner';
 import type {SessionUser} from '@/lib/production';
+import {linkedAccount,studioEntry} from '@/lib/account-session';
+import {accountHeaders,setRequestAccount} from '@/lib/client-account';
 type Account={id:string;name:string;username:string;email:string;enabled:boolean;mustChangePassword:boolean};
 const AccountContext=createContext<{user:SessionUser|null;refresh:()=>Promise<void>;signOut:()=>Promise<void>}>({user:null,refresh:async()=>{},signOut:async()=>{}});
 export function useAccount(){return useContext(AccountContext);}
-async function authRequest(path:string,body:unknown){const r=await fetch('/api/auth/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json() as {error?:string;message?:string};if(!r.ok)throw new Error(r.status===429?'Too many attempts. Wait a minute and try again.':data.message||data.error||'Could not complete that request.');return data;}
+async function authRequest(path:string,body:unknown){const r=await fetch('/api/auth/'+path,{method:'POST',headers:{'Content-Type':'application/json',...(path==='change-password'?accountHeaders():{})},body:JSON.stringify(body)});const data=await r.json() as {error?:string;message?:string};if(!r.ok)throw new Error(r.status===429?'Too many attempts. Wait a minute and try again.':data.message||data.error||'Could not complete that request.');return data;}
 export function AccountGate({children}:{children:ReactNode}){
- const [user,setUser]=useState<SessionUser|null>(null),[loading,setLoading]=useState(true),[problem,setProblem]=useState(''),[busy,setBusy]=useState(false),[username,setUsername]=useState(''),[password,setPassword]=useState('');
- async function refresh(){setProblem('');try{const r=await fetch('/api/session');const data=await r.json() as {user?:SessionUser;error?:string};if(r.status===401){setUser(null);return;}if(!r.ok)throw new Error(data.error||'Could not open your account.');setUser(data.user||null);}catch(e){setUser(null);setProblem(errorText(e));}finally{setLoading(false);}}
- async function signOut(){try{await authRequest('sign-out',{});setUser(null);setPassword('');}catch(e){toast.error(errorText(e));}}
- useEffect(()=>{refresh();const onExpired=()=>{setUser(null);setProblem('Your session ended. Sign in again.');};window.addEventListener('account-expired',onExpired);return()=>window.removeEventListener('account-expired',onExpired);},[]);
+ const entry=useRef(studioEntry(typeof window==='undefined'?'':window.location.search));
+ const [user,setUser]=useState<SessionUser|null>(null),[loading,setLoading]=useState(true),[problem,setProblem]=useState(''),[busy,setBusy]=useState(false),[username,setUsername]=useState(entry.current?.username||''),[password,setPassword]=useState('');
+ const activeUser=useRef<SessionUser|null>(null),requestId=useRef(0),channel=useRef<BroadcastChannel|null>(null);
+ function setAccount(next:SessionUser|null){activeUser.current=next;setRequestAccount(next?.id||null);setUser(next);}
+ function announce(){channel.current?.postMessage('account-changed');}
+ function clearEntry(){entry.current=null;const url=new URL(window.location.href);if(url.searchParams.get('from')==='studio'){url.searchParams.delete('from');url.searchParams.delete('account');window.history.replaceState(window.history.state,'',url.pathname+url.search+url.hash);}}
+ function closeAccount(message:string){++requestId.current;setAccount(null);setPassword('');setLoading(false);setProblem(message);}
+ async function refresh(){
+  const seq=++requestId.current;
+  try{
+   const r=await fetch('/api/session',{cache:'no-store'});
+   const data=await r.json() as {user?:SessionUser;error?:string};
+   if(seq!==requestId.current)return;
+   if(r.status!==401&&!r.ok)throw new Error(data.error||'Could not open your account.');
+   const current=r.status===401?null:data.user||null;
+   const next=await linkedAccount(current,entry.current,async()=>{await authRequest('sign-out',{});announce();});
+   if(seq!==requestId.current)return;
+   if(activeUser.current&&next?.id!==activeUser.current.id){closeAccount('The production account changed. Sign in again to continue.');return;}
+   setAccount(next);
+   setProblem(current&&!next?'Sign in to your production account to continue.':'');
+   if(next)clearEntry();
+  }catch(e){if(seq===requestId.current){setAccount(null);setProblem(errorText(e));}}
+  finally{if(seq===requestId.current)setLoading(false);}
+ }
+ async function signOut(){closeAccount('');try{await authRequest('sign-out',{});announce();}catch(e){setProblem(errorText(e));}}
+ async function signIn(){
+  const seq=++requestId.current,submittedUsername=username.trim().toLowerCase();setBusy(true);setProblem('');
+  try{
+   await authRequest('sign-in/username',{username:submittedUsername,password});
+   if(seq!==requestId.current)return;
+   setPassword('');entry.current={username:submittedUsername};announce();await refresh();
+  }catch(e){if(seq===requestId.current)setProblem(errorText(e));}
+  finally{setBusy(false);}
+ }
+ useEffect(()=>{
+  if(typeof BroadcastChannel!=='undefined'){channel.current=new BroadcastChannel('smooth-production-account');channel.current.onmessage=()=>closeAccount('The production account changed in another tab. Sign in again to continue.');}
+  void refresh();
+  const onExpired=()=>closeAccount('Your session ended. Sign in again.');
+  const checkAccount=()=>{if(activeUser.current&&document.visibilityState!=='hidden')void refresh();};
+  window.addEventListener('account-expired',onExpired);window.addEventListener('focus',checkAccount);document.addEventListener('visibilitychange',checkAccount);
+  const timer=window.setInterval(checkAccount,30000);
+  return()=>{++requestId.current;channel.current?.close();channel.current=null;window.clearInterval(timer);window.removeEventListener('account-expired',onExpired);window.removeEventListener('focus',checkAccount);document.removeEventListener('visibilitychange',checkAccount);};
+ },[]);
  const context={user,refresh,signOut};
  if(loading)return <div className="workspace-loading"><Loader2 className="spin"/>Opening your workspace…</div>;
- if(!user)return <AccountContext value={context}><div className="account-gate"><div className="login-brand"><span><Clapperboard/></span><div><strong>Production Dashboard</strong><small>SMOOTH STUDIOS</small></div></div><form className="login-card" onSubmit={async e=>{e.preventDefault();setBusy(true);setProblem('');try{await authRequest('sign-in/username',{username:username.trim().toLowerCase(),password});setPassword('');await refresh();}catch(e){setProblem(errorText(e));}finally{setBusy(false);}}}><span className="login-icon"><LockKeyhole/></span><h1>Sign in to productions</h1><p>Your projects. Your crew. Your next shoot.</p><FormField label="Username"><Input autoComplete="username" aria-label="Username" value={username} onChange={e=>setUsername(e.target.value)} required autoFocus/></FormField><FormField label="Password"><Input type="password" autoComplete="current-password" aria-label="Password" value={password} onChange={e=>setPassword(e.target.value)} required/></FormField>{problem&&<p className="login-error" role="alert">{problem}</p>}<Button type="submit" disabled={busy}>{busy?<Loader2 className="spin"/>:<LockKeyhole size={16}/>}Sign in</Button><small>Need an account or a password reset? Contact Smooth.</small></form><a className="login-rentals" href="https://smoothxstudios.github.io/smooth-studios-team-portal/">Studio Dashboard</a></div></AccountContext>;
+ if(!user)return <AccountContext value={context}><div className="account-gate"><div className="login-brand"><span><Clapperboard/></span><div><strong>Production Dashboard</strong><small>SMOOTH STUDIOS</small></div></div><form className="login-card" onSubmit={e=>{e.preventDefault();void signIn();}}><span className="login-icon"><LockKeyhole/></span><h1>Sign in to productions</h1><p>Your projects. Your crew. Your next shoot.</p><FormField label="Username"><Input autoComplete="username" aria-label="Username" value={username} onChange={e=>setUsername(e.target.value)} required autoFocus/></FormField><FormField label="Password"><Input type="password" autoComplete="current-password" aria-label="Password" value={password} onChange={e=>setPassword(e.target.value)} required/></FormField>{problem&&<p className="login-error" role="alert">{problem}</p>}<Button type="submit" disabled={busy}>{busy?<Loader2 className="spin"/>:<LockKeyhole size={16}/>}Sign in</Button><small>Need an account or a password reset? Contact Smooth.</small></form><a className="login-rentals" href="https://smoothxstudios.github.io/smooth-studios-team-portal/">Studio Dashboard</a></div></AccountContext>;
  if(user.mustChangePassword)return <AccountContext value={context}><div className="account-gate"><div className="login-card"><h1>Make this account yours</h1><p>Set a password for your production account before continuing.</p><PasswordForm forced/><Button variant="ghost" onClick={signOut}>Sign out</Button></div></div></AccountContext>;
- return <AccountContext value={context}>{children}</AccountContext>;
+ return <AccountContext key={user.id} value={context}>{children}</AccountContext>;
 }
 function PasswordForm({forced=false,onDone}:{forced?:boolean;onDone?:()=>void}){
  const {refresh}=useAccount(),[current,setCurrent]=useState(''),[next,setNext]=useState(''),[confirm,setConfirm]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');

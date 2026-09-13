@@ -1,10 +1,12 @@
 import {IMAGE_TYPES,MAX_IMAGE_SIZE,imageMime} from './image-format';
 import type {Reference} from './shot-list';
+import {accountHeaders} from './client-account';
 export class UploadError extends Error{constructor(message:string,public status=0){super(message);}}
 export async function uploadRequest<T>(url:string,init:RequestInit):Promise<T>{
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
  try{
-  const response=await fetch(url,{...init,signal:controller.signal,credentials:'same-origin'});
+  const headers=new Headers(init.headers);for(const [name,value] of Object.entries(accountHeaders()))headers.set(name,value);
+  const response=await fetch(url,{...init,headers,signal:controller.signal,credentials:'same-origin'});
   if(response.status===401){window.dispatchEvent(new Event('account-expired'));throw new UploadError('Your session expired. Sign in again before uploading.',401);}
   let data:any;try{data=JSON.parse(await response.text());}catch{}
   if(!response.ok||!data||typeof data!=='object'||Array.isArray(data)){

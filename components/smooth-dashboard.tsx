@@ -135,7 +135,7 @@ const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ow
   { key: "guide", label: "Studio Guide", icon: BookOpen },
 ];
 
-function DashboardNavigation({ isOwner, view, onNavigate }: { isOwner: boolean; view: ViewKey; onNavigate: (view: ViewKey) => void }) {
+function DashboardNavigation({ isOwner, accountId, view, onNavigate }: { isOwner: boolean; accountId: string; view: ViewKey; onNavigate: (view: ViewKey) => void }) {
   const { isMobile, setOpenMobile } = useSidebar();
   const closeMobileMenu = () => { if (isMobile) setOpenMobile(false); };
 
@@ -149,7 +149,7 @@ function DashboardNavigation({ isOwner, view, onNavigate }: { isOwner: boolean; 
       </SidebarMenuItem>
     ))}
     <SidebarMenuItem><SidebarMenuButton asChild tooltip="Production dashboard">
-      <a href="https://smooth-studios-production.smoothxstudios.workers.dev" target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu}>
+      <a href={`https://smooth-studios-production.smoothxstudios.workers.dev/?from=studio&account=${encodeURIComponent(accountId === "owner" ? "smooth" : accountId)}`} target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu}>
         <Link2 /><span>Productions</span>
       </a>
     </SidebarMenuButton></SidebarMenuItem>
@@ -1087,7 +1087,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
         <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact /><span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span></SidebarHeader>
         <SidebarContent>
-          <SidebarGroup><SidebarGroupContent><DashboardNavigation isOwner={isOwner} view={view} onNavigate={setView} /></SidebarGroupContent></SidebarGroup>
+          <SidebarGroup><SidebarGroupContent><DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={setView} /></SidebarGroupContent></SidebarGroup>
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
           <ThemeControl dark={dark} onChange={setDark} />

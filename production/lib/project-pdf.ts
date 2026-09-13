@@ -4,6 +4,7 @@ import {hasModule,productionOf,dateLabel,clockLabel,money,expenseTotals,type Cre
 import {timeLabel,type Project} from './shot-list';
 import {orderedShots,renderShotSheet} from './shot-sheet';
 import {renderStoryboard} from './storyboard-pdf';
+import {accountHeaders} from './client-account';
 
 import {PDF_SECTIONS,categoryTitle,type PdfSection,type ExportProject} from './export-model';
 export type PdfOptions={sections:PdfSection[];images:boolean;shotLayout?:'sheet'|'detail'|'storyboard';shotOrder?:'shooting'|'scene';regularFont:Uint8Array;boldFont:Uint8Array;loadImage?:(id:string)=>Promise<{bytes:Uint8Array;mime:string}>;onProgress?:(text:string)=>void};
@@ -113,7 +114,7 @@ export async function createProjectPdf(entries:ExportProject[],options:PdfOption
 }
 
 export async function browserReferenceImage(id:string){
- const response=await fetch('/api/images/'+id,{cache:'no-store'});if(!response.ok)throw new Error('Reference unavailable');
+ const response=await fetch('/api/images/'+id,{cache:'no-store',headers:accountHeaders()});if(!response.ok)throw new Error('Reference unavailable');
  const blob=await response.blob();const url=URL.createObjectURL(blob);
  try{const img=new Image();await new Promise<void>((resolve,reject)=>{img.onload=()=>resolve();img.onerror=()=>reject(new Error('Reference image could not be decoded'));img.src=url;});
   const scale=Math.min(1,1400/Math.max(img.naturalWidth,img.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Image export unavailable');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
