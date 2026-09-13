@@ -24,7 +24,11 @@ const pdf=await PDFDocument.load(result.bytes),form=pdf.getForm(),fields=form.ge
 assert.equal(fields.length,8);assert.equal(new Set(fields.map(f=>f.getName())).size,8);
 assert.equal(form.getTextField(fields[0].getName()).getText(),project.shots[0].values.notes);
 assert.ok(form.acroForm.dict.lookup(PDFName.of('DR'),PDFDict).lookup(PDFName.of('Font'),PDFDict).keys().length>0);
-for(const page of pdf.getPages()){assert.deepEqual(page.getSize(),{width:792,height:612});assert.equal(page.node.Annots().size(),4);}
+for(const page of pdf.getPages()){assert.deepEqual(page.getSize(),{width:792,height:612});assert.ok(page.node.Annots().size()>0);}
+const rectangles=fields.map(f=>f.acroField.getWidgets()[0].getRectangle());
+assert.ok(rectangles.some(r=>r.height>=26&&r.height<=27),'Empty Notes boxes should stay compact.');
+assert.ok(rectangles.every(r=>r.y>=49&&r.y+r.height<550&&r.height<92));
+assert.ok(new Set(rectangles.slice(0,4).map(r=>r.y)).size>1,'Notes follow each description instead of sharing a fixed page-bottom position.');
 for(const f of fields){assert.equal(f.isReadOnly(),false);assert.equal(f.isMultiline(),true);assert.equal(f.acroField.getWidgets().length,1);assert.ok(f.acroField.getWidgets()[0].getAppearances()?.normal);assert.ok(f.acroField.dict.get(PDFName.of('TU')));}
 pdf.registerFontkit(fontkit);
 const editFont=await pdf.embedFont(options.regularFont,{subset:false});
@@ -32,6 +36,14 @@ const edited=form.getTextField(fields[0].getName());edited.setText('María: use 
 const editedBytes=await pdf.save({updateFieldAppearances:false});
 await writeFile('tmp/pdfs/storyboard-edited-check.pdf',editedBytes);
 assert.equal((await PDFDocument.load(editedBytes)).getForm().getTextField(fields[0].getName()).getText(),'María: use take 4.\nKeep the doorway clear.');
+const shortProject={...project,title:'Compact Storyboard',shots:Array.from({length:8},(_,i)=>({...blankShot(),number:String(i+1),order:i+1,description:'Short action.',values:{size:'Wide',movement:'Static'},references:[project.shots[0].references[0]]}))};
+const compact=await createProjectPdf([{project:shortProject,crew:[],files:[]}],{...options,loadImage:async()=>({bytes:image,mime:'image/png'})});
+assert.equal(compact.pageCount,1,'Two rows of four short image cards should fit on one landscape page.');
+const compactPdf=await PDFDocument.load(compact.bytes);assert.equal(compactPdf.getForm().getFields().length,8);assert.equal(compactPdf.getPages()[0].node.Annots().size(),8);
+await writeFile('tmp/pdfs/storyboard-compact-check.pdf',compact.bytes);
+const mixed={...shortProject,shots:shortProject.shots.slice(0,4).map((s,i)=>({...s,description:i===0?'Shot of tree used for coverage.':i===1?'Jada climbs the exposed roots of a tree, peers around it to find a bottomless hole in front of the tree. Jada makes her way towards the hole.':i===2?'Rabbit climbs up exposed tree roots and stops to take a break. Rabbit looks at a pocket watch in distress. Jada appears in frame three seconds later. Rabbit quickly jumps away and out of frame.':'A short reaction.',values:{...s.values,notes:i===3?'Keep the camera low.':''}}))};
+const mixedResult=await createProjectPdf([{project:mixed,crew:[],files:[]}],{...options,loadImage:async()=>({bytes:image,mime:'image/png'})});
+await writeFile('tmp/pdfs/storyboard-mixed-check.pdf',mixedResult.bytes);
 const noImage=await createProjectPdf([{project,crew:[],files:[]}],{...options,images:false,loadImage:async()=>{throw new Error('Should not fetch');}});assert.equal(noImage.warnings.length,0);assert.equal((await PDFDocument.load(noImage.bytes)).getForm().getFields().length,8);
 const unavailable=await createProjectPdf([{project,crew:[],files:[]}],{...options,loadImage:async()=>{throw new Error('Missing');}});assert.equal(unavailable.warnings.length,1);
 const collection=await createProjectPdf([{project,crew:[],files:[]},{project:{...project,title:'Second Production'},crew:[],files:[]}],{...options,images:false});
@@ -42,4 +54,4 @@ await writeFile('tmp/pdfs/storyboard-continuation-check.pdf',continued.bytes);
 const noteParts=(await PDFDocument.load(continued.bytes)).getForm().getFields();assert.ok(noteParts.length>1);
 const allNotes=noteParts.map(f=>f.getText()||'').join(' ').replace(/\s+/g,' ');assert.ok(allNotes.startsWith('START_NOTES '));assert.ok(allNotes.includes(' END_NOTES'));assert.equal((allNotes.match(/Keep continuity between every angle\./g)||[]).length,45);
 await writeFile('tmp/pdfs/storyboard-fixture.json',JSON.stringify(project));
-console.log('Storyboard checks passed: four-column cards, shared images, image failures/exclusion, unique editable notes, Unicode edits saved and reopened, multiple projects, and long-text continuation.');
+console.log('Storyboard checks passed: content-sized four-column cards, two compact rows per page, shared images, image failures/exclusion, unique editable notes, Unicode edits saved and reopened, multiple projects, and long-text continuation.');

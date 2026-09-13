@@ -6,6 +6,7 @@ import {categoryTitle} from './export-model';
 import type {PdfOptions} from './project-pdf';
 
 type TextTools={clean:(value:string)=>string;wrap:(value:string,size:number,width:number,font?:PDFFont)=>string[]};
+type Card={shot:Shot;refs:Reference[];pictures:(PDFImage|null)[];imageHeight:number;thumbRows:number;badges:string[];badgeRows:number;description:string[];notes:string[];notesHeight:number;height:number;continues:boolean;part:number;parts:number};
 const W=792,H=612,M=28,GAP=10,CARD=(W-2*M-3*GAP)/4,PAD=10,BOTTOM=49;
 const ink=rgb(.12,.18,.27),muted=rgb(.39,.46,.56),blue=rgb(.25,.36,.54),border=rgb(.80,.85,.91),pale=rgb(.95,.96,.98);
 const BODY=8.5,LEADING=11.6;
@@ -14,10 +15,10 @@ function shotNotes(project:Project,shot:Shot){
  return project.fields.filter(f=>['notes','takes'].includes(f.key)||f.group.toLowerCase()==='notes').filter(f=>shot.values[f.key]?.trim()).map(f=>f.key==='notes'?shot.values[f.key]:categoryTitle(f.key==='takes'?'Takes':f.label)+': '+shot.values[f.key]).join('\n\n');
 }
 
-/** Four image-led cards per landscape page, with real AcroForm Notes fields. */
+/** Four columns of content-sized cards, with real editable AcroForm Notes fields. */
 export async function renderStoryboard(project:Project,options:PdfOptions,doc:PDFDocument,font:PDFFont,bold:PDFFont,text:TextTools,warnings:Set<string>){
  const form=doc.getForm(),shots=orderedShots(project,options.shotOrder),imageCache=new Map<string,Promise<PDFImage|null>>();
- let page:PDFPage,top=0,position=0;
+ let page:PDFPage,top=0;
  const fit=(value:string,size:number,width:number,strong=false)=>{const f=strong?bold:font;let s=text.clean(value).replace(/\s+/g,' ');if(f.widthOfTextAtSize(s,size)<=width)return s;while(s&&f.widthOfTextAtSize(s+'...',size)>width)s=s.slice(0,-1);return s+'...';};
  const newPage=()=>{
   page=doc.addPage([W,H]);
@@ -44,51 +45,70 @@ export async function renderStoryboard(project:Project,options:PdfOptions,doc:PD
  };
  newPage();
  if(!shots.length){page!.drawText('No shots added yet.',{x:M,y:top-20,size:10,font,color:muted});return;}
+ const maxCardHeight=top-BOTTOM,cards:Card[]=[];
  for(const [shotIndex,shot] of shots.entries()){
   options.onProgress?.(project.title+' / Storyboard '+(shotIndex+1)+' of '+shots.length);
   const refs=options.images?shot.references:[],pictures=await Promise.all(refs.map(load));
   const thumbRows=Math.ceil(Math.max(0,refs.length-1)/4),galleryHeight=thumbRows?thumbRows*28+5:0;
-  const imageHeight=CARD*9/16,notesHeight=92,notesBottom=BOTTOM+30,notesTop=notesBottom+notesHeight;
+  const imageHeight=refs.length?CARD*9/16:options.images?26:0;
   const badges=[shot.values.size,shot.values.movement].filter(Boolean).map(v=>fit(v,7.2,CARD-2*PAD-12));
   const badgeRows=badges.length===2&&badges.reduce((n,b)=>n+font.widthOfTextAtSize(b,7.2)+12,0)+5>CARD-2*PAD?2:badges.length?1:0;
-  const descriptionTop=top-26-imageHeight-galleryHeight-12-badgeRows*19-(badges.length?5:0);
-  const descriptionCapacity=Math.max(1,Math.floor((descriptionTop-notesTop-26)/LEADING));
-  const noteCapacity=Math.floor((notesHeight-12)/(BODY*1.4));
-  const descriptions=text.wrap(shot.description,BODY,CARD-2*PAD,font),notes=text.wrap(shotNotes(project,shot),BODY,CARD-2*PAD-6,font);
-  const parts=Math.max(1,Math.ceil(descriptions.length/descriptionCapacity),Math.ceil(notes.length/noteCapacity));
-  for(let part=0;part<parts;part++){
-   if(position&&position%4===0)newPage();
-   const x=M+(position%4)*(CARD+GAP),inner=x+PAD;position++;
-   page!.drawRectangle({x,y:BOTTOM,width:CARD,height:top-BOTTOM,color:rgb(1,1,1),borderColor:border,borderWidth:.7});
+  const beforeDescription=22+imageHeight+galleryHeight+(imageHeight?8:0)+(badgeRows?badgeRows*17+3:0);
+  const descriptions=shot.description.trim()?text.wrap(shot.description,BODY,CARD-2*PAD,font):[];
+  const noteText=shotNotes(project,shot),notes=noteText.trim()?text.wrap(noteText,BODY,CARD-2*PAD-6,font):[];
+  const parts:Card[]=[];let descriptionOffset=0,noteOffset=0;
+  do{
+   const noteRows=notes.slice(noteOffset,noteOffset+6),notesHeight=Math.max(26,noteRows.length*BODY*1.4+12);
+   const fixedHeight=beforeDescription+14+notesHeight+29;
+   const roomWithoutContinuation=Math.floor((maxCardHeight-fixedHeight)/LEADING);
+   const hasContinuation=noteOffset+noteRows.length<notes.length||descriptions.length-descriptionOffset>roomWithoutContinuation;
+   const capacity=Math.max(1,Math.floor((maxCardHeight-fixedHeight-(hasContinuation?13:0))/LEADING));
+   const description=descriptions.slice(descriptionOffset,descriptionOffset+capacity);
+   descriptionOffset+=description.length;noteOffset+=noteRows.length;
+   const continues=descriptionOffset<descriptions.length||noteOffset<notes.length;
+   parts.push({shot,refs,pictures,imageHeight,thumbRows,badges,badgeRows,description,notes:noteRows,notesHeight,height:fixedHeight+description.length*LEADING+(continues?13:0),continues,part:parts.length+1,parts:0});
+  }while(descriptionOffset<descriptions.length||noteOffset<notes.length);
+  parts.forEach(card=>{card.parts=parts.length;cards.push(card);});
+ }
+ let rowTop=top;
+ for(let start=0;start<cards.length;start+=4){
+  const row=cards.slice(start,start+4),rowHeight=Math.max(...row.map(card=>card.height));
+  if(rowTop-rowHeight<BOTTOM-.01){newPage();rowTop=top;}
+  for(const [column,card] of row.entries()){
+   const {shot,refs,pictures,imageHeight,thumbRows,badges,badgeRows,description,notes,notesHeight,continues,part,parts}=card;
+   const x=M+column*(CARD+GAP),inner=x+PAD,bottom=rowTop-card.height;
+   page!.drawRectangle({x,y:bottom,width:CARD,height:card.height,color:rgb(1,1,1),borderColor:border,borderWidth:.7});
    const id='Scene '+shot.scene.padStart(2,'0')+' / Shot '+shot.number.padStart(2,'0');
-   page!.drawText(fit(id,7.6,CARD-2*PAD-(parts>1?34:0),true),{x:inner,y:top-16,size:7.6,font:bold,color:blue});
-   if(parts>1)page!.drawText((part+1)+' / '+parts,{x:x+CARD-PAD-font.widthOfTextAtSize((part+1)+' / '+parts,7),y:top-16,size:7,font,color:muted});
-   let y=top-26-imageHeight;
-   frame(pictures[0]||null,x+.7,y,CARD-1.4,imageHeight,refs.length?'Unavailable: '+refs[0].name:options.images?'No Reference Image':'Images Not Included');
+   page!.drawText(fit(id,7.6,CARD-2*PAD-(parts>1?34:0),true),{x:inner,y:rowTop-14,size:7.6,font:bold,color:blue});
+   if(parts>1)page!.drawText(part+' / '+parts,{x:x+CARD-PAD-font.widthOfTextAtSize(part+' / '+parts,7),y:rowTop-14,size:7,font,color:muted});
+   let y=rowTop-22;
+   if(imageHeight){y-=imageHeight;frame(pictures[0]||null,x+.7,y,CARD-1.4,imageHeight,refs.length?'Unavailable: '+refs[0].name:'No Reference Image');}
    if(refs.length>1){
     y-=5;const thumbWidth=(CARD-2*PAD-9)/4;
     for(let i=1;i<refs.length;i++){const row=Math.floor((i-1)/4),col=(i-1)%4;frame(pictures[i],inner+col*(thumbWidth+3),y-(row+1)*28,thumbWidth,24,'Unavailable: '+refs[i].name);}
     y-=thumbRows*28;
    }
-   y-=12;let badgeX=inner;
-   badges.forEach((badge,i)=>{const width=font.widthOfTextAtSize(badge,7.2)+12;if(i&&badgeRows===2){badgeX=inner;y-=19;}page!.drawRectangle({x:badgeX,y:y-14,width,height:16,color:pale});page!.drawText(badge,{x:badgeX+6,y:y-9,size:7.2,font,color:blue});badgeX+=width+5;});
-   y-=badgeRows?24:0;
-   const description=descriptions.slice(part*descriptionCapacity,(part+1)*descriptionCapacity);
-   for(const row of description){page!.drawText(row,{x:inner,y:y-BODY,size:BODY,font,color:ink});y-=LEADING;}
-   if(part<parts-1)page!.drawText('Continues on the next card',{x:inner,y:notesTop+19,size:6.8,font,color:muted});
-   page!.drawText('Notes',{x:inner,y:notesTop+7,size:8,font:bold,color:blue});
+   if(imageHeight)y-=8;
+   let badgeX=inner;
+   badges.forEach((badge,i)=>{const width=font.widthOfTextAtSize(badge,7.2)+12;if(i&&badgeRows===2){badgeX=inner;y-=17;}page!.drawRectangle({x:badgeX,y:y-12,width,height:14,color:pale});page!.drawText(badge,{x:badgeX+6,y:y-8,size:7.2,font,color:blue});badgeX+=width+5;});
+   if(badgeRows)y-=20;
+   for(const line of description){page!.drawText(line,{x:inner,y:y-BODY,size:BODY,font,color:ink});y-=LEADING;}
+   if(continues){page!.drawText('Continues on the next card',{x:inner,y:y-8,size:6.8,font,color:muted});y-=13;}
+   const notesTop=y-14,notesBottom=notesTop-notesHeight;
+   page!.drawText('Notes',{x:inner,y:notesTop+5,size:8,font:bold,color:blue});
    const field=form.createTextField('storyboard_notes_'+(form.getFields().length+1));
    field.enableMultiline();field.enableScrolling();field.disableSpellChecking();
-   field.acroField.dict.set(PDFName.of('TU'),PDFHexString.fromText(project.title+' - '+id+' - Notes'+(parts>1?' - Part '+(part+1):'')));
+   field.acroField.dict.set(PDFName.of('TU'),PDFHexString.fromText(project.title+' - '+id+' - Notes'+(parts>1?' - Part '+part:'')));
    field.acroField.setDefaultAppearance('/'+font.name+' '+BODY+' Tf 0.12 0.18 0.27 rg');
-   field.setText(notes.slice(part*noteCapacity,(part+1)*noteCapacity).join('\n'));
+   field.setText(notes.join('\n'));
    field.addToPage(page!,{x:inner,y:notesBottom,width:CARD-2*PAD,height:notesHeight,font,textColor:ink,backgroundColor:rgb(.985,.99,1),borderColor:border,borderWidth:.6});
    field.setFontSize(BODY);field.updateAppearances(font);
    const status=fit(shot.status,7,(CARD-2*PAD)/2),priority=fit(shot.priority,7,(CARD-2*PAD)/2);
-   page!.drawText(status,{x:inner,y:BOTTOM+16,size:7,font,color:muted});
-   page!.drawText(priority,{x:x+CARD-PAD-font.widthOfTextAtSize(priority,7),y:BOTTOM+16,size:7,font,color:shot.priority==='Must have'?rgb(.64,.34,.21):muted});
+   page!.drawText(status,{x:inner,y:notesBottom-12,size:7,font,color:muted});
+   page!.drawText(priority,{x:x+CARD-PAD-font.widthOfTextAtSize(priority,7),y:notesBottom-12,size:7,font,color:shot.priority==='Must have'?rgb(.64,.34,.21):muted});
    const timing=['#'+shot.order,shot.setup?shot.setup+' min Setup':'',shot.duration?timeLabel(shot.duration):''].filter(Boolean).join(' / ');
-   page!.drawText(fit(timing,6.7,CARD-2*PAD),{x:inner,y:BOTTOM+5,size:6.7,font,color:muted});
+   page!.drawText(fit(timing,6.7,CARD-2*PAD),{x:inner,y:notesBottom-22,size:6.7,font,color:muted});
   }
+  rowTop-=rowHeight+GAP;
  }
 }

@@ -44,6 +44,10 @@ Export options have visible PDF Organization, Shot List Layout, and Shot Order l
 
 ## Storyboard PDF
 
-Shot List Layout also offers Storyboard: four image cards per landscape page with scene/shot labels, framing/movement badges, descriptions, status, priority, and editable Notes fields. Existing shot notes and take notes populate the fields; longer descriptions or notes continue on additional cards. Extra references appear as thumbnails. Missing references are marked, and image exclusion remains available.
+Shot List Layout also offers Storyboard: four columns of image cards sized to their content, with scene/shot labels, framing/movement badges, descriptions, status, priority, and editable Notes fields. Existing shot notes and take notes populate the fields; longer descriptions or notes continue on additional cards. Notes follow each description directly. Empty Notes fields stay compact; saved notes expand their field as needed. Multiple rows share a landscape page when they fit. Extra references appear as thumbnails. Missing references are marked, and image exclusion remains available.
 
 Notes use real multiline AcroForm fields with embedded fonts, default form resources, and saved appearances. Notes can be edited and saved in the downloaded PDF; those edits stay in the file and do not change dashboard data. Collections use distinct field names for every card. The export tests save and reopen edited Unicode notes and check form fields, widgets, pagination, and long content.
+
+## Automatic shot numbering
+
+Saving a new Shot # inserts the shot at that position within its scene and renumbers the scene consecutively. Moving a shot between scenes closes the old gap. Numbers beyond the last position place the shot at the end. Shot IDs, reference images, saved notes, and schedule links are preserved. The shot also moves beside its new scene neighbor in filming order unless an explicit filming order was edited. Changes save together under the existing project revision check. Editing other shot details leaves numbering alone.
