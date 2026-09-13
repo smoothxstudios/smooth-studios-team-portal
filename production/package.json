@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/test.mjs && node scripts/test-export.mjs",
+    "test": "node scripts/test.mjs && node scripts/test-export.mjs && node scripts/test-uploads.mjs",
     "deploy": "node scripts/deploy.mjs"
   },
   "dependencies": {

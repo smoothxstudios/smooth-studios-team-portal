@@ -29,7 +29,8 @@ try{
  function client(ip){let cookies=new Map();return async(path,method='GET',body,extra={})=>{
   const headers={Origin:origin,'cf-connecting-ip':ip,...extra};if(cookies.size)headers.Cookie=Array.from(cookies).map(([k,v])=>k+'='+v).join('; ');
   if(body&&!(body instanceof FormData))headers['Content-Type']='application/json';
-  let payload=body?JSON.stringify(body):undefined;
+  let payload=body instanceof Uint8Array?body:body?JSON.stringify(body):undefined;
+  if(body instanceof Uint8Array)headers['Content-Type']='application/octet-stream';
   if(body instanceof FormData){
    // Serialize with the same Fetch implementation that created FormData;
    // Miniflare and Node use separate undici versions.
@@ -97,10 +98,44 @@ try{
  const bytes=Uint8Array.from([137,80,78,71,13,10,26,10]);const imageForm=new FormData();imageForm.set('file',new File([bytes],'test.png',{type:'image/png'}));imageForm.set('projectId',p.id);
  const image=(await expect(await crew('/api/images','POST',imageForm),201)).image;
  const fetched=await crew('/api/images/'+image.id);assert.equal(fetched.status,200);assert.deepEqual(new Uint8Array(await fetched.arrayBuffer()),bytes);
+ // Exercise a real multi-part picture, including retries and paged download.
+ const large=new Uint8Array(2*1024*1024+23);large.fill(71);large.set(bytes);
+ const uploadInput={name:'Large picture.png',mime:'image/png',size:large.length,projectId:p.id};
+ await expect(await stranger('/api/image-uploads','POST',uploadInput),401);
+ const upload=(await expect(await crew('/api/image-uploads','POST',uploadInput),201));
+ const uploadUrl='/api/image-uploads/'+upload.uploadId;
+ await expect(await owner(uploadUrl+'?part=0','PUT',large.slice(0,upload.chunkSize)),404);
+ await expect(await crew(uploadUrl,'POST'),409);
+ await expect(await crew(uploadUrl+'?part=999','PUT',bytes),400);
+ await expect(await crew(uploadUrl+'?part=0','PUT',large.slice(0,upload.chunkSize+1)),413);
+ await expect(await crew(uploadUrl+'?part=0','PUT',new Uint8Array(upload.chunkSize)),400);
+ for(let offset=0,i=0;offset<large.length;offset+=upload.chunkSize,i++)await expect(await crew(uploadUrl+'?part='+i,'PUT',large.slice(offset,offset+upload.chunkSize)),200);
+ await expect(await crew(uploadUrl+'?part=0','PUT',large.slice(0,upload.chunkSize)),200);
+ const largeImage=(await expect(await crew(uploadUrl,'POST'),201)).image;
+ assert.equal((await expect(await crew(uploadUrl,'POST'),201)).image.id,largeImage.id);
+ await expect(await crew(uploadUrl+'?part=0','PUT',large.slice(0,upload.chunkSize)),409);
+ await expect(await crew(uploadUrl,'DELETE'),200);
+ assert.deepEqual(new Uint8Array(await (await owner('/api/images/'+largeImage.id)).arrayBuffer()),large);
+ await db.prepare('UPDATE image_uploads SET created_at=0 WHERE id=?').bind(upload.uploadId).run();
+ const abandoned=await expect(await crew('/api/image-uploads','POST',uploadInput),201);
+ assert.deepEqual(new Uint8Array(await (await owner('/api/images/'+largeImage.id)).arrayBuffer()),large);
+ await expect(await crew('/api/image-uploads/'+abandoned.uploadId+'?part=0','PUT',large.slice(0,abandoned.chunkSize)),200);
+ await expect(await crew('/api/image-uploads/'+abandoned.uploadId,'DELETE'),200);
+ await expect(await crew('/api/image-uploads/'+abandoned.uploadId,'POST'),404);
+ assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM file_chunks WHERE object_key=?').bind('references/'+abandoned.uploadId).first()).n,0);
+ const legacyForm=new FormData();legacyForm.set('file',new File([large],'large-file.png',{type:'image/png'}));legacyForm.set('category','Reference');
+ const legacyFile=(await expect(await crew('/api/projects/'+p.id+'/files','POST',legacyForm),201)).file;
+ assert.deepEqual(new Uint8Array(await (await crew('/api/files/'+legacyFile.id)).arrayBuffer()),large);
+ await expect(await crew('/api/files/'+legacyFile.id,'DELETE'),200);
+ const customDraft=blankProject('Custom category check', [{key:'custom_lens',label:'Lens choice',type:'select',group:'Framing & camera',visible:true,custom:true,options:['24mm','50mm']}]);
+ const customProject=(await expect(await owner('/api/projects','POST',customDraft),201)).project;
+ assert.deepEqual(customProject.fields,customDraft.fields);
+ await expect(await owner('/api/projects/'+customProject.id,'DELETE'),200);
  const fileForm=new FormData();fileForm.set('file',new File(['Production script'],'script.txt',{type:'text/plain'}));fileForm.set('category','Script');
  const file=(await expect(await crew('/api/projects/'+p.id+'/files','POST',fileForm),201)).file;
  assert.equal(await expect(await owner('/api/files/'+file.id),200),'Production script');
  await expect(await stranger('/api/files/'+file.id),401);
+ const permissionUpload=await expect(await crew('/api/image-uploads','POST',{...uploadInput,size:bytes.length}),201);
  const m=(await expect(await owner('/api/projects/'+p.id+'/crew'),200)).crew[0];await expect(await owner('/api/projects/'+p.id+'/crew','DELETE',{memberId:m.id}),200);
  // Removing a tag preserves viewing and downloads, but immediately prevents every edit route.
  assert.equal((await expect(await crew('/api/projects/'+p.id),200)).project.canEdit,false);
@@ -109,6 +144,10 @@ try{
  assert.equal((await expect(await crew('/api/projects/'+p.id+'/files'),200)).files[0].id,file.id);
  await expect(await crew('/api/projects/'+p.id,'PUT',{...p,canEdit:true}),403);
  await expect(await crew('/api/images','POST',imageForm),403);
+ await expect(await crew('/api/image-uploads','POST',uploadInput),403);
+ await expect(await crew('/api/image-uploads/'+permissionUpload.uploadId,'POST'),403);
+ await expect(await crew('/api/image-uploads/'+permissionUpload.uploadId+'?part=0','PUT',bytes),403);
+ await expect(await crew('/api/image-uploads/'+permissionUpload.uploadId,'DELETE'),200);
  await expect(await crew('/api/projects/'+p.id+'/files','POST',fileForm),403);
  await expect(await crew('/api/files/'+file.id,'DELETE'),403);
  assert.equal(await expect(await owner('/api/files/'+file.id),200),'Production script');
@@ -132,5 +171,5 @@ try{
  await expect(await owner('/api/projects/'+p.id,'PUT',p,{Origin:'https://attacker.invalid'}),403);
  await expect(await owner('/api/auth/sign-out','POST',{}),200);await expect(await owner('/api/projects'),401);
  const probe=client('198.51.100.44');for(let i=0;i<5;i++)await probe('/api/auth/sign-in/username','POST',{username:'nobody',password:'invalid-password'});await expect(await probe('/api/auth/sign-in/username','POST',{username:'nobody',password:'invalid-password'}),429);
- console.log('Passed: standalone password sign-in, secure sessions, owner account management, forced password changes, disabled accounts, password reset revocation, sign-out, closed registration, rate limiting, CSRF protection, team-wide project viewing, assignment-based editing, read-only file/image access, private drafts, shared file and image storage.');
+ console.log('Passed: standalone password sign-in, secure sessions, owner account management, forced password changes, disabled accounts, password reset revocation, sign-out, closed registration, rate limiting, CSRF protection, team-wide project viewing, assignment-based editing, read-only file/image access, private drafts, multi-part picture uploads and retries, byte-exact downloads, custom project categories, shared file and image storage.');
 }finally{await mf.dispose();}

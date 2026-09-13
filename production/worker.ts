@@ -10,8 +10,9 @@ import * as file from './app/api/files/[id]/route';
 import * as images from './app/api/images/route';
 import * as image from './app/api/images/[id]/route';
 import * as team from './app/api/team/route';
+import * as imageUploads from './lib/image-uploads';
 type Route=Record<string,(r:Request,c:any)=>Promise<Response>>;
-const routes:[RegExp,Route][]=[[/^\/api\/session$/,session],[/^\/api\/team$/,team],[/^\/api\/projects$/,projects],[/^\/api\/projects\/([^/]+)\/crew$/,crew],[/^\/api\/projects\/([^/]+)\/files$/,files],[/^\/api\/projects\/([^/]+)$/,project],[/^\/api\/files\/([^/]+)$/,file],[/^\/api\/images$/,images],[/^\/api\/images\/([^/]+)$/,image]];
+const routes:[RegExp,Route][]=[[/^\/api\/image-uploads$/,{POST:imageUploads.start}],[/^\/api\/image-uploads\/([^/]+)$/,{PUT:imageUploads.part,POST:imageUploads.finish,DELETE:imageUploads.cancel}],[/^\/api\/session$/,session],[/^\/api\/team$/,team],[/^\/api\/projects$/,projects],[/^\/api\/projects\/([^/]+)\/crew$/,crew],[/^\/api\/projects\/([^/]+)\/files$/,files],[/^\/api\/projects\/([^/]+)$/,project],[/^\/api\/files\/([^/]+)$/,file],[/^\/api\/images$/,images],[/^\/api\/images\/([^/]+)$/,image]];
 export default {async fetch(request:Request){
  const url=new URL(request.url);
  const response=await api(async()=>{
