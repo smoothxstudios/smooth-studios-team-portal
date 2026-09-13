@@ -36,6 +36,8 @@ Create project offers standard categories, the current project's categories, or 
 
 Reference pictures upload in authenticated 128 KiB parts, with ownership and project editing checks on each request. Retried parts and completion are idempotent. MIME types are detected from bytes, original image bytes are preserved, and failed parts can retry without restarting the entire file. Incomplete uploads expire after 24 hours. Pending parts stay inaccessible until completion. Existing image and file URLs remain valid. Database file reads stream bounded pages, and legacy file writes use bounded batches. Upload failures display clear errors and retain the shot draft.
 
-## First AD shot sheet
+## Shot List and Shot Breakdown
 
-PDF exports default to a landscape first AD sheet in shooting order. Multiple shots share each page, with repeated column headings, scene/shot IDs, completion checkboxes, camera and production details, setup/duration, small reference images, and writing lines for takes. Long fields continue with their shot ID instead of being clipped. Export options also offer scene/shot ordering and the existing detailed portrait breakdown. Other selected project sections retain their own readable pages.
+PDF exports default to the landscape Shot List in shooting order. Multiple shots share each page, with repeated column headings, scene/shot IDs, completion checkboxes, camera and production details, setup/duration, small reference images, and an unruled Notes column. Long fields continue with their shot ID instead of being clipped. Export options also offer scene/shot ordering and the portrait Shot Breakdown. Other selected project sections retain their own readable pages.
+
+Export options have visible PDF Organization, Shot List Layout, and Shot Order labels. Export filenames use one hyphen between words. PDF category labels use title case; inline bold labels and camera-column dividers keep each setting easy to scan.

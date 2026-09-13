@@ -2,9 +2,11 @@ import {PDFDocument,PDFFont,PDFPage,rgb,type PDFImage,type RGB} from 'pdf-lib';
 import {dateLabel} from './production';
 import {timeLabel,type Project,type Shot} from './shot-list';
 import type {PdfOptions} from './project-pdf';
+import {categoryTitle} from './export-model';
 
 type TextTools={clean:(value:string)=>string;wrap:(value:string,size:number,width:number,font?:PDFFont)=>string[]};
-type Item={kind:'text';text:string;height:number;size:number;font:PDFFont;color:RGB}|{kind:'image';image:PDFImage;width:number;height:number}|{kind:'rule';height:number};
+type TextRun={text:string;font:PDFFont};
+type Item={kind:'text';text:string;runs?:TextRun[];height:number;size:number;font:PDFFont;color:RGB}|{kind:'image';image:PDFImage;width:number;height:number}|{kind:'divider';height:number};
 const W=792,H=612,M=28,WIDTH=W-2*M,BOTTOM=52,PAD=6;
 const ink=rgb(.12,.18,.26),muted=rgb(.36,.42,.50),blue=rgb(.21,.32,.48),line=rgb(.76,.80,.85);
 
@@ -16,25 +18,43 @@ export function orderedShots(project:Project,order:PdfOptions['shotOrder']='shoo
 /** A continuous, landscape shooting sheet. Long rows continue with their shot ID and table headings repeated. */
 export async function renderShotSheet(project:Project,options:PdfOptions,doc:PDFDocument,font:PDFFont,bold:PDFFont,text:TextTools,warnings:Set<string>){
  const widths=options.images?[32,60,191,185,60,88,120]:[32,60,239,205,60,140];
- const headers=options.images?['Order\nDone','Scene / shot','Action / production','Camera / light / sound','Timing','Reference','Takes / notes']:['Order\nDone','Scene / shot','Action / production','Camera / light / sound','Timing','Takes / notes'];
+ const headers=options.images?['Order\nDone','Scene / Shot','Action / Production','Camera / Lighting / Sound','Timing','Reference','Notes']:['Order\nDone','Scene / Shot','Action / Production','Camera / Lighting / Sound','Timing','Notes'];
  const notesCol=widths.length-1,shots=orderedShots(project,options.shotOrder);
  let page:PDFPage,y=0,capacity=0;
  const lines=(value:string,col:number,size=8.2,strong=false,color=ink):Item[]=>text.wrap(value,size,widths[col]-PAD*2,strong?bold:font).map(s=>({kind:'text',text:s,height:size*1.3,size,font:strong?bold:font,color}));
+ const fieldLines=(label:string,value:string,col:number):Item[]=>{
+  const size=8.2,limit=widths[col]-2*PAD,result:Item[]=[];
+  let runs:TextRun[]=[],used=0,space=false;
+  const append=(s:string,f:PDFFont)=>{if(runs.at(-1)?.font===f)runs[runs.length-1].text+=s;else runs.push({text:s,font:f});used+=f.widthOfTextAtSize(s,size);};
+  const flush=()=>{result.push({kind:'text',text:runs.map(r=>r.text).join(''),runs,height:size*1.3,size,font,color:ink});runs=[];used=0;space=false;};
+  for(const [content,f] of [[categoryTitle(label)+':',bold],[value,font]] as const){
+   for(const word of text.clean(content).split(/(\s+)/u).filter(Boolean)){
+    if(/^\s+$/u.test(word)){const breaks=word.match(/\n/g)?.length||0;for(let n=0;n<breaks;n++)flush();space=breaks===0;continue;}
+    let prefix=space&&runs.length?' ':'';
+    if(used+f.widthOfTextAtSize(prefix+word,size)>limit&&runs.length){flush();prefix='';}
+    if(f.widthOfTextAtSize(word,size)<=limit)append(prefix+word,f);
+    else for(const char of word){if(used+f.widthOfTextAtSize(char,size)>limit&&runs.length)flush();append(char,f);}
+    space=false;
+   }
+   space=true;
+  }
+  if(runs.length)flush();return result;
+ };
  const newPage=()=>{
   page=doc.addPage([W,H]);
   page.drawText('SMOOTH STUDIOS / PRODUCTION',{x:M,y:H-25,size:7.5,font:bold,color:muted});
-  const label='FIRST AD SHOT SHEET';page.drawText(label,{x:W-M-bold.widthOfTextAtSize(label,7.5),y:H-25,size:7.5,font:bold,color:blue});
+  const label='Shot List';page.drawText(label,{x:W-M-bold.widthOfTextAtSize(label,9),y:H-25,size:9,font:bold,color:blue});
   y=H-39;
   for(const title of text.wrap(project.title,16,WIDTH,bold)){page.drawText(title,{x:M,y:y-16,size:16,font:bold,color:ink});y-=20;}
   y-=5;
-  const summary=[dateLabel(project.date),project.client||'Smooth Studios',shots.length+' shots',options.shotOrder==='scene'?'Scene / shot order':'Shooting order','Setup: '+shots.reduce((n,s)=>n+s.setup,0)+' min'].join('  /  ');
+  const summary=[dateLabel(project.date),project.client||'Smooth Studios',shots.length+' Shots',options.shotOrder==='scene'?'Scene / Shot Order':'Shooting Order','Setup: '+shots.reduce((n,s)=>n+s.setup,0)+' min'].join('  /  ');
   for(const row of text.wrap(summary,8.2,WIDTH,font)){page.drawText(row,{x:M,y:y-8.2,size:8.2,font,color:muted});y-=11;}
   y-=10;
   page.drawRectangle({x:M,y:y-26,width:WIDTH,height:26,color:rgb(.92,.94,.96),borderColor:line,borderWidth:.5});
   let x=M;
   headers.forEach((header,col)=>{header.split('\n').forEach((s,i)=>page.drawText(s,{x:x+PAD,y:y-11-i*8,size:7.2,font:bold,color:blue}));x+=widths[col];});
   y-=26;capacity=y-BOTTOM;
-  page.drawText('Check off completed shots. Record takes and circle the preferred take. Setup estimates exclude takes and breaks.',{x:M,y:43,size:7,font,color:muted});
+  page.drawText('Setup estimates exclude takes and breaks.',{x:M,y:43,size:7,font,color:muted});
  };
  newPage();
  if(!shots.length){page!.drawText('No shots added yet.',{x:M+PAD,y:y-24,size:10,font,color:muted});return;}
@@ -46,9 +66,11 @@ export async function renderShotSheet(project:Project,options:PdfOptions,doc:PDF
    const value=shot.values[field.key];if(!value?.trim())continue;
    const group=field.group.toLowerCase();
    const col=['notes','takes'].includes(field.key)||group==='notes'?notesCol:['location','talent','props','wardrobe'].includes(field.key)||group.includes('production')?2:3;
-   cells[col].push(...lines(field.label+': '+value,col));
+   const shortLabels:Record<string,string>={angle:'Angle',direction:'Direction',style:'Style',notes:'Director',takes:'Takes'};
+   const label=field.custom?field.label:shortLabels[field.key]||field.label;
+   if(col===3&&cells[col].length)cells[col].push({kind:'divider',height:5});
+   cells[col].push(...fieldLines(label,value,col));
   }
-  cells[notesCol].push({kind:'rule',height:16},{kind:'rule',height:16});
   if(options.images){
    for(const ref of shot.references){
     try{
@@ -75,7 +97,7 @@ export async function renderShotSheet(project:Project,options:PdfOptions,doc:PDF
    const fullHeight=Math.max(minimum,...cells.map(c=>c.reduce((n,item)=>n+item.height,0)+PAD*2));
    if(y-BOTTOM<minimum||(fullHeight>y-BOTTOM&&fullHeight<=capacity))newPage();
    const available=y-BOTTOM-PAD*2;
-   const drawn=cells.map(c=>{let height=0,n=0;while(n<c.length&&height+c[n].height<=available){height+=c[n].height;n++;}return c.splice(0,n);});
+   const drawn=cells.map(c=>{if(continued&&c[0]?.kind==='divider')c.shift();let height=0,n=0;while(n<c.length&&height+c[n].height<=available){height+=c[n].height;n++;}if(n<c.length&&c[n-1]?.kind==='divider')n--;return c.splice(0,n);});
    const height=Math.max(minimum,...drawn.map(c=>c.reduce((n,item)=>n+item.height,0)+PAD*2));
    const more=cells.some(c=>c.length);
    drawn[1]=identity;drawn[4]=timing;
@@ -87,9 +109,9 @@ export async function renderShotSheet(project:Project,options:PdfOptions,doc:PDF
     if(col)page!.drawLine({start:{x,y},end:{x,y:y-height},thickness:.45,color:line});
     let top=y-PAD;
     for(const item of items){
-     if(item.kind==='text')page!.drawText(item.text,{x:x+PAD,y:top-item.size,size:item.size,font:item.font,color:item.color});
+     if(item.kind==='text'){let left=x+PAD;for(const run of item.runs||[{text:item.text,font:item.font}]){page!.drawText(run.text,{x:left,y:top-item.size,size:item.size,font:run.font,color:item.color});left+=run.font.widthOfTextAtSize(run.text,item.size);}}
      if(item.kind==='image')page!.drawImage(item.image,{x:x+(widths[col]-item.width)/2,y:top-item.height+4,width:item.width,height:item.height-4});
-     if(item.kind==='rule')page!.drawLine({start:{x:x+PAD,y:top-item.height+3},end:{x:x+widths[col]-PAD,y:top-item.height+3},thickness:.4,color:line});
+     if(item.kind==='divider')page!.drawLine({start:{x:x+PAD,y:top-item.height/2+1},end:{x:x+widths[col]-PAD,y:top-item.height/2+1},thickness:.35,color:line});
      top-=item.height;
     }
     if(col===0&&!continued){

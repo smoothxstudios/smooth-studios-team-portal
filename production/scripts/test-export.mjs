@@ -25,7 +25,7 @@ assert.deepEqual(result.warnings,[]);assert.ok(result.pageCount>=9);assert.equal
 await writeFile('tmp/pdfs/production-export-check.pdf',result.bytes);
 const solo=await createProjectPdf([{project:simple,crew:[],files:[]}],{...options,sections:['shots']});assert.equal(solo.pageCount,1);
 const noImage=await createProjectPdf([{project,crew,files}],{...options,sections:['shots'],images:false,loadImage:async()=>{throw new Error('Must not load images');}});assert.equal(noImage.warnings.length,0);
-const sheetProject=exampleProject();sheetProject.title='Nightfall - First AD shot sheet';sheetProject.date='2026-10-10';
+const sheetProject=exampleProject();sheetProject.title='Nightfall - Shot List';sheetProject.date='2026-10-10';
 sheetProject.shots[0].references=project.shots[0].references;
 sheetProject.shots[1].status='Complete';sheetProject.shots[1].values.takes='Takes 1-3. Preferred: 3.';
 sheetProject.shots[0].order=3;sheetProject.shots[2].order=1;
@@ -49,4 +49,4 @@ try{
 }finally{globalThis.fetch=savedFetch;}
 await assert.rejects(()=>createProjectPdf([{project:simple,crew:[],files:[]}],{...options,sections:['budget']}),/None of the selected sections/);
 await writeFile('tmp/pdfs/ui-fixture.json',JSON.stringify({project,simple,crew,files},null,2));
-console.log('PDF checks passed: first AD sheets, compact pagination, shooting/scene order, detailed layout, combined projects, individual sections, opt-in modules, Unicode names, long content, images, and font response validation ('+result.pageCount+' pages).');
+console.log('PDF checks passed: shot lists, compact pagination, shooting/scene order, detailed layout, combined projects, individual sections, opt-in modules, Unicode names, long content, images, and font response validation ('+result.pageCount+' pages).');

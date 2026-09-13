@@ -4,7 +4,7 @@ import {hasModule,productionOf,dateLabel,clockLabel,money,expenseTotals,type Cre
 import {timeLabel,type Project} from './shot-list';
 import {orderedShots,renderShotSheet} from './shot-sheet';
 
-import {PDF_SECTIONS,type PdfSection,type ExportProject} from './export-model';
+import {PDF_SECTIONS,categoryTitle,type PdfSection,type ExportProject} from './export-model';
 export type PdfOptions={sections:PdfSection[];images:boolean;shotLayout?:'sheet'|'detail';shotOrder?:'shooting'|'scene';regularFont:Uint8Array;boldFont:Uint8Array;loadImage?:(id:string)=>Promise<{bytes:Uint8Array;mime:string}>;onProgress?:(text:string)=>void};
 const ink=rgb(.12,.18,.28),muted=rgb(.40,.47,.57),blue=rgb(.25,.39,.64),line=rgb(.85,.89,.94);
 const W=612,H=792,M=48,BOTTOM=54,WIDTH=W-2*M;
@@ -36,8 +36,8 @@ class Pages {
  facts(items:[string,string|number][]) {
   const width=(WIDTH-22)/2;
   for(let i=0;i<items.length;i+=2){const row=items.slice(i,i+2);const lines=row.map(([,v])=>this.wrap(String(v||'Not set'),10,width));
-   if(lines.some(l=>l.length>18)){for(const [label,value]of row){this.heading(label);this.text(String(value||'Not set'));}continue;}
-   const labels=row.map(([label])=>this.wrap(label.toUpperCase(),8,width,this.bold));const labelHeight=Math.max(...labels.map(l=>l.length))*12;
+   if(lines.some(l=>l.length>18)){for(const [label,value]of row){this.heading(categoryTitle(label));this.text(String(value||'Not set'));}continue;}
+   const labels=row.map(([label])=>this.wrap(categoryTitle(label),8,width,this.bold));const labelHeight=Math.max(...labels.map(l=>l.length))*12;
    const height=labelHeight+11+Math.max(...lines.map(l=>l.length))*15;this.need(height+8);
    row.forEach((_,col)=>{const x=M+col*(width+22);labels[col].forEach((label,j)=>this.page.drawText(label,{x,y:this.y-9-j*12,size:8,font:this.bold,color:muted}));lines[col].forEach((s,j)=>this.page.drawText(s,{x,y:this.y-labelHeight-16-j*15,size:10,font:this.font,color:ink}));});this.y-=height+10;
   }
@@ -58,12 +58,12 @@ export async function createProjectPdf(entries:ExportProject[],options:PdfOption
   if(!sections.length){warnings.add(project.title+': none of the selected sections are enabled.');continue;}
   for(const section of sections){
    if(section.key==='shots'&&options.shotLayout!=='detail'){await renderShotSheet(project,options,doc,font,bold,p,warnings);continue;}
-   p.projectTitle=project.title;p.sectionTitle=section.label;p.newPage();p.title(project.title);p.text(section.label,13,blue,true);p.gap(18);options.onProgress?.(project.title+' / '+section.label);
+   p.projectTitle=project.title;p.sectionTitle=section.key==='shots'?'Shot Breakdown':section.label;p.newPage();p.title(project.title);p.text(p.sectionTitle,13,blue,true);p.gap(18);options.onProgress?.(project.title+' / '+p.sectionTitle);
    if(section.key==='overview'){
     p.facts([['Client',project.client||'Smooth Studios'],['Shoot date',dateLabel(project.date)],['Stage',pd.stage],['Deadline',pd.due?dateLabel(pd.due):'Not set'],['Shots',project.shots.length],['Team members',crew.length]]);
-    if(project.brief){p.heading('Project notes');p.text(project.brief);}
-    p.heading('Project team');if(!crew.length)p.text('No team members tagged.');for(const m of crew){p.text(m.name+' / '+m.role,11,ink,true);if(m.phone)p.text(m.phone,9,muted);p.gap(8);}
-    p.heading('Included project sections');p.text(PDF_SECTIONS.filter(s=>hasModule(project,s.key)).map(s=>s.label).join('\n'));
+    if(project.brief){p.heading('Project Notes');p.text(project.brief);}
+    p.heading('Project Team');if(!crew.length)p.text('No team members tagged.');for(const m of crew){p.text(m.name+' / '+m.role,11,ink,true);if(m.phone)p.text(m.phone,9,muted);p.gap(8);}
+    p.heading('Included Project Sections');p.text(PDF_SECTIONS.filter(s=>hasModule(project,s.key)).map(s=>s.label).join('\n'));
    }
    if(section.key==='shots'){
     const shots=orderedShots(project,options.shotOrder);
@@ -80,21 +80,21 @@ export async function createProjectPdf(entries:ExportProject[],options:PdfOption
     }
    }
    if(section.key==='crew'){
-    p.heading('Crew assignments');if(!crew.length)p.text('No team members assigned.');for(const m of crew){p.need(85);p.text(m.name,12,ink,true);p.facts([['Role',m.role],['Call',clockLabel(m.callTime||pd.callSheet.call)],['Phone',m.phone||'Not set']]);p.rule();}
-    p.heading('Task checklist');if(!pd.tasks.length)p.text('No tasks added.');for(const t of pd.tasks){p.need(100);p.heading(t.title);p.facts([['Status',t.status],['Department',t.department],['Assigned to',crew.find(m=>m.id===t.assignee)?.name||'Unassigned'],['Due',t.due?dateLabel(t.due):'Not set']]);if(t.notes)p.text(t.notes);p.rule();}
+    p.heading('Crew Assignments');if(!crew.length)p.text('No team members assigned.');for(const m of crew){p.need(85);p.text(m.name,12,ink,true);p.facts([['Role',m.role],['Call',clockLabel(m.callTime||pd.callSheet.call)],['Phone',m.phone||'Not set']]);p.rule();}
+    p.heading('Task Checklist');if(!pd.tasks.length)p.text('No tasks added.');for(const t of pd.tasks){p.need(100);p.heading(t.title);p.facts([['Status',t.status],['Department',t.department],['Assigned to',crew.find(m=>m.id===t.assignee)?.name||'Unassigned'],['Due',t.due?dateLabel(t.due):'Not set']]);if(t.notes)p.text(t.notes);p.rule();}
    }
    if(section.key==='files'){
     if(!pd.documents.length)p.text('No written documents added.');for(const d of pd.documents){p.heading(d.title);p.text(d.kind,9,muted);p.gap(9);if(d.content)p.text(d.content);if(d.url){p.gap(9);p.text('Working link: '+d.url,9,blue);}p.rule();}
-    p.heading('Uploaded file list');p.text('Uploaded file contents are stored separately in the dashboard.',9,muted);p.gap(10);if(!files.length)p.text('No uploaded files.');for(const f of files){p.text(f.name,10,ink,true);p.text(f.category+' / '+(f.size/1048576).toFixed(2)+' MB',9,muted);p.gap(10);}
+    p.heading('Uploaded Files');p.text('Uploaded file contents are stored separately in the dashboard.',9,muted);p.gap(10);if(!files.length)p.text('No uploaded files.');for(const f of files){p.text(f.name,10,ink,true);p.text(f.category+' / '+(f.size/1048576).toFixed(2)+' MB',9,muted);p.gap(10);}
    }
    if(section.key==='schedule'){
-    const c=pd.callSheet;p.heading('Call sheet');p.facts([['Shoot date',dateLabel(c.date||project.date)],['Time zone',pd.timezone.replaceAll('_',' ')],['General call',clockLabel(c.call)],['Estimated wrap',clockLabel(c.wrap)],['Location',c.location],['Address',c.address],['Contact',c.contactName],['Phone',c.contactPhone]]);
-    for(const [label,value]of [['Parking & arrival',c.parking],['Safety & emergency information',c.safety],['Production notes',c.notes]])if(value){p.heading(label);p.text(value);}
-    if(crew.length){p.heading('Crew calls');for(const m of crew)p.text(m.name+' / '+m.role+' / '+clockLabel(m.callTime||c.call));}
-    p.heading('Shoot schedule');if(!pd.schedule.length)p.text('No schedule blocks added.');for(const b of [...pd.schedule].sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start))){p.need(95);p.heading(b.title);p.text(dateLabel(b.date)+' / '+clockLabel(b.start)+' - '+clockLabel(b.end),10,blue);p.text(b.type+(b.location?' / '+b.location:''),9,muted);if(b.shotIds.length)p.text('Shots: '+b.shotIds.map(id=>{const s=project.shots.find(s=>s.id===id);return s?s.scene+'.'+s.number:'Removed shot';}).join(', '),9);if(b.notes){p.gap(7);p.text(b.notes);}p.rule();}
+    const c=pd.callSheet;p.heading('Call Sheet');p.facts([['Shoot date',dateLabel(c.date||project.date)],['Time zone',pd.timezone.replaceAll('_',' ')],['General call',clockLabel(c.call)],['Estimated wrap',clockLabel(c.wrap)],['Location',c.location],['Address',c.address],['Contact',c.contactName],['Phone',c.contactPhone]]);
+    for(const [label,value]of [['Parking & Arrival',c.parking],['Safety & Emergency Information',c.safety],['Production Notes',c.notes]])if(value){p.heading(label);p.text(value);}
+    if(crew.length){p.heading('Crew Calls');for(const m of crew)p.text(m.name+' / '+m.role+' / '+clockLabel(m.callTime||c.call));}
+    p.heading('Shoot Schedule');if(!pd.schedule.length)p.text('No schedule blocks added.');for(const b of [...pd.schedule].sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start))){p.need(95);p.heading(b.title);p.text(dateLabel(b.date)+' / '+clockLabel(b.start)+' - '+clockLabel(b.end),10,blue);p.text(b.type+(b.location?' / '+b.location:''),9,muted);if(b.shotIds.length)p.text('Shots: '+b.shotIds.map(id=>{const s=project.shots.find(s=>s.id===id);return s?s.scene+'.'+s.number:'Removed shot';}).join(', '),9);if(b.notes){p.gap(7);p.text(b.notes);}p.rule();}
    }
    if(section.key==='budget'){
-    const total=expenseTotals(pd.expenses);p.facts([['Approved budget',money(pd.budgetCents)],['Planned costs',money(total.planned)],['Actual spend',money(total.actual)],['Paid',money(total.paid)],['Unpaid',money(total.actual-total.paid)],['Remaining',money(pd.budgetCents-total.actual)]]);p.heading('Expense breakdown');if(!pd.expenses.length)p.text('No expenses added.');for(const e of pd.expenses){p.need(110);p.heading(e.title);p.facts([['Category',e.category],['Vendor',e.vendor||'Not set'],['Planned',money(e.plannedCents)],['Actual',money(e.actualCents)],['Payment',e.paid?'Paid':'Unpaid'],['Date',e.date?dateLabel(e.date):'Not set']]);if(e.notes)p.text(e.notes);p.rule();}
+    const total=expenseTotals(pd.expenses);p.facts([['Approved budget',money(pd.budgetCents)],['Planned costs',money(total.planned)],['Actual spend',money(total.actual)],['Paid',money(total.paid)],['Unpaid',money(total.actual-total.paid)],['Remaining',money(pd.budgetCents-total.actual)]]);p.heading('Expense Breakdown');if(!pd.expenses.length)p.text('No expenses added.');for(const e of pd.expenses){p.need(110);p.heading(e.title);p.facts([['Category',e.category],['Vendor',e.vendor||'Not set'],['Planned',money(e.plannedCents)],['Actual',money(e.actualCents)],['Payment',e.paid?'Paid':'Unpaid'],['Date',e.date?dateLabel(e.date):'Not set']]);if(e.notes)p.text(e.notes);p.rule();}
    }
   }
  }
