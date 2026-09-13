@@ -54,7 +54,6 @@ export async function renderShotSheet(project:Project,options:PdfOptions,doc:PDF
   let x=M;
   headers.forEach((header,col)=>{header.split('\n').forEach((s,i)=>page.drawText(s,{x:x+PAD,y:y-11-i*8,size:7.2,font:bold,color:blue}));x+=widths[col];});
   y-=26;capacity=y-BOTTOM;
-  page.drawText('Setup estimates exclude takes and breaks.',{x:M,y:43,size:7,font,color:muted});
  };
  newPage();
  if(!shots.length){page!.drawText('No shots added yet.',{x:M+PAD,y:y-24,size:10,font,color:muted});return;}
@@ -63,9 +62,10 @@ export async function renderShotSheet(project:Project,options:PdfOptions,doc:PDF
   const cells:Item[][]=widths.map(()=>[]);
   if(shot.description)cells[2].push(...lines(shot.description,2,8.8));
   for(const field of project.fields){
+   if(field.key==='location')continue;
    const value=shot.values[field.key];if(!value?.trim())continue;
    const group=field.group.toLowerCase();
-   const col=['notes','takes'].includes(field.key)||group==='notes'?notesCol:['location','talent','props','wardrobe'].includes(field.key)||group.includes('production')?2:3;
+   const col=['notes','takes'].includes(field.key)||group==='notes'?notesCol:['talent','props','wardrobe'].includes(field.key)||group.includes('production')?2:3;
    const shortLabels:Record<string,string>={angle:'Angle',direction:'Direction',style:'Style',notes:'Director',takes:'Takes'};
    const label=field.custom?field.label:shortLabels[field.key]||field.label;
    if(col===3&&cells[col].length)cells[col].push({kind:'divider',height:5});
