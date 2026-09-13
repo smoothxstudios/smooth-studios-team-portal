@@ -41,6 +41,7 @@ import {
   TriangleAlert,
   Users,
   WalletCards,
+  X,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +75,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -125,13 +127,39 @@ type AppointmentStatus = RentalState | "customer-paid" | "upcoming-paid" | "depo
 type PaymentFilter = "all" | CustomerPaymentState;
 
 const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ownerOnly?: boolean }[] = [
-  { key: "scheduling", label: "Team Schedule", icon: CalendarDays },
   { key: "overview", label: "Overview", icon: LayoutDashboard },
+  { key: "scheduling", label: "Team Schedule", icon: CalendarDays },
   { key: "rentals", label: "Appointments", icon: CalendarDays },
   { key: "team", label: "Team", icon: Users, ownerOnly: true },
   { key: "payouts", label: "Payouts", icon: WalletCards },
   { key: "guide", label: "Studio Guide", icon: BookOpen },
 ];
+
+function DashboardNavigation({ isOwner, view, onNavigate }: { isOwner: boolean; view: ViewKey; onNavigate: (view: ViewKey) => void }) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  const closeMobileMenu = () => { if (isMobile) setOpenMobile(false); };
+
+  return <nav aria-label="Dashboard sections"><SidebarMenu className="studio-nav">
+    {NAV_ITEMS.filter(item => !item.ownerOnly || isOwner).map(item => (
+      <SidebarMenuItem key={item.key}>
+        <SidebarMenuButton aria-current={view === item.key ? "page" : undefined} isActive={view === item.key}
+          onClick={() => { onNavigate(item.key); closeMobileMenu(); }} tooltip={item.label}>
+          <item.icon /><span>{item.label}</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    ))}
+    <SidebarMenuItem><SidebarMenuButton asChild tooltip="Production dashboard">
+      <a href="https://smooth-studios-production.smoothxstudios.workers.dev" target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu}>
+        <Link2 /><span>Productions</span>
+      </a>
+    </SidebarMenuButton></SidebarMenuItem>
+  </SidebarMenu></nav>;
+}
+
+function CloseMobileMenu() {
+  const { isMobile, setOpenMobile } = useSidebar();
+  return isMobile ? <Button className="mobile-sidebar-close" variant="ghost" size="icon" aria-label="Close navigation" onClick={() => setOpenMobile(false)}><X /></Button> : null;
+}
 
 function dollars(cents: number, exact = false) {
   return (exact ? MONEY_EXACT : MONEY).format(cents / 100);
@@ -532,19 +560,19 @@ function PaymentAmount({ rental, showDetails }: { rental: Rental; showDetails: b
 
 function RentalTable({ rentals, employeeId }: { rentals: Rental[]; employeeId?: string }) {
   return (
-    <Table className="rental-table">
-      <TableHeader><TableRow><TableHead>Appointment</TableHead><TableHead>Category</TableHead><TableHead>Date & time</TableHead><TableHead>{employeeId ? "Price" : "Price / recorded payment"}</TableHead><TableHead>{employeeId ? "Your 30%" : "Assigned team"}</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-      <TableBody>
+    <Table className="rental-table" role="table" aria-label="Appointments">
+      <TableHeader role="rowgroup"><TableRow role="row"><TableHead role="columnheader">Appointment</TableHead><TableHead role="columnheader">Category</TableHead><TableHead role="columnheader">Date & time</TableHead><TableHead role="columnheader">{employeeId ? "Price" : "Price / recorded payment"}</TableHead><TableHead role="columnheader">{employeeId ? "Your 30%" : "Assigned team"}</TableHead><TableHead role="columnheader">Status</TableHead></TableRow></TableHeader>
+      <TableBody role="rowgroup">
         {rentals.map((rental) => (
-          <TableRow key={rental.id}>
-            <TableCell><div className="rental-name"><strong>{rental.customer}</strong><span>{rental.title}</span></div></TableCell>
-            <TableCell><CategoryBadge rental={rental} /></TableCell>
-            <TableCell><div className="rental-date"><strong>{formatDate(rental.start, true)}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div></TableCell>
-            <TableCell className="money-cell"><PaymentAmount rental={rental} showDetails={!employeeId} /></TableCell>
-            <TableCell>
-              {employeeId ? <strong className="share-amount">{dollars(rental.employeePayouts[employeeId]?.amountCents ?? 0, true)}</strong> : <div className="avatar-stack">{rental.assignedEmployeeIds.length ? rental.assignedEmployeeIds.map((id) => <span key={id} style={{ background: teamAccent(id) }}>{id.slice(0, 1).toUpperCase()}</span>) : <em>Unassigned</em>}</div>}
+          <TableRow key={rental.id} role="row">
+            <TableCell className="rental-name-cell" role="cell"><div className="rental-name"><strong>{rental.customer}</strong><span>{rental.title}</span></div></TableCell>
+            <TableCell className="rental-category-cell" role="cell"><CategoryBadge rental={rental} /></TableCell>
+            <TableCell className="rental-date-cell" data-label="Date & time" role="cell"><div className="rental-date"><strong>{formatDate(rental.start, true)}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div></TableCell>
+            <TableCell className="money-cell" data-label={employeeId ? "Price" : "Price / payment"} role="cell"><PaymentAmount rental={rental} showDetails={!employeeId} /></TableCell>
+            <TableCell data-label={employeeId ? "Your 30%" : "Assigned team"} role="cell">
+              {employeeId ? <strong className="share-amount">{dollars(rental.employeePayouts[employeeId]?.amountCents ?? 0, true)}</strong> : <div className="avatar-stack">{rental.assignedEmployeeIds.length ? rental.assignedEmployeeIds.map((id) => <span aria-label={FALLBACK_PROFILES.find(profile => profile.id === id)?.label ?? id} key={id} style={{ background: teamAccent(id) }}>{id.slice(0, 1).toUpperCase()}</span>) : <em>Unassigned</em>}</div>}
             </TableCell>
-            <TableCell><StatusBadge state={appointmentStatus(rental, employeeId)} /></TableCell>
+            <TableCell className="rental-status-cell" data-label="Status" role="cell"><StatusBadge state={appointmentStatus(rental, employeeId)} /></TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -917,6 +945,7 @@ function StripeMatchForm({
 
 function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string; schedulingToken: string }) {
   const [view, setView] = useState<ViewKey>("overview");
+  useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }, [view]);
   useEffect(() => {
     const openSchedule = () => { if (window.location.hash === "#scheduling") setView("scheduling"); };
     openSchedule();
@@ -979,7 +1008,6 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
   }, [employeeId, visibleRentals]);
 
   const recent = visibleRentals.slice(0, 6);
-  const navItems = NAV_ITEMS.filter((item) => !item.ownerOnly || isOwner);
   const displayName = payload.user.name;
 
   const openWorkflow = (request: OwnerWorkflowRequest) => {
@@ -1057,12 +1085,9 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
   return (
     <SidebarProvider>
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
-        <SidebarHeader className="sidebar-brand"><Logo compact /><span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span></SidebarHeader>
+        <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact /><span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span></SidebarHeader>
         <SidebarContent>
-          <SidebarGroup><SidebarGroupContent><SidebarMenu className="studio-nav">
-            {navItems.map((item) => <SidebarMenuItem key={item.key}><SidebarMenuButton isActive={view === item.key} onClick={() => setView(item.key)} tooltip={item.label}><item.icon /><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}
-            <SidebarMenuItem><SidebarMenuButton asChild tooltip="Production dashboard"><a href="https://smooth-studios-production.smoothxstudios.workers.dev" target="_blank" rel="noopener noreferrer"><Link2 /><span>Productions</span></a></SidebarMenuButton></SidebarMenuItem>
-          </SidebarMenu></SidebarGroupContent></SidebarGroup>
+          <SidebarGroup><SidebarGroupContent><DashboardNavigation isOwner={isOwner} view={view} onNavigate={setView} /></SidebarGroupContent></SidebarGroup>
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
           <ThemeControl dark={dark} onChange={setDark} />
@@ -1072,8 +1097,8 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
 
       <SidebarInset className="dashboard-main">
         <header className="dashboard-topbar">
-          <div className="topbar-title"><SidebarTrigger className="mobile-menu-trigger"><Menu /></SidebarTrigger><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : "evening"}, ${displayName}` : NAV_ITEMS.find((item) => item.key === view)?.label}</h1></div></div>
-          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}{isOwner && <Button className="sync-now-button" onClick={openCalendarSync} size="sm" variant="outline"><RefreshCw size={15} /><span>Sync now</span></Button>}<div className="date-chip"><CalendarDays size={15} /><span>Jan–Dec 2026</span></div></div>
+          <div className="topbar-title"><SidebarTrigger className="mobile-menu-trigger" aria-label="Open navigation"><Menu /></SidebarTrigger><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : "evening"}, ${displayName}` : NAV_ITEMS.find((item) => item.key === view)?.label}</h1></div></div>
+          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}{isOwner && <Button className="sync-now-button" aria-label="Sync now" onClick={openCalendarSync} size="sm" variant="outline"><RefreshCw size={15} /><span>Sync now</span></Button>}<div className="date-chip"><CalendarDays size={15} /><span>Jan–Dec 2026</span></div></div>
         </header>
 
         <div className="dashboard-content">
