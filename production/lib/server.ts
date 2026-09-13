@@ -19,10 +19,11 @@ export async function identity(request:Request,allowPasswordChange=false):Promis
 }
 export async function admin(request:Request){const u=await identity(request);if(!u.admin)throw new RequestError("Only Smooth can manage projects and team accounts.",403);return u;}
 export type ProjectRow={id:string;owner:string;data:string;revision:number;updated_at:number;can_edit:number};
-export async function requireProject(id:string,u:SessionUser,access:"read"|"edit"="read"):Promise<ProjectRow>{
-  const row=await db().prepare("SELECT p.*, (p.owner = ? OR ? = 1 OR EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id AND m.email = ?)) AS can_edit FROM projects p WHERE p.id = ?").bind(u.id,u.admin?1:0,u.email,id).first<ProjectRow>();
+// Bind the signed-in user's id, owner flag, and email. The project alias is always p.
+export const PROJECT_ACCESS_SQL="(p.owner = ? OR ? = 1 OR EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id AND m.email = ?))";
+export async function requireProject(id:string,u:SessionUser,_access:"read"|"edit"="read"):Promise<ProjectRow>{
+  const row=await db().prepare("SELECT p.*, 1 AS can_edit FROM projects p WHERE p.id = ? AND "+PROJECT_ACCESS_SQL).bind(id,u.id,u.admin?1:0,u.email).first<ProjectRow>();
   if(!row)throw new RequestError("Project not found.",404);
-  if(access==="edit"&&!row.can_edit)throw new RequestError("You can view this production. Only assigned team members can edit it.",403);
   return row;
 }
 export async function readJSON(request:Request,limit=1000000){const raw=await request.text();if(raw.length>limit)throw new RequestError("This update is too large.",413);try{return JSON.parse(raw);}catch{throw new RequestError("Invalid request data.");}}
@@ -49,7 +50,7 @@ export async function checkImages(p:Project,user:SessionUser,previous?:Project){
   const ids=[...new Set(p.shots.flatMap(s=>s.references.map(r=>r.id)))];
   if(!ids.length)return;
   const prior=new Set(previous?.shots.flatMap(s=>s.references.map(r=>r.id))||[]);
-  const accessible=await db().prepare("SELECT p.id FROM projects p WHERE p.owner = ? OR ? = 1 OR EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id AND m.email = ?)").bind(user.id,user.admin?1:0,user.email).all<{id:string}>();
+  const accessible=await db().prepare("SELECT p.id FROM projects p WHERE "+PROJECT_ACCESS_SQL).bind(user.id,user.admin?1:0,user.email).all<{id:string}>();
   const allowed=new Set(accessible.results.map(p=>p.id));
   for(let i=0;i<ids.length;i+=50){const chunk=ids.slice(i,i+50);const rows=await db().prepare("SELECT id, owner, project_id FROM images WHERE id IN ("+chunk.map(()=>"?").join(",")+")").bind(...chunk).all<{id:string;owner:string;project_id:string|null}>();
     if(rows.results.length!==chunk.length||rows.results.some(r=>!user.admin&&!prior.has(r.id)&&!(r.project_id?allowed.has(r.project_id):r.owner===user.id)))throw new RequestError("A reference image is unavailable to this project. Remove it or upload a new copy.");

@@ -1,11 +1,12 @@
 "use client";
 import type {ReactNode} from "react";
 import {Select, SelectTrigger, SelectValue, SelectContent, SelectItem} from "@/components/ui/select";
+export class RequestFailure extends Error {constructor(message:string,public status:number){super(message);}}
 export async function request<T>(url:string, method="GET", body?:unknown):Promise<T>{
   const r=await fetch(url,{method,headers:body?{"Content-Type":"application/json"}:undefined,body:body?JSON.stringify(body):undefined,cache:"no-store"});
   let d:any;try{d=await r.json();}catch{throw new Error("The connection was interrupted. Please try again.");}
   if(r.status===401)window.dispatchEvent(new Event("account-expired"));
-  if(!r.ok)throw new Error(d.error||"Something went wrong. Please try again.");return d;
+  if(!r.ok)throw new RequestFailure(d.error||"Something went wrong. Please try again.",r.status);return d;
 }
 export function errorText(e:unknown){return e instanceof Error?e.message:"Please try again.";}
 export function Choice({value,onChange,options,label,empty,disabled,className=""}:{value:string;onChange:(v:string)=>void;options:string[];label:string;empty?:string;disabled?:boolean;className?:string}){

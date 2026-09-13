@@ -18,7 +18,7 @@ import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/
 import { Progress } from "@/components/ui/progress";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import {request,errorText,Choice,FormField} from "@/components/production-ui";
+import {request,errorText,Choice,FormField,RequestFailure} from "@/components/production-ui";
 import {uploadReference} from "@/lib/uploads";
 import {AccountActions} from "@/components/accounts";
 import {ProductionProjects,ProductionModules,SECTION_LABELS,type ProductionSection} from "@/components/production-panels";
@@ -45,25 +45,51 @@ function ShotWorkspace(){
   const [confirm,setConfirm]=useState<{title:string;description:string;action:()=>Promise<void>}|null>(null);
   const canEdit=!!user?.admin||project?.canEdit===true;
   const locked=useRef(false);const requestSeq=useRef(0);const {setOpenMobile}=useSidebar();
+  const clearOpenProject=useCallback(()=>{
+    ++requestSeq.current;setProject(null);setEditor(null);setCustomize(false);setProjectDialog(null);setExportScope(null);setConfirm(null);setSection("projects");setSaveError("");setLoadError("");setLoading(false);
+  },[]);
 
   const loadProject=useCallback(async(id?:string)=>{
     const seq=++requestSeq.current;setLoading(true);setLoadError("");setSaveError("");
     try{
       const [list,session]=await Promise.all([request<{projects:ProjectSummary[]}>("/api/projects"),request<{user:SessionUser}>("/api/session")]);
-      const current=id||list.projects[0]?.id;
-      const p=current?(await request<{project:Project}>("/api/projects/"+current)).project:session.user.admin?exampleProject():null;
+      const current=id?list.projects.find(p=>p.id===id)?.id:list.projects[0]?.id;
+      const p=current?(await request<{project:Project}>("/api/projects/"+current)).project:session.user.admin&&!id?exampleProject():null;
       if(seq!==requestSeq.current)return;setEditor(null);setCustomize(false);setProjectDialog(null);setUser(session.user);setProjects(list.projects);setProject(p);setScene("All scenes");setStatus("All statuses");setPriority("All priorities");setLocation("All locations");setQuery("");if(!p)setSection("projects");
-    }catch(e){if(seq===requestSeq.current)setLoadError(errorText(e));}finally{if(seq===requestSeq.current)setLoading(false);}
-  },[]);
+      if(id&&!current){setExportScope(null);setConfirm(null);toast.info("This production is no longer available to your account.");}
+    }catch(e){if(seq===requestSeq.current){if(e instanceof RequestFailure&&[401,403,404].includes(e.status)){clearOpenProject();setProjects([]);}else setLoadError(errorText(e));}}finally{if(seq===requestSeq.current)setLoading(false);}
+  },[clearOpenProject]);
   useEffect(()=>{loadProject();},[loadProject]);
+  useEffect(()=>{
+    if(!user||user.admin)return;
+    let stopped=false,pending=false;
+    let knownIds=new Set(projects.map(p=>p.id));
+    async function refreshAccess(){
+      if(pending||document.visibilityState==="hidden")return;
+      pending=true;const seq=requestSeq.current;
+      try{
+        const result=await request<{projects:ProjectSummary[]}>("/api/projects");
+        if(stopped||seq!==requestSeq.current)return;
+        const nextIds=new Set(result.projects.map(p=>p.id));
+        if([...knownIds].some(id=>!nextIds.has(id)))setExportScope(null);
+        knownIds=nextIds;setProjects(result.projects);
+        if(project&&!nextIds.has(project.id)){clearOpenProject();toast.info("Your access to this production has changed.");}
+      }catch(e){if(!stopped&&seq===requestSeq.current&&e instanceof RequestFailure&&[401,403].includes(e.status)){clearOpenProject();setProjects([]);}}
+      finally{pending=false;}
+    }
+    const timer=window.setInterval(refreshAccess,30000);
+    window.addEventListener("focus",refreshAccess);document.addEventListener("visibilitychange",refreshAccess);
+    return()=>{stopped=true;window.clearInterval(timer);window.removeEventListener("focus",refreshAccess);document.removeEventListener("visibilitychange",refreshAccess);};
+  },[user?.id,user?.admin,project?.id,clearOpenProject]);
   async function persist(p:Project,message?:string,teamAccountIds?:string[]){
     if(!user?.admin&&p.canEdit!==true){toast.error("Only assigned team members can edit this production.");return false;}
-    if(locked.current)return false;locked.current=true;setSaving(true);setSaveError("");
+    if(locked.current)return false;locked.current=true;setSaving(true);setSaveError("");const seq=requestSeq.current;
     try{
       const result=await request<{project:Project}>(p.revision?"/api/projects/"+p.id:"/api/projects",p.revision?"PUT":"POST",teamAccountIds?{...p,teamAccountIds}:p);
+      if(seq!==requestSeq.current)return false;
       setProject(result.project);setProjects(prev=>[summarize(result.project),...prev.filter(x=>x.id!==p.id)]);
       if(message)toast.success(message);return true;
-    }catch(e){setSaveError(errorText(e));toast.error(errorText(e));return false;}
+    }catch(e){if(seq!==requestSeq.current)return false;if(e instanceof RequestFailure&&e.status===404){clearOpenProject();setProjects(prev=>prev.filter(x=>x.id!==p.id));toast.error("This production is no longer available to your account.");}else{setSaveError(errorText(e));toast.error(errorText(e));}return false;}
     finally{locked.current=false;setSaving(false);}
   }
   async function saveShot(shot:Shot){
@@ -102,19 +128,18 @@ function ShotWorkspace(){
     <Sidebar className="studio-sidebar">
       <SidebarHeader className="brand"><div className="brand-mark"><Clapperboard size={21}/></div><div><strong className="dashboard-brand-title">Production Dashboard</strong><small>SMOOTH STUDIOS</small></div></SidebarHeader>
       <SidebarContent>
-        <SidebarGroup><SidebarGroupLabel>WORKSPACE</SidebarGroupLabel><SidebarMenu><SidebarMenuItem><SidebarMenuButton isActive={section==="projects"} className="main-nav" onClick={()=>navigate("projects")} disabled={saving}><LayoutDashboard/><span>All productions</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu></SidebarGroup>
+        <SidebarGroup><SidebarGroupLabel>WORKSPACE</SidebarGroupLabel><SidebarMenu><SidebarMenuItem><SidebarMenuButton isActive={section==="projects"} className="main-nav" onClick={()=>navigate("projects")} disabled={saving}><LayoutDashboard/><span>{user?.admin?"All productions":"Your productions"}</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu></SidebarGroup>
         {project&&section!=="projects"&&section!=="settings"&&<SidebarGroup><SidebarGroupLabel>THIS PRODUCTION</SidebarGroupLabel><SidebarMenu>{projectSections.filter(([key])=>hasModule(project,key)).map(([key,Icon])=><SidebarMenuItem key={key}><SidebarMenuButton isActive={section===key} disabled={saving||loading} onClick={()=>navigate(key)}><Icon/><span>{SECTION_LABELS[key]}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>}
         <SidebarGroup><div className="sidebar-label-row"><SidebarGroupLabel>PROJECTS</SidebarGroupLabel>{user?.admin&&<Button variant="ghost" size="icon" aria-label="New production" disabled={saving||loading} onClick={()=>setProjectDialog("new")}><Plus size={16}/></Button>}</div><SidebarMenu>{listed.map(p=><SidebarMenuItem key={p.id}><SidebarMenuButton isActive={p.id===project?.id&&section!=="projects"} className="project-nav" disabled={saving||loading} onClick={()=>openProduction(p.id)}><FolderOpen/><span>{p.title}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>
         {section==="shots"&&scenes.length>0&&<SidebarGroup><SidebarGroupLabel>SCENES</SidebarGroupLabel><SidebarMenu><SidebarMenuItem><SidebarMenuButton isActive={scene==="All scenes"} onClick={()=>{setScene("All scenes");setOpenMobile(false);}}><Film/><span>All scenes</span><span className="side-count">{allShots.length}</span></SidebarMenuButton></SidebarMenuItem>{scenes.map(s=><SidebarMenuItem key={s}><SidebarMenuButton isActive={scene===s} onClick={()=>{setScene(s);setOpenMobile(false);}}><span className="scene-number">{s.padStart(2,"0")}</span><span>Scene {s}</span><span className="side-count">{allShots.filter(x=>x.scene===s).length}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>}
       </SidebarContent>
-      <SidebarFooter className="production-sidebar-footer"><SidebarMenu><SidebarMenuItem><SidebarMenuButton isActive={section==="settings"} onClick={()=>navigate("settings")} disabled={saving}><Settings size={17}/><span>Settings</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu><div className="side-footer"><span className="owner-avatar">S</span><div><strong>Smooth Studios</strong><small>{user?.admin?"Owner · All projects":"Team · All productions"}</small></div></div></SidebarFooter>
+      <SidebarFooter className="production-sidebar-footer"><SidebarMenu><SidebarMenuItem><SidebarMenuButton isActive={section==="settings"} onClick={()=>navigate("settings")} disabled={saving}><Settings size={17}/><span>Settings</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu><div className="side-footer"><span className="owner-avatar">S</span><div><strong>Smooth Studios</strong><small>{user?.admin?"Owner · All projects":"Team · Tagged projects"}</small></div></div></SidebarFooter>
     </Sidebar>
     <main className="workspace-main">
-      <header className="topbar"><div className="breadcrumb"><SidebarTrigger aria-label="Toggle project navigation"/><span>Productions</span><ChevronRight size={14}/><strong>{SECTION_LABELS[section]}</strong></div><span className="save-state" role="status">{saving?<><Loader2 size={14} className="spin"/>Saving…</>:saveError?<><X size={14}/>Not saved</>:project?.revision?<><CheckCheck size={16}/>Saved</>:null}</span><AccountActions/></header>
+      <header className="topbar"><div className="breadcrumb"><SidebarTrigger aria-label="Toggle project navigation"/><span>Productions</span><ChevronRight size={14}/><strong>{section==="projects"&&!user?.admin?"Your productions":SECTION_LABELS[section]}</strong></div><span className="save-state" role="status">{saving?<><Loader2 size={14} className="spin"/>Saving…</>:saveError?<><X size={14}/>Not saved</>:project?.revision?<><CheckCheck size={16}/>Saved</>:null}</span><AccountActions/></header>
       {loading?<div className="workspace-loading"><Loader2 className="spin"/><p>Opening your productions…</p></div>:loadError?<Empty><EmptyHeader><EmptyMedia variant="icon"><FolderOpen/></EmptyMedia><EmptyTitle>Couldn’t open your projects</EmptyTitle><EmptyDescription>{loadError}</EmptyDescription></EmptyHeader><Button onClick={()=>loadProject()}>Try again</Button></Empty>:section==="settings"?<DashboardSettings admin={!!user?.admin}/>:section==="projects"?<ProductionProjects projects={listed} admin={!!user?.admin} onNew={()=>setProjectDialog("new")} onOpen={openProduction} onExport={()=>setExportScope("all")}/>:project&&user&&<>
         <section className="project-heading"><div><div className="eyebrow">{SECTION_LABELS[section].toUpperCase()}</div><div className="title-line"><h1>{project.title}</h1>{canEdit&&<Button variant="ghost" size="icon" aria-label="Edit project details" onClick={()=>setProjectDialog("edit")} disabled={saving}><Pencil size={17}/></Button>}</div><div className="project-meta"><span><Clapperboard size={14}/>{project.client||"Smooth Studios"}</span><span><CalendarDays size={14}/>{project.date?new Date(project.date+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}):"Shoot date not set"}</span><span className="project-stage">{productionOf(project).stage}</span></div></div><div className="project-actions"><Button variant="outline" onClick={()=>setExportScope("current")} disabled={saving}><Download size={16}/>Export PDF</Button>{user.admin&&<><Button className="new-production-action" variant="outline" onClick={()=>setProjectDialog("new")} disabled={saving}><Plus/>New production</Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" aria-label="Project actions" disabled={saving}><MoreHorizontal/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>setProjectDialog("edit")}><Pencil/>Project details</DropdownMenuItem><DropdownMenuItem onSelect={()=>setProjectDialog("copy")}><Copy/>Copy shot list to new project</DropdownMenuItem>{project.revision>0&&<><DropdownMenuSeparator/><DropdownMenuItem variant="destructive" onSelect={()=>setConfirm({title:"Delete this production?",description:"This removes the shot list, crew assignments, tasks, schedules, documents, and expenses for "+project.title+". This cannot be undone.",action:async()=>{try{await request("/api/projects/"+project.id,"DELETE");await loadProject();setSection("projects");toast.success("Production deleted");}catch(e){toast.error(errorText(e));}}})}><Trash2/>Delete production</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu></>}</div></section>
         <div className="mobile-section-picker"><Choice label="Project section" value={SECTION_LABELS[section]} options={projectSections.filter(([key])=>hasModule(project,key)).map(([key])=>SECTION_LABELS[key])} onChange={label=>{const item=projectSections.find(([key])=>SECTION_LABELS[key]===label);if(item)navigate(item[0]);}}/></div>
-        {!canEdit&&<div className="module-notice project-view-notice"><Eye size={18}/><p><strong>View only</strong>Everyone on the team can view this production. Assigned members can edit.</p></div>}
         {project.brief&&<p className="project-brief">{project.brief}</p>}
         {saveError&&<div className="error-banner" role="alert"><span>{saveError}</span><Button variant="ghost" size="icon" onClick={()=>setSaveError("")} aria-label="Dismiss error"><X size={16}/></Button></div>}
         {section!=="shots"?<ProductionModules key={project.id} section={section} project={project} user={user} canEdit={canEdit} save={persist} saving={saving} onSection={navigate}/>:<>
@@ -135,7 +160,7 @@ function ShotWorkspace(){
             </TableRow>)}</TableBody></Table></div><div className="mobile-shot-list">{filtered.map(shot=><article className={"mobile-shot-card "+(shot.status==="Complete"?"is-complete":"")} key={shot.id}><div className="mobile-shot-heading"><strong>Scene {shot.scene} / Shot {shot.number}</strong><ShotMenu shot={shot}/></div><div className="mobile-shot-status"><StatusControl shot={shot}/><Badge value={shot.priority} kind="priority"/></div>{shot.references.length>0&&<button className="mobile-shot-image" onClick={()=>openShot(shot,"images")} aria-label={"Reference images for shot "+shot.scene+"."+shot.number}><ReferenceImage image={shot.references[0]}/><span>{shot.references.length} reference{shot.references.length===1?"":"s"}</span></button>}<p className="mobile-shot-description">{shot.description||"No description yet."}</p><dl className="mobile-shot-facts">{project.fields.filter(f=>["size","angle","direction","movement"].includes(f.key)).map(f=><div key={f.key}><dt>{f.label}</dt><dd>{shot.values[f.key]||"Not set"}</dd></div>)}</dl><details className="mobile-shot-details"><summary>All shot details<ChevronDown size={16}/></summary><dl className="mobile-shot-facts"><div><dt>Shooting order</dt><dd>{shot.order}</dd></div><div><dt>Setup</dt><dd>{shot.setup} min</dd></div><div><dt>Duration</dt><dd>{timeLabel(shot.duration)}</dd></div>{project.fields.filter(f=>!["size","angle","direction","movement"].includes(f.key)).map(f=><div key={f.key} className={f.type==="textarea"?"wide":""}><dt>{f.label}</dt><dd>{shot.values[f.key]||"Not set"}</dd></div>)}</dl></details><Button variant="outline" onClick={()=>openShot(shot)}>{canEdit?<Pencil size={16}/>:<Eye size={16}/>} {canEdit?"Edit shot":"View shot"}</Button></article>)}</div>{canEdit&&<button className="add-table-row" onClick={addShot} disabled={saving}><Plus size={16}/>Add a shot</button>}</TabsContent>
             <TabsContent value="storyboard"><div className="storyboard-grid">{filtered.map(shot=><article key={shot.id} className={"shot-card "+(shot.status==="Complete"?"is-complete":"")}><div className="card-top"><button className="card-number" onClick={()=>openShot(shot)}>SCENE {shot.scene.padStart(2,"0")}<span>/</span>SHOT {shot.number.padStart(2,"0")}</button><ShotMenu shot={shot}/></div><button className={"story-frame "+(!shot.references.length?"empty-frame":"")} onClick={()=>openShot(shot,"images")} aria-label={"Images for shot "+shot.scene+"."+shot.number}>{shot.references.length?<><ReferenceImage image={shot.references[0]}/><span className="frame-counter"><ImageIcon size={13}/>{shot.references.length}</span></>:<><ImagePlus size={28}/><span>{canEdit?"Add reference image":"No reference images"}</span><small>Storyboard, photo, or frame grab</small></>}</button><div className="card-content"><div className="framing-tags">{["size","movement"].map(key=>shot.values[key]&&<span key={key}>{shot.values[key]}</span>)}</div><button className="card-description" onClick={()=>openShot(shot)}>{shot.description||(canEdit?"Add shot description":"No description yet")}</button><div className="card-detail-line"><span><MapPin size={13}/>{shot.values.location||"Location not set"}</span><span><Clock3 size={13}/>{shot.setup||0} min setup</span></div><div className="card-bottom"><StatusControl shot={shot}/><Badge value={shot.priority} kind="priority"/></div></div></article>)}{canEdit&&<button className="new-shot-card" onClick={addShot} disabled={saving}><span><Plus size={25}/></span>Add a shot</button>}</div></TabsContent>
           </>}
-          <footer className="workspace-foot"><span>Setup estimates exclude shooting, resets, and travel.</span><span>SMOOTH STUDIOS <span className="foot-slash">/</span> SHOT LIST</span></footer>
+          <footer className="workspace-foot"><span>SMOOTH STUDIOS <span className="foot-slash">/</span> SHOT LIST</span></footer>
         </Tabs>
         </>}
       </>}

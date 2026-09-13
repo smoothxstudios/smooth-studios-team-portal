@@ -59,6 +59,17 @@ try{
  await expect(await crew('/api/projects'),403);
  await expect(await crew('/api/auth/change-password','POST',{currentPassword:'temporary-team-password',newPassword:'new-private-crew-password'}),200);
  assert.equal((await expect(await crew('/api/session'),200)).user.mustChangePassword,false);
+ assert.deepEqual((await expect(await crew('/api/projects'),200)).projects,[]);
+ // A second signed-in teammate must have their own isolated project list.
+ await expect(await owner('/api/team','POST',{name:'Sound Crew',username:'sound',email:'sound@example.invalid',password:'temporary-sound-password'}),201);
+ const soundAccount=(await expect(await owner('/api/team'),200)).accounts.find(a=>a.username==='sound');
+ const sound=client('198.51.100.4');
+ await expect(await sound('/api/auth/sign-in/username','POST',{username:'sound',password:'temporary-sound-password'}),200);
+ await expect(await sound('/api/auth/change-password','POST',{currentPassword:'temporary-sound-password',newPassword:'new-private-sound-password'}),200);
+ const soundProject=(await expect(await owner('/api/projects','POST',{...blankProject('Private sound production'),teamAccountIds:[soundAccount.id]}),201)).project;
+ assert.deepEqual((await expect(await sound('/api/projects'),200)).projects.map(p=>p.id),[soundProject.id]);
+ assert.deepEqual((await expect(await crew('/api/projects'),200)).projects,[]);
+ await expect(await crew('/api/projects/'+soundProject.id),404);
  // Optional modules and account tags must work independently of Crew & Tasks.
  const taggedDraft=blankProject('Tagged production');
  assert.deepEqual(taggedDraft.production.modules,[]);
@@ -73,9 +84,9 @@ try{
  await expect(await crew('/api/projects/'+tagged.id+'/crew','POST',{accountId:'owner'}),403);
  const taggedMember=(await expect(await owner('/api/projects/'+tagged.id+'/crew'),200)).crew[0];
  await expect(await owner('/api/projects/'+tagged.id+'/crew','DELETE',{memberId:taggedMember.id}),200);
- assert.equal((await expect(await crew('/api/projects/'+tagged.id),200)).project.canEdit,false);
- await expect(await crew('/api/projects/'+tagged.id,'PUT',{...tagged,canEdit:true}),403);
- assert.equal((await expect(await crew('/api/projects'),200)).projects.find(p=>p.id===tagged.id).canEdit,false);
+ await expect(await crew('/api/projects/'+tagged.id),404);
+ await expect(await crew('/api/projects/'+tagged.id,'PUT',{...tagged,canEdit:true}),404);
+ assert.equal((await expect(await crew('/api/projects'),200)).projects.some(p=>p.id===tagged.id),false);
  await expect(await owner('/api/projects/'+tagged.id+'/crew','POST',{accountId:camera.id}),200);
  assert.equal((await expect(await crew('/api/projects/'+tagged.id),200)).project.canEdit,true);
  const invalidTag=blankProject('Invalid tagged account');
@@ -83,13 +94,21 @@ try{
  await expect(await owner('/api/projects/'+invalidTag.id),404);
  await expect(await owner('/api/projects/'+tagged.id,'PUT',{...tagged,production:{...tagged.production,modules:['unknown']}}),400);
  const draft=blankProject('Permission check');draft.shots=[blankShot()];let p=(await expect(await owner('/api/projects','POST',draft),201)).project;
- // An enabled teammate sees every production without any tag. Editing stays assigned-only.
- assert.equal((await expect(await crew('/api/projects/'+p.id),200)).project.canEdit,false);
- const visibleProjects=(await expect(await crew('/api/projects'),200)).projects;
- assert.equal(visibleProjects.length,2);assert.equal(visibleProjects.find(x=>x.id===p.id).canEdit,false);
- assert.deepEqual((await expect(await crew('/api/projects/'+p.id+'/crew'),200)).crew,[]);
- assert.deepEqual((await expect(await crew('/api/projects/'+p.id+'/files'),200)).files,[]);
- await expect(await crew('/api/projects/'+p.id,'PUT',{...p,canEdit:true,title:'Unauthorized change'}),403);
+ // Untagged productions never appear in the list, totals, direct links, or export data.
+ const deniedProject=await expect(await crew('/api/projects/'+p.id),404);
+ assert.deepEqual(deniedProject,await expect(await crew('/api/projects/'+crypto.randomUUID()),404));
+ const listResponse=await crew('/api/projects');assert.equal(listResponse.headers.get('cache-control'),'private, no-store');
+ const visibleProjects=(await expect(listResponse,200)).projects;
+ assert.deepEqual(visibleProjects.map(x=>x.id),[tagged.id]);
+ assert.equal(visibleProjects[0].canEdit,true);
+ assert.equal(JSON.stringify(visibleProjects).includes(p.title),false);
+ assert.equal(JSON.stringify(visibleProjects).includes(soundProject.title),false);
+ for(const account of [crew,sound]){
+  await expect(await account('/api/projects/'+p.id+'/crew'),404);
+  await expect(await account('/api/projects/'+p.id+'/files'),404);
+  await expect(await account('/api/projects/'+p.id,'PUT',{...p,canEdit:true,title:'Unauthorized change'}),404);
+ }
+ assert.equal((await expect(await owner('/api/projects'),200)).projects.length,3);
  assert.equal((await expect(await owner('/api/projects/'+p.id),200)).project.title,p.title);
  await expect(await stranger('/api/projects/'+p.id),401);
  await expect(await owner('/api/projects/'+p.id+'/crew','POST',{name:'Camera Crew',email:'camera@example.invalid',role:'DP'}),200);
@@ -101,7 +120,9 @@ try{
  await expect(await crew('/api/projects/'+p.id,'DELETE'),403);
  const bytes=Uint8Array.from([137,80,78,71,13,10,26,10]);const imageForm=new FormData();imageForm.set('file',new File([bytes],'test.png',{type:'image/png'}));imageForm.set('projectId',p.id);
  const image=(await expect(await crew('/api/images','POST',imageForm),201)).image;
- const fetched=await crew('/api/images/'+image.id);assert.equal(fetched.status,200);assert.deepEqual(new Uint8Array(await fetched.arrayBuffer()),bytes);
+ const fetched=await crew('/api/images/'+image.id);assert.equal(fetched.status,200);assert.equal(fetched.headers.get('cache-control'),'private, no-store');assert.deepEqual(new Uint8Array(await fetched.arrayBuffer()),bytes);
+ await expect(await sound('/api/images/'+image.id),404);
+ await expect(await sound('/api/projects/'+p.id),404);
  // Exercise a real multi-part picture, including retries and paged download.
  const large=new Uint8Array(2*1024*1024+23);large.fill(71);large.set(bytes);
  const uploadInput={name:'Large picture.png',mime:'image/png',size:large.length,projectId:p.id};
@@ -138,22 +159,39 @@ try{
  const fileForm=new FormData();fileForm.set('file',new File(['Production script'],'script.txt',{type:'text/plain'}));fileForm.set('category','Script');
  const file=(await expect(await crew('/api/projects/'+p.id+'/files','POST',fileForm),201)).file;
  assert.equal(await expect(await owner('/api/files/'+file.id),200),'Production script');
+ await expect(await sound('/api/files/'+file.id),404);
+ await expect(await sound('/api/projects/'+p.id+'/files'),404);
+ await expect(await sound('/api/projects/'+p.id+'/files','POST',fileForm),404);
+ await expect(await sound('/api/images','POST',imageForm),404);
+ await expect(await sound('/api/image-uploads','POST',uploadInput),404);
  await expect(await stranger('/api/files/'+file.id),401);
+ // A reference deliberately copied into another tagged project remains available there.
+ const copiedShot=blankShot();copiedShot.references=[largeImage];
+ tagged=(await expect(await owner('/api/projects/'+tagged.id,'PUT',{...tagged,shots:[copiedShot]}),200)).project;
+ await expect(await sound('/api/images/'+largeImage.id),404);
  const permissionUpload=await expect(await crew('/api/image-uploads','POST',{...uploadInput,size:bytes.length}),201);
  const m=(await expect(await owner('/api/projects/'+p.id+'/crew'),200)).crew[0];await expect(await owner('/api/projects/'+p.id+'/crew','DELETE',{memberId:m.id}),200);
- // Removing a tag preserves viewing and downloads, but immediately prevents every edit route.
- assert.equal((await expect(await crew('/api/projects/'+p.id),200)).project.canEdit,false);
- await expect(await crew('/api/images/'+image.id),200);
- assert.equal(await expect(await crew('/api/files/'+file.id),200),'Production script');
- assert.equal((await expect(await crew('/api/projects/'+p.id+'/files'),200)).files[0].id,file.id);
- await expect(await crew('/api/projects/'+p.id,'PUT',{...p,canEdit:true}),403);
- await expect(await crew('/api/images','POST',imageForm),403);
- await expect(await crew('/api/image-uploads','POST',uploadInput),403);
- await expect(await crew('/api/image-uploads/'+permissionUpload.uploadId,'POST'),403);
- await expect(await crew('/api/image-uploads/'+permissionUpload.uploadId+'?part=0','PUT',bytes),403);
+ // Revocation applies immediately to the existing session, including the uploader's own files.
+ await expect(await crew('/api/projects/'+p.id),404);
+ await expect(await crew('/api/images/'+image.id),404);
+ await expect(await crew('/api/files/'+file.id),404);
+ await expect(await crew('/api/projects/'+p.id+'/files'),404);
+ await expect(await crew('/api/projects/'+p.id+'/crew'),404);
+ assert.deepEqual((await expect(await crew('/api/projects'),200)).projects.map(x=>x.id),[tagged.id]);
+ assert.deepEqual(new Uint8Array(await (await crew('/api/images/'+largeImage.id)).arrayBuffer()),large);
+ const copyMember=(await expect(await owner('/api/projects/'+tagged.id+'/crew'),200)).crew[0];
+ await expect(await owner('/api/projects/'+tagged.id+'/crew','DELETE',{memberId:copyMember.id}),200);
+ await expect(await crew('/api/images/'+largeImage.id),404);
+ assert.deepEqual((await expect(await crew('/api/projects'),200)).projects,[]);
+ await expect(await owner('/api/images/'+image.id),200);
+ await expect(await crew('/api/projects/'+p.id,'PUT',{...p,canEdit:true}),404);
+ await expect(await crew('/api/images','POST',imageForm),404);
+ await expect(await crew('/api/image-uploads','POST',uploadInput),404);
+ await expect(await crew('/api/image-uploads/'+permissionUpload.uploadId,'POST'),404);
+ await expect(await crew('/api/image-uploads/'+permissionUpload.uploadId+'?part=0','PUT',bytes),404);
  await expect(await crew('/api/image-uploads/'+permissionUpload.uploadId,'DELETE'),200);
- await expect(await crew('/api/projects/'+p.id+'/files','POST',fileForm),403);
- await expect(await crew('/api/files/'+file.id,'DELETE'),403);
+ await expect(await crew('/api/projects/'+p.id+'/files','POST',fileForm),404);
+ await expect(await crew('/api/files/'+file.id,'DELETE'),404);
  assert.equal(await expect(await owner('/api/files/'+file.id),200),'Production script');
  await expect(await stranger('/api/images/'+image.id),401);
  const privateForm=new FormData();privateForm.set('file',new File([bytes],'private-draft.png',{type:'image/png'}));
@@ -161,6 +199,17 @@ try{
  await expect(await crew('/api/images/'+privateImage.id),404);
  await expect(await owner('/api/projects/'+p.id+'/crew','POST',{accountId:camera.id}),200);
  assert.equal((await expect(await crew('/api/projects/'+p.id),200)).project.canEdit,true);
+ await expect(await crew('/api/images/'+image.id),200);
+ await expect(await crew('/api/projects/'+p.id+'/crew'),200);
+ assert.equal(await expect(await crew('/api/files/'+file.id),200),'Production script');
+ // Knowing another image id cannot attach it to a project to gain access.
+ const linkedShot={...p.shots[0],references:[privateImage]};
+ await expect(await crew('/api/projects/'+p.id,'PUT',{...p,shots:[linkedShot]}),400);
+ await expect(await crew('/api/images/'+privateImage.id),404);
+ // An owner can deliberately share a draft reference into a tagged project.
+ p=(await expect(await owner('/api/projects/'+p.id,'PUT',{...p,shots:[linkedShot]}),200)).project;
+ await expect(await crew('/api/images/'+privateImage.id),200);
+ await expect(await sound('/api/images/'+privateImage.id),404);
  await expect(await crew('/api/files/'+file.id,'DELETE'),200);
  await expect(await owner('/api/files/'+file.id),404);
  await expect(await owner('/api/team','PUT',{id:camera.id,password:'reset-temporary-password'}),200);
@@ -175,5 +224,5 @@ try{
  await expect(await owner('/api/projects/'+p.id,'PUT',p,{Origin:'https://attacker.invalid'}),403);
  await expect(await owner('/api/auth/sign-out','POST',{}),200);await expect(await owner('/api/projects'),401);
  const probe=client('198.51.100.44');for(let i=0;i<5;i++)await probe('/api/auth/sign-in/username','POST',{username:'nobody',password:'invalid-password'});await expect(await probe('/api/auth/sign-in/username','POST',{username:'nobody',password:'invalid-password'}),429);
- console.log('Passed: standalone password sign-in, secure sessions, owner account management, forced password changes, disabled accounts, password reset revocation, sign-out, closed registration, rate limiting, CSRF protection, team-wide project viewing, assignment-based editing, read-only file/image access, private drafts, multi-part picture uploads and retries, byte-exact downloads, custom project categories, shared file and image storage.');
+ console.log('Passed: standalone password sign-in, secure sessions, owner account management, forced password changes, disabled accounts, password reset revocation, sign-out, closed registration, rate limiting, CSRF protection, tag-restricted project lists and direct access, isolated teammate projects, immediate revocation and re-tagging, protected files and images, copied-reference access, private drafts, multi-part picture uploads and retries, byte-exact downloads, custom project categories, shared file and image storage.');
 }finally{await mf.dispose();}
