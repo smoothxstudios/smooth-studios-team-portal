@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {build} from 'esbuild';
+import {PDFDocument,PDFName,PDFDict} from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+
+await mkdir('tmp/pdfs',{recursive:true});
+await build({entryPoints:['lib/project-pdf.ts','lib/shot-list.ts'],bundle:true,platform:'node',format:'esm',packages:'external',outdir:'.work/storyboard-test'});
+const {createProjectPdf}=await import('../.work/storyboard-test/project-pdf.js');
+const {exampleProject,blankShot}=await import('../.work/storyboard-test/shot-list.js');
+const project=exampleProject();project.title='Storyboard - Studio Campaign';project.date='2026-10-10';
+project.shots=[...project.shots,...Array.from({length:3},(_,i)=>({...blankShot(),scene:'3',number:String(i+1),order:i+6,description:'Pick up the next detail in the sequence.',values:{size:'Close-up',movement:'Static'}}))];
+project.shots[0].values.notes='José: Keep lamp on.\nPreferred take: 2.';
+project.shots[1].values.takes='Takes 1-3; use 3.';
+const image=Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64'));
+project.shots[0].references=[{id:'image-main',name:'Wide Frame.png',caption:''},{id:'image-detail',name:'Second Angle.png',caption:''}];
+project.shots[1].references=[project.shots[0].references[0]];
+const options={sections:['shots'],images:true,shotLayout:'storyboard',regularFont:new Uint8Array(await readFile('public/fonts/ProductionSans.ttf')),boldFont:new Uint8Array(await readFile('public/fonts/ProductionSans-Bold.ttf'))};
+let loads=0;
+const result=await createProjectPdf([{project,crew:[],files:[]}],{...options,loadImage:async()=>{loads++;return {bytes:image,mime:'image/png'};}});
+assert.deepEqual(result.warnings,[]);assert.equal(result.pageCount,2);assert.equal(loads,2,'Shared references load once per production.');
+await writeFile('tmp/pdfs/storyboard-check.pdf',result.bytes);
+const pdf=await PDFDocument.load(result.bytes),form=pdf.getForm(),fields=form.getFields();
+assert.equal(fields.length,8);assert.equal(new Set(fields.map(f=>f.getName())).size,8);
+assert.equal(form.getTextField(fields[0].getName()).getText(),project.shots[0].values.notes);
+assert.ok(form.acroForm.dict.lookup(PDFName.of('DR'),PDFDict).lookup(PDFName.of('Font'),PDFDict).keys().length>0);
+for(const page of pdf.getPages()){assert.deepEqual(page.getSize(),{width:792,height:612});assert.equal(page.node.Annots().size(),4);}
+for(const f of fields){assert.equal(f.isReadOnly(),false);assert.equal(f.isMultiline(),true);assert.equal(f.acroField.getWidgets().length,1);assert.ok(f.acroField.getWidgets()[0].getAppearances()?.normal);assert.ok(f.acroField.dict.get(PDFName.of('TU')));}
+pdf.registerFontkit(fontkit);
+const editFont=await pdf.embedFont(options.regularFont,{subset:false});
+const edited=form.getTextField(fields[0].getName());edited.setText('María: use take 4.\nKeep the doorway clear.');edited.updateAppearances(editFont);
+const editedBytes=await pdf.save({updateFieldAppearances:false});
+await writeFile('tmp/pdfs/storyboard-edited-check.pdf',editedBytes);
+assert.equal((await PDFDocument.load(editedBytes)).getForm().getTextField(fields[0].getName()).getText(),'María: use take 4.\nKeep the doorway clear.');
+const noImage=await createProjectPdf([{project,crew:[],files:[]}],{...options,images:false,loadImage:async()=>{throw new Error('Should not fetch');}});assert.equal(noImage.warnings.length,0);assert.equal((await PDFDocument.load(noImage.bytes)).getForm().getFields().length,8);
+const unavailable=await createProjectPdf([{project,crew:[],files:[]}],{...options,loadImage:async()=>{throw new Error('Missing');}});assert.equal(unavailable.warnings.length,1);
+const collection=await createProjectPdf([{project,crew:[],files:[]},{project:{...project,title:'Second Production'},crew:[],files:[]}],{...options,images:false});
+assert.equal((await PDFDocument.load(collection.bytes)).getForm().getFields().length,16);
+const long={...project,shots:[{...project.shots[0],description:'OPENING '+('Long description for the storyboard. '.repeat(100))+' END_DESCRIPTION',values:{notes:'START_NOTES '+('Keep continuity between every angle. '.repeat(45))+' END_NOTES'}}]};
+const continued=await createProjectPdf([{project:long,crew:[],files:[]}],{...options,images:false});
+await writeFile('tmp/pdfs/storyboard-continuation-check.pdf',continued.bytes);
+const noteParts=(await PDFDocument.load(continued.bytes)).getForm().getFields();assert.ok(noteParts.length>1);
+const allNotes=noteParts.map(f=>f.getText()||'').join(' ').replace(/\s+/g,' ');assert.ok(allNotes.startsWith('START_NOTES '));assert.ok(allNotes.includes(' END_NOTES'));assert.equal((allNotes.match(/Keep continuity between every angle\./g)||[]).length,45);
+await writeFile('tmp/pdfs/storyboard-fixture.json',JSON.stringify(project));
+console.log('Storyboard checks passed: four-column cards, shared images, image failures/exclusion, unique editable notes, Unicode edits saved and reopened, multiple projects, and long-text continuation.');

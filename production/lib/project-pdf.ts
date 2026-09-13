@@ -1,11 +1,12 @@
-import {PDFDocument,PDFFont,PDFPage,rgb,type RGB} from 'pdf-lib';
+import {PDFDocument,PDFFont,PDFPage,PDFName,PDFString,rgb,type RGB} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import {hasModule,productionOf,dateLabel,clockLabel,money,expenseTotals,type CrewMember,type ProjectFile} from './production';
 import {timeLabel,type Project} from './shot-list';
 import {orderedShots,renderShotSheet} from './shot-sheet';
+import {renderStoryboard} from './storyboard-pdf';
 
 import {PDF_SECTIONS,categoryTitle,type PdfSection,type ExportProject} from './export-model';
-export type PdfOptions={sections:PdfSection[];images:boolean;shotLayout?:'sheet'|'detail';shotOrder?:'shooting'|'scene';regularFont:Uint8Array;boldFont:Uint8Array;loadImage?:(id:string)=>Promise<{bytes:Uint8Array;mime:string}>;onProgress?:(text:string)=>void};
+export type PdfOptions={sections:PdfSection[];images:boolean;shotLayout?:'sheet'|'detail'|'storyboard';shotOrder?:'shooting'|'scene';regularFont:Uint8Array;boldFont:Uint8Array;loadImage?:(id:string)=>Promise<{bytes:Uint8Array;mime:string}>;onProgress?:(text:string)=>void};
 const ink=rgb(.12,.18,.28),muted=rgb(.40,.47,.57),blue=rgb(.25,.39,.64),line=rgb(.85,.89,.94);
 const W=612,H=792,M=48,BOTTOM=54,WIDTH=W-2*M;
 
@@ -48,7 +49,8 @@ class Pages {
 export async function createProjectPdf(entries:ExportProject[],options:PdfOptions){
  if(!entries.length||!options.sections.length)throw new Error('Choose a production and at least one section.');
  const doc=await PDFDocument.create();doc.registerFontkit(fontkit);
- const font=await doc.embedFont(options.regularFont,{subset:true}),bold=await doc.embedFont(options.boldFont,{subset:true});
+ // Fillable notes need the full font, including characters entered after export.
+ const font=await doc.embedFont(options.regularFont,{subset:options.shotLayout!=='storyboard'}),bold=await doc.embedFont(options.boldFont,{subset:true});
  const warnings=new Set<string>(),p=new Pages(doc,font,bold,warnings);
  doc.setTitle(entries.length===1?entries[0].project.title+' - Production':'Smooth Studios - Productions');doc.setAuthor('Smooth Studios');doc.setCreator('Production Dashboard');
  if(entries.length>1&&options.sections.some(s=>s!=='shots')){p.newPage();p.title('Production collection');p.text(entries.length+' productions',12,muted);p.gap(20);for(const {project}of entries){p.heading(project.title);p.text([project.client,dateLabel(project.date),productionOf(project).stage].filter(Boolean).join(' / '));}}
@@ -57,6 +59,7 @@ export async function createProjectPdf(entries:ExportProject[],options:PdfOption
   const sections=PDF_SECTIONS.filter(s=>options.sections.includes(s.key)&&hasModule(project,s.key));
   if(!sections.length){warnings.add(project.title+': none of the selected sections are enabled.');continue;}
   for(const section of sections){
+   if(section.key==='shots'&&options.shotLayout==='storyboard'){await renderStoryboard(project,options,doc,font,bold,p,warnings);continue;}
    if(section.key==='shots'&&options.shotLayout!=='detail'){await renderShotSheet(project,options,doc,font,bold,p,warnings);continue;}
    p.projectTitle=project.title;p.sectionTitle=section.key==='shots'?'Shot Breakdown':section.label;p.newPage();p.title(project.title);p.text(p.sectionTitle,13,blue,true);p.gap(18);options.onProgress?.(project.title+' / '+p.sectionTitle);
    if(section.key==='overview'){
@@ -99,7 +102,14 @@ export async function createProjectPdf(entries:ExportProject[],options:PdfOption
   }
  }
  if(!doc.getPageCount())throw new Error('None of the selected sections are enabled for these productions.');
- p.finish();return {bytes:await doc.save(),warnings:[...warnings],pageCount:doc.getPageCount()};
+ if(options.shotLayout==='storyboard'){
+  const form=doc.getForm();
+  // Expose the font to PDF readers when they regenerate edited field appearances.
+  form.acroForm.dict.set(PDFName.of('DR'),doc.context.obj({Font:{[font.name]:font.ref}}));
+  form.acroForm.dict.set(PDFName.of('DA'),PDFString.of('/'+font.name+' 8.5 Tf 0.12 0.18 0.27 rg'));
+  form.updateFieldAppearances(font);
+ }
+ p.finish();return {bytes:await doc.save({updateFieldAppearances:false}),warnings:[...warnings],pageCount:doc.getPageCount()};
 }
 
 export async function browserReferenceImage(id:string){

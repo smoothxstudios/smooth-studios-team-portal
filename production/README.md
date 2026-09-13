@@ -41,3 +41,9 @@ Reference pictures upload in authenticated 128 KiB parts, with ownership and pro
 PDF exports default to the landscape Shot List in shooting order. Multiple shots share each page, with repeated column headings, scene/shot IDs, completion checkboxes, camera and production details, setup/duration, small reference images, and an unruled Notes column. Long fields continue with their shot ID instead of being clipped. Export options also offer scene/shot ordering and the portrait Shot Breakdown. Other selected project sections retain their own readable pages.
 
 Export options have visible PDF Organization, Shot List Layout, and Shot Order labels. Export filenames use one hyphen between words. PDF category labels use title case; inline bold labels and camera-column dividers keep each setting easy to scan.
+
+## Storyboard PDF
+
+Shot List Layout also offers Storyboard: four image cards per landscape page with scene/shot labels, framing/movement badges, descriptions, status, priority, and editable Notes fields. Existing shot notes and take notes populate the fields; longer descriptions or notes continue on additional cards. Extra references appear as thumbnails. Missing references are marked, and image exclusion remains available.
+
+Notes use real multiline AcroForm fields with embedded fonts, default form resources, and saved appearances. Notes can be edited and saved in the downloaded PDF; those edits stay in the file and do not change dashboard data. Collections use distinct field names for every card. The export tests save and reopen edited Unicode notes and check form fields, widgets, pagination, and long content.
