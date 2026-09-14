@@ -28,7 +28,7 @@ export async function PUT(request:Request,context:Context){return api(async()=>{
  if(new URL(request.url).searchParams.get('preview')!=='1')throw new RequestError('Not found.',404);
  const u=await identity(request),{id}=await context.params,row=await authorized(request,id,u);
  // A copied reference grants read access only; its original project's editors create the preview.
- if(row.project_id)await requireProject(row.project_id,u,'edit');else if(!u.admin&&row.owner!==u.id)throw new RequestError('Image not found.',404);
+ if(!u.admin){if(row.project_id)await requireProject(row.project_id,u,'edit');else if(row.owner!==u.id)throw new RequestError('Image not found.',404);}
  if(row.preview_mime)return json({ok:true});
  const max=256*1024,reader=request.body?.getReader();if(!reader)throw new RequestError('Preview is empty.');
  const bytes=new Uint8Array(max);let size=0;

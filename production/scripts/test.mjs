@@ -268,6 +268,19 @@ try{
  p=(await expect(await owner('/api/projects/'+p.id,'PUT',{...p,shots:[linkedShot]}),200)).project;
  await expect(await crew('/api/images/'+privateImage.id),200);
  await expect(await sound('/api/images/'+privateImage.id),404);
+ // Copied references can outlive their source project; Smooth can still derive previews.
+ const oldSource=(await expect(await owner('/api/projects','POST',blankProject('Old reference source')),201)).project;
+ const oldForm=new FormData();oldForm.set('file',new File([bytes],'old-reference.png',{type:'image/png'}));oldForm.set('projectId',oldSource.id);
+ const oldImage=(await expect(await owner('/api/images','POST',oldForm),201)).image;
+ const preservedDraft=blankProject('Preserved reference');preservedDraft.shots=[{...blankShot(),references:[oldImage]}];
+ const preserved=(await expect(await owner('/api/projects','POST',{...preservedDraft,teamAccountIds:[camera.id]}),201)).project;
+ await expect(await owner('/api/projects/'+oldSource.id,'DELETE'),200);
+ await expect(await crew('/api/images/'+oldImage.id),200);
+ await expect(await crew('/api/images/'+oldImage.id+'?preview=1','PUT',displayBytes),404);
+ await expect(await owner('/api/images/'+oldImage.id+'?preview=1','PUT',displayBytes),201);
+ assert.deepEqual(new Uint8Array(await (await crew('/api/images/'+oldImage.id+'?preview=1')).arrayBuffer()),displayBytes);
+ await expect(await owner('/api/projects/'+preserved.id,'DELETE'),200);
+ await expect(await crew('/api/images/'+oldImage.id+'?preview=1'),404);
  await expect(await crew('/api/files/'+file.id,'DELETE'),200);
  await expect(await owner('/api/files/'+file.id),404);
  // Teammates own the projects they create; account administration stays with Smooth.

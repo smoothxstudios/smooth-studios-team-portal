@@ -74,7 +74,7 @@ if(accountRow?.password&&process.env.DASHBOARD_PASSWORD_OWNER&&await verifyPassw
  const cookie=login.headers.getSetCookie().map(v=>v.split(';')[0]).join('; ');
  const me=await fetch(origin+'/api/session',{headers:{Cookie:cookie},signal:AbortSignal.timeout(30000)});if(!me.ok||!(await me.json()).user?.admin)throw new Error('The production account check failed.');
  try{
-  const pending=(await query('SELECT i.id FROM images i LEFT JOIN image_previews v ON v.image_id=i.id WHERE v.image_id IS NULL'))[0].results;
+  const pending=(await query('SELECT i.id, EXISTS(SELECT 1 FROM project_image_refs r WHERE r.image_id=i.id) AS referenced FROM images i LEFT JOIN image_previews v ON v.image_id=i.id WHERE v.image_id IS NULL'))[0].results;
   console.log('Existing image preview conversion: '+JSON.stringify(await backfillImagePreviews({origin,cookie,images:pending})));
   const sample=(await query('SELECT image_id FROM image_previews LIMIT 1'))[0].results[0];
   if(sample){
