@@ -21,24 +21,27 @@ import { toast } from "sonner";
 import {request,errorText,Choice,FormField,RequestFailure} from "@/components/production-ui";
 import {uploadReference} from "@/lib/uploads";
 import {placeShotAtNumber} from "@/lib/shot-order";
-import {AccountActions} from "@/components/accounts";
+import {AccountActions,useAccount} from "@/components/accounts";
 import {ProductionProjects,ProductionModules,SECTION_LABELS,type ProductionSection} from "@/components/production-panels";
-import {productionOf,defaultProduction,hasModule,STAGES,type SessionUser} from "@/lib/production";
+import {productionOf,defaultProduction,hasModule,STAGES} from "@/lib/production";
 import {ModulePicker,TeamPicker,DashboardSettings} from "@/components/project-options";
 import {ExportDialog} from "@/components/project-export";
 import { BASE_COLUMNS, DEFAULT_COLUMNS, FIELDS, GROUPS, PRIORITY, STATUS, blankProject, blankShot, exampleProject, summarize, timeLabel, uid, type Field, type Project, type ProjectSummary, type Reference, type Shot } from "@/lib/shot-list";
 
 function Badge({value,kind="status"}:{value:string;kind?:string}){return <span className={"tag "+kind+" "+value.toLowerCase().replaceAll(" ","-")}>{kind==="status"&&value==="Complete"?<Check size={12}/>:null}{value}</span>;}
 function ReferenceImage({image,className=""}:{image:Reference;className?:string}){
-  const [failed,setFailed]=useState(false);
-  return failed?<span className={"image-failed "+className}><ImageIcon size={22}/>Image unavailable</span>:<img src={"/api/images/"+image.id} alt={image.caption||image.name} className={className} loading="lazy" onError={()=>setFailed(true)}/>;
+  const {user}=useAccount(),[failed,setFailed]=useState(false),[retry,setRetry]=useState(0);
+  useEffect(()=>{setFailed(false);setRetry(0);},[image.id,user?.id]);
+  useEffect(()=>{if(failed&&retry===0){const timer=setTimeout(()=>{setRetry(1);setFailed(false);},1000);return()=>clearTimeout(timer);}},[failed,retry]);
+  const url="/api/images/"+image.id+"?account="+encodeURIComponent(user?.id||'__signed_out__')+(className==='expanded-image'?'':'&preview=1')+(retry?'&retry=1':'');
+  return failed?<span className={"image-failed "+className}><ImageIcon size={22}/>Image unavailable</span>:<img src={url} alt={image.caption||image.name} className={className} loading={className==='expanded-image'?'eager':'lazy'} decoding="async" onError={()=>setFailed(true)}/>;
 }
 
 export default function Workspace(){return <SidebarProvider style={{"--sidebar-width":"236px"} as React.CSSProperties}><ShotWorkspace/><Toaster richColors position="bottom-right"/></SidebarProvider>;}
 
 function ShotWorkspace(){
   const [project,setProject]=useState<Project|null>(null),[projects,setProjects]=useState<ProjectSummary[]>([]);
-  const [user,setUser]=useState<SessionUser|null>(null),[section,setSection]=useState<ProductionSection>("projects");
+  const {user}=useAccount();const [section,setSection]=useState<ProductionSection>("projects");
   const [loading,setLoading]=useState(true),[loadError,setLoadError]=useState(""),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState("");
   const [view,setView]=useState("table"),[scene,setScene]=useState("All scenes"),[status,setStatus]=useState("All statuses"),[priority,setPriority]=useState("All priorities"),[location,setLocation]=useState("All locations"),[query,setQuery]=useState(""),[sort,setSort]=useState("Story order");
   const [exportScope,setExportScope]=useState<"current"|"all"|null>(null),[showFilters,setShowFilters]=useState(false);
@@ -52,15 +55,16 @@ function ShotWorkspace(){
   },[]);
 
   const loadProject=useCallback(async(id?:string)=>{
+    if(!user)return;
     const seq=++requestSeq.current;setLoading(true);setLoadError("");setSaveError("");
     try{
-      const [list,session]=await Promise.all([request<{projects:ProjectSummary[]}>("/api/projects"),request<{user:SessionUser}>("/api/session")]);
-      const current=id?list.projects.find(p=>p.id===id)?.id:list.projects[0]?.id;
-      const p=current?(await request<{project:Project}>("/api/projects/"+current)).project:session.user.admin&&!id?exampleProject():null;
-      if(seq!==requestSeq.current)return;setEditor(null);setCustomize(false);setProjectDialog(null);setUser(session.user);setProjects(list.projects);setProject(p);setScene("All scenes");setStatus("All statuses");setPriority("All priorities");setLocation("All locations");setQuery("");if(!p)setSection("projects");
-      if(id&&!current){setExportScope(null);setConfirm(null);toast.info("This production is no longer available to your account.");}
-    }catch(e){if(seq===requestSeq.current){if(e instanceof RequestFailure&&[401,403,404].includes(e.status)){clearOpenProject();setProjects([]);}else setLoadError(errorText(e));}}finally{if(seq===requestSeq.current)setLoading(false);}
-  },[clearOpenProject]);
+      const list=id?null:await request<{projects:ProjectSummary[]}>("/api/projects");
+      const p=id?(await request<{project:Project}>("/api/projects/"+id)).project:user.admin&&!list?.projects.length?exampleProject():null;
+      if(seq!==requestSeq.current)return;setEditor(null);setCustomize(false);setProjectDialog(null);
+      if(list)setProjects(list.projects);else if(p)setProjects(previous=>[summarize(p),...previous.filter(item=>item.id!==p.id)]);
+      setProject(p);setScene("All scenes");setStatus("All statuses");setPriority("All priorities");setLocation("All locations");setQuery("");if(!p)setSection("projects");
+    }catch(e){if(seq===requestSeq.current){if(e instanceof RequestFailure&&[401,403,404].includes(e.status)){clearOpenProject();setProjects(previous=>e.status===404?previous.filter(p=>p.id!==id):[]);if(e.status===404)toast.info("This production is no longer available to your account.");}else setLoadError(errorText(e));}}finally{if(seq===requestSeq.current)setLoading(false);}
+  },[clearOpenProject,user?.id,user?.admin]);
   useEffect(()=>{loadProject();},[loadProject]);
   useEffect(()=>{
     if(!user||user.admin)return;
@@ -198,7 +202,7 @@ function ShotEditor({initial,initialTab,canEdit,projectId,fields,saving,onSave,o
 
   async function save(){if(!canEdit)return;if(!shot.scene.trim()||!shot.number.trim()){setLocalError("Add a scene and shot number.");return;}setLocalError("");const ok=await onSave({...shot,scene:shot.scene.trim(),number:shot.number.trim()});if(ok)onClose();}
   return <>
-    <Sheet open onOpenChange={v=>!v&&close()}><SheetContent className="shot-editor" showCloseButton={false} onInteractOutside={e=>{e.preventDefault();close();}} onEscapeKeyDown={e=>{e.preventDefault();close();}}>
+    <Sheet open onOpenChange={v=>!v&&!expanded&&!discard&&close()}><SheetContent className="shot-editor" showCloseButton={false} onInteractOutside={e=>{e.preventDefault();if(!expanded&&!discard)close();}} onEscapeKeyDown={e=>{if(!expanded&&!discard){e.preventDefault();close();}}}>
       <SheetHeader className="editor-header"><div><span className="eyebrow">SHOT DETAILS</span><SheetTitle>Scene {shot.scene || "—"} <span className="muted">/</span> Shot {shot.number || "—"}</SheetTitle><SheetDescription>{canEdit?"Plan the frame. Keep every detail together.":"View the framing, production notes, and reference images."}</SheetDescription></div><Button variant="ghost" size="icon" onClick={close} disabled={saving||uploading} aria-label="Close shot editor"><X/></Button></SheetHeader>
       <Tabs value={tab} onValueChange={setTab} className="editor-tabs"><TabsList className="editor-tab-list"><TabsTrigger value="details">Framing</TabsTrigger><TabsTrigger value="production">Production</TabsTrigger><TabsTrigger value="schedule">Schedule & takes</TabsTrigger><TabsTrigger value="images">Images <span className="tab-count">{shot.references.length}</span></TabsTrigger></TabsList>
         <div className="editor-scroll">

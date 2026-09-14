@@ -5,8 +5,16 @@ import {Checkbox} from './ui/checkbox';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from './ui/dialog';
 import {Choice,FormField,request,errorText} from './production-ui';
 import {PDF_SECTIONS,exportFilename,type PdfSection,type ExportProject} from '@/lib/export-model';
-// Load the PDF engine with the app so an open tab never requests a deleted export chunk after deployment.
-import {createProjectPdf,browserReferenceImage} from '@/lib/project-pdf';
+import {accountHeaders} from '@/lib/client-account';
+type PdfEngine=typeof import('@/lib/project-pdf');
+let pdfLoadAttempt=0;
+async function loadPdfEngine():Promise<PdfEngine>{
+ const path='/assets/pdf-export.js'+(pdfLoadAttempt?'?retry='+pdfLoadAttempt:'');
+ let timer:ReturnType<typeof setTimeout>|undefined;
+ try{return await Promise.race([import(/* @vite-ignore */ path) as Promise<PdfEngine>,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error('Timed out')),30000);})]);}
+ catch{pdfLoadAttempt++;throw new Error('The PDF tools could not load. Check your connection and try again.');}
+ finally{clearTimeout(timer);}
+}
 import {loadPdfFonts} from '@/lib/pdf-assets';
 import {hasModule,type CrewMember,type ProjectFile} from '@/lib/production';
 import type {Project,ProjectSummary} from '@/lib/shot-list';
@@ -21,7 +29,8 @@ export function ExportDialog({scope,project,projects,onClose}:{scope:'current'|'
   setBusy(true);setError('');setWarnings([]);setProgress('Loading project details…');
   const next:DownloadFile[]=[];const notices=new Set<string>();
   try{
-   const fonts=await loadPdfFonts();
+   const [fonts,engine]=await Promise.all([loadPdfFonts(),loadPdfEngine()]);
+   const {createProjectPdf,browserReferenceImage}=engine,headers=accountHeaders();
    const entries:ExportProject[]=[];
    for(const id of ids){
     setProgress('Loading production '+(entries.length+1)+' of '+ids.length+'…');
@@ -33,7 +42,7 @@ export function ExportDialog({scope,project,projects,onClose}:{scope:'current'|'
    }
    const jobs=mode==='Separate PDF Per Section'?entries.flatMap(e=>sections.filter(s=>hasModule(e.project,s)).map(s=>({entries:[e],sections:[s],name:e.project.title+'-'+PDF_SECTIONS.find(x=>x.key===s)!.label}))):mode==='Separate PDF Per Production'?entries.map(e=>({entries:[e],sections,name:e.project.title})).filter(job=>job.sections.some(s=>hasModule(job.entries[0].project,s))):[{entries,sections,name:entries.length===1?entries[0].project.title:'Smooth-Studios-Productions'}];
    if(!jobs.length)throw new Error('None of the selected sections are enabled. Choose another section.');
-   for(const job of jobs){const result=await createProjectPdf(job.entries,{sections:job.sections,images,shotLayout:layout==='Storyboard'?'storyboard':layout==='Shot List'?'sheet':'detail',shotOrder:order==='Shooting Order'?'shooting':'scene',regularFont:fonts[0],boldFont:fonts[1],loadImage:browserReferenceImage,onProgress:setProgress});result.warnings.forEach(w=>notices.add(w));const url=URL.createObjectURL(new Blob([new Uint8Array(result.bytes)],{type:'application/pdf'}));urls.current.push(url);next.push({url,name:exportFilename(job.name)+'.pdf',pages:result.pageCount});}
+   for(const job of jobs){const result=await createProjectPdf(job.entries,{sections:job.sections,images,shotLayout:layout==='Storyboard'?'storyboard':layout==='Shot List'?'sheet':'detail',shotOrder:order==='Shooting Order'?'shooting':'scene',regularFont:fonts[0],boldFont:fonts[1],loadImage:id=>browserReferenceImage(id,headers),onProgress:setProgress});result.warnings.forEach(w=>notices.add(w));const url=URL.createObjectURL(new Blob([new Uint8Array(result.bytes)],{type:'application/pdf'}));urls.current.push(url);next.push({url,name:exportFilename(job.name)+'.pdf',pages:result.pageCount});}
    setDownloads(next);setWarnings([...notices]);setProgress('');
   }catch(e){next.forEach(f=>URL.revokeObjectURL(f.url));setError(errorText(e));}finally{setBusy(false);}
  }

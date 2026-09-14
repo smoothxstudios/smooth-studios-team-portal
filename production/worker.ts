@@ -42,7 +42,8 @@ export default {async fetch(request:Request){
   return asset;
  });
  const headers=new Headers(response.headers);headers.set('X-Content-Type-Options','nosniff');headers.set('Referrer-Policy','same-origin');headers.set('X-Frame-Options','DENY');headers.set('Permissions-Policy','camera=(), microphone=(), geolocation=()');
- if(url.pathname.startsWith('/api/'))headers.set('Cache-Control','private, no-store');
+ if(url.pathname.startsWith('/api/')&&!(request.method==='GET'&&/^\/api\/images\/[^/]+$/.test(url.pathname)&&[200,304].includes(response.status)&&headers.has('ETag')))headers.set('Cache-Control','private, no-store');
+ if(url.pathname==='/assets/pdf-export.js')headers.set('Cache-Control','no-cache');
  if(headers.get('Content-Type')?.includes('text/html'))headers.set('Cache-Control','no-cache');
  headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
  return new Response(response.body,{status:response.status,headers});

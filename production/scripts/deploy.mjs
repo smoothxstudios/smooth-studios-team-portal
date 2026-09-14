@@ -1,6 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import {hashPassword} from 'better-auth/crypto';
+import {backfillImagePreviews} from './image-previews.mjs';
 const account=process.env.CLOUDFLARE_ACCOUNT_ID?.trim(),token=process.env.CLOUDFLARE_API_TOKEN?.trim();
 if(!/^[a-f0-9]{32}$/.test(account||'')||!token)throw new Error('The existing Cloudflare deployment secrets are required.');
 async function cf(path,method='GET',body,optional=false){
@@ -36,39 +37,58 @@ const origin=config.vars.APP_ORIGIN;
 let ready=false,healthStatus=0,healthDetail='';
 for(let attempt=0;attempt<5;attempt++){
  if(attempt)await new Promise(resolve=>setTimeout(resolve,attempt*2000));
- const health=await fetch(origin+'/api/health',{signal:AbortSignal.timeout(15000)});
+ try{const started=Date.now(),health=await fetch(origin+'/api/health',{signal:AbortSignal.timeout(15000)});
  healthStatus=health.status;const body=await health.text();healthDetail=body.slice(0,300);
- try{ready=health.ok&&JSON.parse(body).accountsReady===true;}catch{}
+ ready=health.ok&&JSON.parse(body).accountsReady===true;
+ if(ready)console.log('Production health check: HTTP '+health.status+' in '+(Date.now()-started)+' ms.');
+ }catch{healthDetail='Connection interrupted during readiness check.';}
  if(ready)break;
 }
 if(!ready)throw new Error('The production readiness check failed ('+healthStatus+'): '+healthDetail);
 // Verify the actual asset binding, including an old tab's missing export module.
 const expectedShell=await readFile('dist/client/index.html','utf8');
 const expectedScript=expectedShell.match(/<script[^>]+src="([^"]+)"/)?.[1];
-let assetsReady=false;
-for(let attempt=0;attempt<4;attempt++){
+let assetsReady=false,assetStatus='';
+for(let attempt=0;attempt<8;attempt++){
  if(attempt)await new Promise(resolve=>setTimeout(resolve,2000));
- const [shell,missing,script]=await Promise.all([
+ try{const [shell,missing,script,pdf]=await Promise.all([
   fetch(origin+'/',{cache:'no-cache',signal:AbortSignal.timeout(15000)}),
   fetch(origin+'/assets/__previous_export_readiness__.js',{signal:AbortSignal.timeout(15000)}),
-  fetch(origin+expectedScript,{method:'HEAD',signal:AbortSignal.timeout(15000)})
+  fetch(origin+expectedScript,{method:'HEAD',signal:AbortSignal.timeout(15000)}),
+  fetch(origin+'/assets/pdf-export.js',{method:'HEAD',signal:AbortSignal.timeout(15000)})
  ]);
- assetsReady=!!expectedScript&&shell.ok&&(await shell.text()).includes(expectedScript)&&shell.headers.get('cache-control')?.includes('no-cache')&&missing.status===404&&!missing.headers.get('content-type')?.includes('text/html')&&script.ok&&/javascript/.test(script.headers.get('content-type')||'');
+ const checks={currentShell:!!expectedScript&&shell.ok&&(await shell.text()).includes(expectedScript),htmlCache:shell.headers.get('cache-control')?.includes('no-cache'),missingAsset:missing.status===404&&!missing.headers.get('content-type')?.includes('text/html'),script:script.ok&&/javascript/.test(script.headers.get('content-type')||''),pdf:pdf.ok&&/javascript/.test(pdf.headers.get('content-type')||'')&&pdf.headers.get('cache-control')?.includes('no-cache')};
+ assetsReady=Object.values(checks).every(Boolean);assetStatus=JSON.stringify(checks);
+ }catch{assetStatus='Asset check connection interrupted.';}
  if(assetsReady)break;
 }
-if(!assetsReady)throw new Error('The production asset readiness check failed.');
-console.log('Production assets verified: current JavaScript, revalidated HTML, and missing asset 404 responses.');
+if(!assetsReady)throw new Error('The production asset readiness check failed: '+assetStatus);
+console.log('Production assets verified: current JavaScript, on-demand PDF tools, revalidated HTML, and missing asset 404 responses.');
 // A read-only sign-in check uses the existing owner credential only while the
 // account still matches its initial password. Changed passwords are preserved.
 const accountRow=(await query('SELECT password FROM account WHERE userId=\'owner\' AND providerId=\'credential\''))[0].results[0];
 const {verifyPassword}=await import('better-auth/crypto');
-if(await verifyPassword({hash:accountRow.password,password:process.env.DASHBOARD_PASSWORD_OWNER})){
+if(accountRow?.password&&process.env.DASHBOARD_PASSWORD_OWNER&&await verifyPassword({hash:accountRow.password,password:process.env.DASHBOARD_PASSWORD_OWNER})){
  const login=await fetch(origin+'/api/auth/sign-in/username',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({username:'smooth',password:process.env.DASHBOARD_PASSWORD_OWNER}),signal:AbortSignal.timeout(30000)});
  if(!login.ok)throw new Error('The production login check failed ('+login.status+').');
  const cookie=login.headers.getSetCookie().map(v=>v.split(';')[0]).join('; ');
  const me=await fetch(origin+'/api/session',{headers:{Cookie:cookie},signal:AbortSignal.timeout(30000)});if(!me.ok||!(await me.json()).user?.admin)throw new Error('The production account check failed.');
- await fetch(origin+'/api/auth/sign-out',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(30000)});
-}
+ try{
+  const pending=(await query('SELECT i.id FROM images i LEFT JOIN image_previews v ON v.image_id=i.id WHERE v.image_id IS NULL'))[0].results;
+  console.log('Existing image preview conversion: '+JSON.stringify(await backfillImagePreviews({origin,cookie,images:pending})));
+  const sample=(await query('SELECT image_id FROM image_previews LIMIT 1'))[0].results[0];
+  if(sample){
+   const url=origin+'/api/images/'+encodeURIComponent(sample.image_id)+'?preview=1&account=owner',headers={Cookie:cookie,'X-Production-Account':'owner'};
+   const preview=await fetch(url,{headers,signal:AbortSignal.timeout(15000)});
+   if(!preview.ok||preview.headers.get('X-Image-Variant')!=='preview'||!preview.headers.get('ETag'))throw new Error('The live image preview check failed.');
+   await preview.arrayBuffer();
+   const cached=await fetch(url,{headers:{...headers,'If-None-Match':preview.headers.get('ETag')},signal:AbortSignal.timeout(15000)});
+   const anonymous=await fetch(url,{headers:{'If-None-Match':preview.headers.get('ETag')},signal:AbortSignal.timeout(15000)});
+   if(cached.status!==304||anonymous.status!==401||!cached.headers.get('Cache-Control')?.includes('must-revalidate'))throw new Error('The live private image cache check failed.');
+   console.log('Production images verified: lightweight previews, authenticated 304 responses, and blocked anonymous access.');
+  }
+ }finally{await fetch(origin+'/api/auth/sign-out',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(30000)});}
+}else console.log('Existing preview conversion skipped: the owner has changed the deployment credential.');
 console.log('Production dashboard is ready: '+origin);
 console.log('File storage: '+(config.r2_buckets?'production object bucket':'production database'));
 if(process.env.GITHUB_STEP_SUMMARY)await writeFile(process.env.GITHUB_STEP_SUMMARY,'Production dashboard: '+origin+'\n\nAccount sign-in and project APIs verified. Initial usernames: smooth, akiva, jordyn, rayne. Initial passwords match the existing studio portal; future production password changes remain independent.\n');

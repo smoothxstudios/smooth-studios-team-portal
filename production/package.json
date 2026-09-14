@@ -8,8 +8,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postbuild": "node scripts/build-pdf.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/test.mjs && node scripts/test-shot-order.mjs && node scripts/test-export.mjs && node scripts/test-storyboard.mjs && node scripts/test-uploads.mjs",
+    "test": "node scripts/test.mjs && node scripts/test-shot-order.mjs && node scripts/test-export.mjs && node scripts/test-storyboard.mjs && node scripts/test-uploads.mjs && node scripts/test-performance.mjs",
     "deploy": "node scripts/deploy.mjs"
   },
   "dependencies": {
@@ -59,7 +60,8 @@
     "typescript": "5.9.3",
     "vinext": "1.0.0-beta.5",
     "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "wrangler": "4.92.0",
+    "sharp": "0.34.5"
   },
   "type": "module"
 }

@@ -23,9 +23,16 @@ if(process.env.LOCAL_NODE_TEST==='1'){
 try{
  const db=await mf.getD1Database('DB');
  for(const name of (await readdir('drizzle')).filter(n=>n.endsWith('.sql')).sort()){
-  const sql=(await readFile('drizzle/'+name,'utf8')).replaceAll('--> statement-breakpoint','');
-  for(const statement of sql.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
+  if(name==='0005_image_previews.sql')await db.prepare('INSERT INTO projects(id,owner,title,data,revision,updated_at) VALUES(?,?,?,?,1,0)').bind('legacy-index-fixture','owner','Legacy fixture',JSON.stringify({shots:[{references:[{id:'old-reference'},{id:'old-reference'}]}]})).run();
+  const sql=await readFile('drizzle/'+name,'utf8');
+  const statements=sql.includes('--> statement-breakpoint')?sql.split('--> statement-breakpoint'):sql.split(';');
+  for(const statement of statements.map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
  }
+ assert.deepEqual((await db.prepare('SELECT image_id FROM project_image_refs WHERE project_id=?').bind('legacy-index-fixture').all()).results,[{image_id:'old-reference'}]);
+ await db.prepare('UPDATE projects SET data=? WHERE id=?').bind(JSON.stringify({shots:[{references:[{id:'replacement-reference'}]}]}),'legacy-index-fixture').run();
+ assert.deepEqual((await db.prepare('SELECT image_id FROM project_image_refs WHERE project_id=?').bind('legacy-index-fixture').all()).results,[{image_id:'replacement-reference'}]);
+ await db.prepare('DELETE FROM projects WHERE id=?').bind('legacy-index-fixture').run();
+ assert.equal((await db.prepare('SELECT COUNT(*) n FROM project_image_refs').first()).n,0);
  const password='Test-password-for-owner-only',now=new Date().toISOString(),hash=await hashPassword(password);
  await db.prepare('INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt,username,displayUsername,enabled,mustChangePassword) VALUES(\'owner\',\'Smooth\',\'owner@production.invalid\',0,?,?,\'smooth\',\'smooth\',1,0)').bind(now,now).run();
  await db.prepare('INSERT INTO account(id,userId,accountId,providerId,password,createdAt,updatedAt) VALUES(\'owner-credential\',\'owner\',\'owner\',\'credential\',?,?,?)').bind(hash,now,now).run();
@@ -148,7 +155,24 @@ try{
  await expect(await crew('/api/projects/'+p.id,'DELETE'),403);
  const bytes=Uint8Array.from([137,80,78,71,13,10,26,10]);const imageForm=new FormData();imageForm.set('file',new File([bytes],'test.png',{type:'image/png'}));imageForm.set('projectId',p.id);
  const image=(await expect(await crew('/api/images','POST',imageForm),201)).image;
- const fetched=await crew('/api/images/'+image.id);assert.equal(fetched.status,200);assert.equal(fetched.headers.get('cache-control'),'private, no-store');assert.deepEqual(new Uint8Array(await fetched.arrayBuffer()),bytes);
+ const fetched=await crew('/api/images/'+image.id);assert.equal(fetched.status,200);assert.equal(fetched.headers.get('cache-control'),'private, no-cache, must-revalidate');assert.deepEqual(new Uint8Array(await fetched.arrayBuffer()),bytes);
+ const originalEtag=fetched.headers.get('etag');assert.ok(originalEtag);
+ const conditional=await crew('/api/images/'+image.id,'GET',undefined,{'If-None-Match':originalEtag});assert.equal(conditional.status,304);assert.equal((await conditional.arrayBuffer()).byteLength,0);
+ assert.notEqual((await owner('/api/images/'+image.id)).headers.get('etag'),originalEtag);
+ await expect(await crew('/api/images/'+image.id+'?account=owner','GET',undefined,{'If-None-Match':originalEtag}),401);
+ const fallback=await crew('/api/images/'+image.id+'?preview=1');assert.equal(fallback.headers.get('X-Image-Variant'),'original');assert.deepEqual(new Uint8Array(await fallback.arrayBuffer()),bytes);
+ await expect(await stranger('/api/images/'+image.id+'?preview=1','PUT',bytes),401);
+ await expect(await sound('/api/images/'+image.id+'?preview=1','PUT',bytes),404);
+ await expect(await crew('/api/images/'+image.id+'?preview=1','PUT',new Uint8Array(256*1024+1)),413);
+ await expect(await crew('/api/images/'+image.id+'?preview=1','PUT',new TextEncoder().encode('<html>Invalid image</html>')),400);
+ const displayBytes=Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64'));
+ await expect(await crew('/api/images/'+image.id+'?preview=1','PUT',displayBytes),201);
+ const preview=await crew('/api/images/'+image.id+'?preview=1&account='+camera.id);assert.equal(preview.headers.get('X-Image-Variant'),'preview');assert.deepEqual(new Uint8Array(await preview.arrayBuffer()),displayBytes);
+ const previewEtag=preview.headers.get('etag');assert.notEqual(previewEtag,originalEtag);
+ assert.equal((await crew('/api/images/'+image.id+'?preview=1','GET',undefined,{'If-None-Match':previewEtag})).status,304);
+ await expect(await crew('/api/images/'+image.id+'?preview=1','PUT',bytes),200);
+ assert.deepEqual(new Uint8Array(await (await crew('/api/images/'+image.id+'?preview=1')).arrayBuffer()),displayBytes);
+ assert.deepEqual(new Uint8Array(await (await crew('/api/images/'+image.id)).arrayBuffer()),bytes);
  await expect(await sound('/api/images/'+image.id),404);
  await expect(await sound('/api/projects/'+p.id),404);
  // Exercise a real multi-part picture, including retries and paged download.
@@ -165,6 +189,7 @@ try{
  for(let offset=0,i=0;offset<large.length;offset+=upload.chunkSize,i++)await expect(await crew(uploadUrl+'?part='+i,'PUT',large.slice(offset,offset+upload.chunkSize)),200);
  await expect(await crew(uploadUrl+'?part=0','PUT',large.slice(0,upload.chunkSize)),200);
  const largeImage=(await expect(await crew(uploadUrl,'POST'),201)).image;
+ await expect(await crew('/api/images/'+largeImage.id+'?preview=1','PUT',displayBytes),201);
  assert.equal((await expect(await crew(uploadUrl,'POST'),201)).image.id,largeImage.id);
  await expect(await crew(uploadUrl+'?part=0','PUT',large.slice(0,upload.chunkSize)),409);
  await expect(await crew(uploadUrl,'DELETE'),200);
@@ -202,14 +227,19 @@ try{
  // Revocation applies immediately to the existing session, including the uploader's own files.
  await expect(await crew('/api/projects/'+p.id),404);
  await expect(await crew('/api/images/'+image.id),404);
+ const revokedPreview=await crew('/api/images/'+image.id+'?preview=1','GET',undefined,{'If-None-Match':previewEtag});assert.equal(revokedPreview.status,404);assert.equal(revokedPreview.headers.get('cache-control'),'private, no-store');
+ await expect(await crew('/api/images/'+image.id,'GET',undefined,{'If-None-Match':originalEtag}),404);
  await expect(await crew('/api/files/'+file.id),404);
  await expect(await crew('/api/projects/'+p.id+'/files'),404);
  await expect(await crew('/api/projects/'+p.id+'/crew'),404);
  assert.deepEqual((await expect(await crew('/api/projects'),200)).projects.map(x=>x.id),[tagged.id]);
  assert.deepEqual(new Uint8Array(await (await crew('/api/images/'+largeImage.id)).arrayBuffer()),large);
+ assert.deepEqual(new Uint8Array(await (await crew('/api/images/'+largeImage.id+'?preview=1')).arrayBuffer()),displayBytes);
+ await expect(await crew('/api/images/'+largeImage.id+'?preview=1','PUT',displayBytes),404);
  const copyMember=(await expect(await owner('/api/projects/'+tagged.id+'/crew'),200)).crew[0];
  await expect(await owner('/api/projects/'+tagged.id+'/crew','DELETE',{memberId:copyMember.id}),200);
  await expect(await crew('/api/images/'+largeImage.id),404);
+ await expect(await crew('/api/images/'+largeImage.id+'?preview=1'),404);
  assert.deepEqual((await expect(await crew('/api/projects'),200)).projects,[]);
  await expect(await owner('/api/images/'+image.id),200);
  await expect(await crew('/api/projects/'+p.id,'PUT',{...p,canEdit:true}),404);
