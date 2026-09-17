@@ -2,12 +2,20 @@ import type {Shot} from './shot-list';
 
 const storyOrder=(a:Shot,b:Shot)=>a.number.localeCompare(b.number,undefined,{numeric:true})||a.order-b.order;
 
+/** Move one shot in filming order and give every shot a distinct position. */
+export function placeShotAtOrder(shots:Shot[],incoming:Shot):Shot[]{
+ if(!Number.isSafeInteger(incoming.order)||incoming.order<1||incoming.order>100000)throw new Error('Use a whole shooting order of 1 or higher.');
+ const ordered=shots.filter(s=>s.id!==incoming.id).slice().sort((a,b)=>a.order-b.order||a.scene.localeCompare(b.scene,undefined,{numeric:true})||storyOrder(a,b)||a.id.localeCompare(b.id));
+ ordered.splice(Math.min(incoming.order-1,ordered.length),0,incoming);
+ return ordered.map((s,i)=>({...s,order:i+1}));
+}
+
 /** Insert a saved shot at its numbered position without changing shot IDs or their linked data. */
 export function placeShotAtNumber(shots:Shot[],incoming:Shot):Shot[]{
  const shot={...incoming,scene:incoming.scene.trim(),number:incoming.number.trim()};
  const previous=shots.find(s=>s.id===shot.id);
  if(previous&&previous.scene.trim()===shot.scene&&previous.number.trim()===shot.number){
-  return shots.map(s=>s.id===shot.id?shot:s);
+  return shot.order!==previous.order?placeShotAtOrder(shots,shot):shots.map(s=>s.id===shot.id?shot:s);
  }
  const position=Number(shot.number);
  if(!/^\d+$/.test(shot.number)||!Number.isSafeInteger(position)||position<1){
@@ -26,7 +34,7 @@ export function placeShotAtNumber(shots:Shot[],incoming:Shot):Shot[]{
  // Keep an explicitly edited filming order. Otherwise place the moved shot next to
  // its new scene neighbor, so default table/storyboard/PDF ordering follows the move.
  const orderEdited=shot.order!==(previous?.order??Math.max(0,...shots.map(s=>s.order))+1);
- if(orderEdited)return [...remaining,shot].map(s=>updates.get(s.id)||s);
+ if(orderEdited)return placeShotAtOrder([...remaining,shot].map(s=>updates.get(s.id)||s),updates.get(shot.id)!);
  const filming=remaining.slice().sort((a,b)=>a.order-b.order);
  const next=sceneShots[index+1],prior=sceneShots[index-1];
  let insert=next?filming.findIndex(s=>s.id===next.id):prior?filming.findIndex(s=>s.id===prior.id)+1:filming.findIndex(s=>s.scene.localeCompare(shot.scene,undefined,{numeric:true})>0);

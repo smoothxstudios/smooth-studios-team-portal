@@ -1,4 +1,5 @@
 "use client";
+import {useProjectDraft} from './project-collaboration';
 import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from "react";
 import {createPortal} from "react-dom";
 import {ArrowUpRight,CalendarDays,Check,CheckCheck,CheckSquare,ChevronRight,Clapperboard,Clock3,Copy,Download,Eye,FileText,FolderOpen,Link2,Loader2,MapPin,Pencil,Plus,Printer,Receipt,Trash2,Upload,Users,Wallet} from "lucide-react";
@@ -25,6 +26,7 @@ type Save=(p:Project,message?:string)=>Promise<boolean>;
 export type ProductionSection="settings"|"projects"|"overview"|"shots"|"crew"|"files"|"schedule"|"budget";
 export const SECTION_LABELS:Record<ProductionSection,string>={settings:"Settings",projects:"All productions",overview:"Project overview",shots:"Shot list",crew:"Crew & tasks",files:"Scripts & files",schedule:"Schedule & call sheet",budget:"Budget & expenses"};
 function Modal({title,description,children,onClose,onSave,busy,label="Save changes",wide=false}:{title:string;description:string;children:ReactNode;onClose:()=>void;onSave:()=>void;busy:boolean;label?:string;wide?:boolean}){
+ useProjectDraft();
  const canEdit=useContext(ProjectEditingContext);
  return <Dialog open onOpenChange={v=>!v&&!busy&&onClose()}><DialogContent className={"production-modal "+(wide?"large":"")} onInteractOutside={e=>e.preventDefault()} onEscapeKeyDown={e=>busy&&e.preventDefault()}><DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader><div className="production-modal-body"><fieldset className="view-only-fields" disabled={!canEdit}>{children}</fieldset></div><DialogFooter><Button variant="outline" onClick={onClose} disabled={busy}>{canEdit?"Cancel":"Close"}</Button>{canEdit&&<Button onClick={onSave} disabled={busy}>{busy?<Loader2 className="spin"/>:<Check/>}{label}</Button>}</DialogFooter></DialogContent></Dialog>;
 }
@@ -37,6 +39,7 @@ export function ProductionProjects({projects,onOpen,onNew,onExport,admin}:{proje
 export function ProductionModules({section,project,user,canEdit,save,saving,onSection}:{section:ProductionSection;project:Project;user:SessionUser;canEdit:boolean;save:Save;saving:boolean;onSection:(s:ProductionSection)=>void}){
  const [crew,setCrew]=useState<CrewMember[]>([]),[files,setFiles]=useState<ProjectFile[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState("");
  const [confirm,setConfirm]=useState<{title:string;action:()=>Promise<void>}|null>(null),[deleting,setDeleting]=useState(false);
+ useProjectDraft(!!confirm);
  const pd=productionOf(project),canManage=user.admin||project.canManage===true;
  async function reload(){if(!project.revision){setCrew([]);setFiles([]);return;}setLoading(true);setError("");try{const results=await Promise.all([request<{crew:CrewMember[]}>("/api/projects/"+project.id+"/crew"),request<{files:ProjectFile[]}>("/api/projects/"+project.id+"/files")]);setCrew(results[0].crew);setFiles(results[1].files);}catch(e){setError(errorText(e));}finally{setLoading(false);}}
  useEffect(()=>{reload();},[project.id,!!project.revision]);

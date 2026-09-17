@@ -21,6 +21,8 @@ import { toast } from "sonner";
 import {request,errorText,Choice,FormField,RequestFailure} from "@/components/production-ui";
 import {uploadReference} from "@/lib/uploads";
 import {placeShotAtNumber} from "@/lib/shot-order";
+import type {ProjectChange,MergeChoices} from '@/lib/project-merge';
+import {ProjectDraftProvider,useProjectDraft,useOpenDrafts,ConflictReview,type PendingReview} from '@/components/project-collaboration';
 import {AccountActions,useAccount} from "@/components/accounts";
 import {ProductionProjects,ProductionModules,SECTION_LABELS,type ProductionSection} from "@/components/production-panels";
 import {productionOf,defaultProduction,hasModule,STAGES} from "@/lib/production";
@@ -37,7 +39,7 @@ function ReferenceImage({image,className=""}:{image:Reference;className?:string}
   return failed?<span className={"image-failed "+className}><ImageIcon size={22}/>Image unavailable</span>:<img src={url} alt={image.caption||image.name} className={className} loading={className==='expanded-image'?'eager':'lazy'} decoding="async" onError={()=>setFailed(true)}/>;
 }
 
-export default function Workspace(){return <SidebarProvider style={{"--sidebar-width":"236px"} as React.CSSProperties}><ShotWorkspace/><Toaster richColors position="bottom-right"/></SidebarProvider>;}
+export default function Workspace(){return <ProjectDraftProvider><SidebarProvider style={{"--sidebar-width":"236px"} as React.CSSProperties}><ShotWorkspace/><Toaster richColors position="bottom-right"/></SidebarProvider></ProjectDraftProvider>;}
 
 function ShotWorkspace(){
   const [project,setProject]=useState<Project|null>(null),[projects,setProjects]=useState<ProjectSummary[]>([]);
@@ -45,13 +47,25 @@ function ShotWorkspace(){
   const [loading,setLoading]=useState(true),[loadError,setLoadError]=useState(""),[saving,setSaving]=useState(false),[saveError,setSaveError]=useState("");
   const [view,setView]=useState("table"),[scene,setScene]=useState("All scenes"),[status,setStatus]=useState("All statuses"),[priority,setPriority]=useState("All priorities"),[location,setLocation]=useState("All locations"),[query,setQuery]=useState(""),[sort,setSort]=useState("Story order");
   const [exportScope,setExportScope]=useState<"current"|"all"|null>(null),[showFilters,setShowFilters]=useState(false);
-  const [editor,setEditor]=useState<{shot:Shot;tab:string}|null>(null),[customize,setCustomize]=useState(false),[projectDialog,setProjectDialog]=useState<"new"|"edit"|"copy"|null>(null);
+  const [editor,setEditor]=useState<{shot:Shot;tab:string;base:Project}|null>(null),[customize,setCustomize]=useState(false),[projectDialog,setProjectDialog]=useState<"new"|"edit"|"copy"|null>(null);
   const [confirm,setConfirm]=useState<{title:string;description:string;action:()=>Promise<void>}|null>(null);
   const canEdit=!!user?.admin||project?.canEdit===true;
   const canManage=!!user?.admin||project?.canManage===true;
   const locked=useRef(false);const requestSeq=useRef(0);const {setOpenMobile}=useSidebar();
+  const projectRef=useRef<Project|null>(null),snapshots=useRef(new Map<string,Project>()),pendingRemote=useRef<Project|null>(null);
+  const [remoteWaiting,setRemoteWaiting]=useState(false),[syncProblem,setSyncProblem]=useState(''),[review,setReview]=useState<PendingReview|null>(null);
+  const reviewRef=useRef<PendingReview|null>(null),drafts=useOpenDrafts(),draftsRef=useRef(drafts);draftsRef.current=drafts;
+  useProjectDraft(!!confirm);
+  const adoptProject=useCallback((p:Project)=>{
+    projectRef.current=p;setProject(p);snapshots.current.set(p.id+':'+p.revision,p);
+    if(snapshots.current.size>20)snapshots.current.delete(snapshots.current.keys().next().value!);
+    if(!pendingRemote.current||pendingRemote.current.revision<=p.revision){pendingRemote.current=null;setRemoteWaiting(false);}
+    setProjects(previous=>[summarize(p),...previous.filter(item=>item.id!==p.id)]);
+  },[]);
+  function finishReview(choices:MergeChoices|null){reviewRef.current?.resolve(choices);reviewRef.current=null;setReview(null);}
+  useEffect(()=>()=>{reviewRef.current?.resolve(null);},[]);
   const clearOpenProject=useCallback(()=>{
-    ++requestSeq.current;setProject(null);setEditor(null);setCustomize(false);setProjectDialog(null);setExportScope(null);setConfirm(null);setSection("projects");setSaveError("");setLoadError("");setLoading(false);
+    ++requestSeq.current;reviewRef.current?.resolve(null);reviewRef.current=null;setReview(null);projectRef.current=null;snapshots.current.clear();pendingRemote.current=null;setRemoteWaiting(false);setSyncProblem('');setProject(null);setEditor(null);setCustomize(false);setProjectDialog(null);setExportScope(null);setConfirm(null);setSection("projects");setSaveError("");setLoadError("");setLoading(false);
   },[]);
 
   const loadProject=useCallback(async(id?:string)=>{
@@ -61,11 +75,37 @@ function ShotWorkspace(){
       const list=id?null:await request<{projects:ProjectSummary[]}>("/api/projects");
       const p=id?(await request<{project:Project}>("/api/projects/"+id)).project:user.admin&&!list?.projects.length?exampleProject():null;
       if(seq!==requestSeq.current)return;setEditor(null);setCustomize(false);setProjectDialog(null);
-      if(list)setProjects(list.projects);else if(p)setProjects(previous=>[summarize(p),...previous.filter(item=>item.id!==p.id)]);
-      setProject(p);setScene("All scenes");setStatus("All statuses");setPriority("All priorities");setLocation("All locations");setQuery("");if(!p)setSection("projects");
+      pendingRemote.current=null;setRemoteWaiting(false);setSyncProblem('');
+      if(list)setProjects(list.projects);
+      if(p)adoptProject(p);else{projectRef.current=null;setProject(null);}
+      setScene("All scenes");setStatus("All statuses");setPriority("All priorities");setLocation("All locations");setQuery("");if(!p)setSection("projects");
     }catch(e){if(seq===requestSeq.current){if(e instanceof RequestFailure&&[401,403,404].includes(e.status)){clearOpenProject();setProjects(previous=>e.status===404?previous.filter(p=>p.id!==id):[]);if(e.status===404)toast.info("This production is no longer available to your account.");}else setLoadError(errorText(e));}}finally{if(seq===requestSeq.current)setLoading(false);}
-  },[clearOpenProject,user?.id,user?.admin]);
+  },[adoptProject,clearOpenProject,user?.id,user?.admin]);
   useEffect(()=>{loadProject();},[loadProject]);
+  useEffect(()=>{
+    if(drafts===0&&!locked.current&&pendingRemote.current){const next=pendingRemote.current;if(next.id===projectRef.current?.id&&next.revision>projectRef.current.revision)adoptProject(next);else{pendingRemote.current=null;setRemoteWaiting(false);}}
+  },[drafts,adoptProject]);
+  useEffect(()=>{
+    if(!project?.revision)return;
+    const id=project.id;let stopped=false,pending=false;
+    async function sync(){
+      if(stopped||pending||locked.current||document.visibilityState==='hidden'||projectRef.current?.id!==id)return;
+      pending=true;const seq=requestSeq.current;
+      try{
+        const revision=pendingRemote.current?.id===id?pendingRemote.current.revision:projectRef.current.revision;
+        const result=await request<{project?:Project;unchanged?:boolean}>('/api/projects/'+id+'?since='+revision);
+        if(stopped||seq!==requestSeq.current||projectRef.current?.id!==id||locked.current)return;
+        setSyncProblem('');
+        if(result.project&&result.project.revision>projectRef.current.revision){
+          if(draftsRef.current){if(!pendingRemote.current||result.project.revision>pendingRemote.current.revision)pendingRemote.current=result.project;setRemoteWaiting(true);}
+          else adoptProject(result.project);
+        }
+      }catch(e){if(!stopped&&seq===requestSeq.current){if(e instanceof RequestFailure&&[401,403,404].includes(e.status)){clearOpenProject();setProjects(previous=>e.status===404?previous.filter(p=>p.id!==id):[]);toast.info('Your access to this production has changed.');}else setSyncProblem('Reconnecting to team updates…');}}
+      finally{pending=false;}
+    }
+    const timer=window.setInterval(sync,6000);window.addEventListener('focus',sync);document.addEventListener('visibilitychange',sync);
+    return()=>{stopped=true;window.clearInterval(timer);window.removeEventListener('focus',sync);document.removeEventListener('visibilitychange',sync);};
+  },[project?.id,!!project?.revision,adoptProject,clearOpenProject]);
   useEffect(()=>{
     if(!user||user.admin)return;
     let stopped=false,pending=false;
@@ -87,25 +127,42 @@ function ShotWorkspace(){
     window.addEventListener("focus",refreshAccess);document.addEventListener("visibilitychange",refreshAccess);
     return()=>{stopped=true;window.clearInterval(timer);window.removeEventListener("focus",refreshAccess);document.removeEventListener("visibilitychange",refreshAccess);};
   },[user?.id,user?.admin,project?.id,clearOpenProject]);
-  async function persist(p:Project,message?:string,teamAccountIds?:string[]){
+  async function persist(p:Project,message?:string,teamAccountIds?:string[],shotId?:string,editBase?:Project){
     if(!user||(p.revision>0&&!user.admin&&p.canEdit!==true)){toast.error("You no longer have permission to edit this production.");return false;}
     if(locked.current)return false;locked.current=true;setSaving(true);setSaveError("");const seq=requestSeq.current;
     try{
-      const result=await request<{project:Project}>(p.revision?"/api/projects/"+p.id:"/api/projects",p.revision?"PUT":"POST",teamAccountIds?{...p,teamAccountIds}:p);
+      let result:{project:Project};
+      if(p.revision){
+        const base=editBase||snapshots.current.get(p.id+':'+p.revision);
+        if(!base)throw new Error('The starting version of this draft is unavailable. Keep your draft open and try again.');
+        const change:ProjectChange={base,project:p,shotId};
+        while(true){
+          try{result=await request<{project:Project}>('/api/projects/'+p.id,'PATCH',change);break;}
+          catch(e){
+            if(seq!==requestSeq.current)return false;
+            if(!(e instanceof RequestFailure)||e.status!==409||!e.details?.conflicts?.length||!e.details?.project)throw e;
+            const choices=await new Promise<MergeChoices|null>(resolve=>{const next={conflicts:e.details.conflicts,resolve,token:crypto.randomUUID()};reviewRef.current=next;setReview(next);});
+            if(!choices||seq!==requestSeq.current)return false;
+            change.choices=choices;change.reviewRevision=e.details.project.revision;
+          }
+        }
+      }else result=await request<{project:Project}>('/api/projects','POST',teamAccountIds?{...p,teamAccountIds}:p);
       if(seq!==requestSeq.current)return false;
-      setProject(result.project);setProjects(prev=>[summarize(result.project),...prev.filter(x=>x.id!==p.id)]);
+      adoptProject(result.project);setSyncProblem('');
       if(message)toast.success(message);return true;
     }catch(e){if(seq!==requestSeq.current)return false;if(e instanceof RequestFailure&&e.status===404){clearOpenProject();setProjects(prev=>prev.filter(x=>x.id!==p.id));toast.error("This production is no longer available to your account.");}else{setSaveError(errorText(e));toast.error(errorText(e));}return false;}
     finally{locked.current=false;setSaving(false);}
   }
   async function saveShot(shot:Shot){
-    if(!project)return false;
+    const base=editor?.base||project;if(!base)return false;
     try{
-      const shots=placeShotAtNumber(project.shots,shot),saved=shots.find(s=>s.id===shot.id)!;
-      return persist({...project,shots},saved.number!==shot.number?"Saved as Scene "+saved.scene+" / Shot "+saved.number:"Shot saved");
+      // Validate locally, then apply the move to the latest shared sequence on the server.
+      const checked=placeShotAtNumber(base.shots,shot);
+      const shots=base.revision?(base.shots.some(s=>s.id===shot.id)?base.shots.map(s=>s.id===shot.id?shot:s):[...base.shots,shot]):checked;
+      return persist({...base,shots},'Shot saved',undefined,shot.id,base);
     }catch(e){toast.error(errorText(e));return false;}
   }
-  function openShot(shot:Shot,tab="details"){setSaveError("");setEditor({shot:structuredClone(shot),tab});}
+  function openShot(shot:Shot,tab="details"){if(project){setSaveError("");setEditor({shot:structuredClone(shot),tab,base:project});}}
   function addShot(){if(project&&canEdit)openShot(blankShot(project.shots,scene==="All scenes"?"1":scene));}
   function clearFilters(){setScene("All scenes");setStatus("All statuses");setPriority("All priorities");setLocation("All locations");setQuery("");}
   const allShots=project?.shots||[];
@@ -123,7 +180,7 @@ function ShotWorkspace(){
 
   async function moveShot(shot:Shot,delta:number){
     if(!project)return;const ordered=[...project.shots].sort((a,b)=>a.order-b.order);const i=ordered.findIndex(s=>s.id===shot.id);const j=i+delta;if(j<0||j>=ordered.length)return;
-    [ordered[i],ordered[j]]=[ordered[j],ordered[i]];await persist({...project,shots:ordered.map((s,n)=>({...s,order:n+1}))});
+    const moved={...shot,order:j+1};await persist({...project,shots:project.shots.map(s=>s.id===shot.id?moved:s)},'Shooting order updated',undefined,shot.id,project);
   }
   function duplicateShot(shot:Shot){if(!project)return;const fresh=blankShot(project.shots,shot.scene);openShot({...structuredClone(shot),id:fresh.id,number:fresh.number,order:fresh.order,status:"Planned",values:{...shot.values,takes:""}});}
   function deleteShot(shot:Shot){setConfirm({title:"Delete shot "+shot.scene+"."+shot.number+"?",description:"This removes the shot and its reference links from this project.",action:async()=>{if(project)await persist({...project,shots:project.shots.filter(s=>s.id!==shot.id)},"Shot deleted");}});}
@@ -142,7 +199,7 @@ function ShotWorkspace(){
       <SidebarFooter className="production-sidebar-footer"><SidebarMenu><SidebarMenuItem><SidebarMenuButton isActive={section==="settings"} onClick={()=>navigate("settings")} disabled={saving}><Settings size={17}/><span>Settings</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu><div className="side-footer"><span className="owner-avatar">{user?.name.trim().charAt(0)||"S"}</span><div><strong>{user?.name||"Smooth Studios"}</strong><small>{user?.admin?"Owner · All projects":"Team · Your projects"}</small></div></div></SidebarFooter>
     </Sidebar>
     <main className="workspace-main">
-      <header className="topbar"><div className="breadcrumb"><SidebarTrigger aria-label="Toggle project navigation"/><span>Productions</span><ChevronRight size={14}/><strong>{section==="projects"&&!user?.admin?"Your productions":SECTION_LABELS[section]}</strong></div><span className="save-state" role="status">{saving?<><Loader2 size={14} className="spin"/>Saving…</>:saveError?<><X size={14}/>Not saved</>:project?.revision?<><CheckCheck size={16}/>Saved</>:null}</span><AccountActions/></header>
+      <header className="topbar"><div className="breadcrumb"><SidebarTrigger aria-label="Toggle project navigation"/><span>Productions</span><ChevronRight size={14}/><strong>{section==="projects"&&!user?.admin?"Your productions":SECTION_LABELS[section]}</strong></div><span className="save-state" role="status" title="Team updates sync automatically">{saving?<><Loader2 size={14} className="spin"/>Saving…</>:saveError?<><X size={14}/>Not saved</>:syncProblem?<><Loader2 size={14} className="spin"/>Reconnecting…</>:remoteWaiting?<>Team Updates</>:project?.revision?<><CheckCheck size={16}/>Saved</>:null}</span><AccountActions/></header>
       {loading?<div className="workspace-loading"><Loader2 className="spin"/><p>Opening your productions…</p></div>:loadError?<Empty><EmptyHeader><EmptyMedia variant="icon"><FolderOpen/></EmptyMedia><EmptyTitle>Couldn’t open your projects</EmptyTitle><EmptyDescription>{loadError}</EmptyDescription></EmptyHeader><Button onClick={()=>loadProject()}>Try again</Button></Empty>:section==="settings"?<DashboardSettings admin={!!user?.admin}/>:section==="projects"?<ProductionProjects projects={listed} admin={!!user?.admin} onNew={()=>setProjectDialog("new")} onOpen={openProduction} onExport={()=>setExportScope("all")}/>:project&&user&&<>
         <section className="project-heading"><div><div className="eyebrow">{SECTION_LABELS[section].toUpperCase()}</div><div className="title-line"><h1>{project.title}</h1>{canEdit&&<Button variant="ghost" size="icon" aria-label="Edit project details" onClick={()=>setProjectDialog("edit")} disabled={saving}><Pencil size={17}/></Button>}</div><div className="project-meta"><span><Clapperboard size={14}/>{project.client||"Smooth Studios"}</span><span><CalendarDays size={14}/>{project.date?new Date(project.date+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}):"Shoot date not set"}</span><span className="project-stage">{productionOf(project).stage}</span></div></div><div className="project-actions"><Button variant="outline" onClick={()=>setExportScope("current")} disabled={saving}><Download size={16}/>Export PDF</Button>{user&&<><Button className="new-production-action" variant="outline" onClick={()=>setProjectDialog("new")} disabled={saving}><Plus/>New production</Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" aria-label="Project actions" disabled={saving}><MoreHorizontal/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>setProjectDialog("edit")}><Pencil/>Project details</DropdownMenuItem><DropdownMenuItem onSelect={()=>setProjectDialog("copy")}><Copy/>Copy shot list to new project</DropdownMenuItem>{project.revision>0&&canManage&&<><DropdownMenuSeparator/><DropdownMenuItem variant="destructive" onSelect={()=>setConfirm({title:"Delete this production?",description:"This removes the shot list, crew assignments, tasks, schedules, documents, and expenses for "+project.title+". This cannot be undone.",action:async()=>{try{await request("/api/projects/"+project.id,"DELETE");await loadProject();setSection("projects");toast.success("Production deleted");}catch(e){toast.error(errorText(e));}}})}><Trash2/>Delete production</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu></>}</div></section>
         <div className="mobile-section-picker"><Choice label="Project section" value={SECTION_LABELS[section]} options={projectSections.filter(([key])=>hasModule(project,key)).map(([key])=>SECTION_LABELS[key])} onChange={label=>{const item=projectSections.find(([key])=>SECTION_LABELS[key]===label);if(item)navigate(item[0]);}}/></div>
@@ -174,16 +231,19 @@ function ShotWorkspace(){
     {project&&editor&&<ShotEditor key={editor.shot.id} initial={editor.shot} initialTab={editor.tab} canEdit={canEdit} projectId={project.revision?project.id:undefined} fields={project.fields} saving={saving} onSave={saveShot} onClose={()=>setEditor(null)}/>}
     {project&&canEdit&&customize&&<CustomizeDialog project={project} saving={saving} onSave={async(fields,columns)=>{const ok=await persist({...project,fields,columns},"Categories updated");if(ok)setCustomize(false);}} onClose={()=>setCustomize(false)}/>}
     {projectDialog&&user&&(projectDialog!=="edit"||canEdit)&&<ProjectDialog mode={projectDialog} project={project} saving={saving} onClose={()=>setProjectDialog(null)} onSave={async(p,teamAccountIds)=>{const ok=await persist(p,projectDialog==="edit"?"Project updated":"Project created",teamAccountIds);if(ok){clearFilters();if(projectDialog!=="edit"||!hasModule(p,section))setSection("overview");setProjectDialog(null);}}}/>}
+    {review&&<ConflictReview key={review.token} review={review} onDone={finishReview}/>}
     {exportScope&&<ExportDialog scope={exportScope} project={project} projects={listed} onClose={()=>setExportScope(null)}/>}
     <AlertDialog open={!!confirm} onOpenChange={v=>!v&&setConfirm(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{confirm?.title}</AlertDialogTitle><AlertDialogDescription>{confirm?.description}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={()=>confirm?.action()}>Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </>;
 }
 
 function ShotEditor({initial,initialTab,canEdit,projectId,fields,saving,onSave,onClose}:{initial:Shot;initialTab:string;canEdit:boolean;projectId?:string;fields:Field[];saving:boolean;onSave:(s:Shot)=>Promise<boolean>;onClose:()=>void}){
+  useProjectDraft();
   const [shot,setShot]=useState(initial),[tab,setTab]=useState(initialTab),[uploading,setUploading]=useState(false),[dragging,setDragging]=useState(false),[discard,setDiscard]=useState(false),[expanded,setExpanded]=useState<Reference|null>(null),[localError,setLocalError]=useState("");
   const fileInput=useRef<HTMLInputElement>(null);const uploadLock=useRef(false);
   const [uploadProgress,setUploadProgress]=useState(0);
-  const dirty=JSON.stringify(shot)!==JSON.stringify(initial);
+  const [orderInput,setOrderInput]=useState(String(initial.order));
+  const dirty=JSON.stringify(shot)!==JSON.stringify(initial)||orderInput!==String(initial.order);
   useEffect(()=>{const prevent=(e:BeforeUnloadEvent)=>{if(dirty||uploading){e.preventDefault();e.returnValue="";}};window.addEventListener("beforeunload",prevent);return()=>window.removeEventListener("beforeunload",prevent);},[dirty,uploading]);
   function close(){if(saving||uploading)return;if(dirty)setDiscard(true);else onClose();}
   function set<K extends keyof Shot>(key:K,value:Shot[K]){setShot(s=>({...s,[key]:value}));}
@@ -200,15 +260,15 @@ function ShotEditor({initial,initialTab,canEdit,projectId,fields,saving,onSave,o
     if(failures.length){setLocalError(failures.join("\n"));toast.error(failures[0]);}
   }
 
-  async function save(){if(!canEdit)return;if(!shot.scene.trim()||!shot.number.trim()){setLocalError("Add a scene and shot number.");return;}setLocalError("");const ok=await onSave({...shot,scene:shot.scene.trim(),number:shot.number.trim()});if(ok)onClose();}
+  async function save(){if(!canEdit)return;if(!shot.scene.trim()||!shot.number.trim()){setLocalError("Add a scene and shot number.");return;}const order=Number(orderInput.trim());if(!/^\d+$/.test(orderInput.trim())||!Number.isSafeInteger(order)||order<1||order>100000){setLocalError("Enter a whole shooting order from 1 to 100,000.");setTab("schedule");return;}setLocalError("");const ok=await onSave({...shot,order,scene:shot.scene.trim(),number:shot.number.trim()});if(ok)onClose();}
   return <>
     <Sheet open onOpenChange={v=>!v&&!expanded&&!discard&&close()}><SheetContent className="shot-editor" showCloseButton={false} onInteractOutside={e=>{e.preventDefault();if(!expanded&&!discard)close();}} onEscapeKeyDown={e=>{if(!expanded&&!discard){e.preventDefault();close();}}}>
       <SheetHeader className="editor-header"><div><span className="eyebrow">SHOT DETAILS</span><SheetTitle>Scene {shot.scene || "—"} <span className="muted">/</span> Shot {shot.number || "—"}</SheetTitle><SheetDescription>{canEdit?"Plan the frame. Keep every detail together.":"View the framing, production notes, and reference images."}</SheetDescription></div><Button variant="ghost" size="icon" onClick={close} disabled={saving||uploading} aria-label="Close shot editor"><X/></Button></SheetHeader>
       <Tabs value={tab} onValueChange={setTab} className="editor-tabs"><TabsList className="editor-tab-list"><TabsTrigger value="details">Framing</TabsTrigger><TabsTrigger value="production">Production</TabsTrigger><TabsTrigger value="schedule">Schedule & takes</TabsTrigger><TabsTrigger value="images">Images <span className="tab-count">{shot.references.length}</span></TabsTrigger></TabsList>
         <div className="editor-scroll">
-          <TabsContent value="details"><fieldset className="view-only-fields" disabled={!canEdit}><div className="form-grid"><FormField label="Scene #"><Input aria-label="Scene number" value={shot.scene} onChange={e=>set("scene",e.target.value)} placeholder="1"/></FormField><FormField label="Shot #" hint="Moves this shot and renumbers the scene on save. Numbers beyond the last position place it at the end."><Input inputMode="numeric" aria-label="Shot number" value={shot.number} onChange={e=>set("number",e.target.value)} placeholder="1"/></FormField><FormField label="Description / action" wide><Textarea aria-label="Shot description" value={shot.description} onChange={e=>set("description",e.target.value)} rows={4} placeholder="What happens in this shot?"/></FormField></div><h3 className="form-section-title">Framing & movement</h3><p className="section-hint">Size is the framing. Angle is camera height. Direction is your position around the subject.</p><div className="form-grid">{renderFields(GROUPS[0])}</div>{fields.some(f=>!GROUPS.includes(f.group))&&<><h3 className="form-section-title">Custom details</h3><div className="form-grid">{[...new Set(fields.filter(f=>!GROUPS.includes(f.group)).map(f=>f.group))].map(g=><div className="contents" key={g}>{renderFields(g)}</div>)}</div></>}</fieldset></TabsContent>
-          <TabsContent value="production"><fieldset className="view-only-fields" disabled={!canEdit}><h3 className="form-section-title first">Production details</h3><div className="form-grid">{renderFields(GROUPS[1])}</div><h3 className="form-section-title">Lighting & sound</h3><div className="form-grid">{renderFields(GROUPS[2])}</div></fieldset></TabsContent>
-          <TabsContent value="schedule"><fieldset className="view-only-fields" disabled={!canEdit}><h3 className="form-section-title first">Schedule & progress</h3><div className="form-grid"><FormField label="Shooting order" hint="The order you plan to film this shot."><Input type="number" min="1" max="100000" aria-label="Shooting order" value={shot.order} onChange={e=>set("order",Math.max(1,Number(e.target.value)||1))}/></FormField><FormField label="Estimated setup (minutes)" hint="Lighting, gear, and talent preparation."><Input type="number" min="0" max="10000" aria-label="Estimated setup in minutes" value={shot.setup} onChange={e=>set("setup",Math.max(0,Number(e.target.value)||0))}/></FormField><FormField label="Shot duration (seconds)" hint="Estimated screen time in the finished edit."><Input type="number" min="0" max="100000" aria-label="Shot duration in seconds" value={shot.duration} onChange={e=>set("duration",Math.max(0,Number(e.target.value)||0))}/></FormField><FormField label="Priority"><Choice label="Shot priority" value={shot.priority} options={PRIORITY} onChange={v=>set("priority",v)}/></FormField><FormField label="Completion status"><Choice label="Shot status" value={shot.status} options={STATUS} onChange={v=>set("status",v)}/></FormField></div><h3 className="form-section-title">On-set notes</h3><div className="form-grid">{renderFields(GROUPS[3])}</div></fieldset></TabsContent>
+          <TabsContent value="details"><fieldset className="view-only-fields" disabled={!canEdit||saving}><div className="form-grid"><FormField label="Scene #"><Input aria-label="Scene number" value={shot.scene} onChange={e=>set("scene",e.target.value)} placeholder="1"/></FormField><FormField label="Shot #" hint="Moves this shot and renumbers the scene on save. Numbers beyond the last position place it at the end."><Input inputMode="numeric" aria-label="Shot number" value={shot.number} onChange={e=>set("number",e.target.value)} placeholder="1"/></FormField><FormField label="Description / action" wide><Textarea aria-label="Shot description" value={shot.description} onChange={e=>set("description",e.target.value)} rows={4} placeholder="What happens in this shot?"/></FormField></div><h3 className="form-section-title">Framing & movement</h3><p className="section-hint">Size is the framing. Angle is camera height. Direction is your position around the subject.</p><div className="form-grid">{renderFields(GROUPS[0])}</div>{fields.some(f=>!GROUPS.includes(f.group))&&<><h3 className="form-section-title">Custom details</h3><div className="form-grid">{[...new Set(fields.filter(f=>!GROUPS.includes(f.group)).map(f=>f.group))].map(g=><div className="contents" key={g}>{renderFields(g)}</div>)}</div></>}</fieldset></TabsContent>
+          <TabsContent value="production"><fieldset className="view-only-fields" disabled={!canEdit||saving}><h3 className="form-section-title first">Production details</h3><div className="form-grid">{renderFields(GROUPS[1])}</div><h3 className="form-section-title">Lighting & sound</h3><div className="form-grid">{renderFields(GROUPS[2])}</div></fieldset></TabsContent>
+          <TabsContent value="schedule"><fieldset className="view-only-fields" disabled={!canEdit||saving}><h3 className="form-section-title first">Schedule & progress</h3><div className="form-grid"><FormField label="Shooting Order" hint="Moves this shot to that position and shifts the other shots. Numbers beyond the last position go at the end."><Input type="text" inputMode="numeric" pattern="[0-9]*" aria-label="Shooting order" value={orderInput} onChange={e=>setOrderInput(e.target.value)} disabled={saving}/></FormField><FormField label="Estimated setup (minutes)" hint="Lighting, gear, and talent preparation."><Input type="number" min="0" max="10000" aria-label="Estimated setup in minutes" value={shot.setup} onChange={e=>set("setup",Math.max(0,Number(e.target.value)||0))}/></FormField><FormField label="Shot duration (seconds)" hint="Estimated screen time in the finished edit."><Input type="number" min="0" max="100000" aria-label="Shot duration in seconds" value={shot.duration} onChange={e=>set("duration",Math.max(0,Number(e.target.value)||0))}/></FormField><FormField label="Priority"><Choice label="Shot priority" value={shot.priority} options={PRIORITY} onChange={v=>set("priority",v)}/></FormField><FormField label="Completion status"><Choice label="Shot status" value={shot.status} options={STATUS} onChange={v=>set("status",v)}/></FormField></div><h3 className="form-section-title">On-set notes</h3><div className="form-grid">{renderFields(GROUPS[3])}</div></fieldset></TabsContent>
           <TabsContent value="images"><h3 className="form-section-title first">Reference images</h3><p className="section-hint">{canEdit?"Add storyboards, inspiration, or frame grabs. The first image is the cover in both views.":"Storyboards, inspiration, and frame grabs for this shot."}</p>{canEdit&&<><input ref={fileInput} type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" aria-label="Upload reference images" onChange={e=>e.target.files&&upload(e.target.files)} disabled={uploading||shot.references.length>=8}/>
             <button className={"upload-zone "+(dragging?"is-dragging":"")} disabled={uploading||shot.references.length>=8} onClick={()=>fileInput.current?.click()} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);if(!uploading&&shot.references.length<8)upload(e.dataTransfer.files);}}>{uploading?<Loader2 className="spin"/>:<Upload/>}<strong>{uploading?"Uploading "+uploadProgress+"%…":shot.references.length>=8?"8 images added":"Drop images here or click to upload"}</strong><span>JPG, PNG, WebP, GIF · Up to 12 MB each · Original quality · 8 per shot</span></button></>}
             <div className="reference-gallery">{shot.references.map((r,i)=><div className="reference-card" key={r.id}><button className="reference-preview" onClick={()=>setExpanded(r)} aria-label={"Enlarge "+r.name}><ReferenceImage image={r}/><Expand size={16}/>{i===0&&<span>Cover</span>}</button><div className="reference-details"><span className="reference-name">{r.name}</span><Input readOnly={!canEdit} aria-label={"Caption for "+r.name} placeholder="Add image notes…" value={r.caption} onChange={e=>set("references",shot.references.map(x=>x.id===r.id?{...x,caption:e.target.value}:x))}/>{canEdit&&<div className="reference-actions">{i>0&&<Button size="sm" variant="ghost" onClick={()=>set("references",[r,...shot.references.filter(x=>x.id!==r.id)])}>Make cover</Button>}<Button size="sm" variant="ghost" onClick={()=>set("references",shot.references.filter(x=>x.id!==r.id))} aria-label={"Remove "+r.name}><Trash2 size={14}/>Remove</Button></div>}</div></div>)}</div>
@@ -224,6 +284,7 @@ function ShotEditor({initial,initialTab,canEdit,projectId,fields,saving,onSave,o
 }
 
 function CustomizeDialog({project,saving,onSave,onClose,creating=false}:{project:Project;saving:boolean;creating?:boolean;onSave:(f:Field[],c:string[])=>Promise<void>;onClose:()=>void}){
+  useProjectDraft();
   const [fields,setFields]=useState(()=>structuredClone(project.fields)),[columns,setColumns]=useState(project.columns||DEFAULT_COLUMNS),[editKey,setEditKey]=useState<string|null>(null),[newName,setNewName]=useState(""),[newType,setNewType]=useState("text"),[newOptions,setNewOptions]=useState(""),[newGroup,setNewGroup]=useState(GROUPS[0]),[error,setError]=useState("");
   const edited=fields.find(f=>f.key===editKey);
   function patch(key:string,p:Partial<Field>){setFields(fs=>fs.map(f=>f.key===key?{...f,...p}:f));}
@@ -233,6 +294,7 @@ function CustomizeDialog({project,saving,onSave,onClose,creating=false}:{project
 }
 
 function ProjectDialog({mode,project,saving,onSave,onClose}:{mode:"new"|"edit"|"copy";project:Project|null;saving:boolean;onSave:(p:Project,teamAccountIds?:string[])=>Promise<void>;onClose:()=>void}){
+  useProjectDraft();
   const [title,setTitle]=useState(mode==="edit"?project?.title||"":mode==="copy"?(project?.title||"Shoot")+" — copy":"");
   const [client,setClient]=useState(mode==="edit"?project?.client||"":""),[date,setDate]=useState(mode==="edit"?project?.date||"":""),[brief,setBrief]=useState(mode==="edit"?project?.brief||"":""),[categorySource,setCategorySource]=useState("Current project categories"),[error,setError]=useState("");
   const [production,setProduction]=useState(()=>mode==="edit"&&project?productionOf(project):defaultProduction());

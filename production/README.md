@@ -50,7 +50,15 @@ Notes use real multiline AcroForm fields with embedded fonts, default form resou
 
 ## Automatic shot numbering
 
-Saving a new Shot # inserts the shot at that position within its scene and renumbers the scene consecutively. Moving a shot between scenes closes the old gap. Numbers beyond the last position place the shot at the end. Shot IDs, reference images, saved notes, and schedule links are preserved. The shot also moves beside its new scene neighbor in filming order unless an explicit filming order was edited. Changes save together under the existing project revision check. Editing other shot details leaves numbering alone.
+Saving a new Shot # inserts the shot at that position within its scene and renumbers the scene consecutively. Moving a shot between scenes closes the old gap. Numbers beyond the last position place the shot at the end. Shot IDs, reference images, saved notes, and schedule links are preserved. The shot also moves beside its new scene neighbor in filming order unless an explicit filming order was edited. The Shooting Order input accepts an empty draft while typing, validates whole numbers on Save, moves the shot to the requested position, and shifts other shots to distinct consecutive positions. Editing other shot details leaves numbering alone.
+
+## Shared editing
+
+Project saves use a three-way merge between the editor's starting version, their draft, and the current saved project. Independent edits to shots, custom fields, tasks, scripts, schedules, and expenses combine by stable item ID and field. If both people edit the same field differently, Review Shared Changes displays both versions and requires a choice before saving. Keep Editing leaves the draft open. Choices apply only to the reviewed revision; a newer conflicting change requires another review. Deletes that overlap with edits also require review. Shot-number and shooting-order moves apply atomically to the latest sequence, preserving other editors' content and newly added shots.
+
+Open projects check for updates on focus and every six seconds while visible. Unchanged responses contain only the revision. New updates appear automatically when no editor is open; an open draft stays intact and merges when saved. Requests continue to enforce account pins and project access. Removing a tag blocks reads, updates, and exports. Atomic conditional writes retry a merge if another save wins the race; no database migration is required. Existing older tabs keep their original revision check until refreshed.
+
+The test suite covers simultaneous writes by two signed-in accounts, same-shot field merges, overlapping edits, stale review choices, concurrent additions and reorders, and access revocation, alongside the existing account, upload, and PDF checks.
 
 ## Opening Production from Studio Dashboard
 

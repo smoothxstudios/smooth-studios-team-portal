@@ -45,9 +45,13 @@ const projectSchema=z.object({id:z.string().uuid(),title:z.string().trim().min(1
 export async function projectBody(request:Request):Promise<Project & {teamAccountIds?:string[]}>{
   const raw=await request.text();if(raw.length>1000000)throw new RequestError("This project is too large. Split it into separate shoot days.",413);
   let data;try{data=JSON.parse(raw);}catch{throw new RequestError("Invalid project data.");}
+  return validateProject(data);
+}
+export function validateProject(data:unknown):Project & {teamAccountIds?:string[]}{
   const p=projectSchema.extend({teamAccountIds:z.array(z.string().min(1).max(80)).max(100).optional()}).parse(data);
   if(new Set(p.shots.map(s=>s.id)).size!==p.shots.length||new Set(p.fields.map(f=>f.key)).size!==p.fields.length)throw new RequestError("Duplicate shot or category IDs.");
   if(p.fields.some(f=>f.type==="select"&&(!f.options?.length||new Set(f.options).size!==f.options.length)))throw new RequestError("Dropdowns need unique options.");
+  for(const list of [p.production.tasks,p.production.documents,p.production.schedule,p.production.expenses,...p.shots.map(s=>s.references)])if(new Set(list.map(item=>item.id)).size!==list.length)throw new RequestError('Duplicate item IDs.');
   return p;
 }
 export async function checkImages(p:Project,user:SessionUser,previous?:Project){

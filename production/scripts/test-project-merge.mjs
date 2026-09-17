@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+await build({entryPoints:['lib/project-merge.ts','lib/shot-list.ts'],bundle:true,platform:'node',format:'esm',outdir:'.work/merge-test'});
+const {mergeProject}=await import('../.work/merge-test/project-merge.js');
+const {blankProject,blankShot}=await import('../.work/merge-test/shot-list.js');
+const base={...blankProject('Shared production'),revision:1};
+base.shots=Array.from({length:6},(_,i)=>({...blankShot(),number:String(i+1),order:i+1,description:'Action '+(i+1),values:{takes:'Original '+i},references:[{id:crypto.randomUUID(),name:'Frame '+i,caption:'Original caption'}]}));
+base.production.tasks=[{id:crypto.randomUUID(),title:'Prepare camera',notes:'Original task notes',status:'To do'}];
+base.production.documents=[{id:crypto.randomUUID(),title:'Treatment',content:'Original treatment',updatedAt:1}];
+const clone=()=>structuredClone(base);
+const merge=(mine,current,extra={})=>mergeProject({base,project:mine,...extra},{...current,revision:2});
+const sequence=p=>p.shots.slice().sort((a,b)=>a.order-b.order).map(s=>s.id);
+const numbered=p=>p.shots.slice().sort((a,b)=>Number(a.number)-Number(b.number)).map(s=>s.id);
+const verify=p=>{assert.equal(new Set(p.shots.map(s=>s.id)).size,p.shots.length);assert.deepEqual(p.shots.map(s=>s.order).sort((a,b)=>a-b),p.shots.map((_,i)=>i+1));};
+let mine=clone(),current=clone();mine.shots[0].description='Camera edit';current.shots[1].description='Sound edit';
+let result=merge(mine,current,{shotId:mine.shots[0].id});assert.deepEqual(result.conflicts,[]);assert.equal(result.project.shots[0].description,'Camera edit');assert.equal(result.project.shots[1].description,'Sound edit');
+current=clone();current.shots[0].values.takes='New take';result=merge(mine,current,{shotId:mine.shots[0].id});assert.deepEqual(result.conflicts,[]);assert.equal(result.project.shots[0].values.takes,'New take');assert.equal(result.project.shots[0].description,'Camera edit');
+current.shots[0].description='Team action';result=merge(mine,current,{shotId:mine.shots[0].id});assert.equal(result.conflicts.length,1);assert.match(result.conflicts[0].label,/Scene 1 \/ Shot 1.*Description/);assert.equal(result.conflicts[0].mine,'Camera edit');assert.equal(result.conflicts[0].current,'Team action');
+const key=result.conflicts[0].key;
+for(const choice of ['mine','current']){const reviewed=merge(mine,current,{shotId:mine.shots[0].id,reviewRevision:2,choices:{[key]:choice}});assert.deepEqual(reviewed.conflicts,[]);assert.equal(reviewed.project.shots[0].description,choice==='mine'?'Camera edit':'Team action');assert.equal(reviewed.project.shots[0].values.takes,'New take');}
+assert.equal(merge(mine,current,{reviewRevision:1,choices:{[key]:'mine'}}).conflicts.length,1,'A choice cannot overwrite a version that has not been reviewed.');
+mine=clone();current=clone();mine.production.tasks[0].status='Done';current.production.tasks[0].notes='Bring spare batteries';mine.production.documents[0].content='New treatment';mine.production.documents[0].updatedAt=20;current.production.documents[0].title='Revised title';current.production.documents[0].updatedAt=30;current.production.callSheet.parking='South entrance';
+result=merge(mine,current);assert.deepEqual(result.conflicts,[]);assert.equal(result.project.production.tasks[0].status,'Done');assert.equal(result.project.production.tasks[0].notes,'Bring spare batteries');assert.equal(result.project.production.documents[0].title,'Revised title');assert.equal(result.project.production.documents[0].content,'New treatment');assert.equal(result.project.production.documents[0].updatedAt,30);assert.equal(result.project.production.callSheet.parking,'South entrance');
+mine=clone();current=clone();mine.shots[0].references.unshift({id:crypto.randomUUID(),name:'New cover'});current.shots[0].references.push({id:crypto.randomUUID(),name:'Team image'});result=merge(mine,current);assert.deepEqual(result.conflicts,[]);assert.deepEqual(result.project.shots[0].references.map(r=>r.name),['New cover','Frame 0','Team image']);
+mine=clone();current=clone();mine.shots=mine.shots.filter(s=>s.id!==base.shots[0].id);current.shots[1].description='Independent edit';result=merge(mine,current);assert.deepEqual(result.conflicts,[]);assert.equal(result.project.shots.some(s=>s.id===base.shots[0].id),false);assert.equal(result.project.shots[0].description,'Independent edit');
+current.shots[0].description='Edited deleted shot';result=merge(mine,current);assert.equal(result.conflicts.length,1);assert.equal(result.conflicts[0].mine,undefined);
+mine=clone();current=clone();mine.shots[0].description='Restore my edit';current.shots.shift();result=merge(mine,current,{shotId:mine.shots[0].id});assert.equal(result.conflicts.length,1);const deletedKey=result.conflicts[0].key;
+result=merge(mine,current,{shotId:mine.shots[0].id,reviewRevision:2,choices:{[deletedKey]:'mine'}});assert.deepEqual(result.conflicts,[]);verify(result.project);assert.equal(result.project.shots[0].description,'Restore my edit');
+result=merge(mine,current,{shotId:mine.shots[0].id,reviewRevision:2,choices:{[deletedKey]:'current'}});assert.deepEqual(result.conflicts,[]);assert.equal(result.project.shots.some(s=>s.id===mine.shots[0].id),false);
+// A stale description edit must keep the latest shot numbers and filming order.
+mine=clone();mine.shots[0].description='Keep this action';current=mergeProject({base,project:{...clone(),shots:base.shots.map(s=>s.id===base.shots[0].id?{...s,number:'4'}:s)},shotId:base.shots[0].id},base).project;
+result=merge(mine,current,{shotId:mine.shots[0].id});assert.deepEqual(result.conflicts,[]);assert.deepEqual(sequence(result.project),sequence(current));assert.deepEqual(numbered(result.project),numbered(current));assert.equal(result.project.shots.find(s=>s.id===mine.shots[0].id).description,'Keep this action');
+mine=clone();mine.shots[5].order=2;current=clone();current.shots[5].description='Keep latest action';result=merge(mine,current,{shotId:mine.shots[5].id});assert.deepEqual(result.conflicts,[]);verify(result.project);assert.equal(sequence(result.project)[1],base.shots[5].id);assert.equal(result.project.shots.find(s=>s.id===base.shots[5].id).description,'Keep latest action');assert.deepEqual(numbered(result.project),base.shots.map(s=>s.id));
+mine.shots[5].number='3';result=merge(mine,current,{shotId:mine.shots[5].id});verify(result.project);assert.equal(sequence(result.project)[1],base.shots[5].id);assert.equal(numbered(result.project)[2],base.shots[5].id);
+mine=clone();const first={...blankShot(base.shots),number:'2',description:'New shot A'};mine.shots.push(first);current=mergeProject({base,project:mine,shotId:first.id},base).project;
+mine=clone();const second={...blankShot(base.shots),number:'2',description:'New shot B'};mine.shots.push(second);result=merge(mine,current,{shotId:second.id});assert.deepEqual(result.conflicts,[]);verify(result.project);assert.equal(result.project.shots.length,8);assert.equal(numbered(result.project)[1],second.id);assert.equal(numbered(result.project)[2],first.id);
+assert.equal(base.shots.length,6);assert.equal(base.shots[0].description,'Action 1');
+console.log('Merge checks passed: independent shots and fields, reviewed conflicts, stale choices, production modules, image additions, delete/edit conflicts, restoring drafts, shot moves, filming order, and concurrent insertions.');

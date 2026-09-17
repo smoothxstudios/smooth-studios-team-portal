@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 await build({entryPoints:['lib/shot-order.ts','lib/shot-list.ts'],bundle:true,platform:'node',format:'esm',outdir:'.work/shot-order-test'});
-const {placeShotAtNumber}=await import('../.work/shot-order-test/shot-order.js');
+const {placeShotAtNumber,placeShotAtOrder}=await import('../.work/shot-order-test/shot-order.js');
 const {blankShot}=await import('../.work/shot-order-test/shot-list.js');
 const shots=Array.from({length:14},(_,i)=>({...blankShot(),number:String(i+1),order:i+1,description:'Action '+(i+1),references:[{id:'reference-'+i,name:'Frame '+i,caption:'Keep this reference'}],values:{notes:'Saved notes '+i},status:i===5?'Complete':'Planned'}));
 const before=structuredClone(shots);
@@ -29,6 +29,14 @@ const isolated=placeShotAtNumber([...shots,...second,other],{...shots[13],number
 const sparse=[{...shots[0],number:'1'},{...shots[1],number:'5'},{...shots[2],number:'12'}];
 const closed=placeShotAtNumber(sparse,{...shots[2],number:'2'});assert.deepEqual(closed.map(s=>s.number),['1','2','3']);
 const manual=placeShotAtNumber(shots,{...shots[13],number:'10',order:2});assert.equal(manual.find(s=>s.id===shots[13].id).order,2);
+verify(manual,shots);
+for(const order of [1,2,10,14,100000]){
+ const reordered=placeShotAtOrder(shots,{...shots[0],order});
+ assert.equal(reordered[Math.min(order,14)-1].id,shots[0].id);verify(reordered,shots);
+ assert.deepEqual(reordered.slice().sort((a,b)=>Number(a.number)-Number(b.number)).map(s=>s.id),shots.map(s=>s.id));
+}
+const orderOnly=placeShotAtNumber(shots,{...shots[0],order:10});assert.equal(orderOnly[9].id,shots[0].id);verify(orderOnly,shots);
+for(const order of [0,-1,1.5,NaN,100001])assert.throws(()=>placeShotAtOrder(shots,{...shots[0],order}),/whole shooting order/);
 const noteEdit=placeShotAtNumber(shots,{...shots[3],description:'Edited action only'});assert.deepEqual(noteEdit.map(s=>[s.id,s.number,s.order]),shots.map(s=>[s.id,s.number,s.order]));
 const legacy={...shots[0],number:'1A'};assert.equal(placeShotAtNumber([legacy],{...legacy,description:'Legacy note edit'})[0].number,'1A');
 for(const number of ['','0','-1','1.5','1A','9007199254740992'])assert.throws(()=>placeShotAtNumber(shots,{...fresh,number}),/whole shot number/);

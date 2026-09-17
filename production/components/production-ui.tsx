@@ -3,11 +3,11 @@ import type {ReactNode} from "react";
 import {accountHeaders} from "@/lib/client-account";
 import {fetchJson} from "@/lib/http";
 import {Select, SelectTrigger, SelectValue, SelectContent, SelectItem} from "@/components/ui/select";
-export class RequestFailure extends Error {constructor(message:string,public status:number){super(message);}}
+export class RequestFailure extends Error {constructor(message:string,public status:number,public details?:any){super(message);}}
 export async function request<T>(url:string, method="GET", body?:unknown):Promise<T>{
   const {response:r,data:d}=await fetchJson(url,{method,headers:{...accountHeaders(),...(body?{"Content-Type":"application/json"}:{})},body:body?JSON.stringify(body):undefined,cache:"no-store"});
   if(r.status===401)window.dispatchEvent(new Event("account-expired"));
-  if(!r.ok)throw new RequestFailure(d.error||"Something went wrong. Please try again.",r.status);return d;
+  if(!r.ok)throw new RequestFailure(d.error||"Something went wrong. Please try again.",r.status,d);return d;
 }
 export function errorText(e:unknown){return e instanceof Error?e.message:"Please try again.";}
 export function Choice({value,onChange,options,label,empty,disabled,className=""}:{value:string;onChange:(v:string)=>void;options:string[];label:string;empty?:string;disabled?:boolean;className?:string}){

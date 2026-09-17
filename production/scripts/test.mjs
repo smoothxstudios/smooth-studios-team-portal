@@ -5,6 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {hashPassword} from 'better-auth/crypto';
 import {build} from 'esbuild';
 import {testAssets} from './mock-assets.mjs';
+import {testCollaboration} from './test-collaboration-api.mjs';
 const bundle=spawnSync(process.execPath,['node_modules/wrangler/bin/wrangler.js','deploy','--dry-run','--outdir','.work/worker'],{encoding:'utf8',env:{...process.env,WRANGLER_SEND_METRICS:'false'}});
 if(bundle.status!==0)throw new Error(bundle.stdout+bundle.stderr);
 await build({entryPoints:['lib/shot-list.ts'],bundle:true,platform:'node',format:'esm',outfile:'.work/shot-list.mjs'});
@@ -393,6 +394,7 @@ try{
  await expect(await signupProbe('/api/auth/sign-up/email','POST',probeSignup),200);
  for(let i=0;i<4;i++)await expect(await signupProbe('/api/auth/sign-up/email','POST',probeSignup),400);
  await expect(await signupProbe('/api/auth/sign-up/email','POST',probeSignup),429);
+ await testCollaboration({owner,crew,sound,stranger,camera,soundAccount,expect,blankProject,blankShot});
  await expect(await owner('/api/team','PUT',{id:camera.id,password:'reset-temporary-password'}),200);
  await expect(await crew('/api/session'),401);
  await expect(await crew('/api/auth/sign-in/username','POST',{username:'camera',password:'new-private-crew-password'}),401);
