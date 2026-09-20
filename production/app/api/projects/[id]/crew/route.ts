@@ -7,13 +7,20 @@ export async function GET(request:Request,c:Context){return api(async()=>{
  return json({crew:rows.results});
 });}
 export async function POST(request:Request,c:Context){return api(async()=>{
- const u=await identity(request),{id}=await c.params;await requireProject(id,u,'manage');let body=await readJSON(request,10000);
- if(typeof body.accountId==='string'){
-  const account=await db().prepare('SELECT name,email FROM user WHERE id=? AND enabled=1').bind(body.accountId).first<{name:string;email:string}>();
-  if(!account)throw new RequestError('Choose an active team account.');
-  body={...account,role:'Team member',phone:'',callTime:''};
+ const u=await identity(request),{id}=await c.params;await requireProject(id,u,'manage');const body=await readJSON(request,10000);
+ if(body&&typeof body==='object'&&'accountId' in body){
+  if(typeof body.accountId!=='string'||!body.accountId.length||body.accountId.length>80)throw new RequestError('Choose an active team account.');
+  // Existing accounts are authoritative identities, including legacy imported
+  // email values. Do not normalize them through the manual crew-contact form.
+  // Retrying a tag keeps the existing crew role, phone, and call time intact.
+  await db().prepare("INSERT INTO project_members (id,project_id,name,email,role,phone,call_time) SELECT ?,?,name,email,'Team member','','' FROM user WHERE id=? AND enabled=1 ON CONFLICT(project_id,email) DO NOTHING").bind(crypto.randomUUID(),id,body.accountId).run();
+  const member=await db().prepare('SELECT id,project_id AS projectId,name,email,role,phone,call_time AS callTime FROM project_members WHERE project_id=? AND email=(SELECT email FROM user WHERE id=? AND enabled=1)').bind(id,body.accountId).first();
+  if(!member)throw new RequestError('Choose an active team account.');
+  return json({member});
  }
- const member=crewSchema.parse(body);
+ const parsed=crewSchema.safeParse(body);
+ if(!parsed.success)throw new RequestError('Check the crew member’s name, email, role, and call time.');
+ const member=parsed.data;
  if(!await db().prepare("SELECT id FROM user WHERE email=? AND enabled=1").bind(member.email).first())throw new RequestError("Choose an active team account. Create new logins in Team accounts first.");
  const duplicate=await db().prepare("SELECT id FROM project_members WHERE project_id=? AND email=?").bind(id,member.email).first<{id:string}>();
  if(duplicate&&duplicate.id!==member.id)throw new RequestError("That email is already assigned to this project.",409);
