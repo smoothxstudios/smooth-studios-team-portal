@@ -1216,9 +1216,36 @@ export function SmoothDashboard() {
     const savedTheme = localStorage.getItem("smooth-theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const themeTimer = window.setTimeout(() => setDark(savedTheme ? savedTheme === "dark" : prefersDark), 0);
-    fetch("./data/access.json").then((response) => response.ok ? response.json() : Promise.reject()).then((data: { profiles: AccessProfile[] }) => setProfiles(data.profiles)).catch(() => setProfiles(FALLBACK_PROFILES));
     return () => window.clearTimeout(themeTimer);
   }, []);
+
+  useEffect(() => {
+    if (payload) return;
+    const controller = new AbortController();
+    let latestRequest = 0;
+    const refreshProfiles = async () => {
+      const request = ++latestRequest;
+      try {
+        // GitHub Pages caches JSON for ten minutes. Account activation must
+        // appear immediately, including after logout and returning to a tab.
+        const response = await fetch(`./data/access.json?v=${Date.now()}`, { cache: "no-store", signal: controller.signal });
+        if (!response.ok) return;
+        const data = await response.json() as { profiles: AccessProfile[] };
+        if (!controller.signal.aborted && request === latestRequest && Array.isArray(data.profiles) && data.profiles.length) setProfiles(data.profiles);
+      } catch { /* Keep the current list when the connection is unavailable. */ }
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") void refreshProfiles(); };
+    void refreshProfiles();
+    window.addEventListener("focus", refreshProfiles);
+    window.addEventListener("pageshow", refreshProfiles);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      controller.abort();
+      window.removeEventListener("focus", refreshProfiles);
+      window.removeEventListener("pageshow", refreshProfiles);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [payload]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
