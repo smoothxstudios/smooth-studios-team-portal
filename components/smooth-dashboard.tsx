@@ -91,6 +91,8 @@ import { encryptWorkflowPayload } from "@/lib/dashboard-crypto";
 import { APPOINTMENT_CATEGORIES, categorizeAppointment } from "@/lib/appointment-categories.mjs";
 import { GithubWorkflowDialog, type OwnerWorkflowRequest } from "@/components/github-workflow-dialog";
 import { StudioGuidePage } from "@/components/studio-guide";
+import { TeamAccountSetup, type NewTeamSettings } from "@/components/team-account-setup";
+import { TEAM } from "@/lib/team-schedule.mjs";
 import { TeamSchedulingPage } from "@/components/team-scheduling";
 import { teamToken } from "@/lib/team-auth.mjs";
 import { disableTeamPush } from "@/lib/team-api";
@@ -98,6 +100,7 @@ import type {
   AccessProfile,
   DashboardPayload,
   Employee,
+  EmployeePayout,
   EncryptedEnvelope,
   Rental,
   StripeSummary,
@@ -105,17 +108,8 @@ import type {
   UnmatchedStripePayment,
 } from "@/lib/dashboard-types";
 
-const FALLBACK_PROFILES: AccessProfile[] = [
-  { id: "owner", label: "Smooth", role: "owner" },
-  { id: "akiva", label: "Akiva", role: "employee" },
-  { id: "jordyn", label: "Jordyn", role: "employee" },
-  { id: "rayne", label: "Rayne", role: "employee" },
-];
-const TEAM_ACCENTS: Record<string, string> = {
-  akiva: "rgb(225, 0, 0)",
-  jordyn: "rgb(37, 99, 235)",
-  rayne: "rgb(147, 51, 234)",
-};
+const FALLBACK_PROFILES: AccessProfile[] = TEAM.map(person => ({ id: person.id, label: person.name, role: person.id === "owner" ? "owner" : "employee" }));
+const TEAM_ACCENTS: Record<string, string> = Object.fromEntries(TEAM.map(person => [person.id, person.color]));
 const STUDIO_TIME_ZONE = "America/New_York";
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
@@ -214,6 +208,21 @@ function customerPaymentState(rental: Rental): CustomerPaymentState {
   return "pending";
 }
 
+function paidEarnings(payout?: EmployeePayout) {
+  return payout?.paidAmountCents ?? (payout?.paid ? payout.amountCents : 0);
+}
+
+function unpaidEarnings(payout?: EmployeePayout) {
+  return payout?.outstandingCents ?? Math.max((payout?.amountCents ?? 0) - paidEarnings(payout), 0);
+}
+
+function EmployeeEarnings({ payout }: { payout?: EmployeePayout }) {
+  return <div className="payment-amount"><strong className="share-amount">{payout?.compensationConfigured === false ? "Rate needed" : dollars(payout?.amountCents ?? 0, true)}</strong>
+    {payout?.compensationLabel && <span className="payment-detail">{payout.compensationLabel}</span>}
+    {paidEarnings(payout) > 0 && unpaidEarnings(payout) > 0 && <span className="payment-detail payment-detail-review">{dollars(paidEarnings(payout), true)} paid · {dollars(unpaidEarnings(payout), true)} still owed</span>}
+  </div>;
+}
+
 function rentalState(rental: Rental, employeeId?: string): RentalState {
   const ended = new Date(rental.end).getTime() <= Date.now();
   if (!ended) return "upcoming";
@@ -223,10 +232,11 @@ function rentalState(rental: Rental, employeeId?: string): RentalState {
 }
 
 function eligibleForPayout(rental: Rental, paidThrough: string, employeeScope: string) {
-  if (new Date(rental.end) > new Date(`${paidThrough}T23:59:59`) || !customerFullyPaid(rental)) return false;
-  if (employeeScope === "all") return Object.values(rental.employeePayouts).some((payout) => !payout.paid);
+  const endDate = new Intl.DateTimeFormat("en-CA", { timeZone: STUDIO_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(rental.end));
+  if (endDate > paidThrough || new Date(rental.end).getTime() > Date.now() || !customerFullyPaid(rental)) return false;
+  if (employeeScope === "all") return Object.values(rental.employeePayouts).some((payout) => unpaidEarnings(payout) > 0);
   const payout = rental.employeePayouts[employeeScope];
-  return Boolean(payout && !payout.paid);
+  return Boolean(payout && unpaidEarnings(payout) > 0);
 }
 
 function appointmentStatus(rental: Rental, employeeId?: string): AppointmentStatus {
@@ -561,7 +571,7 @@ function PaymentAmount({ rental, showDetails }: { rental: Rental; showDetails: b
 function RentalTable({ rentals, employeeId }: { rentals: Rental[]; employeeId?: string }) {
   return (
     <Table className="rental-table" role="table" aria-label="Appointments">
-      <TableHeader role="rowgroup"><TableRow role="row"><TableHead role="columnheader">Appointment</TableHead><TableHead role="columnheader">Category</TableHead><TableHead role="columnheader">Date & time</TableHead><TableHead role="columnheader">{employeeId ? "Price" : "Price / recorded payment"}</TableHead><TableHead role="columnheader">{employeeId ? "Your 30%" : "Assigned team"}</TableHead><TableHead role="columnheader">Status</TableHead></TableRow></TableHeader>
+      <TableHeader role="rowgroup"><TableRow role="row"><TableHead role="columnheader">Appointment</TableHead><TableHead role="columnheader">Category</TableHead><TableHead role="columnheader">Date & time</TableHead><TableHead role="columnheader">{employeeId ? "Price" : "Price / recorded payment"}</TableHead><TableHead role="columnheader">{employeeId ? "Your earnings" : "Assigned team"}</TableHead><TableHead role="columnheader">Status</TableHead></TableRow></TableHeader>
       <TableBody role="rowgroup">
         {rentals.map((rental) => (
           <TableRow key={rental.id} role="row">
@@ -569,8 +579,8 @@ function RentalTable({ rentals, employeeId }: { rentals: Rental[]; employeeId?: 
             <TableCell className="rental-category-cell" role="cell"><CategoryBadge rental={rental} /></TableCell>
             <TableCell className="rental-date-cell" data-label="Date & time" role="cell"><div className="rental-date"><strong>{formatDate(rental.start, true)}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div></TableCell>
             <TableCell className="money-cell" data-label={employeeId ? "Price" : "Price / payment"} role="cell"><PaymentAmount rental={rental} showDetails={!employeeId} /></TableCell>
-            <TableCell data-label={employeeId ? "Your 30%" : "Assigned team"} role="cell">
-              {employeeId ? <strong className="share-amount">{dollars(rental.employeePayouts[employeeId]?.amountCents ?? 0, true)}</strong> : <div className="avatar-stack">{rental.assignedEmployeeIds.length ? rental.assignedEmployeeIds.map((id) => <span aria-label={FALLBACK_PROFILES.find(profile => profile.id === id)?.label ?? id} key={id} style={{ background: teamAccent(id) }}>{id.slice(0, 1).toUpperCase()}</span>) : <em>Unassigned</em>}</div>}
+            <TableCell data-label={employeeId ? "Your earnings" : "Assigned team"} role="cell">
+              {employeeId ? <EmployeeEarnings payout={rental.employeePayouts[employeeId]} /> : <div className="avatar-stack">{rental.assignedEmployeeIds.length ? rental.assignedEmployeeIds.map((id) => <span aria-label={FALLBACK_PROFILES.find(profile => profile.id === id)?.label ?? id} key={id} style={{ background: teamAccent(id) }}>{id.slice(0, 1).toUpperCase()}</span>) : <em>Unassigned</em>}</div>}
             </TableCell>
             <TableCell className="rental-status-cell" data-label="Status" role="cell"><StatusBadge state={appointmentStatus(rental, employeeId)} /></TableCell>
           </TableRow>
@@ -591,7 +601,7 @@ function TeamSnapshot({ employees, rentals }: { employees: Employee[]; rentals: 
       <div className="team-strip-grid">
         {employees.map((employee) => {
           const assigned = rentals.filter((rental) => rental.assignedEmployeeIds.includes(employee.id));
-          const owed = assigned.reduce((sum, rental) => sum + (rentalState(rental, employee.id) === "earned" ? rental.employeePayouts[employee.id]?.amountCents ?? 0 : 0), 0);
+          const owed = assigned.reduce((sum, rental) => sum + (rentalState(rental, employee.id) === "earned" ? unpaidEarnings(rental.employeePayouts[employee.id]) : 0), 0);
           const upcoming = assigned.filter((rental) => rentalState(rental, employee.id) === "upcoming").length;
           return <div className="employee-pulse" key={employee.id}><span className="employee-avatar" style={{ background: teamAccent(employee.id, employee.accent) }}>{employee.name.slice(0, 1)}</span><div><strong>{employee.name}</strong><span>{upcoming} upcoming</span></div><div><strong>{dollars(owed)}</strong><span>owed</span></div></div>;
         })}
@@ -600,19 +610,23 @@ function TeamSnapshot({ employees, rentals }: { employees: Employee[]; rentals: 
   );
 }
 
-function TeamPage({ employees, rentals }: { employees: Employee[]; rentals: Rental[] }) {
+function TeamPage({ employees, rentals, teamAccess, onSetup }: { employees: Employee[]; rentals: Rental[]; teamAccess?: DashboardPayload["teamAccess"]; onSetup: () => void }) {
+  const [copied, setCopied] = useState("");
   return (
     <div className="team-page-grid">
       {employees.map((employee) => {
         const assigned = rentals.filter((rental) => rental.assignedEmployeeIds.includes(employee.id));
-        const paid = assigned.reduce((sum, rental) => sum + (rental.employeePayouts[employee.id]?.paid ? rental.employeePayouts[employee.id].amountCents : 0), 0);
-        const owed = assigned.reduce((sum, rental) => sum + (rentalState(rental, employee.id) === "earned" ? rental.employeePayouts[employee.id]?.amountCents ?? 0 : 0), 0);
+        const paid = assigned.reduce((sum, rental) => sum + paidEarnings(rental.employeePayouts[employee.id]), 0);
+        const owed = assigned.reduce((sum, rental) => sum + (rentalState(rental, employee.id) === "earned" ? unpaidEarnings(rental.employeePayouts[employee.id]) : 0), 0);
         const next = assigned.find((rental) => rentalState(rental, employee.id) === "upcoming");
         return (
           <article className="panel employee-card" key={employee.id}>
-            <div className="employee-card-head"><span className="employee-avatar large" style={{ background: teamAccent(employee.id, employee.accent) }}>{employee.name.slice(0, 1)}</span><div><h2>{employee.name}</h2><p>{employee.email}</p></div><StatusBadge state={next ? "upcoming" : "paid"} /></div>
+            <div className="employee-card-head"><span className="employee-avatar large" style={{ background: teamAccent(employee.id, employee.accent) }}>{employee.name.slice(0, 1)}</span><div><h2>{employee.name}</h2><p>{employee.email ?? (employee.onboarding ? "Account setup needed" : "")}</p></div>{!(employee.onboarding && !employee.accessReady) && <StatusBadge state={next ? "upcoming" : "paid"} />}</div>
             <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>Still owed</span><strong>{dollars(owed)}</strong></div><div><span>Appointments</span><strong>{assigned.length}</strong></div></div>
             <div className="employee-next"><CalendarDays size={16} /><span>Next accepted appointment</span><strong>{next ? formatDate(next.start, true) : "None scheduled"}</strong></div>
+            {employee.onboarding && !employee.accessReady && <Button className="team-setup-action" variant="outline" onClick={onSetup}>Set up private account</Button>}
+            {teamAccess?.[employee.id] && <Button className="team-setup-action" variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(teamAccess[employee.id].password); setCopied(employee.id); } catch { setCopied(`unavailable:${employee.id}`); } }}>{copied === employee.id ? "Password copied" : "Copy sign-in password"}</Button>}
+            {copied === `unavailable:${employee.id}` && teamAccess?.[employee.id] && <p className="team-account-password">{teamAccess[employee.id].password}</p>}
           </article>
         );
       })}
@@ -945,6 +959,11 @@ function StripeMatchForm({
 
 function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string; schedulingToken: string }) {
   const [view, setView] = useState<ViewKey>("overview");
+  const [teamSetupOpen, setTeamSetupOpen] = useState(false);
+  const [teamSetupBusy, setTeamSetupBusy] = useState(false);
+  useEffect(() => {
+    if (payload.role === "owner" && window.location.hash.startsWith("#setup-team")) { setView("team"); setTeamSetupOpen(true); }
+  }, [payload.role]);
   useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }, [view]);
   useEffect(() => {
     const openSchedule = () => { if (window.location.hash === "#scheduling") setView("scheduling"); };
@@ -984,8 +1003,8 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
       const payouts = employeeId ? [rental.employeePayouts[employeeId]].filter(Boolean) : Object.values(rental.employeePayouts);
       for (const payout of payouts) {
         const state = rentalState(rental, employeeId);
-        if (payout.paid) paid += payout.amountCents;
-        else if (state === "earned") owed += payout.amountCents;
+        paid += paidEarnings(payout);
+        if (state === "earned") owed += unpaidEarnings(payout);
         else if (state === "upcoming") projected += payout.amountCents;
       }
     }
@@ -1000,8 +1019,8 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
       const payouts = employeeId ? [rental.employeePayouts[employeeId]].filter(Boolean) : Object.values(rental.employeePayouts);
       for (const payout of payouts) {
         months[month].payroll += payout.amountCents;
-        if (payout.paid) months[month].paid += payout.amountCents;
-        else if (rentalState(rental, employeeId) === "earned") months[month].owed += payout.amountCents;
+        months[month].paid += paidEarnings(payout);
+        if (rentalState(rental, employeeId) === "earned") months[month].owed += unpaidEarnings(payout);
       }
     }
     return months;
@@ -1009,6 +1028,19 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
 
   const recent = visibleRentals.slice(0, 6);
   const displayName = payload.user.name;
+
+  const prepareTeamSetup = async (settings: NewTeamSettings) => {
+    setTeamSetupBusy(true);
+    try {
+      const envelope = await encryptWorkflowPayload(settings, sessionPassword);
+      setTeamSetupOpen(false);
+      openWorkflow({ workflowId: "update-team.yml", title: "Activate employee accounts", actionLabel: "Activate accounts",
+        description: "Create private logins, enable scheduling access, and refresh the team dashboards.",
+        inputs: { team_envelope: JSON.stringify(envelope) },
+        details: Object.entries(settings.employees).map(([id, entry]) => ({ label: TEAM.find(p => p.id === id)?.name ?? id,
+          value: `${entry.email} · ${entry.compensation.type === "hourly" ? dollars(entry.compensation.hourlyCents!, true) + "/hour" : entry.compensation.type === "commission" ? (entry.compensation.rate! * 100) + "%" : "Pay rate to be set"}` })) });
+    } finally { setTeamSetupBusy(false); }
+  };
 
   const openWorkflow = (request: OwnerWorkflowRequest) => {
     setWorkflowRequest(request);
@@ -1084,6 +1116,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
 
   return (
     <SidebarProvider>
+      {isOwner && <TeamAccountSetup open={teamSetupOpen} onOpenChange={setTeamSetupOpen} employees={payload.employees} busy={teamSetupBusy} onSubmit={prepareTeamSetup} enabled={Boolean(payload.workflowAccess)} />}
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
         <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact /><span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span></SidebarHeader>
         <SidebarContent>
@@ -1119,7 +1152,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
                 </article>
                 <article className="panel upcoming-panel">
                   <div className="panel-heading"><div><p className="eyebrow">On the calendar</p><h2>Coming up</h2></div><button onClick={() => setView("rentals")}>View all <ChevronRight size={15} /></button></div>
-                  <div className="upcoming-list">{upcoming.length ? upcoming.slice(0, 4).map((rental) => <div className="upcoming-item" key={rental.id}><div className="date-block"><strong>{new Date(rental.start).getDate()}</strong><span>{formatDate(rental.start, true).slice(0, 3)}</span></div><div className="upcoming-copy"><strong>{rental.customer}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div><div className="upcoming-value"><strong>{dollars(employeeId ? rental.employeePayouts[employeeId]?.amountCents ?? 0 : rental.priceCents)}</strong><span>{employeeId ? "your 30%" : "appointment"}</span></div></div>) : <EmptyState copy="Accepted Calendar assignments will appear here." title="No upcoming appointments" />}</div>
+                  <div className="upcoming-list">{upcoming.length ? upcoming.slice(0, 4).map((rental) => <div className="upcoming-item" key={rental.id}><div className="date-block"><strong>{new Date(rental.start).getDate()}</strong><span>{formatDate(rental.start, true).slice(0, 3)}</span></div><div className="upcoming-copy"><strong>{rental.customer}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div><div className="upcoming-value"><strong>{dollars(employeeId ? rental.employeePayouts[employeeId]?.amountCents ?? 0 : rental.priceCents)}</strong><span>{employeeId ? "your earnings" : "appointment"}</span></div></div>) : <EmptyState copy="Accepted Calendar assignments will appear here." title="No upcoming appointments" />}</div>
                 </article>
               </section>
 
@@ -1155,7 +1188,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
             </div>
             {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the next Calendar sync, scheduled every 5 minutes." : "No appointments match the selected filters."} title="No appointments found" />}
           </article>}
-          {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} />}
+          {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} />}
           {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={visibleRentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />}
           {view === "guide" && <StudioGuidePage isOwner={isOwner} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
           {view === "scheduling" && <TeamSchedulingPage isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}

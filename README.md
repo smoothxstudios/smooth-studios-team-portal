@@ -8,7 +8,7 @@ A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and e
 - Employee overview: upcoming appointments, completed history, projected earnings, earned-but-unpaid amount, paid totals, and weekly/monthly/yearly context.
 - Appointment categories: Studio Rentals, Studio Packages, Outside, Graduation, Video, Business, Campaign, and a safe Other fallback. Add-ons inherit the main package category from the event title.
 - Employee assignment: an accepted Calendar invitation must match a configured employee email; accepted portal offers are merged by appointment ID and time without duplicate commission. Pending offers never count as accepted.
-- Earnings: every accepted employee receives 30% of the full appointment price, whether it is a studio rental or another package. When multiple employees accept, each receives the full 30%.
+- Earnings: existing employees default to 30% of the appointment price. Jordyn receives 40% for appointments starting September 26, 2026 onward in America/New_York ($20 on a $50 appointment); earlier work retains 30%. A one-time ledger snapshot preserves previously paid amounts and leaves the raise difference outstanding until Smooth marks it paid. Tips never increase the commission base. New hires use their individually selected hourly or percentage rate; unset rates never inherit 30%. Hourly earnings cover accepted studio-rental hours only.
 - Customer payment: matched Stripe payments are the preferred source of truth. Acuity IDs are matched first; high-confidence customer email/name, amount, and date matches are used as a fallback. `Paid Online:` remains the fallback when Stripe is not connected or no Stripe payment can be safely matched. Any amount above the price is recorded as a tip. A lower positive amount is a deposit, and a completed appointment with a remaining balance is flagged for review. Smooth can confirm payment received by invoice, cash, Apple Pay, or another method through the payment-override workflow.
 - Reconciliation safety: Stripe payments that cannot be confidently tied to one Calendar appointment appear only in Smooth's encrypted **Stripe reconciliation** review list. Smooth can select a payment, search for its Calendar appointment, and confirm the match from the dashboard. Unmatched payments are never silently attached to an employee commission.
 - Earned timing: commission becomes earned only after both the appointment end time has passed and the customer is fully paid.
@@ -22,7 +22,7 @@ GitHub Pages serves static files, so it cannot protect Calendar data with a trad
 
 Use a private repository whenever the GitHub account plan permits private-repository Pages. If Pages requires a public repository, the deployed data remains encrypted and employee emails are still kept in GitHub Secrets, but source code and the public login screen remain visible.
 
-Never commit `.private/`, Google credentials, Calendar IDs, employee email addresses, or dashboard passwords.
+Never commit plaintext `.private/` files, Google credentials, Calendar IDs, employee email addresses, or dashboard passwords. New employee emails, individual passwords, and pay setup are stored in owner-encrypted `public/data/team-settings.json`; only Smooth’s encrypted dashboard includes passwords for private handoff. Every new employee still receives a separately encrypted dashboard.
 
 The owner workflow token is encrypted only inside Smooth's dashboard payload. It is never included in an employee payload or the public access-profile file. Treat the owner dashboard password as an administrative credential and rotate the token on its expiration date.
 
@@ -98,6 +98,12 @@ The Stripe key is optional during deployment. If it is absent, the dashboard con
 6. Run **Sync Smooth Studios Calendar** once. The next owner sign-in will include the workflow controls; employee dashboards will not receive the token.
 
 When the token expires, replace only `DASHBOARD_GITHUB_TOKEN` and run one Calendar sync. Dashboard passwords do not need to change.
+
+## Add the four new team members
+
+DaCari, Sorayia, Amia, and Terrill are included in the team roster. In the unlocked owner dashboard, open **Team → Set up private account**. Enter their email addresses, select a pay setup (or leave it unset), and activate the accounts. Strong individual passwords are generated locally and the submitted settings are encrypted with the owner session password before the workflow starts. After the workflow succeeds, refresh and copy each person's password from their team card. The setup does not send emails or calendar invitations.
+
+The activation workflow preserves existing accounts, updates backend authentication, imports Calendar/Stripe, and publishes the new encrypted dashboards. Identical retries are safe; existing activated accounts cannot be silently overwritten. Calendar sync, Studio Guide updates, and payroll workflows read the same private settings. Unactivated profiles are omitted from the login picker. Keep the owner password available: it encrypts both the owner dashboard and the private team settings.
 
 ## Generate strong passwords
 

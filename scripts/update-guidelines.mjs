@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { readTeamSettings, teamPasswords } from "./lib/team-settings.mjs";
 import { decryptPayload, encryptPayload, normalizeRulebook } from "./lib/dashboard-data.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -14,12 +15,9 @@ function requiredEnvironment(name) {
 }
 
 const config = await readJson("config/studio.config.json");
-const profiles = ["owner", ...config.employees.map((employee) => employee.id)];
-const passwords = Object.fromEntries(profiles.map((id) => {
-  const password = requiredEnvironment(`DASHBOARD_PASSWORD_${id.toUpperCase()}`);
-  if (password.length < 16) throw new Error(`Missing strong password for ${id}`);
-  return [id, password];
-}));
+const settings = await readTeamSettings(root, config, requiredEnvironment("DASHBOARD_PASSWORD_OWNER"));
+const passwords = teamPasswords(config, settings);
+const profiles = ["owner", ...config.employees.filter(e => passwords[e.id]).map(e => e.id)];
 
 const serializedEnvelope = requiredEnvironment("STUDIO_GUIDE_ENVELOPE").trim();
 if (serializedEnvelope.length > 56_000) throw new Error("Encrypted Studio Guide input is too large");

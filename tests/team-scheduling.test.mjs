@@ -5,12 +5,12 @@ import { createHmac } from "node:crypto";
 import test, { mock } from "node:test";
 import worker from "../team-api/worker.mjs";
 import { teamToken, tokenHash, unbase64url } from "../lib/team-auth.mjs";
-import { addLocalDays, blockOccurrences, localInstant, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
+import { TEAM, addLocalDays, blockOccurrences, localInstant, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
 import { deliverPush, publicPushKey, pushEndpoint, vapidAuthorization, flushAlerts } from "../team-api/push.mjs";
 
 const schema = await readFile(new URL("../team-api/migrations/0000_brief_ravenous.sql", import.meta.url), "utf8");
 const seed = await readFile(new URL("../team-api/migrations/0001_initial_state.sql", import.meta.url), "utf8");
-const ids = ["owner", "akiva", "jordyn", "rayne", "sync"];
+const ids = [...TEAM.map(person => person.id), "sync"];
 const tokens = Object.fromEntries(await Promise.all(ids.map(async id => [id, await teamToken(`synthetic-test-password-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(ids.map(async id => [id, await tokenHash(tokens[id])])));
 const now = Date.parse("2026-09-09T12:00:00Z");
@@ -351,4 +351,17 @@ test("assignment warns when employee has no notification devices; sync diagnosti
   const diagnostic = await f.call("sync", "/sync/accepted");
   assert.deepEqual(diagnostic.data.pushDiagnostics, { registeredDevices: 0, queuedAlerts: 1, retryingAlerts: 0 });
   assert.equal((await f.call("owner", "/sync/accepted")).status, 403);
+});
+
+
+test("new employees can accept only their own rental assignments", async () => {
+  const f = fixture(); await f.importCalendar();
+  for (const id of ["dacari", "sorayia", "amia", "terrill"]) {
+    const item = await offer(f, id);
+    assert.equal((await f.call(id, `/assignments/${item.id}`, { revision: (await f.snapshot()).revision, status: "accepted" })).status, 200);
+    const own = await f.snapshot(id);
+    assert.equal(own.assignments.length, 1);
+    assert.equal(own.assignments[0].employeeId, id);
+  }
+  assert.equal((await f.snapshot("jordyn")).assignments.length, 0);
 });

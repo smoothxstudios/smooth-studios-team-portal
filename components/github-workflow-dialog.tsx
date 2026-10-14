@@ -40,7 +40,7 @@ type GithubWorkflowRun = {
 };
 
 export type OwnerWorkflowRequest = {
-  workflowId: "calendar-sync.yml" | "mark-paid.yml" | "override-payment.yml" | "match-stripe-payment.yml" | "update-guidelines.yml" | "deploy-team-api.yml";
+  workflowId: "calendar-sync.yml" | "mark-paid.yml" | "override-payment.yml" | "match-stripe-payment.yml" | "update-guidelines.yml" | "deploy-team-api.yml" | "update-team.yml";
   title: string;
   description: string;
   actionLabel: string;

@@ -12,7 +12,7 @@ on:
         required: true
         default: all
         type: choice
-        options: [all, akiva, jordyn, rayne]
+        options: [all, akiva, jordyn, rayne, dacari, sorayia, amia, terrill]
 
 permissions:
   contents: write
@@ -38,6 +38,8 @@ jobs:
       - uses: actions/configure-pages@v5
       - run: npm ci
       - name: Update payout cutoff
+        env:
+          DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}
         run: npm run mark:paid -- --through "${{ inputs.paid_through }}" --employee "${{ inputs.employee }}"
       - name: Refresh encrypted dashboards
         env:

@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { categorizeAppointment } from "../../lib/appointment-categories.mjs";
 import { summarizeStripeSnapshot } from "./stripe-data.mjs";
+import { calculateEmployeePayout, initializePayAdjustments } from "./employee-pay.mjs";
 
 const KDF_ITERATIONS = 310_000;
 const RULEBOOK_LIMITS = {
@@ -102,18 +103,14 @@ function summaryRentalType(summary = "") {
   return value.replace(/\s*\(Smooth Studios\)\s*$/i, "") || "Studio Rental";
 }
 
-function paidByCutoff(end, cutoff) {
-  if (!cutoff) return false;
-  return end.slice(0, 10) <= cutoff;
-}
-
 function employeeInvitationEmails(employee) {
   const configured = Array.isArray(employee.invitationEmails) ? employee.invitationEmails : [employee.email];
   return configured.map((email) => email?.trim().toLowerCase()).filter(Boolean);
 }
 
 function dashboardEmployee(employee) {
-  return { id: employee.id, name: employee.name, email: employee.email, accent: employee.accent };
+  return { id: employee.id, name: employee.name, email: employee.email, accent: employee.accent,
+    ...(employee.onboarding ? { onboarding: true, accessReady: employee.accessReady === true } : {}) };
 }
 
 function normalizedEmail(value) {
@@ -300,17 +297,12 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
   const assignedEmployees = config.employees.filter((employee) =>
     employeeInvitationEmails(employee).some((email) => acceptedEmails.has(email)),
   );
-  const amountCents = Math.round(parsed.priceCents * config.commissionRate);
   const title = summaryRentalType(event.summary);
   const category = categorizeAppointment(title);
   const employeePayouts = Object.fromEntries(
     assignedEmployees.map((employee) => [
       employee.id,
-      {
-        amountCents,
-        paid: fullyPaid && new Date(end).getTime() <= Date.now() && paidByCutoff(end, ledger.employees?.[employee.id]?.paidThrough),
-        ...(ledger.employees?.[employee.id]?.paidThrough ? { paidAt: ledger.employees[employee.id].paidThrough } : {}),
-      },
+      calculateEmployeePayout({ employee, config, ledger, start, end, priceCents: parsed.priceCents, categoryId: category.id, fullyPaid }),
     ]),
   );
 
@@ -337,6 +329,7 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
 }
 
 export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, stripeMatches = {}, source, ownerWorkflowToken, stripeSnapshot = null, rulebook, portalAssignments = [] }) {
+  initializePayAdjustments(config, ledger);
   const reconciliation = reconcileStripePayments(calendarEvents, stripeSnapshot?.charges ?? [], stripeMatches);
   const rentals = calendarEvents
     .map((event) => normalizeCalendarEvent(
@@ -358,11 +351,8 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
           rental.assignedEmployeeIds.includes(assignment.employeeId)) continue;
       const id = assignment.employeeId;
       rental.assignedEmployeeIds.push(id);
-      rental.employeePayouts[id] = {
-        amountCents: Math.round(rental.priceCents * config.commissionRate),
-        paid: rental.fullyPaid && Date.parse(rental.end) <= Date.now() && paidByCutoff(rental.end, ledger.employees?.[id]?.paidThrough),
-        ...(ledger.employees?.[id]?.paidThrough ? { paidAt: ledger.employees[id].paidThrough } : {}),
-      };
+      rental.employeePayouts[id] = calculateEmployeePayout({ employee: config.employees.find(employee => employee.id === id), config, ledger,
+        start: rental.start, end: rental.end, priceCents: rental.priceCents, categoryId: rental.categoryId, fullyPaid: rental.fullyPaid });
     }
   }
   const generatedAt = new Date().toISOString();
@@ -457,7 +447,7 @@ export async function writeEncryptedDashboards({ payloads, passwords, outputDire
   await mkdir(outputDirectory, { recursive: true });
   const profiles = [
     { id: "owner", label: "Smooth", role: "owner" },
-    ...config.employees.map((employee) => ({ id: employee.id, label: employee.name, role: "employee" })),
+    ...config.employees.filter(employee => !employee.onboarding || employee.accessReady).map((employee) => ({ id: employee.id, label: employee.name, role: "employee" })),
   ];
   for (const profile of profiles) {
     const password = passwords[profile.id];

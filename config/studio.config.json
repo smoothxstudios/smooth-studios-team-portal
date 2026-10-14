@@ -21,13 +21,61 @@
       "id": "jordyn",
       "name": "Jordyn",
       "emailEnvironmentVariable": "EMPLOYEE_EMAIL_JORDYN",
-      "accent": "rgb(37, 99, 235)"
+      "accent": "rgb(37, 99, 235)",
+      "commissionHistory": [
+        {
+          "effectiveFrom": "2026-09-26",
+          "rate": 0.4,
+          "previousRate": 0.3,
+          "adjustmentId": "jordyn-2026-09-26"
+        }
+      ]
     },
     {
       "id": "rayne",
       "name": "Rayne",
       "emailEnvironmentVariable": "EMPLOYEE_EMAIL_RAYNE",
       "accent": "rgb(147, 51, 234)"
+    },
+    {
+      "id": "dacari",
+      "name": "DaCari",
+      "emailEnvironmentVariable": "EMPLOYEE_EMAIL_DACARI",
+      "accent": "rgb(13, 148, 136)",
+      "onboarding": true,
+      "compensation": {
+        "type": "pending"
+      }
+    },
+    {
+      "id": "sorayia",
+      "name": "Sorayia",
+      "emailEnvironmentVariable": "EMPLOYEE_EMAIL_SORAYIA",
+      "accent": "rgb(219, 39, 119)",
+      "onboarding": true,
+      "compensation": {
+        "type": "pending"
+      }
+    },
+    {
+      "id": "amia",
+      "name": "Amia",
+      "emailEnvironmentVariable": "EMPLOYEE_EMAIL_AMIA",
+      "accent": "rgb(217, 119, 6)",
+      "onboarding": true,
+      "compensation": {
+        "type": "pending"
+      }
+    },
+    {
+      "id": "terrill",
+      "name": "Terrill",
+      "emailEnvironmentVariable": "EMPLOYEE_EMAIL_TERRILL",
+      "accent": "rgb(79, 70, 229)",
+      "onboarding": true,
+      "compensation": {
+        "type": "pending"
+      }
     }
   ]
 }

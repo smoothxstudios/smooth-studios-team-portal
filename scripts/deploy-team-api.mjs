@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { teamToken, tokenHash } from "../lib/team-auth.mjs";
+import { readTeamSettings, teamPasswords } from "./lib/team-settings.mjs";
 import { TEAM, TEAM_API_URL } from "../lib/team-schedule.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,9 +21,13 @@ async function secretRequest(method, data) {
   if (!response.ok || !result.success) throw new Error(`Cloudflare secret setup failed (${response.status}). Check the account and token permissions.`);
   return result.result;
 }
+const studioConfig = JSON.parse(await readFile(path.join(root, "config/studio.config.json"), "utf8"));
+const settings = await readTeamSettings(root, studioConfig, process.env.DASHBOARD_PASSWORD_OWNER);
+const passwords = teamPasswords(studioConfig, settings);
 const hashes = {};
 for (const { id } of TEAM) {
-  const password = process.env[`DASHBOARD_PASSWORD_${id.toUpperCase()}`];
+  const password = passwords[id];
+  if (!password && studioConfig.employees.find(e => e.id === id)?.onboarding) continue;
   if (!password || password.length < 16) throw new Error(`Missing strong dashboard password for ${id}.`);
   hashes[id] = await tokenHash(await teamToken(password, id));
 }

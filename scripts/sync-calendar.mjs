@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDashboardPayloads, decryptPayload, writeEncryptedDashboards } from "./lib/dashboard-data.mjs";
+import { readTeamSettings, resolveEmployees, teamPasswords } from "./lib/team-settings.mjs";
 import { fetchStripeSnapshot } from "./lib/stripe-data.mjs";
 import { syncTeamSchedule } from "./lib/team-api.mjs";
 import { syncCalendarAssignmentNotes } from "./lib/calendar-assignments.mjs";
@@ -67,36 +68,11 @@ function requiredEnvironment(name) {
   return value;
 }
 
-function parseInvitationEmails(value, environmentName) {
-  const emails = [...new Set(
-    value
-      .split(/[,;\r\n]+/)
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  )];
-  if (!emails.length || emails.some((email) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) {
-    throw new Error(`${environmentName} must contain one or more valid email addresses separated by commas`);
-  }
-  return emails;
-}
-
-const config = {
-  ...rawConfig,
-  employees: rawConfig.employees.map((employee) => {
-    const invitationEmails = parseInvitationEmails(
-      requiredEnvironment(employee.emailEnvironmentVariable),
-      employee.emailEnvironmentVariable,
-    );
-    return { ...employee, email: invitationEmails[0], invitationEmails };
-  }),
-};
-
+const settings = await readTeamSettings(root, rawConfig, requiredEnvironment("DASHBOARD_PASSWORD_OWNER"));
+const passwords = teamPasswords(rawConfig, settings);
+const config = { ...rawConfig, employees: resolveEmployees(rawConfig, settings, passwords) };
 const serviceAccount = JSON.parse(requiredEnvironment("GOOGLE_SERVICE_ACCOUNT_JSON"));
 const calendarId = requiredEnvironment(config.calendarIdEnvironmentVariable);
-const passwords = {
-  owner: requiredEnvironment("DASHBOARD_PASSWORD_OWNER"),
-  ...Object.fromEntries(config.employees.map((employee) => [employee.id, requiredEnvironment(`DASHBOARD_PASSWORD_${employee.id.toUpperCase()}`)])),
-};
 let rulebook;
 try {
   const existingOwnerEnvelope = await readJson("public/data/owner.json");
@@ -148,7 +124,10 @@ if (teamEnabled) {
     ...(calendarAssignmentSync.status === "needs_access" ? { serviceAccountEmail: serviceAccount.client_email } : {}) };
   process.stdout.write(`Calendar assignment notes: ${calendarAssignmentSync.status}; ${calendarAssignmentSync.updated} updated; ${calendarAssignmentSync.failed} need attention.\n`);
 }
+// Credentials stay only in the owner's encrypted view for private handoff.
+payloads.owner.teamAccess = Object.fromEntries(Object.keys(settings.employees).map(id => [id, { password: passwords[id] }]));
 await writeEncryptedDashboards({ payloads, passwords, outputDirectory: path.join(root, "public/data"), config });
+await writeFile(path.join(root, "data/payout-ledger.json"), `${JSON.stringify(ledger, null, 2)}\n`);
 if (teamEnabled) await writeFile(path.join(root, "public/data/team-api.json"), `${JSON.stringify({ version: 1, enabled: true })}\n`);
 process.stdout.write(
   `Encrypted ${calendarEvents.length} Calendar events${stripeSnapshot ? ` and ${stripeSnapshot.charges.length} Stripe payments` : ""} for ${Object.keys(payloads).length} dashboards.\n`,

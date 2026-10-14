@@ -45,7 +45,7 @@ jobs:
         run: |
           git config user.name "smooth-studios-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add public/data
+          git add public/data data/payout-ledger.json
           git diff --cached --quiet || git commit -m "data: refresh encrypted calendar dashboards"
           git push
       - run: npm run build:github-pages

@@ -7,6 +7,9 @@ on:
       - "team-api/**"
       - "lib/team-*.mjs"
       - "scripts/deploy-team-api.mjs"
+      - "scripts/lib/employee-pay.mjs"
+      - "scripts/lib/team-settings.mjs"
+      - "config/studio.config.json"
       - ".github/workflows/deploy-team-api.yml"
   workflow_dispatch:
 
@@ -61,7 +64,7 @@ jobs:
         run: |
           git config user.name "smooth-studios-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add public/data
+          git add public/data data/payout-ledger.json
           git diff --cached --quiet || git commit -m "data: enable live team scheduling"
           # Preserve code changes published while the Calendar import ran.
           git pull --rebase origin main

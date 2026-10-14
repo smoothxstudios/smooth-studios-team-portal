@@ -5,10 +5,16 @@ export type Employee = {
   name: string;
   email?: string;
   accent: string;
+  onboarding?: boolean;
+  accessReady?: boolean;
 };
 
 export type EmployeePayout = {
   amountCents: number;
+  paidAmountCents?: number;
+  outstandingCents?: number;
+  compensationLabel?: string;
+  compensationConfigured?: boolean;
   paid: boolean;
   paidAt?: string;
 };
@@ -106,6 +112,7 @@ export type DashboardPayload = {
   stripeSummary?: StripeSummary;
   unmatchedStripePayments?: UnmatchedStripePayment[];
   rulebook?: StudioRulebook;
+  teamAccess?: Record<string, { password: string }>;
   workflowAccess?: {
     provider: "github";
     repository: string;
