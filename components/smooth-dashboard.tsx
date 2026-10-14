@@ -1195,7 +1195,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
           </article>}
           {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} />}
           {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={visibleRentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />}
-          {view === "guide" && <StudioGuidePage isOwner={isOwner} draftPassword={sessionPassword} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
+          {view === "guide" && <StudioGuidePage isOwner={isOwner} draftPassword={sessionPassword} teamToken={schedulingToken} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
           {view === "scheduling" && <TeamSchedulingPage isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
         </div>
       </SidebarInset>

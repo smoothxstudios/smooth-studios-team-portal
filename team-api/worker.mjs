@@ -112,6 +112,40 @@ async function route(request, env, ctx) {
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
   else if (user === "sync") fail(403, "Sync access is restricted to synchronization endpoints.");
 
+  if (request.method === "GET" && url.pathname === "/guidelines/questions") {
+    const rows = user === "owner"
+      ? await db.prepare("SELECT id, asked_by, question, status, created_at FROM guideline_questions ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, created_at DESC LIMIT 500").all()
+      : await db.prepare("SELECT id, asked_by, question, status, created_at FROM guideline_questions WHERE asked_by = ? ORDER BY created_at DESC LIMIT 100").bind(user).all();
+    return { questions: rows.results.map(row => ({ id: row.id, askedBy: row.asked_by, question: row.question, status: row.status, createdAt: row.created_at })) };
+  }
+  if (request.method === "POST" && url.pathname === "/guidelines/questions") {
+    const input = await body(request), question = text(input.question, 300).replace(/\s+/g, " ");
+    if (question.length < 8) fail(400, "Add a specific question of at least 8 characters.");
+    const normalized = question.toLowerCase().replace(/[?!.,]+$/, "");
+    const existing = await db.prepare("SELECT id FROM guideline_questions WHERE asked_by = ? AND normalized = ?").bind(user, normalized).first();
+    if (existing) return { id: existing.id, saved: true, duplicate: true };
+    const id = crypto.randomUUID(), now = new Date().toISOString();
+    // A single statement keeps simultaneous submissions within the per-person cap.
+    const result = await db.prepare(`INSERT OR IGNORE INTO guideline_questions (id, asked_by, question, normalized, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM guideline_questions WHERE asked_by = ? AND status = 'open') < 60`)
+      .bind(id, user, question, normalized, now, now, user).run();
+    if (!result.meta.changes) {
+      const duplicate = await db.prepare("SELECT id FROM guideline_questions WHERE asked_by = ? AND normalized = ?").bind(user, normalized).first();
+      if (duplicate) return { id: duplicate.id, saved: true, duplicate: true };
+      fail(400, "Your question list is full. Ask Smooth to review the existing questions.");
+    }
+    return { id, saved: true };
+  }
+  if (request.method === "PATCH" && url.pathname.startsWith("/guidelines/questions/")) {
+    if (user !== "owner") fail(403, "Only Smooth can manage the question queue.");
+    const input = await body(request);
+    if (!["open", "answered", "dismissed"].includes(input.status)) fail(400, "Choose open, answered or dismissed.");
+    const result = await db.prepare("UPDATE guideline_questions SET status = ?, updated_at = ? WHERE id = ?")
+      .bind(input.status, new Date().toISOString(), url.pathname.slice("/guidelines/questions/".length)).run();
+    if (!result.meta.changes) fail(404, "Question not found.");
+    return { saved: true };
+  }
+
   if (request.method === "GET" && url.pathname === "/schedule") {
     const s = await snapshot(db), isOwner = user === "owner";
     const assignments = s.assignments.filter(a => isOwner || a.employeeId === user);

@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { applyGuidePatch, createGuidePatch, generalGuidelineCategory, MAX_GUIDELINES, MAX_GUIDELINE_UPDATE_BYTES, rebaseGuideDraft } from "../lib/studio-guidelines.mjs";
 import { GUIDELINE_CATEGORIES, GUIDELINE_QUESTIONS, composeGuidelineAnswer, guidelineQuestionEntryId, tidyGuidelineAnswer } from "../lib/studio-guideline-questions.mjs";
 import { decryptPayload, encryptPayload, normalizeRulebook } from "../scripts/lib/dashboard-data.mjs";
+import { organizeGuideline, needsGuidelineAnswer, tidyGuidelineBody } from "../lib/guideline-content.mjs";
+import { searchGuidelines } from "../lib/guideline-search.mjs";
+import { guidelineQuestions, questionState, submittedEntryId } from "../lib/guideline-queue.mjs";
 
 const entry = (id, body = `Instructions for ${id}.`) => ({ id, title: `Title ${id}`, category: "General", body, tags: [] });
 const book = (entries, updatedAt = "2026-10-14T12:00:00.000Z") => ({ version: 1, updatedAt, entries });
@@ -77,8 +80,8 @@ test("reopening a successfully published draft does not create duplicate changes
 });
 
 test("every suggested answer is publishable and the complete initial interview fits one update", () => {
-  assert.equal(GUIDELINE_QUESTIONS.length, 91);
-  assert.equal(GUIDELINE_CATEGORIES.length, 13);
+  assert.equal(GUIDELINE_QUESTIONS.length, 115);
+  assert.equal(GUIDELINE_CATEGORIES.length, 8);
   assert.equal(new Set(GUIDELINE_QUESTIONS.map(q => q.id)).size, GUIDELINE_QUESTIONS.length);
   const chosen = [];
   for (const question of GUIDELINE_QUESTIONS) {
@@ -95,7 +98,7 @@ test("every suggested answer is publishable and the complete initial interview f
 });
 
 test("custom answer cleanup preserves quantities, negation and exceptions", () => {
-  assert.equal(tidyGuidelineAnswer("  arrive 15 mins early\n- do not leave for 1 hr unless I approve "), "Arrive 15 minutes early.\n\nDo not leave for 1 hour unless I approve.");
+  assert.equal(tidyGuidelineAnswer("  arrive 15 mins early\n- do not leave for 1 hr unless I approve "), "Arrive 15 minutes early.\n- Do not leave for 1 hour unless I approve.");
   assert.equal(tidyGuidelineAnswer("wait 1 min then 2 hrs"), "Wait 1 minute then 2 hours.");
   const question = GUIDELINE_QUESTIONS[0];
   assert.equal(composeGuidelineAnswer(question, 0, "except when I specify otherwise"), `${question.choices[0].body}\n\nExcept when I specify otherwise.`);
@@ -111,7 +114,61 @@ test("drafts and publication patches remain unreadable with another profile pass
 });
 
 test("legacy categories broaden without changing custom categories or instructions", () => {
-  assert.equal(generalGuidelineCategory("Before the rental"), "Rental preparation");
-  assert.equal(generalGuidelineCategory("After the rental"), "Cleaning & supplies");
+  assert.equal(generalGuidelineCategory("Before the rental"), "Rentals & clients");
+  assert.equal(generalGuidelineCategory("After the rental"), "Cleaning & reset");
   assert.equal(generalGuidelineCategory("My custom topic"), "My custom topic");
+});
+
+test("formatting is idempotent and preserves timing, amounts, negation, lists and URLs", () => {
+  const raw = "  dont collect $50 unless I approve\n* wait 15 mins, not 30 mins\n* email me at studio@example.invalid\n\nhttps://example.invalid/Booking";
+  const formatted = tidyGuidelineBody(raw);
+  assert.equal(formatted, "Don't collect $50 unless I approve.\n- Wait 15 minutes, not 30 minutes.\n- Email me at studio@example.invalid\n\nhttps://example.invalid/Booking");
+  assert.equal(tidyGuidelineBody("https://example.invalid/im/dont\nstudio.im@example.invalid"), "https://example.invalid/im/dont\nstudio.im@example.invalid");
+  assert.equal(tidyGuidelineBody(formatted), formatted);
+});
+
+test("organization updates do not create conflicts or turn published answers back into drafts", () => {
+  const original = { ...entry("question-arrival-time", "arrive 15 mins early"), category: "Team & scheduling" };
+  const organized = organizeGuideline(original);
+  const restored = rebaseGuideDraft([], [original], [organized]);
+  assert.equal(restored.conflicts.length, 0);
+  assert.deepEqual(restored.entries, [organized]);
+  assert.equal(createGuidePatch(book([organized]), [original]).upserts.length, 0);
+  assert.equal(questionState(guidelineQuestions([original])[0], [original], [organized]), "published");
+});
+
+test("uncertain answers stay in the queue and do not appear as completed policies", () => {
+  for (const value of ["", "IDK.", "I'm not sure", "Not sure yet.", "TBD", "Ask me later."]) {
+    assert.equal(needsGuidelineAnswer(value), true, value);
+  }
+  for (const value of ["No.", "No extra people.", "Ask me before moving equipment.", "Not applicable."]) assert.equal(needsGuidelineAnswer(value), false, value);
+  const entries = [{ ...entry("question-arrival-time", "Not sure."), title: "Arrival time" }];
+  assert.equal(questionState(guidelineQuestions(entries)[0], entries, entries), "unanswered");
+  assert.equal(searchGuidelines(entries, "arrival").length, 0);
+});
+
+test("new, submitted, and incomplete custom questions join the queue without duplicating answered topics", () => {
+  const originalAnswers = GUIDELINE_QUESTIONS.slice(0, 91).map(q => ({ id: guidelineQuestionEntryId(q.id), title: q.title, category: q.category, body: q.choices[0].body, tags: q.tags }));
+  const rows = [{ id: "one", question: "Where are the spare AA batteries?", status: "open", askedBy: "jordyn" }];
+  const questions = guidelineQuestions([...originalAnswers, entry("custom", "TBD")], rows);
+  assert.equal(questions.filter(q => questionState(q, originalAnswers, originalAnswers) === "unanswered").length, 26);
+  const submitted = questions.find(q => q.entryId === submittedEntryId("one"));
+  const answer = entry(submitted.entryId, "Check the designated supply shelf.");
+  assert.equal(questionState(submitted, [answer], []), "saved");
+  assert.equal(questionState(submitted, [answer], [answer]), "published");
+});
+
+test("natural queries, synonyms and typos rank relevant published answers without inventing a result", () => {
+  const entries = GUIDELINE_QUESTIONS.map(q => ({ id: guidelineQuestionEntryId(q.id), title: q.title, category: q.category, body: q.choices[0].body, tags: q.tags }));
+  for (const [query, expected] of [
+    ["What if a client wants more time?", "extension-approval"],
+    ["the light wont fire", "trigger-troubleshooting"],
+    ["running behind", "running-late"],
+    ["backdorp ripped", "damaged-paper"],
+    ["what if someone leaves a bag", "lost-property"],
+    ["Can I give someone their money back?", "refund-requests"],
+    ["how late can clients stay", "overrun"],
+  ]) assert.ok(searchGuidelines(entries, query).slice(0, 2).some(result => result.entry.id === guidelineQuestionEntryId(expected)), query);
+  assert.equal(searchGuidelines(entries, "zebra astronaut").length, 0);
+  assert.equal(searchGuidelines([], "refund").length, 0);
 });

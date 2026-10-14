@@ -368,10 +368,10 @@ test("shares the same Studio Guide with every encrypted dashboard", () => {
     source: "google-calendar",
     rulebook,
   });
-  assert.deepEqual(payloads.owner.rulebook, rulebook);
-  assert.deepEqual(payloads.akiva.rulebook, rulebook);
-  assert.deepEqual(payloads.jordyn.rulebook, rulebook);
-  assert.deepEqual(payloads.rayne.rulebook, rulebook);
+  assert.deepEqual(payloads.owner.rulebook, normalizeRulebook(rulebook));
+  assert.deepEqual(payloads.akiva.rulebook, normalizeRulebook(rulebook));
+  assert.deepEqual(payloads.jordyn.rulebook, normalizeRulebook(rulebook));
+  assert.deepEqual(payloads.rayne.rulebook, normalizeRulebook(rulebook));
 });
 
 test("normalizes imported Studio Guide fields and generates stable IDs", () => {

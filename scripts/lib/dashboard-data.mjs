@@ -6,6 +6,7 @@ import { categorizeAppointment } from "../../lib/appointment-categories.mjs";
 import { summarizeStripeSnapshot } from "./stripe-data.mjs";
 import { calculateEmployeePayout, initializePayAdjustments } from "./employee-pay.mjs";
 import { MAX_GUIDELINES } from "../../lib/studio-guidelines.mjs";
+import { organizeGuideline } from "../../lib/guideline-content.mjs";
 
 const KDF_ITERATIONS = 310_000;
 const RULEBOOK_LIMITS = {
@@ -54,7 +55,7 @@ export function normalizeRulebook(input, { updatedAt } = {}) {
       seenTags.add(key);
       if (tags.length === RULEBOOK_LIMITS.tags) break;
     }
-    return { id, title, category, body, tags };
+    return organizeGuideline({ id, title, category, body, tags });
   });
 
   const sourceUpdatedAt = typeof source.updatedAt === "string" && Number.isFinite(Date.parse(source.updatedAt))

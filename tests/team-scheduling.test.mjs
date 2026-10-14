@@ -10,6 +10,7 @@ import { deliverPush, publicPushKey, pushEndpoint, vapidAuthorization, flushAler
 
 const schema = await readFile(new URL("../team-api/migrations/0000_brief_ravenous.sql", import.meta.url), "utf8");
 const seed = await readFile(new URL("../team-api/migrations/0001_initial_state.sql", import.meta.url), "utf8");
+const questionsSchema = await readFile(new URL("../team-api/migrations/0002_guideline_questions.sql", import.meta.url), "utf8");
 const ids = [...TEAM.map(person => person.id), "sync"];
 const tokens = Object.fromEntries(await Promise.all(ids.map(async id => [id, await teamToken(`synthetic-test-password-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(ids.map(async id => [id, await tokenHash(tokens[id])])));
@@ -18,7 +19,7 @@ mock.timers.enable({ apis: ["Date"], now });
 test.after(() => mock.timers.reset());
 
 class D1TestDatabase {
-  constructor() { this.sqlite = new DatabaseSync(":memory:"); this.sqlite.exec(schema); this.sqlite.exec(seed); }
+  constructor() { this.sqlite = new DatabaseSync(":memory:"); this.sqlite.exec(schema); this.sqlite.exec(seed); this.sqlite.exec(questionsSchema); }
   prepare(sql) {
     const sqlite = this.sqlite;
     let args = [];
@@ -92,6 +93,35 @@ test("API requires authentication, checks origin, and separates sync authority",
   assert.equal((await f.call("sync", "/schedule")).status, 403);
   assert.equal((await f.call("rayne", "/assignments", {})).status, 403);
   assert.equal((await f.call(null, "/health")).data.ready, true);
+});
+
+test("guideline questions are shared with the owner without exposing another employee's queue", async () => {
+  const f = fixture();
+  assert.equal((await f.call(null, "/guidelines/questions")).status, 401);
+  assert.equal((await f.call("sync", "/guidelines/questions")).status, 403);
+  const first = await f.call("jordyn", "/guidelines/questions", { question: "Where are the spare batteries?", askedBy: "owner" });
+  assert.equal(first.status, 200);
+  await f.call("amia", "/guidelines/questions", { question: "Where should we store client umbrellas?" });
+  const own = await f.call("jordyn", "/guidelines/questions");
+  assert.equal(own.data.questions.length, 1);
+  assert.equal(own.data.questions[0].askedBy, "jordyn");
+  assert.equal((await f.call("owner", "/guidelines/questions")).data.questions.length, 2);
+  assert.equal((await f.call("rayne", `/guidelines/questions/${first.data.id}`, { status: "answered" }, "PATCH")).status, 403);
+  assert.equal((await f.call("owner", `/guidelines/questions/${first.data.id}`, { status: "answered" }, "PATCH")).status, 200);
+  assert.equal((await f.call("jordyn", "/guidelines/questions")).data.questions[0].status, "answered");
+});
+
+test("question submissions validate length, deduplicate retries and limit open requests", async () => {
+  const f = fixture();
+  assert.equal((await f.call("owner", "/guidelines/questions", { question: "short" })).status, 400);
+  assert.equal((await f.call("owner", "/guidelines/questions", { question: "x".repeat(301) })).status, 400);
+  const a = await f.call("terrill", "/guidelines/questions", { question: "Where is the loading area?" });
+  const retry = await f.call("terrill", "/guidelines/questions", { question: "WHERE IS THE LOADING AREA" });
+  assert.equal(retry.data.id, a.data.id);
+  for (let i = 1; i < 60; i++) assert.equal((await f.call("terrill", "/guidelines/questions", { question: `Synthetic question number ${i}?` })).status, 200);
+  assert.equal((await f.call("terrill", "/guidelines/questions", { question: "One more unanswered question?" })).status, 400);
+  assert.equal((await f.call("owner", `/guidelines/questions/${a.data.id}`, { status: "answered" }, "PATCH")).status, 200);
+  assert.equal((await f.call("terrill", "/guidelines/questions", { question: "One more unanswered question?" })).status, 200);
 });
 test("employee cannot create another employee's block or read their class reason", async () => {
   const f = fixture();

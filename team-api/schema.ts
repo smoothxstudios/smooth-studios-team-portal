@@ -1,4 +1,4 @@
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const state = sqliteTable("team_state", {
   id: integer("id").primaryKey(),
@@ -40,3 +40,13 @@ export const alerts = sqliteTable("team_alerts", {
   attempts: integer("attempts").notNull().default(0),
   dueAt: integer("due_at").notNull(),
 });
+
+export const guidelineQuestions = sqliteTable("guideline_questions", {
+  id: text("id").primaryKey(),
+  askedBy: text("asked_by").notNull(),
+  question: text("question").notNull(),
+  normalized: text("normalized").notNull(),
+  status: text("status").notNull().default("open"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, table => [uniqueIndex("guideline_questions_author_text").on(table.askedBy, table.normalized), index("guideline_questions_status").on(table.status, table.createdAt)]);
