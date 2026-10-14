@@ -5,7 +5,13 @@
       "paidThrough": "2026-08-14"
     },
     "jordyn": {
-      "paidThrough": "2026-09-26"
+      "paidThrough": "2026-09-26",
+      "rateAdjustments": {
+        "jordyn-2026-09-26": {
+          "originalPaidThrough": "2026-09-26",
+          "settledThrough": null
+        }
+      }
     },
     "rayne": {
       "paidThrough": "2026-10-02"
