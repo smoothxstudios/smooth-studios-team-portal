@@ -1,9 +1,10 @@
 "use client";
 
-import { type ChangeEvent, type FormEvent, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   FileText,
+  MessageCircleQuestion,
   Pencil,
   Plus,
   Search,
@@ -19,12 +20,14 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { GuidelineInterview } from "@/components/guideline-interview";
+import { GUIDELINE_CATEGORIES, GUIDELINE_QUESTIONS } from "@/lib/studio-guideline-questions.mjs";
+import { generalGuidelineCategory, MAX_GUIDELINES } from "@/lib/studio-guidelines.mjs";
 import type { StudioGuideline, StudioRulebook } from "@/lib/dashboard-types";
 
-const MAX_ENTRIES = 50;
-const MAX_GUIDE_BYTES = 40_000;
+const MAX_ENTRIES = MAX_GUIDELINES;
 const EMPTY_FIELDS = { title: "", category: "General", body: "", tags: "" };
-const CATEGORY_SUGGESTIONS = ["Before the rental", "During the rental", "After the rental", "Equipment", "Customer care", "Emergencies", "General"];
+const CATEGORY_SUGGESTIONS = [...GUIDELINE_CATEGORIES, "General"];
 
 function newGuidelineId() {
   return `guide-${crypto.randomUUID()}`;
@@ -105,16 +108,19 @@ function formattedUpdatedAt(value: string | null | undefined) {
 export function StudioGuidePage({
   rulebook,
   isOwner,
+  draftPassword,
   onPublish,
 }: {
   rulebook?: StudioRulebook;
   isOwner: boolean;
+  draftPassword: string;
   onPublish: (entries: StudioGuideline[]) => Promise<void>;
 }) {
-  const entries = useMemo(() => rulebook?.entries ?? [], [rulebook]);
+  const entries = useMemo(() => (rulebook?.entries ?? []).map(entry => ({ ...entry, category: generalGuidelineCategory(entry.category) })), [rulebook]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [managerOpen, setManagerOpen] = useState(false);
+  const [interviewOpen, setInterviewOpen] = useState(false);
   const [draft, setDraft] = useState<StudioGuideline[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [fields, setFields] = useState(EMPTY_FIELDS);
@@ -122,6 +128,13 @@ export function StudioGuidePage({
   const [notice, setNotice] = useState("");
   const [publishing, setPublishing] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const openQuestions = () => { if (isOwner && window.location.hash === "#guidelines-questions") setInterviewOpen(true); };
+    openQuestions();
+    window.addEventListener("hashchange", openQuestions);
+    return () => window.removeEventListener("hashchange", openQuestions);
+  }, [isOwner]);
 
   const categories = useMemo(() => [...new Set(entries.map((entry) => entry.category))].sort((a, b) => a.localeCompare(b)), [entries]);
   const visibleEntries = useMemo(() => {
@@ -167,7 +180,7 @@ export function StudioGuidePage({
       return;
     }
     if (!editingId && draft.length >= MAX_ENTRIES) {
-      setError(`The Studio Guide supports up to ${MAX_ENTRIES} guidelines.`);
+      setError(`Studio Guidelines supports up to ${MAX_ENTRIES} entries.`);
       return;
     }
     const next = { id: editingId ?? newGuidelineId(), title, category: categoryValue, body, tags };
@@ -202,17 +215,12 @@ export function StudioGuidePage({
 
   const publish = async () => {
     setError("");
-    const serialized = JSON.stringify({ version: 1, entries: draft });
-    if (new TextEncoder().encode(serialized).length > MAX_GUIDE_BYTES) {
-      setError("This draft is too large to publish. Shorten a few guidelines and try again.");
-      return;
-    }
     setPublishing(true);
     try {
       await onPublish(draft);
       setManagerOpen(false);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The Studio Guide could not be prepared.");
+      setError(caught instanceof Error ? caught.message : "Studio Guidelines could not be prepared.");
     } finally {
       setPublishing(false);
     }
@@ -224,21 +232,23 @@ export function StudioGuidePage({
         <div className="guide-hero-icon"><BookOpen /></div>
         <div className="guide-hero-copy">
           <p className="eyebrow">Studio operations</p>
-          <h2>Studio rental rulebook</h2>
-          <p>Quick answers for preparing the studio, helping renters, handling equipment, and closing out every appointment.</p>
+          <h2>Studio Guidelines</h2>
+          <p>Your shared reference for studio operations, team responsibilities, client care, equipment, rentals, and assignments.</p>
         </div>
         <div className="guide-hero-meta">
           <strong>{entries.length}</strong>
           <span>guideline{entries.length === 1 ? "" : "s"}</span>
           <small>Updated {formattedUpdatedAt(rulebook?.updatedAt)}</small>
         </div>
-        {isOwner && <Button className="guide-manage-button" onClick={openManager}><Pencil size={16} /> Manage guide</Button>}
+        {isOwner && <Button className="guide-manage-button" onClick={openManager}><Pencil size={16} /> Edit or import</Button>}
       </article>
+
+      {isOwner && <article className="panel guide-interview-invite"><div className="guide-interview-invite-icon"><MessageCircleQuestion /></div><div><p className="eyebrow">Build it together</p><h3>Turn your answers into studio guidelines</h3><p>{GUIDELINE_QUESTIONS.length} suggested questions across {GUIDELINE_CATEGORIES.length} topics. Choose an answer or type your own, review the wording, and publish it for the team. Pick up where you left off on this device.</p></div><Button onClick={() => setInterviewOpen(true)}>Answer questions <Plus size={16} /></Button></article>}
 
       <article className="panel guide-browser">
         <div className="guide-browser-head">
-          <div className="guide-search"><Search size={18} /><Input aria-label="Search the Studio Guide" onChange={(event) => setQuery(event.target.value)} placeholder="Search a question, task, or keyword" type="search" value={query} /></div>
-          <div aria-label="Filter Studio Guide by category" className="guide-categories">
+          <div className="guide-search"><Search size={18} /><Input aria-label="Search Studio Guidelines" onChange={(event) => setQuery(event.target.value)} placeholder="Search a question, task, or keyword" type="search" value={query} /></div>
+          <div aria-label="Filter Studio Guidelines by category" className="guide-categories">
             {["All", ...categories].map((item) => <button aria-pressed={category === item} className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)} type="button">{item}</button>)}
           </div>
         </div>
@@ -260,8 +270,8 @@ export function StudioGuidePage({
         ) : (
           <div className="guide-empty">
             <FileText />
-            <strong>{entries.length ? "No matching guidelines" : "The Studio Guide is ready for its first entry"}</strong>
-            <p>{entries.length ? "Try another search or choose All categories." : isOwner ? "Use Manage guide to add instructions or import a rulebook." : "Smooth has not published any rental guidelines yet."}</p>
+            <strong>{entries.length ? "No matching guidelines" : "Studio Guidelines is ready for its first entry"}</strong>
+            <p>{entries.length ? "Try another search or choose All categories." : isOwner ? "Answer the suggested questions, add instructions, or import existing guidelines." : "Smooth has not published any studio guidelines yet."}</p>
             {!entries.length && isOwner && <Button onClick={openManager}><Plus size={16} /> Add first guideline</Button>}
           </div>
         )}
@@ -272,12 +282,12 @@ export function StudioGuidePage({
           <DialogContent className="guide-manager-dialog">
             <DialogHeader>
               <p className="eyebrow">Smooth controls</p>
-              <DialogTitle>Manage Studio Guide</DialogTitle>
-              <DialogDescription>Add quick answers one at a time or import an existing .txt, .md, or .json rulebook.</DialogDescription>
+              <DialogTitle>Manage Studio Guidelines</DialogTitle>
+              <DialogDescription>Add quick answers one at a time or import existing .txt, .md, or .json guidelines.</DialogDescription>
             </DialogHeader>
 
             <div className="guide-manager-toolbar">
-              <input accept=".txt,.md,.markdown,.json,text/plain,text/markdown,application/json" aria-label="Import Studio Guide file" hidden onChange={importFile} ref={fileInput} type="file" />
+              <input accept=".txt,.md,.markdown,.json,text/plain,text/markdown,application/json" aria-label="Import Studio Guidelines file" hidden onChange={importFile} ref={fileInput} type="file" />
               <Button onClick={() => fileInput.current?.click()} type="button" variant="outline"><Upload size={16} /> Import file</Button>
               <Button onClick={resetEditor} type="button" variant="outline"><Plus size={16} /> New guideline</Button>
               <span>{draft.length}/{MAX_ENTRIES} guidelines</span>
@@ -297,7 +307,7 @@ export function StudioGuidePage({
               <form className="guide-editor" onSubmit={saveDraft}>
                 <div className="guide-editor-heading"><div><strong>{editingId ? "Edit guideline" : "New guideline"}</strong><span>Write the answer the way you want the team to follow it.</span></div>{editingId && <Badge variant="secondary">Editing</Badge>}</div>
                 <label>Question or title<Input maxLength={120} onChange={(event) => setFields((current) => ({ ...current, title: event.target.value }))} placeholder="Example: What should I check before a renter arrives?" value={fields.title} /></label>
-                <label>Category<Input list="guide-category-suggestions" maxLength={50} onChange={(event) => setFields((current) => ({ ...current, category: event.target.value }))} placeholder="Before the rental" value={fields.category} /></label>
+                <label>Category<Input list="guide-category-suggestions" maxLength={50} onChange={(event) => setFields((current) => ({ ...current, category: event.target.value }))} placeholder="Rental preparation" value={fields.category} /></label>
                 <datalist id="guide-category-suggestions">{CATEGORY_SUGGESTIONS.map((item) => <option key={item} value={item} />)}</datalist>
                 <label>Instructions<Textarea maxLength={5_000} onChange={(event) => setFields((current) => ({ ...current, body: event.target.value }))} placeholder="Add clear steps, expectations, and what to do if something goes wrong." rows={8} value={fields.body} /></label>
                 <label>Search tags <span>(optional, separated by commas)</span><Input onChange={(event) => setFields((current) => ({ ...current, tags: event.target.value }))} placeholder="lights, arrival, cleanup" value={fields.tags} /></label>
@@ -314,6 +324,7 @@ export function StudioGuidePage({
           </DialogContent>
         </Dialog>
       )}
+      {isOwner && draftPassword && <GuidelineInterview open={interviewOpen} onOpenChange={setInterviewOpen} rulebook={rulebook} password={draftPassword} onPublish={onPublish} />}
     </section>
   );
 }

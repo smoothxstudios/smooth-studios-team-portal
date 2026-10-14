@@ -34,18 +34,20 @@ async function derivePasswordKey(password: string, salt: Uint8Array, iterations:
   );
 }
 
-export async function decryptDashboard(
+export async function decryptPrivatePayload<T>(
   envelope: EncryptedEnvelope,
   password: string,
-): Promise<DashboardPayload> {
+): Promise<T> {
   const key = await derivePasswordKey(password, decodeBase64(envelope.salt), envelope.iterations, ["decrypt"]);
   const plaintext = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: toArrayBuffer(decodeBase64(envelope.iv)) },
     key,
     decodeBase64(envelope.ciphertext),
   );
-  return JSON.parse(new TextDecoder().decode(plaintext)) as DashboardPayload;
+  return JSON.parse(new TextDecoder().decode(plaintext)) as T;
 }
+
+export const decryptDashboard = (envelope: EncryptedEnvelope, password: string) => decryptPrivatePayload<DashboardPayload>(envelope, password);
 
 export async function encryptWorkflowPayload(payload: unknown, password: string): Promise<EncryptedEnvelope> {
   const iterations = 310_000;

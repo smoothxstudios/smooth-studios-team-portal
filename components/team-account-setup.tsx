@@ -57,7 +57,7 @@ export function TeamAccountSetup({ open, onOpenChange, employees, busy, enabled,
           <option value="pending">Set pay rate later</option><option value="hourly">Hourly · studio rentals</option><option value="commission">Percentage of appointment price</option>
         </select></label>{row.payType !== "pending" && <label>{row.payType === "hourly" ? "Dollars per rental hour" : "Percentage"}<input type="number" min="0.01" max={row.payType === "commission" ? "100" : "1000"} step="0.01" inputMode="decimal" required value={row.rate} onChange={event => change(row.id, { rate: event.target.value })} /></label>}</div>
       </fieldset>)}
-      {rows.some(row => row.payType === "pending") && <p className="schedule-small">Accounts with no rate can use scheduling and the Studio Guide. Their earnings remain uncalculated until a rate is set.</p>}
+      {rows.some(row => row.payType === "pending") && <p className="schedule-small">Accounts with no rate can use scheduling and Studio Guidelines. Their earnings remain uncalculated until a rate is set.</p>}
       {!enabled && <p role="alert">Owner workflow access must be available to activate accounts.</p>}
       {error && <p className="login-error" role="alert">{error}</p>}
       <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>Cancel</Button><Button type="submit" disabled={busy || !enabled || !rows.length}>{busy ? "Preparing…" : "Review accounts"}</Button></DialogFooter>

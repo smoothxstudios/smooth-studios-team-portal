@@ -103,7 +103,7 @@ When the token expires, replace only `DASHBOARD_GITHUB_TOKEN` and run one Calend
 
 DaCari, Sorayia, Amia, and Terrill are included in the team roster. In the unlocked owner dashboard, open **Team → Set up private account**. Enter their email addresses, select a pay setup (or leave it unset), and activate the accounts. Strong individual passwords are generated locally and the submitted settings are encrypted with the owner session password before the workflow starts. After the workflow succeeds, refresh and copy each person's password from their team card. The setup does not send emails or calendar invitations.
 
-The activation workflow preserves existing accounts, updates backend authentication, imports Calendar/Stripe, and publishes the new encrypted dashboards. Identical retries are safe; existing activated accounts cannot be silently overwritten. Calendar sync, Studio Guide updates, and payroll workflows read the same private settings. Unactivated profiles are omitted from the login picker. Keep the owner password available: it encrypts both the owner dashboard and the private team settings.
+The activation workflow preserves existing accounts, updates backend authentication, imports Calendar/Stripe, and publishes the new encrypted dashboards. Identical retries are safe; existing activated accounts cannot be silently overwritten. Calendar sync, Studio Guidelines updates, and payroll workflows read the same private settings. Unactivated profiles are omitted from the login picker. Keep the owner password available: it encrypts both the owner dashboard and the private team settings.
 
 ## Generate strong passwords
 
@@ -117,6 +117,16 @@ This creates four strong passwords and preview dashboards. Passwords are written
 Use `npm run provision -- --rotate` only when intentionally rotating every dashboard password.
 
 ## Owner workflows
+
+### Studio Guidelines
+
+Open **Studio Guidelines → Answer questions** in the owner dashboard, or use the `#guidelines-questions` link. The guided interview offers 91 questions across 13 studio operations topics. Pick a suggested policy or type your own answer, edit the categorized preview, and select **Save answer & next**. Suggested policies are never added automatically. Custom text receives basic formatting cleanup; the interview does not invent policies or use an AI rewriting service.
+
+Saved answers and progress are encrypted with the owner session password in this browser's local storage. **Pause** keeps saved progress on that device; unsaved text must be saved first. **Publish saved answers** opens the existing owner workflow confirmation and shares the answers in every activated employee's encrypted dashboard. Reload after the workflow succeeds. If another device has published changes, saved drafts merge unrelated changes and ask which version to keep for conflicting entries. The publishing workflow also rejects stale revisions.
+
+**Edit or import** remains available for direct edits and .txt, .md, or .json imports. Existing rental instructions remain in the general guidelines. The book supports 200 entries, with a 40 KB limit per encrypted update; updates send only changed entries. No private answers or credentials are placed in the public source code.
+
+### Other controls
 
 - **Mark employee earnings paid**: Smooth chooses a paid-through date in the dashboard. It updates the payout ledger, rebuilds encrypted data, and redeploys the site.
 - **Update customer payment**: Smooth chooses an appointment and confirms payment received by invoice, cash, or another method, marks it not fully paid, or clears the manual status.

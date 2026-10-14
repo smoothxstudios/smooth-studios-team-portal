@@ -5,10 +5,11 @@ import path from "node:path";
 import { categorizeAppointment } from "../../lib/appointment-categories.mjs";
 import { summarizeStripeSnapshot } from "./stripe-data.mjs";
 import { calculateEmployeePayout, initializePayAdjustments } from "./employee-pay.mjs";
+import { MAX_GUIDELINES } from "../../lib/studio-guidelines.mjs";
 
 const KDF_ITERATIONS = 310_000;
 const RULEBOOK_LIMITS = {
-  entries: 50,
+  entries: MAX_GUIDELINES,
   title: 120,
   category: 50,
   body: 5_000,

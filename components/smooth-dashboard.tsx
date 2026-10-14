@@ -91,6 +91,7 @@ import { encryptWorkflowPayload } from "@/lib/dashboard-crypto";
 import { APPOINTMENT_CATEGORIES, categorizeAppointment } from "@/lib/appointment-categories.mjs";
 import { GithubWorkflowDialog, type OwnerWorkflowRequest } from "@/components/github-workflow-dialog";
 import { StudioGuidePage } from "@/components/studio-guide";
+import { createGuidePatch, MAX_GUIDELINE_UPDATE_BYTES } from "@/lib/studio-guidelines.mjs";
 import { TeamAccountSetup, type NewTeamSettings } from "@/components/team-account-setup";
 import { TEAM } from "@/lib/team-schedule.mjs";
 import { TeamSchedulingPage } from "@/components/team-scheduling";
@@ -126,7 +127,7 @@ const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ow
   { key: "rentals", label: "Appointments", icon: CalendarDays },
   { key: "team", label: "Team", icon: Users, ownerOnly: true },
   { key: "payouts", label: "Payouts", icon: WalletCards },
-  { key: "guide", label: "Studio Guide", icon: BookOpen },
+  { key: "guide", label: "Studio Guidelines", icon: BookOpen },
 ];
 
 function DashboardNavigation({ isOwner, accountId, view, onNavigate }: { isOwner: boolean; accountId: string; view: ViewKey; onNavigate: (view: ViewKey) => void }) {
@@ -966,7 +967,10 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
   }, [payload.role]);
   useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }, [view]);
   useEffect(() => {
-    const openSchedule = () => { if (window.location.hash === "#scheduling") setView("scheduling"); };
+    const openSchedule = () => {
+      if (window.location.hash === "#scheduling") setView("scheduling");
+      if (["#guidelines", "#guidelines-questions"].includes(window.location.hash)) setView("guide");
+    };
     openSchedule();
     window.addEventListener("hashchange", openSchedule);
     return () => window.removeEventListener("hashchange", openSchedule);
@@ -1081,17 +1085,18 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
   });
 
   const publishStudioGuide = async (entries: StudioGuideline[]) => {
-    if (!isOwner || !sessionPassword) throw new Error("Unlock the Smooth dashboard again before publishing the Studio Guide.");
-    const submittedGuide = { version: 1, entries };
-    if (new TextEncoder().encode(JSON.stringify(submittedGuide)).length > 40_000) {
-      throw new Error("The Studio Guide is too large to publish. Shorten a few guidelines and try again.");
+    if (!isOwner || !sessionPassword) throw new Error("Unlock the Smooth dashboard again before publishing Studio Guidelines.");
+    const submittedGuide = createGuidePatch(payload.rulebook, entries);
+    if (!submittedGuide.upserts.length && !submittedGuide.deleteIds.length) throw new Error("There are no new changes to publish.");
+    if (new TextEncoder().encode(JSON.stringify(submittedGuide)).length > MAX_GUIDELINE_UPDATE_BYTES) {
+      throw new Error("These changes exceed the 40 KB update limit. Shorten the new instructions or publish a smaller group of changes.");
     }
     const encryptedGuide = await encryptWorkflowPayload(submittedGuide, sessionPassword);
     openWorkflow({
       workflowId: "update-guidelines.yml",
-      title: "Publish Studio Guide",
-      description: "This updates the shared rulebook in every encrypted team dashboard and republishes the portal.",
-      actionLabel: "Publish guide",
+      title: "Publish Studio Guidelines",
+      description: "This shares your saved guidelines with every team member and republishes the portal.",
+      actionLabel: "Publish guidelines",
       inputs: { guide_envelope: JSON.stringify(encryptedGuide) },
       details: [
         { label: "Guidelines", value: String(entries.length) },
@@ -1190,7 +1195,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
           </article>}
           {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} />}
           {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={visibleRentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />}
-          {view === "guide" && <StudioGuidePage isOwner={isOwner} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
+          {view === "guide" && <StudioGuidePage isOwner={isOwner} draftPassword={sessionPassword} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
           {view === "scheduling" && <TeamSchedulingPage isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
         </div>
       </SidebarInset>
