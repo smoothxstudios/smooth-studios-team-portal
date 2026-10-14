@@ -20,6 +20,26 @@
       "id": "rayne",
       "label": "Rayne",
       "role": "employee"
+    },
+    {
+      "id": "dacari",
+      "label": "DaCari",
+      "role": "employee"
+    },
+    {
+      "id": "sorayia",
+      "label": "Sorayia",
+      "role": "employee"
+    },
+    {
+      "id": "amia",
+      "label": "Amia",
+      "role": "employee"
+    },
+    {
+      "id": "terrill",
+      "label": "Terrill",
+      "role": "employee"
     }
   ]
 }
