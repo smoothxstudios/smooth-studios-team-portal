@@ -106,11 +106,24 @@ async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK) };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
   else if (user === "sync") fail(403, "Sync access is restricted to synchronization endpoints.");
+
+  // The content vault verifies existing dashboard credentials server-to-server.
+  // Return identity only: no calendar, payroll, passwords, or workflow tokens.
+  const identity = person => ({ id: person.id, username: person.id === "owner" ? "smooth" : person.id,
+    name: person.name, role: person.id === "owner" ? "owner" : "member" });
+  if (request.method === "GET" && url.pathname === "/identity") {
+    return { user: identity(TEAM.find(person => person.id === user)) };
+  }
+  if (request.method === "GET" && url.pathname === "/identity/team") {
+    owner(user);
+    const hashes = JSON.parse(env.TEAM_TOKEN_HASHES);
+    return { members: TEAM.filter(person => hashes[person.id]).map(identity) };
+  }
 
   if (request.method === "GET" && url.pathname === "/guidelines/questions") {
     const rows = user === "owner"

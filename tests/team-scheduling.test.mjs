@@ -95,6 +95,31 @@ test("API requires authentication, checks origin, and separates sync authority",
   assert.equal((await f.call(null, "/health")).data.ready, true);
 });
 
+test("shared login verifies identity without exposing dashboard data and restricts the team list", async () => {
+  const f = fixture();
+  assert.equal((await f.call(null, "/identity")).status, 401);
+  assert.equal((await f.call("bad-key", "/identity")).status, 401);
+  assert.equal((await f.call("sync", "/identity")).status, 403);
+  for (const person of TEAM) {
+    const result = await f.call(person.id, "/identity");
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.data, { user: { id: person.id, username: person.id === "owner" ? "smooth" : person.id,
+      name: person.name, role: person.id === "owner" ? "owner" : "member" } });
+  }
+  assert.equal((await f.call("amia", "/identity/team")).status, 403);
+  assert.equal((await f.call("sync", "/identity/team")).status, 403);
+  assert.equal((await f.call("owner", "/identity/team")).data.members.length, TEAM.length);
+  const reduced = { ...hashes }; delete reduced.amia;
+  f.env.TEAM_TOKEN_HASHES = JSON.stringify(reduced);
+  assert.equal((await f.call("amia", "/identity")).status, 401);
+  assert.equal((await f.call("owner", "/identity/team")).data.members.some(p => p.id === "amia"), false);
+  const response = await worker.fetch(new Request("https://api.example.invalid/identity", {
+    headers: { authorization: `Bearer ${tokens.owner}` },
+  }), f.env, { waitUntil() {} });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
 test("guideline questions are shared with the owner without exposing another employee's queue", async () => {
   const f = fixture();
   assert.equal((await f.call(null, "/guidelines/questions")).status, 401);
