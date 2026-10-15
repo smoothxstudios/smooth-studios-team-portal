@@ -17,6 +17,7 @@ import {
   Banknote,
   BookOpen,
   CalendarDays,
+  CalendarCheck,
   Check,
   ChevronDown,
   ChevronRight,
@@ -118,7 +119,7 @@ const STUDIO_TIME_ZONE = "America/New_York";
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 
-type ViewKey = "overview" | "rentals" | "team" | "payouts" | "guide" | "scheduling";
+type ViewKey = "overview" | "rentals" | "team" | "payouts" | "guide" | "scheduling" | "availability";
 type RentalState = "upcoming" | "earned" | "paid" | "awaiting";
 type CustomerPaymentState = "paid" | "deposit" | "review" | "pending";
 type AppointmentStatus = RentalState | "customer-paid" | "upcoming-paid" | "deposit" | "review";
@@ -127,6 +128,7 @@ type PaymentFilter = "all" | CustomerPaymentState;
 const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ownerOnly?: boolean }[] = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "scheduling", label: "Team Schedule", icon: CalendarDays },
+  { key: "availability", label: "Availability", icon: CalendarCheck },
   { key: "rentals", label: "Appointments", icon: CalendarDays },
   { key: "team", label: "Team", icon: Users, ownerOnly: true },
   { key: "payouts", label: "Payouts", icon: WalletCards },
@@ -1158,7 +1160,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
         </header>
 
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
-          {view === "overview" && !isOwner && <TeamSchedulingPage token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide") }} />}
+          {view === "overview" && !isOwner && <TeamSchedulingPage token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide") }} />}
           {view === "overview" && isOwner && (
             <>
               <section className="kpi-grid">
@@ -1220,7 +1222,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
             {!isOwner && employeeEarnings.rentals.length > 0 && <article className="panel employee-earnings-details"><div className="panel-heading"><div><h2>Earnings by appointment</h2><p>Upcoming amounts are estimates. Custom assignments are listed in Schedule.</p></div></div><RentalTable employeeId={employeeId} rentals={employeeEarnings.rentals} /></article>}
           </>}
           {view === "guide" && <StudioGuidePage isOwner={isOwner} draftPassword={sessionPassword} teamToken={schedulingToken} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
-          {view === "scheduling" && <TeamSchedulingPage isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
+          {(view === "scheduling" || view === "availability") && <TeamSchedulingPage availabilityOnly={view === "availability"} onAvailability={() => setView("availability")} isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
         </div>
         <DashboardVersionFooter viewer={isOwner ? "owner" : "employee"} />
       </SidebarInset>

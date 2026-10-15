@@ -5,12 +5,13 @@ import { createHmac } from "node:crypto";
 import test, { mock } from "node:test";
 import worker from "../team-api/worker.mjs";
 import { teamToken, tokenHash, unbase64url } from "../lib/team-auth.mjs";
-import { TEAM, addLocalDays, blockOccurrences, localInstant, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
+import { TEAM, addLocalDays, blockOccurrences, localInstant, assignmentConflicts, hasConflictOverride, workPreferenceMatch } from "../lib/team-schedule.mjs";
 import { deliverPush, publicPushKey, pushEndpoint, vapidAuthorization, flushAlerts } from "../team-api/push.mjs";
 
 const schema = await readFile(new URL("../team-api/migrations/0000_brief_ravenous.sql", import.meta.url), "utf8");
 const seed = await readFile(new URL("../team-api/migrations/0001_initial_state.sql", import.meta.url), "utf8");
 const questionsSchema = await readFile(new URL("../team-api/migrations/0002_guideline_questions.sql", import.meta.url), "utf8");
+const preferencesSchema = await readFile(new URL("../team-api/migrations/0003_work_preferences.sql", import.meta.url), "utf8");
 const ids = [...TEAM.map(person => person.id), "sync"];
 const tokens = Object.fromEntries(await Promise.all(ids.map(async id => [id, await teamToken(`synthetic-test-password-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(ids.map(async id => [id, await tokenHash(tokens[id])])));
@@ -19,7 +20,7 @@ mock.timers.enable({ apis: ["Date"], now });
 test.after(() => mock.timers.reset());
 
 class D1TestDatabase {
-  constructor() { this.sqlite = new DatabaseSync(":memory:"); this.sqlite.exec(schema); this.sqlite.exec(seed); this.sqlite.exec(questionsSchema); }
+  constructor() { this.sqlite = new DatabaseSync(":memory:"); this.sqlite.exec(schema); this.sqlite.exec(seed); this.sqlite.exec(questionsSchema); this.sqlite.exec(preferencesSchema); }
   prepare(sql) {
     const sqlite = this.sqlite;
     let args = [];
@@ -127,6 +128,7 @@ test("custom dashboard origin supports preflight and authenticated scheduling wi
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers.get("access-control-allow-origin"), origin);
   assert.match(preflight.headers.get("access-control-allow-headers"), /Authorization/);
+  assert.match(preflight.headers.get("access-control-allow-methods"), /PATCH/);
   assert.equal((await f.call("jordyn", "/schedule", undefined, "GET", { origin })).status, 200);
   assert.equal((await f.call(null, "/schedule", undefined, "GET", { origin })).status, 401);
   assert.equal((await f.call("owner", "/schedule", undefined, "GET", { origin: "https://dashboard.smoothstudios.co.untrusted.invalid" })).status, 403);
@@ -431,4 +433,90 @@ test("new employees can accept only their own rental assignments", async () => {
     assert.equal(own.assignments[0].employeeId, id);
   }
   assert.equal((await f.snapshot("jordyn")).assignments.length, 0);
+});
+
+const workPreference = { userId: "jordyn", startLocal: "2026-10-05T00:00", endLocal: "2026-10-06T00:00", allDay: true, repeatUntil: "2026-12-15", note: "Open to rentals" };
+async function prefer(f, user = "jordyn", data = workPreference) {
+  return f.call(user, "/work-preferences", { ...data, revision: (await f.snapshot()).revision });
+}
+test("work preferences are private to their employee and owner, and survive unrelated calendar syncs", async () => {
+  const f = fixture();
+  assert.equal((await f.call(null, "/work-preferences", {})).status, 401);
+  assert.equal((await f.call("sync", "/work-preferences", {})).status, 403);
+  assert.equal((await prefer(f, "jordyn", { ...workPreference, userId: "rayne" })).status, 200);
+  const saved = (await f.snapshot("jordyn")).workPreferences[0];
+  assert.equal(saved.userId, "jordyn");
+  assert.equal((await f.snapshot("rayne")).workPreferences.length, 0);
+  assert.equal((await f.snapshot()).workPreferences.length, 1);
+  assert.equal((await f.snapshot()).availabilityVersion, 1);
+  assert.equal((await f.call("rayne", `/work-preferences/${saved.id}`, { ...workPreference, revision: 1 }, "PATCH")).status, 404);
+  assert.equal((await f.call("rayne", `/work-preferences/${saved.id}`, { revision: 1 }, "DELETE")).status, 404);
+  assert.equal((await f.call("jordyn", `/work-preferences/${saved.id}`, { ...workPreference, userId: "rayne", note: "Prefer afternoons", revision: 1 }, "PATCH")).status, 200);
+  await f.importCalendar();
+  const updated = (await f.snapshot()).workPreferences[0];
+  assert.equal(updated.userId, "jordyn");
+  assert.equal(updated.note, "Prefer afternoons");
+  assert.equal(updated.createdAt, saved.createdAt);
+  assert.equal((await f.call("jordyn", `/work-preferences/${saved.id}`, { revision: (await f.snapshot()).revision }, "DELETE")).status, 200);
+  assert.equal((await f.snapshot()).workPreferences.length, 0);
+});
+test("owner can manage employee preferences; duplicate and racing writes are safe", async () => {
+  const f = fixture();
+  const data = { ...workPreference, userId: "amia", revision: 0 };
+  const results = await Promise.all([f.call("owner", "/work-preferences", data), f.call("owner", "/work-preferences", data)]);
+  assert.deepEqual(results.map(r => r.status).sort(), [200, 409]);
+  assert.equal((await prefer(f, "owner", data)).status, 409);
+  assert.equal((await prefer(f, "owner", { ...data, userId: "owner" })).status, 400);
+  const saved = (await f.snapshot()).workPreferences[0];
+  assert.equal(saved.userId, "amia");
+  assert.equal((await f.call("owner", `/work-preferences/${saved.id}`, { ...workPreference, note: "Updated by Smooth", revision: 0 }, "PATCH")).status, 409);
+  assert.equal((await f.snapshot()).workPreferences[0].note, "Open to rentals");
+  assert.equal((await f.call("owner", `/work-preferences/${saved.id}`, { revision: 1 }, "DELETE")).status, 200);
+});
+test("preferred days validate dates, hours, full-day boundaries and series limits", async () => {
+  const f = fixture();
+  for (const invalid of [
+    { startLocal: "2026-02-30T00:00" }, { endLocal: "2026-10-04T00:00" },
+    { endLocal: "2026-10-07T00:00" }, { allDay: "yes" },
+    { startLocal: "2026-10-05T12:00" }, { repeatUntil: "2028-01-01" },
+    { repeatUntil: "2026-02-30" }, { note: "x".repeat(121) },
+    { startLocal: "2026-08-03T00:00", endLocal: "2026-08-04T00:00", repeatUntil: null },
+    { startLocal: "2027-03-07T02:30", endLocal: "2027-03-07T03:30", repeatUntil: "2027-03-21", allDay: false },
+  ]) assert.equal((await prefer(f, "jordyn", { ...workPreference, ...invalid })).status, 400, JSON.stringify(invalid));
+  assert.equal((await f.snapshot()).workPreferences.length, 0);
+  assert.equal((await prefer(f, "jordyn", { ...workPreference, startLocal: "2026-09-09T00:00", endLocal: "2026-09-10T00:00", repeatUntil: null })).status, 200);
+  assert.equal((await prefer(f, "jordyn", { ...workPreference, startLocal: "2026-08-31T00:00", endLocal: "2026-09-01T00:00", repeatUntil: "2026-12-15" })).status, 200);
+});
+test("full-day weekly preferences preserve local dates through both DST transitions", async () => {
+  const f = fixture();
+  const fullDay = { ...workPreference, startLocal: "2026-10-25T00:00", endLocal: "2026-10-26T00:00", repeatUntil: "2027-04-01" };
+  assert.equal((await prefer(f, "jordyn", fullDay)).status, 200);
+  const occurrences = blockOccurrences(fullDay, "2026-11-01T00:00Z", "2027-03-16T00:00Z");
+  const fall = occurrences.find(p => p.start.startsWith("2026-11-01"));
+  const spring = occurrences.find(p => p.start.startsWith("2027-03-14"));
+  assert.equal((Date.parse(fall.end) - Date.parse(fall.start)) / 3600000, 25);
+  assert.equal((Date.parse(spring.end) - Date.parse(spring.start)) / 3600000, 23);
+});
+test("preference matching distinguishes partial windows, joins adjacent windows, and honors gaps", () => {
+  const period = { start: "2026-10-05T13:00Z", end: "2026-10-05T15:00Z" };
+  const first = { ...workPreference, allDay: false, startLocal: "2026-10-05T09:00", endLocal: "2026-10-05T10:00" };
+  const second = { ...first, startLocal: "2026-10-05T10:00", endLocal: "2026-10-05T11:00" };
+  assert.equal(workPreferenceMatch("jordyn", period, [workPreference]), "full");
+  assert.equal(workPreferenceMatch("rayne", period, [workPreference]), "none");
+  assert.equal(workPreferenceMatch("jordyn", period, [first]), "partial");
+  assert.equal(workPreferenceMatch("jordyn", period, [first, second]), "full");
+  assert.equal(workPreferenceMatch("jordyn", period, [first, { ...second, startLocal: "2026-10-05T10:30" }]), "partial");
+  assert.equal(workPreferenceMatch("jordyn", { start: period.end, end: "2026-10-05T16:00Z" }, [second]), "none");
+});
+test("preferences never create assignments, accrue pay, or override time conflicts", async () => {
+  const f = fixture(); await f.importCalendar();
+  assert.equal((await prefer(f)).status, 200);
+  assert.equal((await f.snapshot()).assignments.length, 0);
+  assert.equal((await f.call("sync", "/sync/accepted")).data.assignments.length, 0);
+  assert.equal((await f.call("jordyn", "/blocks", { ...block, revision: (await f.snapshot()).revision })).status, 200);
+  assert.equal(workPreferenceMatch("jordyn", rental, (await f.snapshot()).workPreferences), "full");
+  assert.equal((await f.call("owner", "/assignments", { employeeId: "jordyn", appointmentId: rental.id, revision: (await f.snapshot()).revision })).status, 409);
+  assert.equal((await f.snapshot()).blocks.length, 1);
+  // No stated preference does not prevent an otherwise valid assignment offer.
+  assert.equal((await f.call("owner", "/assignments", { employeeId: "rayne", appointmentId: rental.id, revision: (await f.snapshot()).revision })).status, 200);
 });

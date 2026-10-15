@@ -50,3 +50,8 @@ All writes use bound SQL. Schedule revisions and atomic conditional batches reje
 Apply schema changes with `npx drizzle-kit generate --config team-api/drizzle.config.ts`; review the generated migration, then redeploy with the workflow. Do not drop production tables or replace the existing VAPID secret. Keep the DB binding and database ID unchanged unless intentionally migrating infrastructure.
 
 Tests: `npm test`. Type check: `npx tsc --noEmit`. Worker bundle check: `npx wrangler deploy --dry-run --config team-api/wrangler.jsonc`.
+# Availability preferences
+
+`GET /schedule` returns `availabilityVersion: 1` and `workPreferences` for the signed-in employee, or the full team for Smooth. Work preferences are separate from `blocks`: they express interest and never authorize an assignment, override a conflict, or enter rental payroll.
+
+`POST /work-preferences`, `PATCH /work-preferences/:id`, and `DELETE /work-preferences/:id` use the same revision checks as scheduling. Employees can manage only their own entries; Smooth can manage employee entries. Dates and weekly recurrences use Eastern time, including full days spanning daylight-saving changes. Migration `0003_work_preferences.sql` adds a table without changing existing blocks or assignments.

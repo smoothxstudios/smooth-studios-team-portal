@@ -13,6 +13,7 @@ export type EmployeeHomeOptions = {
   rentals: Rental[];
   owed: number;
   onSchedule: () => void;
+  onAvailability: () => void;
   onEarnings: () => void;
   onGuide: () => void;
 };
@@ -56,7 +57,7 @@ export function EmployeeHome({ userId, schedule, loading, options, onBlockTime, 
     <section className="panel employee-pay" aria-label="Pay owed"><div className="employee-pay-label"><Banknote size={21} /><div><h2>Pay owed</h2><p>Earned and awaiting payout</p></div></div><strong>{(options.owed / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}</strong><Button variant="ghost" onClick={options.onEarnings}>View earnings <ArrowRight size={16} /></Button></section>
 
     <nav className="employee-shortcuts" aria-label="Employee shortcuts">
-      <button className="panel employee-shortcut" onClick={schedule ? onBlockTime : options.onSchedule}><span className="employee-shortcut-icon"><Plus size={22} /></span><span><strong>Block time</strong><small>Add classes or time you can’t work</small></span><ArrowRight size={18} /></button>
+      <button className="panel employee-shortcut" onClick={options.onAvailability ?? (schedule ? onBlockTime : options.onSchedule)}><span className="employee-shortcut-icon"><Plus size={22} /></span><span><strong>Availability</strong><small>Choose work days or block time</small></span><ArrowRight size={18} /></button>
       <button className="panel employee-shortcut" onClick={options.onGuide}><span className="employee-shortcut-icon"><BookOpen size={22} /></span><span><strong>Studio guidelines</strong><small>Find answers and rental checklists</small></span><ArrowRight size={18} /></button>
     </nav>
   </div>;

@@ -1,15 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Plus, RefreshCw, ShieldCheck, Trash2, X } from "lucide-react";
+import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Plus, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { enableTeamPush, disableTeamPush, teamPushIsEnabled, testTeamPush, teamRequest, type TeamSchedule, type TeamAssignment, type TimeBlock } from "@/lib/team-api";
+import { enableTeamPush, disableTeamPush, teamPushIsEnabled, testTeamPush, teamRequest, type TeamSchedule, type TeamAssignment, type TimeBlock, type WorkPreference } from "@/lib/team-api";
 import type { DashboardPayload } from "@/lib/dashboard-types";
 import { EmployeeHome, type EmployeeHomeOptions } from "@/components/employee-home";
-import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps } from "@/lib/team-schedule.mjs";
+import { TeamAvailability } from "@/components/team-availability";
+import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps, workPreferenceMatch } from "@/lib/team-schedule.mjs";
 
 const personName = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
 const time = (value: string) => new Date(value).toLocaleTimeString("en-US", { timeZone: STUDIO_ZONE, hour: "numeric", minute: "2-digit" });
@@ -24,7 +25,7 @@ function Person({ id }: { id: string }) {
   return <span className="schedule-person"><i style={{ background: TEAM.find(p => p.id === id)?.color }} />{personName(id)}</span>;
 }
 
-export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSync, home, pastContent }: { userId: string; isOwner: boolean; token: string; onSetup?: () => void; calendarSync?: DashboardPayload["calendarAssignmentSync"]; home?: EmployeeHomeOptions; pastContent?: ReactNode }) {
+export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSync, home, pastContent, availabilityOnly = false, onAvailability }: { userId: string; isOwner: boolean; token: string; onSetup?: () => void; calendarSync?: DashboardPayload["calendarAssignmentSync"]; home?: EmployeeHomeOptions; pastContent?: ReactNode; availabilityOnly?: boolean; onAvailability?: () => void }) {
   const isHome = Boolean(home);
   const [schedule, setSchedule] = useState<TeamSchedule | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         if (ready) {
           const result = await teamRequest<TeamSchedule>(token, "/schedule");
           if (!disposed && version === requestVersion.current) { setSchedule(result); setError(""); setNeedsRefresh(false); }
-          if (!isHome) try {
+          if (!isHome && !availabilityOnly) try {
             const registered = await teamPushIsEnabled(token, result.pushPublicKey);
             if (!disposed) setPushEnabled(registered);
           } catch {
@@ -81,7 +82,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     const onFocus = () => void refresh();
     window.addEventListener("focus", onFocus);
     return () => { disposed = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); };
-  }, [token, isHome]);
+  }, [token, isHome, availabilityOnly]);
 
   async function mutate(path: string, data: object, method = "POST") {
     if (!schedule || busy || needsRefresh || mutationInFlight.current) return false;
@@ -96,7 +97,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         setSchedule(current => current ? { ...current, assignments: current.assignments.map(a => a.id === path.slice(13) ? { ...a, status: data.status as TeamAssignment["status"] } : a) } : current);
       }
       // Once saved, a refresh failure must not invite a duplicate submission.
-      setMessage(result.notification ?? ("status" in data && data.status === "accepted" ? "Assignment accepted." : "status" in data && data.status === "declined" ? "Assignment declined." : path === "/blocks" ? "Availability saved." : "Saved. Calendar notes and rental earnings update on the next sync, scheduled every 5 minutes."));
+      setMessage(result.notification ?? ("status" in data && data.status === "accepted" ? "Assignment accepted." : "status" in data && data.status === "declined" ? "Assignment declined." : (path.startsWith("/blocks") || path.startsWith("/work-preferences")) ? (method === "DELETE" ? "Availability entry removed." : "Availability saved.") : "Saved. Calendar notes and rental earnings update on the next sync, scheduled every 5 minutes."));
       try { await load(); } catch { setError("Your change was saved, but the updated view could not load. Press Refresh before making another change."); }
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : "Couldn’t save this change."); return false; }
@@ -134,13 +135,22 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
   const visibleAssignments = (schedule?.assignments ?? []).filter(a => (filter === "all" || a.employeeId === filter)).sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   const upcomingAssignments = visibleAssignments.filter(a => future(a.end) && ["pending", "accepted"].includes(a.status));
   const blocks = (schedule?.blocks ?? []).filter(b => filter === "all" || b.userId === filter).sort((a, b) => a.startLocal.localeCompare(b.startLocal));
+  const preferences = (schedule?.workPreferences ?? []).filter(p => filter === "all" || p.userId === filter);
+  const selectedPreference = period ? workPreferenceMatch(assignment.employeeId, period, schedule?.workPreferences ?? []) : "none";
+  function employeeAvailabilityLabel(id: string) {
+    if (!period || !schedule) return "";
+    if (assignmentConflicts(id, period, schedule.blocks, schedule.assignments, schedule.appointments).length) return "Time conflict";
+    if (!schedule.availabilityVersion) return "No recorded conflict";
+    const match = workPreferenceMatch(id, period, schedule.workPreferences ?? []);
+    return match === "full" ? "Wants to work this time" : match === "partial" ? "Partly within preferred hours" : "No preference recorded";
+  }
   const days = Array.from({ length: 7 }, (_, i) => addLocalDays(`${week}T00:00`, i).slice(0, 10));
   function openAssignment(appointmentId = "") {
     setAssignment({ employeeId: filter !== "all" && filter !== "owner" ? filter : "akiva", appointmentId, title: "", instructions: "", overrideConflicts: false, ...initialPeriod() });
     setError(""); setAssignmentOpen(true);
   }
-  function openBlockTime() {
-    setError(""); setBlock({ userId: isOwner && filter !== "all" ? filter : userId, reason: "Class", ...initialPeriod(), repeatUntil: "", weekly: false }); setBlockOpen(true);
+  function openBlockTime(id?: string) {
+    setError(""); setBlock({ userId: isOwner ? id ?? (filter !== "all" ? filter : userId) : userId, reason: "Class", ...initialPeriod(), repeatUntil: "", weekly: false }); setBlockOpen(true);
   }
   async function refreshManually() {
     setBusy(true); setError("");
@@ -174,23 +184,24 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
   }
 
   return <section className="team-scheduling">
-    {!home && <header className="schedule-intro"><div>{isOwner && <p className="schedule-eyebrow">TEAM SCHEDULE</p>}<h2>{isOwner ? "The right person. The right time." : "My schedule"}</h2><p>Block class time and other commitments. Review rental offers and assignments here.</p></div>
+    {!home && <header className="schedule-intro"><div>{isOwner && <p className="schedule-eyebrow">{availabilityOnly ? "TEAM AVAILABILITY" : "TEAM SCHEDULE"}</p>}<h2>{availabilityOnly ? isOwner ? "When your team wants to work" : "My availability" : isOwner ? "The right person. The right time." : "My schedule"}</h2><p>{availabilityOnly ? "Keep preferred work days and unavailable time together." : "Review rental offers and assignments. Manage preferred work days and time off in Availability."}</p></div>
       <Button disabled={busy || loading} variant="outline" onClick={() => void refreshManually()}><RefreshCw size={16} />Refresh</Button></header>}
     {error && <div role="alert" className="schedule-error"><p>{error}</p>{home && <Button disabled={busy} variant="outline" onClick={() => void refreshManually()}><RefreshCw size={16} />Refresh</Button>}</div>}
     {message && <p role="status" className="schedule-success">{message}</p>}
-    {home && <EmployeeHome userId={userId} schedule={schedule} loading={loading} options={home} onBlockTime={openBlockTime} renderOffer={assignmentCard} />}
-    {!home && !isOwner && <nav className="employee-schedule-tabs" aria-label="Schedule views"><Button variant={scheduleTab === "upcoming" ? "default" : "outline"} aria-pressed={scheduleTab === "upcoming"} onClick={() => setScheduleTab("upcoming")}>Upcoming & availability</Button><Button variant={scheduleTab === "past" ? "default" : "outline"} aria-pressed={scheduleTab === "past"} onClick={() => setScheduleTab("past")}>Past</Button></nav>}
-    {!home && !isOwner && scheduleTab === "past" && <>{pastContent}<article className="schedule-panel"><h3>Past offers & responses</h3>{visibleAssignments.filter(a => !["pending", "accepted"].includes(a.status) || !future(a.end)).length ? <div className="schedule-history employee-past-offers">{visibleAssignments.filter(a => !["pending", "accepted"].includes(a.status) || !future(a.end)).slice(-50).reverse().map(a => <div key={a.id}><span>{date(a.start)} · {a.title}</span><span className="schedule-status">{a.status}</span></div>)}</div> : <p className="schedule-empty">{loading ? "Loading past offers…" : "No past offers in this view."}</p>}</article></>}
+    {home && <EmployeeHome userId={userId} schedule={schedule} loading={loading} options={home} onBlockTime={() => openBlockTime()} renderOffer={assignmentCard} />}
+    {!home && !availabilityOnly && !isOwner && <nav className="employee-schedule-tabs" aria-label="Schedule views"><Button variant={scheduleTab === "upcoming" ? "default" : "outline"} aria-pressed={scheduleTab === "upcoming"} onClick={() => setScheduleTab("upcoming")}>Upcoming</Button><Button variant={scheduleTab === "past" ? "default" : "outline"} aria-pressed={scheduleTab === "past"} onClick={() => setScheduleTab("past")}>Past</Button></nav>}
+    {!home && !availabilityOnly && !isOwner && scheduleTab === "past" && <>{pastContent}<article className="schedule-panel"><h3>Past offers & responses</h3>{visibleAssignments.filter(a => !["pending", "accepted"].includes(a.status) || !future(a.end)).length ? <div className="schedule-history employee-past-offers">{visibleAssignments.filter(a => !["pending", "accepted"].includes(a.status) || !future(a.end)).slice(-50).reverse().map(a => <div key={a.id}><span>{date(a.start)} · {a.title}</span><span className="schedule-status">{a.status}</span></div>)}</div> : <p className="schedule-empty">{loading ? "Loading past offers…" : "No past offers in this view."}</p>}</article></>}
     {loading && !home && <div className="schedule-panel">Loading your schedule…</div>}
     {!loading && enabled === false && <div className="schedule-panel"><h3>Scheduling setup is waiting for deployment</h3><p>{isOwner ? "Your Cloudflare credentials are used securely by GitHub Actions. Activate below to deploy the Worker, prepare the database, and import Calendar. This area opens after all three succeed." : "Smooth is finishing setup. Your existing dashboard is unchanged."}</p>{isOwner && onSetup && <Button className="mt-4" onClick={onSetup}>Activate team scheduling</Button>}</div>}
-    {schedule && !home && (isOwner || scheduleTab === "upcoming") && <>
+    {schedule && !home && availabilityOnly && <TeamAvailability userId={userId} isOwner={isOwner} schedule={schedule} busy={busy} needsRefresh={needsRefresh} error={error} mutate={mutate} onBlockTime={openBlockTime} />}
+    {schedule && !home && !availabilityOnly && (isOwner || scheduleTab === "upcoming") && <>
       {isOwner && calendarSync?.status === "needs_access" && <div className="schedule-warning" role="status"><strong>Google Calendar needs permission to show rental assignments</strong><p>In your rental calendar’s Settings and sharing, give <b>{calendarSync.serviceAccountEmail ?? "the existing dashboard service account"}</b> “Make changes to events” access. Rental team notes will appear after the next sync. Your assignments are saved here.</p></div>}
       {isOwner && calendarSync?.status === "retrying" && <p className="schedule-warning" role="status">Some rental team notes could not update in Google Calendar. They will retry on the next sync; your assignments are saved here.</p>}
       <div className="schedule-toolbar"><div className="schedule-actions">
-        <Button onClick={openBlockTime}><Plus size={16} />Block time</Button>
+        <Button onClick={onAvailability ?? (() => openBlockTime())} variant="outline"><CalendarDays size={16} />Availability</Button>
         {isOwner && <Button onClick={() => openAssignment()} variant="outline"><Plus size={16} />Assign work</Button>}
       </div><label className="schedule-filter">{isOwner ? "View team member" : "Your schedule"}{isOwner ? <select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">Everyone</option>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select> : <Person id={userId} />}</label></div>
-      <div className="schedule-notice"><ShieldCheck size={18} /><p>All times are Tallahassee time (Eastern). Calendar and payment syncing is scheduled every 5 minutes; portal responses update immediately. {isOwner ? "Check recorded commitments before assigning work. Employees confirm by accepting." : "A pending offer is confirmed when you select Accept."}</p></div>
+      <div className="schedule-notice"><ShieldCheck size={18} /><p>All times are Tallahassee time (Eastern). Calendar and payment syncing is scheduled every 5 minutes; portal responses update immediately. {isOwner ? "Check recorded commitments before assigning work. Preferred days express interest; blocked time and existing work take priority. Employees confirm by accepting." : "A pending offer is confirmed when you select Accept."}</p></div>
 
       <article className="schedule-panel"><div className="schedule-row schedule-section-heading"><div><h3><CalendarDays size={20} />Week at a glance</h3><p>{date(localInstant(`${week}T12:00`))}–{date(localInstant(`${days[6]}T12:00`))} · {schedule.syncedAt ? `Calendar synced ${date(schedule.syncedAt)} at ${time(schedule.syncedAt)}` : "Waiting for Calendar"}</p></div><div className="schedule-actions">
         <Button size="icon" variant="outline" aria-label="Previous week" onClick={() => setWeek(addLocalDays(`${week}T00:00`, -7).slice(0, 10))}><ChevronLeft /></Button>
@@ -200,11 +211,13 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       <div className="schedule-week">{days.map(day => {
         const from = localInstant(`${day}T00:00`), to = localInstant(addLocalDays(`${day}T00:00`, 1));
         const occurrences = blocks.flatMap(b => blockOccurrences(b, from, to)) as (TimeBlock & { start: string; end: string })[];
+        const preferred = preferences.flatMap(p => blockOccurrences(p, from, to)) as (WorkPreference & { start: string; end: string })[];
         const offers = visibleAssignments.filter(a => ["pending", "accepted"].includes(a.status) && overlaps(a, { start: from, end: to }));
         const calendar = schedule.appointments.filter(a => overlaps(a, { start: from, end: to }) &&
           (filter === "all" || a.acceptedEmployeeIds.includes(filter)));
         return <div className="schedule-day" key={day}><h4>{new Date(from).toLocaleDateString("en-US", { timeZone: STUDIO_ZONE, weekday: "short", day: "numeric", month: "short" })}</h4>
-          {!occurrences.length && !offers.length && !calendar.length && <p className="schedule-empty-day">No recorded commitments</p>}
+          {!occurrences.length && !preferred.length && !offers.length && !calendar.length && <p className="schedule-empty-day">No recorded commitments</p>}
+          {preferred.map(p => <div className="schedule-entry preferred" key={`${p.id}-${p.start}`}><Person id={p.userId} /><strong>Wants to work</strong><span>{p.allDay ? "Full day" : `${time(p.start)}–${time(p.end)}`}</span>{p.note && <small>{p.note}</small>}</div>)}
           {occurrences.map(b => <div className="schedule-entry blocked" key={`${b.id}-${b.start}`}><Person id={b.userId} /><strong>{b.reason}</strong><span>{time(b.start)}–{time(b.end)} · Blocked</span></div>)}
           {calendar.map(a => <div className="schedule-entry" key={a.id}><strong>{a.customer ? `${a.customer} · ` : ""}{a.title}</strong><span>{time(a.start)}–{time(a.end)}</span><small className={a.acceptedEmployeeIds.length ? "schedule-calendar-accepted" : undefined}>{a.acceptedEmployeeIds.length ? <><Check size={14} aria-hidden="true" />Calendar accepted: {a.acceptedEmployeeIds.map(personName).join(", ")}</> : offers.some(o => o.appointmentId === a.id) ? "Portal offer below" : "No accepted team member"}</small>{isOwner && future(a.start) && <button onClick={() => openAssignment(a.id)}>Assign person →</button>}</div>)}
           {offers.map(a => <div className={`schedule-entry ${a.status}`} key={a.id}><Person id={a.employeeId} /><strong>{a.title}</strong><span>{time(a.start)}–{time(a.end)} · {a.status}</span></div>)}
@@ -216,17 +229,13 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         {isOwner && visibleAssignments.some(a => !["pending", "accepted"].includes(a.status) || !future(a.end)) && <details className="schedule-history"><summary>Past offers & responses</summary>{visibleAssignments.filter(a => !["pending", "accepted"].includes(a.status) || !future(a.end)).slice(-50).reverse().map(a => <div key={a.id}><Person id={a.employeeId} /><span>{date(a.start)} · {a.title}</span><span>{a.status}</span></div>)}</details>}
       </article>
 
-      <article className="schedule-panel"><div className="schedule-section-heading"><h3>Time off & class schedules <span className="schedule-count">{blocks.length}</span></h3><p>Reasons are visible only to Smooth and the person whose time is blocked. Add one weekly block for each class meeting day. Delete a series and add a replacement to change it.</p></div>
-        {blocks.length ? <div className="schedule-blocks">{blocks.map(b => <div className="schedule-block" key={b.id}><div><Person id={b.userId} /><strong>{b.reason}</strong><p>{date(localInstant(b.startLocal))} · {time(localInstant(b.startLocal))}–{time(localInstant(b.endLocal))}{b.endLocal.slice(0, 10) !== b.startLocal.slice(0, 10) ? ` (${date(localInstant(b.endLocal))})` : ""}</p><small>{b.repeatUntil ? `Weekly through ${date(localInstant(`${b.repeatUntil}T12:00`))}` : "One-time block"}</small></div><Button aria-label={`Remove ${b.reason} block for ${personName(b.userId)}`} size="icon" variant="outline" disabled={busy || needsRefresh} onClick={() => setConfirm({ path: `/blocks/${b.id}`, method: "DELETE", data: {}, description: `Remove ${b.reason}${b.repeatUntil ? " and all its weekly occurrences" : ""} for ${personName(b.userId)}? Existing assignments will not change.` })}><Trash2 size={16} /></Button></div>)}</div> : <p className="schedule-empty">No time blocks added yet.</p>}
-      </article>
-
       <article className="schedule-panel schedule-push"><div><h3><Bell size={20} />Schedule notifications</h3><p>Receive a general alert, tap it, unlock your dashboard, and accept or decline here. No texts are sent.</p><p className="schedule-small">On iPhone: Safari → Share → Add to Home Screen. Open that icon, unlock, then enable notifications. Closing the app or locking your phone keeps alerts on. Using Log out in the dashboard disables them on this device.</p>{!pushSupported && <p className="schedule-warning">This browser session does not support push. Use the Home Screen app on iPhone or a supported browser.</p>}</div><div className="schedule-actions">
         {pushEnabled ? <><Button variant="outline" disabled={busy} onClick={() => void pushAction("test")}>Send test</Button><Button variant="outline" disabled={busy} onClick={() => void pushAction("disable")}>Disable this device</Button></> : <Button disabled={busy || !pushSupported || !schedule.pushPublicKey} onClick={() => void pushAction("enable")}><Bell size={16} />Enable on this device</Button>}
       </div>{pushFeedback && <p className={pushFeedback.ok ? "schedule-success" : "schedule-warning"} role={pushFeedback.ok ? "status" : "alert"}>{pushFeedback.text}</p>}{isOwner && <p className="schedule-small">Registered devices: {TEAM.map(p => `${p.name} ${schedule.devices[p.id] ?? 0}`).join(" · ")}. Registration does not guarantee delivery; focus mode and device settings can suppress alerts.</p>}</article>
       <p className="schedule-small">Studio rental offers and acceptances are listed in the Google Calendar event’s description after syncing. Existing Calendar invitations remain valid. Custom tasks stay in this dashboard.</p>
     </>}
 
-    <Dialog open={blockOpen} onOpenChange={open => { if (!busy) setBlockOpen(open); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Block availability</DialogTitle><DialogDescription>Class, personal time, or another commitment. Times are Eastern. Existing assignments are not cancelled.</DialogDescription></DialogHeader>
+    <Dialog open={blockOpen} onOpenChange={open => { if (!busy) setBlockOpen(open); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Block time</DialogTitle><DialogDescription>Class, personal time, or another commitment. Times are Eastern. Existing assignments are not cancelled.</DialogDescription></DialogHeader>
       <form onSubmit={async e => { e.preventDefault(); if (await mutate("/blocks", { ...block, repeatUntil: block.weekly ? block.repeatUntil : null })) setBlockOpen(false); }}>
         {isOwner && <label>Team member<select value={block.userId} onChange={e => setBlock({ ...block, userId: e.target.value })}>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
         <label>Reason<Input required maxLength={120} value={block.reason} onChange={e => setBlock({ ...block, reason: e.target.value })} placeholder="Class, personal time, another job…" /></label>
@@ -241,7 +250,8 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       <form onSubmit={async e => { e.preventDefault(); if (await mutate("/assignments", assignment)) setAssignmentOpen(false); }}>
         <label>Rental or assignment<select value={assignment.appointmentId} onChange={e => setAssignment({ ...assignment, appointmentId: e.target.value, overrideConflicts: false })}><option value="">Custom assignment (no automatic commission)</option>{appointments.map(a => <option key={a.id} value={a.id}>{date(a.start)} {time(a.start)} · {a.customer} · {a.title}</option>)}</select></label>
         {selectedAppointment ? <p className="schedule-notice">{date(selectedAppointment.start)} · {time(selectedAppointment.start)}–{time(selectedAppointment.end)} · {money(selectedAppointment.priceCents)}<br />Calendar controls this rental’s date and price.</p> : <><label>Assignment title<Input required maxLength={160} value={assignment.title} onChange={e => setAssignment({ ...assignment, title: e.target.value })} placeholder="Prepare the studio, assist on location…" /></label><div className="schedule-form-pair"><label>Starts (Eastern)<Input required type="datetime-local" value={assignment.startLocal} onChange={e => setAssignment({ ...assignment, startLocal: e.target.value, overrideConflicts: false })} /></label><label>Ends (Eastern)<Input required type="datetime-local" value={assignment.endLocal} onChange={e => setAssignment({ ...assignment, endLocal: e.target.value, overrideConflicts: false })} /></label></div></>}
-        <label>Employee<select value={assignment.employeeId} onChange={e => setAssignment({ ...assignment, employeeId: e.target.value, overrideConflicts: false })}>{TEAM.filter(p => p.id !== "owner").map(p => <option key={p.id} value={p.id}>{p.name}{period && schedule && assignmentConflicts(p.id, period, schedule.blocks, schedule.assignments, schedule.appointments).length ? " — time conflict" : " — no recorded conflict"}</option>)}</select></label>
+        <label>Employee<select value={assignment.employeeId} onChange={e => setAssignment({ ...assignment, employeeId: e.target.value, overrideConflicts: false })}>{TEAM.filter(p => p.id !== "owner").map(p => <option key={p.id} value={p.id}>{p.name}{period ? ` — ${employeeAvailabilityLabel(p.id)}` : ""}</option>)}</select></label>
+        {period && schedule?.availabilityVersion === 1 && !conflicts.length && <p className={selectedPreference === "full" ? "schedule-success" : "schedule-notice"}>{selectedPreference === "full" ? `${personName(assignment.employeeId)} wants to work during this entire time. They still need to accept the offer.` : selectedPreference === "partial" ? "Only part of this assignment falls within their preferred hours. Confirm the full time with them." : "No work preference covers this time. You can still offer it; the employee confirms by accepting."}</p>}
         {(conflicts.length > 0 || alreadyInvited || alreadyOffered) && <p className="schedule-warning">{alreadyInvited ? "This person already accepted the Calendar invitation." : alreadyOffered ? "This person already has an active offer for this appointment." : conflicts.join("; ")}</p>}
         {isOwner && conflicts.length > 0 && !alreadyInvited && !alreadyOffered && <label className="schedule-check"><input type="checkbox" checked={assignment.overrideConflicts} onChange={e => setAssignment({ ...assignment, overrideConflicts: e.target.checked })} />Allow this time conflict. The employee still needs to accept.</label>}
         <label>Instructions (optional)<Textarea maxLength={2000} rows={3} value={assignment.instructions} onChange={e => setAssignment({ ...assignment, instructions: e.target.value })} placeholder="Arrival instructions, responsibilities, anything to prepare…" /></label>

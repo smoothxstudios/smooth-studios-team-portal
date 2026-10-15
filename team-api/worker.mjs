@@ -106,7 +106,7 @@ async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -164,7 +164,10 @@ async function route(request, env, ctx) {
     const assignments = s.assignments.filter(a => isOwner || a.employeeId === user);
     const ids = new Set(assignments.filter(active).map(a => a.appointmentId));
     const devices = (await db.prepare("SELECT user_id, COUNT(*) AS count FROM team_devices GROUP BY user_id").all()).results;
-    return { revision: s.state.revision, syncedAt: s.state.synced_at,
+    const workPreferences = user === "owner"
+      ? await jsonRows(db, "SELECT data FROM team_work_preferences")
+      : await jsonRows(db, "SELECT data FROM team_work_preferences WHERE user_id = ?", user);
+    return { revision: s.state.revision, syncedAt: s.state.synced_at, availabilityVersion: 1, workPreferences,
       appointments: s.appointments.filter(a => isOwner || ids.has(a.id) || a.acceptedEmployeeIds.includes(user))
         .map(a => isOwner ? a : { ...a, acceptedEmployeeIds: a.acceptedEmployeeIds.filter(id => id === user) }),
       blocks: s.blocks.filter(b => isOwner || b.userId === user), assignments,
@@ -230,6 +233,50 @@ async function route(request, env, ctx) {
     await db.prepare("DELETE FROM team_appointments WHERE generation != ?").bind(generation).run();
     if (notify.length) ctx.waitUntil(flushAlerts(env));
     return { synced: next.length };
+  }
+  if (["POST", "PATCH", "DELETE"].includes(request.method) &&
+      (url.pathname === "/work-preferences" || /^\/work-preferences\/[^/]+$/.test(url.pathname))) {
+    const input = await body(request), s = await snapshot(db);
+    expectedRevision(input, s.state);
+    const id = url.pathname.slice("/work-preferences/".length);
+    const existing = id ? (await jsonRows(db, "SELECT data FROM team_work_preferences WHERE id = ?", id))[0] : null;
+    if (request.method !== "POST" && (!existing || (user !== "owner" && existing.userId !== user))) fail(404, "Work preference not found.");
+    if (request.method === "POST" && id) fail(404, "Use Add work preference to create an entry.");
+    if (request.method === "DELETE") {
+      await commit(db, s.state, mutation => [db.prepare(`DELETE FROM team_work_preferences WHERE id = ? AND ${guard}`).bind(existing.id, mutation)]);
+      return { deleted: true };
+    }
+    const userId = existing?.userId ?? (user === "owner" ? person(input.userId, true) : user);
+    if (userId === "owner") fail(400, "Choose an employee for a work preference.");
+    const startLocal = text(input.startLocal, 16), endLocal = text(input.endLocal, 16);
+    const start = localInstant(startLocal), end = localInstant(endLocal);
+    const localDuration = Date.parse(`${endLocal}Z`) - Date.parse(`${startLocal}Z`);
+    if (localDuration <= 0 || localDuration > 86400_000 || Date.parse(start) > Date.now() + 366 * 86400_000) {
+      fail(400, "Choose up to one day of preferred work time within the next year, with an end after the start.");
+    }
+    if (input.allDay !== undefined && typeof input.allDay !== "boolean") fail(400, "Choose a full day or specific hours.");
+    const allDay = input.allDay === true;
+    if (allDay && (!startLocal.endsWith("T00:00") || endLocal !== addLocalDays(startLocal, 1))) fail(400, "A full day must run from midnight to the following midnight.");
+    const repeatUntil = input.repeatUntil ? text(input.repeatUntil, 10) : null;
+    let lastEnd = end;
+    if (repeatUntil) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(repeatUntil) || !Number.isFinite(Date.parse(`${repeatUntil}T12:00Z`)) ||
+          new Date(`${repeatUntil}T12:00Z`).toISOString().slice(0, 10) !== repeatUntil ||
+          repeatUntil < startLocal.slice(0, 10) || repeatUntil > addLocalDays(startLocal, 364).slice(0, 10)) fail(400, "Weekly preferences need an end date within one year of their first day.");
+      for (let d = 7; addLocalDays(startLocal, d).slice(0, 10) <= repeatUntil; d += 7) {
+        localInstant(addLocalDays(startLocal, d)); lastEnd = localInstant(addLocalDays(endLocal, d));
+      }
+    }
+    // Today is valid while the selected work window is still in progress.
+    if (Date.parse(lastEnd) <= Date.now()) fail(400, "Choose a day or weekly series that still has upcoming work time.");
+    const preferences = await jsonRows(db, "SELECT data FROM team_work_preferences WHERE user_id = ?", userId);
+    if (!existing && preferences.length >= 200) fail(400, "Remove an old work preference before adding more (200 per person).");
+    if (preferences.some(p => p.id !== existing?.id && p.startLocal === startLocal && p.endLocal === endLocal && p.repeatUntil === repeatUntil)) fail(409, "That work preference is already saved. Edit the existing entry instead.");
+    const item = { id: existing?.id ?? crypto.randomUUID(), userId, startLocal, endLocal, repeatUntil, allDay,
+      note: text(input.note ?? "", 120, false), createdAt: existing?.createdAt ?? new Date().toISOString() };
+    await commit(db, s.state, mutation => [db.prepare(`INSERT INTO team_work_preferences (id, user_id, data) SELECT ?, ?, ? WHERE ${guard}
+      ON CONFLICT(id) DO UPDATE SET data = excluded.data`).bind(item.id, userId, JSON.stringify(item), mutation)]);
+    return { saved: true };
   }
   if (request.method === "POST" && url.pathname === "/blocks") {
     const input = await body(request), s = await snapshot(db);
@@ -378,7 +425,7 @@ const worker = {
     if (origin && !origins.has(origin)) return new Response(JSON.stringify({ error: "Origin not allowed." }), { status: 403, headers });
     if (origin) headers["access-control-allow-origin"] = origin;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...headers,
-      "access-control-allow-methods": "GET, POST, DELETE, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type", "access-control-max-age": "600" } });
+      "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type", "access-control-max-age": "600" } });
     try { return new Response(JSON.stringify(await route(request, env, ctx)), { headers }); }
     catch (error) {
       const status = error instanceof ApiError ? error.status : 500;

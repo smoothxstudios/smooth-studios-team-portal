@@ -2,9 +2,10 @@ import { TEAM_API_URL } from "@/lib/team-schedule.mjs";
 import { unbase64url } from "@/lib/team-auth.mjs";
 
 export type TimeBlock = { id: string; userId: string; reason: string; startLocal: string; endLocal: string; repeatUntil: string | null; createdAt: string };
+export type WorkPreference = { id: string; userId: string; note: string; allDay: boolean; startLocal: string; endLocal: string; repeatUntil: string | null; createdAt: string };
 export type TeamAppointment = { id: string; title: string; customer: string; start: string; end: string; priceCents: number; acceptedEmployeeIds: string[] };
 export type TeamAssignment = { id: string; employeeId: string; appointmentId: string | null; title: string; instructions: string; start: string; end: string; status: "pending" | "accepted" | "declined" | "cancelled"; createdAt: string; updatedAt: string; note?: string; conflictOverride?: { approvedBy: "owner"; approvedAt: string; start: string; end: string } };
-export type TeamSchedule = { revision: number; syncedAt: string | null; appointments: TeamAppointment[]; blocks: TimeBlock[]; assignments: TeamAssignment[]; devices: Record<string, number>; pushPublicKey: string | null };
+export type TeamSchedule = { revision: number; syncedAt: string | null; appointments: TeamAppointment[]; blocks: TimeBlock[]; workPreferences?: WorkPreference[]; availabilityVersion?: number; assignments: TeamAssignment[]; devices: Record<string, number>; pushPublicKey: string | null };
 export type PushTestResult = { accepted: boolean; expired: boolean; status: number; provider: string; message: string };
 export type GuidelineQuestionRequest = { id: string; askedBy: string; question: string; status: "open" | "answered" | "dismissed"; createdAt: string };
 

@@ -1,6 +1,28 @@
 {
-  "currentVersion": "2.8.2",
+  "currentVersion": "2.9.0",
   "releases": [
+    {
+      "id": "2026-10-15-work-preferences",
+      "version": "2.9.0",
+      "date": "2026-10-15",
+      "category": "Scheduling",
+      "title": "Preferred work days and time off in one Availability section",
+      "changes": [
+        "Employees can add, edit, and remove preferred work days or specific hours, with optional weekly repeats.",
+        "Availability combines work preferences with existing class and personal time blocks; Home now links directly to it.",
+        "Smooth can review each employee’s availability, see preferences on the weekly schedule, and distinguish full, partial, and unstated preferences while assigning work.",
+        "Blocked time and existing work still flag conflicts. Preferences never create an assignment or earnings, and assignment acceptance remains required.",
+        "Preferences are stored privately with the scheduling service. Employees see only their own entries; Smooth can manage the team’s entries."
+      ],
+      "employee": {
+        "changes": [
+          "Use Availability to choose the days or hours you want to work and block time you cannot work.",
+          "Add a full day or specific hours, repeat it weekly, and edit or remove work preferences later.",
+          "The Home shortcut opens Availability. Smooth sees your preferences when offering work; you still confirm an assignment by accepting it."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-15-content-vault-navigation",
       "version": "2.8.2",

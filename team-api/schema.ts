@@ -20,6 +20,12 @@ export const blocks = sqliteTable("team_blocks", {
   data: text("data").notNull(),
 });
 
+export const workPreferences = sqliteTable("team_work_preferences", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  data: text("data").notNull(),
+}, table => [index("team_work_preferences_user").on(table.userId)]);
+
 export const assignments = sqliteTable("team_assignments", {
   id: text("id").primaryKey(),
   employeeId: text("employee_id").notNull(),

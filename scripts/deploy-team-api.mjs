@@ -53,5 +53,5 @@ await wrangler(["d1", "migrations", "apply", "smooth-studios-team-db", "--remote
 await wrangler(["deploy"]);
 const health = await fetch(`${TEAM_API_URL}/health`, { signal: AbortSignal.timeout(30_000) });
 const status = health.ok && await health.json();
-if (!status?.ready || !status?.pushReady || status.version !== 1) throw new Error("The Worker was deployed but has not passed its readiness check. Run this deployment again before enabling scheduling.");
+if (!status?.ready || !status?.pushReady || status.version !== 1 || status.availabilityVersion !== 1) throw new Error("The Worker was deployed but has not passed its readiness check. Run this deployment again before enabling scheduling.");
 process.stdout.write("Team scheduling API and push keys are ready. Existing push keys were preserved.\n");

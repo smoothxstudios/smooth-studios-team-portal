@@ -30,6 +30,15 @@
 .schedule-entry.blocked { border-left-color: #737380; background: var(--muted); }
 .schedule-entry.pending { border-left-color: #d59615; }
 .schedule-entry.accepted { border-left-color: #169966; }
+.schedule-entry.preferred { border-left-color: #169966; background: #15965e0c; }
+.availability-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.availability-preferred { border-top: 3px solid #169966; }
+.availability-columns .schedule-section-heading button { margin-top: 16px; min-height: 44px; }
+.availability-entry-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.availability-entry-actions button { min-width: 44px; min-height: 44px; }
+.availability-past-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; }
+.availability-past-toggle input { width: 18px; height: 18px; accent-color: var(--primary); }
+@media (max-width: 900px) { .availability-columns { grid-template-columns: minmax(0, 1fr); } }
 .schedule-entry .schedule-calendar-accepted { display: flex; align-items: flex-start; gap: 5px; color: #087c43; background: #15965e12; border-radius: 6px; padding: 6px; font-size: 14px; font-weight: 700; }
 .schedule-calendar-accepted svg { flex-shrink: 0; margin-top: 2px; }
 .dark .schedule-entry .schedule-calendar-accepted { color: #7de2b2; background: #15965e20; }
