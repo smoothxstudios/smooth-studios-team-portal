@@ -1,6 +1,6 @@
 {
   "name": "smooth-studios-team-portal",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -8,8 +8,8 @@
   "scripts": {
     "install:ci": "bash scripts/install-ci.sh",
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
-    "build": "bash scripts/build-verified.sh",
-    "build:github-pages": "next build",
+    "build": "node scripts/check-dashboard-release.mjs && bash scripts/build-verified.sh",
+    "build:github-pages": "node scripts/check-dashboard-release.mjs && next build",
     "provision": "node scripts/provision-dashboard.mjs",
     "sync:calendar": "node scripts/sync-calendar.mjs",
     "mark:paid": "node scripts/mark-paid.mjs",

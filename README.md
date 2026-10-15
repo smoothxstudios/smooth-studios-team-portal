@@ -139,6 +139,12 @@ Saved answer drafts and deferred-question progress are encrypted with the owner 
 
 The dashboard verifies that the encrypted workflow token belongs to `smoothxstudios`, triggers the selected GitHub Action, and follows its status through completion. Closing or logging out of the owner dashboard discards the decrypted token from the browser session.
 
+## Dashboard versions and update history
+
+The footer on sign-in and dashboard pages shows the current app version and release date. **What changed** opens searchable notes grouped by topic, including retrospective entries back to the August 30, 2026 launch. Earlier updates were not individually versioned; numbered release notes begin with v0.1.1. Dates use Eastern time.
+
+For each dashboard fix or upgrade, bump the version in `package.json`, both root version fields in `package-lock.json`, and `config/dashboard-releases.json`. Prepend a short release note and retain the earlier entries. Both build commands check that these versions agree. Routine data syncs and business-record updates do not change the app version. See `AGENTS.md` for the release-maintenance rules.
+
 ## Local development
 
 ```bash
