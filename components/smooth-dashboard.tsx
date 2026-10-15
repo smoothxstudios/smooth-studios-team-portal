@@ -93,7 +93,8 @@ import { GithubWorkflowDialog, type OwnerWorkflowRequest } from "@/components/gi
 import { StudioGuidePage } from "@/components/studio-guide";
 import { createGuidePatch, MAX_GUIDELINE_UPDATE_BYTES } from "@/lib/studio-guidelines.mjs";
 import { TeamAccountSetup, type NewTeamSettings } from "@/components/team-account-setup";
-import { TEAM } from "@/lib/team-schedule.mjs";
+import { TEAM, studioLocal } from "@/lib/team-schedule.mjs";
+import { employeeEarningsForYear } from "@/lib/employee-home.mjs";
 import { TeamSchedulingPage } from "@/components/team-scheduling";
 import { teamToken } from "@/lib/team-auth.mjs";
 import { disableTeamPush } from "@/lib/team-api";
@@ -129,13 +130,16 @@ const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ow
   { key: "payouts", label: "Payouts", icon: WalletCards },
   { key: "guide", label: "Studio Guidelines", icon: BookOpen },
 ];
+const EMPLOYEE_NAV_ITEMS = NAV_ITEMS.filter(item => !item.ownerOnly && item.key !== "rentals").map(item => ({
+  ...item, label: item.key === "overview" ? "Home" : item.key === "scheduling" ? "Schedule" : item.key === "payouts" ? "Earnings" : item.label,
+}));
 
 function DashboardNavigation({ isOwner, accountId, view, onNavigate }: { isOwner: boolean; accountId: string; view: ViewKey; onNavigate: (view: ViewKey) => void }) {
   const { isMobile, setOpenMobile } = useSidebar();
   const closeMobileMenu = () => { if (isMobile) setOpenMobile(false); };
 
   return <nav aria-label="Dashboard sections"><SidebarMenu className="studio-nav">
-    {NAV_ITEMS.filter(item => !item.ownerOnly || isOwner).map(item => (
+    {(isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).map(item => (
       <SidebarMenuItem key={item.key}>
         <SidebarMenuButton aria-current={view === item.key ? "page" : undefined} isActive={view === item.key}
           onClick={() => { onNavigate(item.key); closeMobileMenu(); }} tooltip={item.label}>
@@ -404,7 +408,7 @@ function PeriodTotals({ rentals, employeeId }: { rentals: Rental[]; employeeId?:
             <span>{period.label}</span>
             <strong>{dollars(total)}</strong>
             <small>{employeeId ? `${secondary} completed appointment${secondary === 1 ? "" : "s"}` : `${dollars(secondary)} earned payroll`}</small>
-            <em className={change !== null && change < 0 ? "down" : ""}>{change === null ? "No prior comparison" : `${change >= 0 ? "+" : ""}${change}% vs prior`}</em>
+            {(change !== null || !employeeId) && <em className={change !== null && change < 0 ? "down" : ""}>{change === null ? "No prior comparison" : `${change >= 0 ? "+" : ""}${change}% vs prior`}</em>}
           </div>
         );
       })}
@@ -662,12 +666,13 @@ function PayoutPage({
   const selectedEmployee = employees.find((employee) => employee.id === payoutEmployee);
   const payoutScopeLabel = selectedEmployee?.name ?? "All employees";
   const eligibleAppointments = rentals.filter((rental) => eligibleForPayout(rental, paidThrough, payoutEmployee)).length;
+  const hasChartData = monthly.some(month => month.paid > 0 || month.owed > 0);
   return (
     <section className={`payout-layout${isOwner ? "" : " employee-payout-layout"}`}>
       <article className="panel payout-chart-panel">
-        <div className="panel-heading"><div><p className="eyebrow">Weekly · monthly · yearly</p><h2>{isOwner ? "Team payouts" : "My payout history"}</h2></div></div>
-        <div className="payout-summary"><div><span>{isOwner ? "Paid to team" : "Paid"}</span><strong>{dollars(metrics.paid)}</strong></div><div><span>Earned, unpaid</span><strong>{dollars(metrics.owed)}</strong></div><div><span>Projected</span><strong>{dollars(metrics.projected)}</strong></div></div>
-        <div className="bar-chart-wrap">
+        <div className="panel-heading"><div>{isOwner && <p className="eyebrow">Weekly · monthly · yearly</p>}<h2>{isOwner ? "Team payouts" : "Earnings summary"}</h2></div></div>
+        <div className="payout-summary"><div><span>{isOwner ? "Paid to team" : "Paid"}</span><strong>{dollars(metrics.paid)}</strong></div><div><span>{isOwner ? "Earned, unpaid" : "Pay owed"}</span><strong>{dollars(metrics.owed)}</strong></div><div><span>{isOwner ? "Projected" : "Upcoming estimate"}</span><strong>{dollars(metrics.projected)}</strong></div></div>
+        {(isOwner || hasChartData) ? <div className="bar-chart-wrap">
           <ResponsiveContainer height="100%" width="100%">
             <BarChart data={monthly} margin={{ left: -20, right: 0 }}>
               <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 6" vertical={false} />
@@ -678,7 +683,7 @@ function PayoutPage({
               <Bar dataKey="owed" fill="#e10000" name="Owed" radius={[5, 5, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </div> : <p className="employee-chart-empty">Your earnings chart will appear after your first completed, fully paid appointment.</p>}
       </article>
       {isOwner && (
         <article className="panel mark-paid-card">
@@ -960,6 +965,8 @@ function StripeMatchForm({
 
 function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string; schedulingToken: string }) {
   const [view, setView] = useState<ViewKey>("overview");
+  const currentYear = Number(studioLocal(Date.now()).slice(0, 4));
+  const [earningsYear, setEarningsYear] = useState(currentYear);
   const [teamSetupOpen, setTeamSetupOpen] = useState(false);
   const [teamSetupBusy, setTeamSetupBusy] = useState(false);
   useEffect(() => {
@@ -988,6 +995,9 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
   const employeeId = isOwner ? undefined : payload.user.id;
   const rentals = useMemo(() => [...payload.rentals].sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime()), [payload.rentals]);
   const visibleRentals = useMemo(() => employeeId ? rentals.filter((rental) => rental.assignedEmployeeIds.includes(employeeId)) : rentals, [employeeId, rentals]);
+  const pastRentals = visibleRentals.filter(rental => Date.parse(rental.end) <= Date.now());
+  const employeeEarnings = useMemo(() => employeeEarningsForYear(visibleRentals, employeeId, earningsYear), [visibleRentals, employeeId, earningsYear]);
+  const earningsYears = [...new Set([currentYear, ...visibleRentals.map(rental => Number(studioLocal(rental.start).slice(0, 4)))])].sort((a, b) => b - a);
   const categoryOptions = useMemo(() => APPOINTMENT_CATEGORIES.filter((category) => visibleRentals.some((rental) => appointmentCategory(rental).id === category.id)), [visibleRentals]);
   const filteredRentals = useMemo(() => visibleRentals.filter((rental) =>
     (categoryFilter === "all" || appointmentCategory(rental).id === categoryFilter)
@@ -1123,7 +1133,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
     <SidebarProvider>
       {isOwner && <TeamAccountSetup open={teamSetupOpen} onOpenChange={setTeamSetupOpen} employees={payload.employees} busy={teamSetupBusy} onSubmit={prepareTeamSetup} enabled={Boolean(payload.workflowAccess)} />}
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
-        <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact /><span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span></SidebarHeader>
+        <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact />{isOwner && <span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span>}</SidebarHeader>
         <SidebarContent>
           <SidebarGroup><SidebarGroupContent><DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={setView} /></SidebarGroupContent></SidebarGroup>
         </SidebarContent>
@@ -1135,12 +1145,13 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
 
       <SidebarInset className="dashboard-main">
         <header className="dashboard-topbar">
-          <div className="topbar-title"><SidebarTrigger className="mobile-menu-trigger" aria-label="Open navigation"><Menu /></SidebarTrigger><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : "evening"}, ${displayName}` : NAV_ITEMS.find((item) => item.key === view)?.label}</h1></div></div>
-          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}{isOwner && <Button className="sync-now-button" aria-label="Sync now" onClick={openCalendarSync} size="sm" variant="outline"><RefreshCw size={15} /><span>Sync now</span></Button>}<div className="date-chip"><CalendarDays size={15} /><span>Jan–Dec 2026</span></div></div>
+          <div className="topbar-title"><SidebarTrigger className="mobile-menu-trigger" aria-label="Open navigation"><Menu /></SidebarTrigger><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div>
+          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}{isOwner && <><Button className="sync-now-button" aria-label="Sync now" onClick={openCalendarSync} size="sm" variant="outline"><RefreshCw size={15} /><span>Sync now</span></Button><div className="date-chip"><CalendarDays size={15} /><span>Jan–Dec 2026</span></div></>}</div>
         </header>
 
-        <div className="dashboard-content">
-          {view === "overview" && (
+        <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
+          {view === "overview" && !isOwner && <TeamSchedulingPage token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide") }} />}
+          {view === "overview" && isOwner && (
             <>
               <section className="kpi-grid">
                 {isOwner ? <><KpiCard icon={CircleDollarSign} label="Appointment revenue" note="Fully paid Calendar appointments" tone="red" value={dollars(metrics.revenue)} /><KpiCard icon={Banknote} label="Payroll owed" note="Earned, not yet paid" tone="amber" value={dollars(metrics.owed)} /><KpiCard icon={ShieldCheck} label="Paid to team" note="Recorded employee payouts" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={`${upcoming.length} accepted assignments`} tone="blue" value={String(upcoming.length)} /></> : <><KpiCard icon={Banknote} label="Earned, not paid" note="Completed + customer paid" tone="red" value={dollars(metrics.owed)} /><KpiCard icon={Clock3} label="Projected earnings" note="From upcoming appointments" tone="amber" value={dollars(metrics.projected)} /><KpiCard icon={ShieldCheck} label="Paid this year" note="Payouts marked complete" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={upcoming[0] ? `Next: ${formatDate(upcoming[0].start, true)}` : "Nothing scheduled"} tone="blue" value={String(upcoming.length)} /></>}
@@ -1166,7 +1177,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
             </>
           )}
 
-          {view === "rentals" && <article className="panel page-panel">
+          {view === "rentals" && isOwner && <article className="panel page-panel">
             <div className="panel-heading page-heading">
               <div><p className="eyebrow">Beginning January 1, 2026</p><h2>{isOwner ? "All appointments" : "My accepted appointments"}</h2><p>{isOwner ? "Revenue includes every fully paid appointment—even when no employee is assigned." : "Only appointments accepted from one of your Google emails appear here."}</p></div>
               <div className="page-actions">
@@ -1194,9 +1205,14 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
             {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the next Calendar sync, scheduled every 5 minutes." : "No appointments match the selected filters."} title="No appointments found" />}
           </article>}
           {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} />}
-          {view === "payouts" && <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={metrics} monthly={monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={visibleRentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />}
+          {view === "payouts" && <>
+            {!isOwner && <div className="employee-earnings-heading"><div><h2>My earnings</h2><p>Paid, owed, and estimated earnings by appointment year.</p></div><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
+            <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
+            {!isOwner && earningsYear === currentYear && <PeriodTotals employeeId={employeeId} rentals={visibleRentals} />}
+            {!isOwner && employeeEarnings.rentals.length > 0 && <article className="panel employee-earnings-details"><div className="panel-heading"><div><h2>Earnings by appointment</h2><p>Upcoming amounts are estimates. Custom assignments are listed in Schedule.</p></div></div><RentalTable employeeId={employeeId} rentals={employeeEarnings.rentals} /></article>}
+          </>}
           {view === "guide" && <StudioGuidePage isOwner={isOwner} draftPassword={sessionPassword} teamToken={schedulingToken} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
-          {view === "scheduling" && <TeamSchedulingPage isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
+          {view === "scheduling" && <TeamSchedulingPage isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
         </div>
       </SidebarInset>
       {isOwner && (

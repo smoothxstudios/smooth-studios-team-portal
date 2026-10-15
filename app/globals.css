@@ -772,6 +772,102 @@ button { cursor: pointer; }
   .kpi-grid { grid-template-columns: minmax(0, 1fr); }
   .rental-table tbody tr { grid-template-columns: minmax(0, 1fr); }
 }
+/* Employee home: upcoming work first, with details available on demand. */
+.employee-home { display: grid; gap: 18px; width: 100%; max-width: 1120px; margin: 0 auto; }
+.employee-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 24px; }
+.employee-section-heading h2, .employee-pay h2 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.025em; }
+.employee-section-heading p { margin-top: 5px; font-size: 13px; color: var(--muted-foreground); }
+.employee-section-heading .eyebrow { color: var(--primary); margin: 0 0 8px; font-size: 11px; }
+.employee-home button { min-height: 44px; }
+.employee-attention { border-top: 3px solid #e8aa32; }
+.employee-attention .schedule-offers { padding: 0 24px 24px; }
+.employee-attention .schedule-offer { background: var(--background); }
+.employee-attention .schedule-actions { margin-top: 16px; }
+.employee-attention .schedule-actions button { flex: 1; }
+.employee-attention .schedule-instructions { align-items: flex-start; }
+.employee-updates { display: grid; gap: 10px; }
+.employee-updates strong { font-size: 14px; }
+.employee-updates p { margin-top: 5px; }
+.employee-home-next { overflow: hidden; }
+.employee-work { border-top: 1px solid var(--border); }
+.employee-work > summary { display: grid; grid-template-columns: 180px minmax(0, 1fr) auto 18px; align-items: center; gap: 20px; padding: 22px 24px; cursor: pointer; list-style: none; }
+.employee-work > summary::-webkit-details-marker { display: none; }
+.employee-work > summary:hover { background: var(--muted); }
+.employee-work > summary:focus-visible, .employee-shortcut:focus-visible { outline: 2px solid var(--primary); outline-offset: -3px; border-radius: 12px; }
+.employee-work-date strong, .employee-work-date span { display: block; }
+.employee-work-date strong { font-size: 15px; font-weight: 650; }
+.employee-work-date span { margin-top: 5px; font-size: 13px; color: var(--muted-foreground); }
+.employee-work-title { min-width: 0; overflow-wrap: anywhere; }
+.employee-work-title > span { display: block; color: var(--muted-foreground); font-size: 12px; margin-bottom: 5px; }
+.employee-work-title h3 { font-size: 16px; font-weight: 600; line-height: 1.4; }
+.employee-work-title p { color: var(--muted-foreground); font-size: 14px; margin-top: 5px; }
+.employee-work .schedule-status { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
+.employee-work-chevron { color: var(--muted-foreground); transition: transform .15s; }
+.employee-work[open] .employee-work-chevron { transform: rotate(180deg); }
+.employee-work-details { padding: 0 24px 24px; border-top: 1px dashed var(--border); }
+.employee-work-details h4 { margin-top: 20px; font-weight: 650; font-size: 14px; }
+.employee-work-details p { font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 15px; }
+.employee-empty { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 28px 24px 40px; }
+.employee-empty > svg { color: var(--muted-foreground); margin-bottom: 4px; }
+.employee-empty h3 { font-size: 20px; font-weight: 600; letter-spacing: -.025em; }
+.employee-empty p { max-width: 410px; color: var(--muted-foreground); font-size: 14px; line-height: 1.7; }
+.employee-pay { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 24px; padding: 22px 24px; }
+.employee-pay-label { display: flex; align-items: center; gap: 14px; }
+.employee-pay-label > svg { color: var(--primary); flex-shrink: 0; }
+.employee-pay h2 { font-size: 16px; }
+.employee-pay p { margin-top: 4px; color: var(--muted-foreground); font-size: 13px; }
+.employee-pay > strong { font-size: 28px; font-weight: 650; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.employee-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.employee-shortcut { display: grid; grid-template-columns: 44px minmax(0, 1fr) 18px; align-items: center; gap: 14px; padding: 22px; text-align: left; cursor: pointer; }
+.employee-shortcut:hover { background: var(--muted); }
+.employee-shortcut-icon { display: grid; place-items: center; height: 44px; border: 1px solid var(--border); border-radius: 12px; }
+.employee-shortcut strong, .employee-shortcut small { display: block; }
+.employee-shortcut strong { font-size: 15px; font-weight: 650; }
+.employee-shortcut small { margin-top: 5px; color: var(--muted-foreground); font-size: 13px; line-height: 1.5; }
+.employee-shortcut > svg { color: var(--muted-foreground); }
+.employee-schedule-tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+.employee-schedule-tabs button { min-height: 44px; }
+.employee-past-offers { margin-top: 8px; border-top: 0; }
+.employee-earnings-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 20px; }
+.employee-earnings-heading h2 { font-size: 24px; font-weight: 650; letter-spacing: -.03em; }
+.employee-earnings-heading p { color: var(--muted-foreground); font-size: 14px; margin-top: 5px; line-height: 1.6; }
+.employee-earnings-heading label { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.employee-earnings-heading select { min-height: 44px; font-size: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+.employee-payout-layout .payout-chart-panel { min-height: 0; }
+.employee-payout-layout .payout-summary { padding-bottom: 22px; }
+.employee-payout-layout .payout-summary span { font-size: 14px; }
+.employee-chart-empty { padding: 0 24px 24px; color: var(--muted-foreground); font-size: 14px; line-height: 1.6; }
+.employee-earnings-details { margin-top: 18px; overflow: hidden; }
+.employee-earnings-view .period-total small, .employee-earnings-view .period-total em, .employee-earnings-view .period-strip-title span { font-size: 12px; }
+.employee-earnings-view .period-total > span, .employee-earnings-view .period-strip-title strong { font-size: 13px; }
+@media (max-width: 1050px) {
+  .employee-work > summary { grid-template-columns: minmax(0, 1fr) auto 18px; gap: 12px; }
+  .employee-work-date { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .employee-home { gap: 14px; }
+  .employee-section-heading { align-items: flex-start; padding: 20px 16px 16px; gap: 8px; }
+  .employee-section-heading h2 { font-size: 19px; }
+  .employee-section-heading > button { padding: 8px; font-size: 13px; }
+  .employee-section-heading > button svg { display: none; }
+  .employee-attention .schedule-offers { padding: 0 16px 16px; }
+  .employee-work > summary { padding: 18px 16px; grid-template-columns: minmax(0, 1fr) 18px; }
+  .employee-work-date { grid-column: 1; }
+  .employee-work-title { grid-column: 1; }
+  .employee-work .schedule-status { grid-column: 1; justify-self: start; margin-top: 2px; }
+  .employee-work-chevron { grid-column: 2; grid-row: 1; }
+  .employee-work-details { padding: 0 16px 20px; }
+  .employee-pay { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 20px 16px 12px; }
+  .employee-pay-label { gap: 9px; }
+  .employee-pay-label > svg { display: none; }
+  .employee-pay > strong { font-size: 25px; }
+  .employee-pay > button { grid-column: 1 / -1; justify-self: end; }
+  .employee-shortcuts { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .employee-shortcut { padding: 18px 16px; }
+  .employee-earnings-heading { flex-wrap: wrap; }
+  .employee-earnings-heading label { width: 100%; justify-content: space-between; }
+  .employee-earnings-heading select { min-width: 120px; }
+}
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition-duration:.01ms !important; animation-duration:.01ms !important; } }
 
 /* Private team onboarding uses the existing responsive scheduling dialog. */
