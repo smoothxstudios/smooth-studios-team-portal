@@ -25,6 +25,7 @@ import {
   Clock3,
   Eye,
   EyeOff,
+  FolderOpen,
   GitBranch,
   Landmark,
   LayoutDashboard,
@@ -151,6 +152,11 @@ function DashboardNavigation({ isOwner, accountId, view, onNavigate }: { isOwner
     <SidebarMenuItem><SidebarMenuButton asChild tooltip="Production dashboard">
       <a href={`https://smooth-studios-production.smoothxstudios.workers.dev/?from=studio&account=${encodeURIComponent(accountId === "owner" ? "smooth" : accountId)}`} target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu}>
         <Link2 /><span>Productions</span>
+      </a>
+    </SidebarMenuButton></SidebarMenuItem>
+    <SidebarMenuItem><SidebarMenuButton asChild tooltip="Content Vault">
+      <a href="https://content.smoothstudios.co/" target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu}>
+        <FolderOpen /><span>Content Vault</span>
       </a>
     </SidebarMenuButton></SidebarMenuItem>
   </SidebarMenu></nav>;

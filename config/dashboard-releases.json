@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.8.1",
+  "currentVersion": "2.8.2",
   "releases": [
+    {
+      "id": "2026-10-15-content-vault-navigation",
+      "version": "2.8.2",
+      "date": "2026-10-15",
+      "category": "Dashboard",
+      "title": "Content Vault in the sidebar",
+      "changes": [
+        "Open Content Vault directly from the sidebar below Productions, on both owner and employee dashboards.",
+        "The shortcut matches the other navigation links, opens in a new tab, and closes the mobile menu when selected."
+      ],
+      "employee": {
+        "changes": [
+          "Open Content Vault from the sidebar below Productions.",
+          "The vault opens in a new tab, and the mobile menu closes when you select it."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-15-role-specific-history",
       "version": "2.8.1",
