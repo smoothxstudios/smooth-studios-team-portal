@@ -1,6 +1,30 @@
 {
-  "currentVersion": "2.9.0",
+  "currentVersion": "2.10.0",
   "releases": [
+    {
+      "id": "2026-10-15-temp-check-studio-stars",
+      "version": "2.10.0",
+      "date": "2026-10-15",
+      "category": "Team",
+      "title": "Temp Check, daily creative questions, and studio stars",
+      "changes": [
+        "Employees get a dismissible Temp Check at the top of the dashboard every three hours, with five self-reported mood choices.",
+        "A daily creative question rotates across camera basics, exposure, video, lighting, and audio. The answer explanation appears after submitting.",
+        "Each correct daily answer earns 10 permanent points. Every 100 points unlocks a digital star sticker, with progress and recent answers available from the top bar.",
+        "Smooth can review employee mood check-ins, correct and incorrect answers, points, and stars in Team. Employees see only their own records.",
+        "Server-side daily limits, duplicate protection, private storage, and Eastern-time date handling keep results consistent across devices. Moods never affect points or rental pay.",
+        "Deployment checks allow time for new server capabilities to become available before enabling the update."
+      ],
+      "employee": {
+        "changes": [
+          "Temp Check lets you share how you feel with Smooth every three hours while using the dashboard. You can skip it, and moods do not affect points.",
+          "Answer one daily creative question to practice your craft. A correct answer earns 10 points; an explanation follows every submitted answer.",
+          "Watch your points grow in the top bar and collect a digital star sticker every 100 points. Open your progress to see recent answers.",
+          "Only you and Smooth can see your check-ins and results. A new question arrives each day at midnight Eastern."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-15-work-preferences",
       "version": "2.9.0",

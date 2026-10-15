@@ -51,7 +51,17 @@ function wrangler(args) {
 }
 await wrangler(["d1", "migrations", "apply", "smooth-studios-team-db", "--remote"]);
 await wrangler(["deploy"]);
-const health = await fetch(`${TEAM_API_URL}/health`, { signal: AbortSignal.timeout(30_000) });
-const status = health.ok && await health.json();
-if (!status?.ready || !status?.pushReady || status.version !== 1 || status.availabilityVersion !== 1) throw new Error("The Worker was deployed but has not passed its readiness check. Run this deployment again before enabling scheduling.");
+// A freshly deployed Worker can briefly serve the prior version at the edge.
+// Wait for the required capabilities, without weakening the readiness gate.
+let ready = false;
+for (let attempt = 0; attempt < 10; attempt++) {
+  try {
+    const health = await fetch(`${TEAM_API_URL}/health`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+    const status = health.ok && await health.json();
+    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 1);
+  } catch { /* A transient deployment response is retried within this bound. */ }
+  if (ready) break;
+  if (attempt < 9) await new Promise(resolve => setTimeout(resolve, 2000));
+}
+if (!ready) throw new Error("The Worker was deployed but has not passed its readiness check. Run this deployment again before enabling scheduling.");
 process.stdout.write("Team scheduling API and push keys are ready. Existing push keys were preserved.\n");

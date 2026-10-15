@@ -1,6 +1,7 @@
 import { tokenHash } from "../lib/team-auth.mjs";
 import { TEAM, localInstant as parseLocalInstant, addLocalDays, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
 import { deliverPush, flushAlerts, publicPushKey, pushDeliveryMessage, pushEndpoint } from "./push.mjs";
+import { engagementRoute } from "./engagement.mjs";
 
 const users = TEAM.map(p => p.id);
 const origins = new Set(["https://smoothxstudios.github.io", "https://dashboard.smoothstudios.co", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
@@ -106,11 +107,12 @@ async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
   else if (user === "sync") fail(403, "Sync access is restricted to synchronization endpoints.");
+  if (url.pathname === "/engagement" || url.pathname.startsWith("/engagement/")) return engagementRoute({ request, db, user, env, body, fail });
 
   // The content vault verifies existing dashboard credentials server-to-server.
   // Return identity only: no calendar, payroll, passwords, or workflow tokens.

@@ -98,6 +98,7 @@ import { TeamAccountSetup, type NewTeamSettings } from "@/components/team-accoun
 import { TEAM, studioLocal } from "@/lib/team-schedule.mjs";
 import { employeeEarningsForYear } from "@/lib/employee-home.mjs";
 import { TeamSchedulingPage } from "@/components/team-scheduling";
+import { EmployeeEngagementBar, TeamEngagementReview } from "@/components/team-engagement";
 import { DashboardVersionFooter } from "@/components/dashboard-version-footer";
 import { teamToken } from "@/lib/team-auth.mjs";
 import { disableTeamPush } from "@/lib/team-api";
@@ -1160,6 +1161,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
         </header>
 
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
+          {!isOwner && <EmployeeEngagementBar key={payload.user.id} token={schedulingToken} />}
           {view === "overview" && !isOwner && <TeamSchedulingPage token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide") }} />}
           {view === "overview" && isOwner && (
             <>
@@ -1214,7 +1216,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
             </div>
             {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the next Calendar sync, scheduled every 5 minutes." : "No appointments match the selected filters."} title="No appointments found" />}
           </article>}
-          {view === "team" && isOwner && <TeamPage employees={payload.employees} rentals={rentals} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} />}
+          {view === "team" && isOwner && <><TeamPage employees={payload.employees} rentals={rentals} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} /><TeamEngagementReview token={schedulingToken} /></>}
           {view === "payouts" && <>
             {!isOwner && <div className="employee-earnings-heading"><div><h2>My earnings</h2><p>Paid, owed, and estimated earnings by appointment year.</p></div><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
             <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />

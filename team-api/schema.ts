@@ -26,6 +26,24 @@ export const workPreferences = sqliteTable("team_work_preferences", {
   data: text("data").notNull(),
 }, table => [index("team_work_preferences_user").on(table.userId)]);
 
+export const engagementState = sqliteTable("team_engagement_state", {
+  userId: text("user_id").primaryKey(),
+  nextMoodAt: integer("next_mood_at").notNull().default(0),
+  lastMoodId: text("last_mood_id"),
+  questionDismissedDay: text("question_dismissed_day").notNull().default(""),
+});
+
+export const moodCheckins = sqliteTable("team_mood_checkins", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull(),
+  mood: text("mood").notNull(), createdAt: integer("created_at").notNull(),
+}, table => [index("team_mood_checkins_user_time").on(table.userId, table.createdAt)]);
+
+export const creativeAttempts = sqliteTable("team_creative_attempts", {
+  userId: text("user_id").notNull(), day: text("day").notNull(),
+  correct: integer("correct").notNull(), points: integer("points").notNull(),
+  createdAt: integer("created_at").notNull(), data: text("data").notNull(),
+}, table => [primaryKey({ columns: [table.userId, table.day] })]);
+
 export const assignments = sqliteTable("team_assignments", {
   id: text("id").primaryKey(),
   employeeId: text("employee_id").notNull(),

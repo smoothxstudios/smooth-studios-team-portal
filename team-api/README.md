@@ -55,3 +55,17 @@ Tests: `npm test`. Type check: `npx tsc --noEmit`. Worker bundle check: `npx wra
 `GET /schedule` returns `availabilityVersion: 1` and `workPreferences` for the signed-in employee, or the full team for Smooth. Work preferences are separate from `blocks`: they express interest and never authorize an assignment, override a conflict, or enter rental payroll.
 
 `POST /work-preferences`, `PATCH /work-preferences/:id`, and `DELETE /work-preferences/:id` use the same revision checks as scheduling. Employees can manage only their own entries; Smooth can manage employee entries. Dates and weekly recurrences use Eastern time, including full days spanning daylight-saving changes. Migration `0003_work_preferences.sql` adds a table without changing existing blocks or assignments.
+
+# Temp Check and studio stars
+
+Migration `0004_team_engagement.sql` adds private check-in state, mood history, and creative answer records. No existing scheduling tables or rental earnings are changed. `/health` advertises `engagementVersion: 1`; deployment waits for this capability at the edge before continuing.
+
+- `GET /engagement`: the authenticated employee's current prompt, points, star progress, and last 14 scored answers. An unanswered question contains no answer key or explanation.
+- `POST /engagement/mood`: one of the five self-reported moods plus a UUID `requestId`. Server time starts a three-hour cooldown. Conditional transactions and request IDs prevent duplicate check-ins across devices and network retries.
+- `POST /engagement/dismiss`: `{kind: "mood"}` skips the current check-in for three hours without recording a mood. `{kind: "question", day}` records that the daily popup has appeared or been dismissed; the employee can still open it from the bar and answer later that day.
+- `POST /engagement/answer`: `{day, questionId, optionId}`. The server selects and grades today's question, stores the chosen and correct answers plus an explanation, and awards 10 points when correct. A unique employee/day key allows only one scored answer, including simultaneous or repeated submissions. Wrong or missed answers never remove points. Every 100 accumulated points earns a digital star sticker.
+- `GET /engagement/team`: owner-only summaries, each employee's last 10 check-ins and last 14 answers, and today's answer status. Employees cannot query another person's records. Sync credentials cannot use these endpoints.
+
+The 42-question bank is authored in `team-api/creative-questions.mjs`, rotates across technical creative topics, and links to primary learning resources after grading. The bank is bundled only into the Worker, not the browser. This is a learning activity, not a secure examination; source code lives in a public repository. All stored attempts retain their original wording and answer key so later bank edits cannot rewrite prior results.
+
+Daily questions reset at midnight in America/New_York. Mood intervals measure three elapsed hours, including daylight-saving transitions. Prompts appear while employees use the dashboard; they do not send off-hours push notifications. The employee can dismiss them, and both their own and Smooth's access are stated in the UI. Moods do not affect scores, pay, assignments, or notifications. Private records are never committed to the public repository or cached in a service worker.
