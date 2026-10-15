@@ -1,18 +1,48 @@
 {
-  "currentVersion": "0.1.1",
+  "currentVersion": "2.8.1",
   "releases": [
     {
-      "id": "2026-10-15-release-history",
-      "version": "0.1.1",
+      "id": "2026-10-15-role-specific-history",
+      "version": "2.8.1",
       "date": "2026-10-15",
       "category": "Dashboard",
-      "title": "A visible version and the full upgrade story",
+      "title": "Relevant update notes for each role and meaningful versions",
+      "changes": [
+        "Employees see curated design and day-to-day feature updates. The owner retains the complete history and can preview the employee view.",
+        "Administrative entries are removed from the employee list before searching, counting, or showing topic filters. Sign-in displays the version without opening the history.",
+        "Version 1 covers the original reporting portal; version 2 begins with live scheduling. Later feature milestones advance the middle number, while fixes advance the last number. Earlier numbers are explicitly retrospective.",
+        "Prepared dashboard.smoothstudios.co support: builds use the configured Pages base path, including logos and app icons, and the scheduling service accepts the new origin. DNS and GitHub Pages domain settings complete the move."
+      ],
+      "employee": {
+        "changes": [
+          "What changed focuses on design improvements and features that affect your daily work.",
+          "Version labels now follow the dashboard’s feature milestones. Earlier labels are marked retrospective in the history."
+        ]
+      },
+      "commits": []
+    },
+    {
+      "id": "2026-10-15-release-history",
+      "version": "2.8.0",
+      "date": "2026-10-15",
+      "category": "Dashboard",
+      "title": "A visible version and dated update history",
       "changes": [
         "The bottom of the dashboard and sign-in page now shows the version and update date.",
         "Open What changed to search dated notes covering the portal's earlier upgrades, back to its August launch.",
-        "Future dashboard releases will add a version and notes here. Routine Calendar syncs do not change the app version."
+        "Future dashboard releases will add a version and notes here. Routine Calendar syncs do not change the app version.",
+        "Originally published under package label v0.1.1; this feature milestone is now labeled v2.8.0 in the retrospective history."
       ],
-      "commits": []
+      "commits": [
+        "3b08a2c"
+      ],
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "The footer shows the dashboard version and update date.",
+          "What changed contains dated notes about improvements to the dashboard. Search by topic or keyword."
+        ]
+      }
     },
     {
       "id": "2026-10-15-employee-home",
@@ -25,7 +55,18 @@
         "Removed duplicate cards and empty charts from Home. Assignment details expand when needed.",
         "Live schedule changes take priority over older synced data, and repeated clicks cannot submit the same scheduling change twice."
       ],
-      "commits": ["33d6e16"]
+      "commits": [
+        "33d6e16"
+      ],
+      "version": "2.7.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Home focuses on assignment offers, your next assignments, one Pay owed summary, and shortcuts to Block time and Studio Guidelines.",
+          "Earnings contains the charts, year selector, totals, and appointment breakdown. Past work lives under Schedule → Past.",
+          "Duplicate cards and empty charts have been removed from Home. Expand an assignment when you need its preparation instructions."
+        ]
+      }
     },
     {
       "id": "2026-10-14-shared-identity",
@@ -35,7 +76,11 @@
       "changes": [
         "Added an authenticated identity check so the Content Vault integration can recognize the teammate already signed in to the dashboard."
       ],
-      "commits": ["3a56ee5"]
+      "commits": [
+        "3a56ee5"
+      ],
+      "version": "2.6.0",
+      "retrospective": true
     },
     {
       "id": "2026-10-14-guide-search",
@@ -48,7 +93,17 @@
         "Saved answers can be exported for review and reimported using their existing IDs, avoiding duplicate entries.",
         "Publishing sends changed entries and checks for conflicting edits."
       ],
-      "commits": ["7df0a1c"]
+      "commits": [
+        "7df0a1c"
+      ],
+      "version": "2.5.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Guidelines are organized into clearer topics, and search recognizes related words and questions.",
+          "You can send an unanswered studio question to Smooth for a future answer."
+        ]
+      }
     },
     {
       "id": "2026-10-14-studio-guidelines",
@@ -60,7 +115,17 @@
         "Added 91 categorized interview questions with suggested answers, editable previews, and saved owner progress.",
         "Draft answers stay private until the owner publishes them; existing guidelines are preserved."
       ],
-      "commits": ["6f1dd4b"]
+      "commits": [
+        "6f1dd4b"
+      ],
+      "version": "2.4.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "The rental rulebook is now Studio Guidelines, covering general studio operations as well as rentals.",
+          "Use the categories and search to find answers for your work."
+        ]
+      }
     },
     {
       "id": "2026-10-14-team-roster",
@@ -71,7 +136,18 @@
         "Added support for four new teammates, with private account activation and individual pay settings managed by the owner.",
         "The login roster refreshes after account activation, on logout, and when returning to the sign-in tab."
       ],
-      "commits": ["31f4d74", "1fc5a0e"]
+      "commits": [
+        "31f4d74",
+        "1fc5a0e"
+      ],
+      "version": "2.3.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "New teammates can appear in the sign-in list after their accounts are ready.",
+          "The account list refreshes when you log out or return to the sign-in tab."
+        ]
+      }
     },
     {
       "id": "2026-10-14-effective-pay-rates",
@@ -83,15 +159,35 @@
         "Previously recorded payouts are preserved, while any retroactive increase remains visible as an amount still owed.",
         "New teammates can have their own hourly or percentage rate; an unset rate does not inherit another employee's rate."
       ],
-      "commits": ["31f4d74"]
+      "commits": [
+        "31f4d74"
+      ],
+      "version": "2.3.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Your earnings use the pay rate in effect on the appointment date.",
+          "Any outstanding adjustment is included in the amount still owed to you."
+        ],
+        "title": "Earnings reflect the rate for your appointment date"
+      }
     },
     {
       "id": "2026-09-20-production-tagging",
       "date": "2026-09-20",
       "category": "Productions",
       "title": "Tag existing production teammates",
-      "changes": ["Fixed adding existing production accounts to a project's team."],
-      "commits": ["1c081a3"]
+      "changes": [
+        "Fixed adding existing production accounts to a project's team."
+      ],
+      "commits": [
+        "1c081a3"
+      ],
+      "employee": {
+        "changes": [
+          "Existing production teammates can be added to a project team."
+        ]
+      }
     },
     {
       "id": "2026-09-16-production-concurrency",
@@ -101,7 +197,14 @@
       "changes": [
         "Fixed handling of concurrent production edits and improved shot ordering when teammates update a project."
       ],
-      "commits": ["710d5e0"]
+      "commits": [
+        "710d5e0"
+      ],
+      "employee": {
+        "changes": [
+          "Shared production edits are handled more reliably, including shot order when teammates update the same project."
+        ]
+      }
     },
     {
       "id": "2026-09-14-production-images",
@@ -112,7 +215,16 @@
         "Improved production startup and image loading while preserving private image caching.",
         "Added recovery for failed image loads and restored previews for older copied references and recoverable uploads."
       ],
-      "commits": ["2f3ff5e", "586b793"]
+      "commits": [
+        "2f3ff5e",
+        "586b793"
+      ],
+      "employee": {
+        "changes": [
+          "Production pages and reference images load faster.",
+          "Improved retries for failed image loads and restored previews for older references and recoverable uploads."
+        ]
+      }
     },
     {
       "id": "2026-09-13-production-accounts",
@@ -124,7 +236,19 @@
         "Teammates can create private productions and manage their project teams; a public sign-up page supports new production accounts.",
         "The studio's Productions link uses the signed-in teammate's account."
       ],
-      "commits": ["53b1204", "67563da", "8f0cd5f", "20fe116"]
+      "commits": [
+        "53b1204",
+        "67563da",
+        "8f0cd5f",
+        "20fe116"
+      ],
+      "employee": {
+        "changes": [
+          "You can access production projects and files for projects you are tagged in.",
+          "Teammates can create private productions and manage their project teams. New production accounts can use the sign-up page.",
+          "The Productions link opens using your signed-in teammate account."
+        ]
+      }
     },
     {
       "id": "2026-09-13-storyboard-export",
@@ -135,7 +259,17 @@
         "Added Storyboard PDF export with editable notes and cards sized to their content.",
         "Shots can be inserted by number. Removed the estimated setup value from the shot-list summary."
       ],
-      "commits": ["928557f", "70bd35b", "28dfa66"]
+      "commits": [
+        "928557f",
+        "70bd35b",
+        "28dfa66"
+      ],
+      "employee": {
+        "changes": [
+          "Export a Storyboard PDF with editable notes and cards sized to their content.",
+          "Insert shots by number. The estimated setup value was removed from the shot-list summary."
+        ]
+      }
     },
     {
       "id": "2026-09-12-production-tools",
@@ -147,7 +281,21 @@
         "Repaired PDF export after dashboard updates, added first assistant director shot sheets, and clarified export choices.",
         "Improved shot-list readability and matched the production browser title and studio logo to the team dashboard."
       ],
-      "commits": ["dcaf2f4", "7b05841", "38ddbb3", "ce58e03", "bb7e753", "e73b14b"]
+      "commits": [
+        "dcaf2f4",
+        "7b05841",
+        "38ddbb3",
+        "ce58e03",
+        "bb7e753",
+        "e73b14b"
+      ],
+      "employee": {
+        "changes": [
+          "Project setup, team tagging, picture uploads, and smaller-screen layouts are easier to use.",
+          "Create custom categories and export more readable shot lists or first assistant director shot sheets.",
+          "Production pages use the same studio logo and browser-title styling as the team dashboard."
+        ]
+      }
     },
     {
       "id": "2026-09-12-mobile-navigation",
@@ -159,7 +307,18 @@
         "Overview moved to the first navigation position, and Productions adopted the same tab styling.",
         "Improved smaller-screen layouts and controls. Employee Overview was later replaced by Home on October 15."
       ],
-      "commits": ["4269a4b"]
+      "commits": [
+        "4269a4b"
+      ],
+      "version": "2.2.1",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Choosing a tab on mobile opens that section and closes the sidebar.",
+          "Productions uses the same tab styling as the other sections, and smaller-screen controls fit better.",
+          "Overview moved to the first position at this stage; your employee view later became Home on October 15."
+        ]
+      }
     },
     {
       "id": "2026-09-09-production-launch",
@@ -169,7 +328,18 @@
       "changes": [
         "Added a standalone production dashboard with individual team accounts and a Productions link from the studio portal."
       ],
-      "commits": ["ed0666f", "1bbcc69", "8c3f1e5"]
+      "commits": [
+        "ed0666f",
+        "1bbcc69",
+        "8c3f1e5"
+      ],
+      "version": "2.2.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Open Productions from the studio dashboard to use production tools with your individual account."
+        ]
+      }
     },
     {
       "id": "2026-09-09-notification-fixes",
@@ -181,7 +351,19 @@
         "Send test reports the result for the current device, and assignment setup shows whether the teammate has registered a device.",
         "Clarified that closing the app or locking the phone keeps alerts enabled; logging out disables them on that device."
       ],
-      "commits": ["1f9b9d4", "3439615"]
+      "commits": [
+        "1f9b9d4",
+        "3439615"
+      ],
+      "version": "2.1.1",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Notification setup provides clearer feedback, and Send test reports the result for the device you are using.",
+          "Closing the app or locking your phone keeps alerts enabled. Logging out disables alerts on that device."
+        ],
+        "title": "Clearer notification setup and test results"
+      }
     },
     {
       "id": "2026-09-09-calendar-assignment-notes",
@@ -194,7 +376,21 @@
         "Calendar sync was scheduled every five minutes. Actual timing depends on workflow execution.",
         "Protected dashboard publishing and concurrent code updates during frequent data syncs."
       ],
-      "commits": ["0a2bd40", "c26145e", "33ae4ba"]
+      "commits": [
+        "0a2bd40",
+        "c26145e",
+        "33ae4ba"
+      ],
+      "version": "2.1.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Studio rental offers and acceptances appear in the Google Calendar event description after syncing.",
+          "Calendar accepted is highlighted in green. If Smooth approves a scheduling conflict, you still choose whether to accept the offer.",
+          "Calendar updates are scheduled every five minutes; updates may take longer to appear."
+        ],
+        "title": "Clearer assignment status in Calendar"
+      }
     },
     {
       "id": "2026-09-09-team-scheduling",
@@ -206,7 +402,18 @@
         "Owners can offer studio rentals or custom assignments directly from the dashboard. Teammates can accept or decline them.",
         "Added optional device push notifications and conflict checks, backed by the private scheduling service."
       ],
-      "commits": ["7f2a79e"]
+      "commits": [
+        "7f2a79e"
+      ],
+      "version": "2.0.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Block one-time or weekly availability for classes and other commitments.",
+          "View studio rental and custom assignment offers, then accept or decline them in the dashboard.",
+          "Enable optional push alerts on your device for schedule updates."
+        ]
+      }
     },
     {
       "id": "2026-09-09-rental-guide",
@@ -217,7 +424,16 @@
         "Added a searchable, categorized guide that the owner can edit or import and publish to employee dashboards.",
         "Guideline content is distributed in encrypted dashboards. The guide was later expanded into Studio Guidelines."
       ],
-      "commits": ["a433081"]
+      "commits": [
+        "a433081"
+      ],
+      "version": "1.6.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "A categorized, searchable rental guide is available in the dashboard. It was later expanded into Studio Guidelines."
+        ]
+      }
     },
     {
       "id": "2026-09-08-mobile-zoom-colors",
@@ -228,15 +444,36 @@
         "Adjusted mobile input and layout styling to prevent unwanted iPhone zoom and horizontal overflow.",
         "Updated Rayne's icon to purple and Jordyn's to blue."
       ],
-      "commits": ["12af300"]
+      "commits": [
+        "12af300"
+      ],
+      "version": "1.5.2",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Mobile fields and layouts were adjusted to prevent unwanted iPhone zoom and horizontal overflow.",
+          "Rayne uses purple and Jordyn uses blue for clearer teammate distinction."
+        ]
+      }
     },
     {
       "id": "2026-09-05-remove-explainer",
       "date": "2026-09-05",
       "category": "Dashboard",
       "title": "Less repetition on the employee dashboard",
-      "changes": ["Removed the large commission-rule explainer card from the employee view."],
-      "commits": ["cbd5ec9"]
+      "changes": [
+        "Removed the large commission-rule explainer card from the employee view."
+      ],
+      "commits": [
+        "cbd5ec9"
+      ],
+      "version": "1.5.1",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Removed the large commission-rule explanation card to simplify the employee dashboard."
+        ]
+      }
     },
     {
       "id": "2026-09-05-stripe",
@@ -248,7 +485,12 @@
         "Owners can link a Stripe payment to its Calendar appointment directly in the dashboard.",
         "Deposits, final payments, and tips can be linked to the same appointment."
       ],
-      "commits": ["ed79c42", "8524a96"]
+      "commits": [
+        "ed79c42",
+        "8524a96"
+      ],
+      "version": "1.5.0",
+      "retrospective": true
     },
     {
       "id": "2026-09-05-owner-controls",
@@ -260,15 +502,33 @@
         "Payout marking can target an individual employee instead of always applying to everyone.",
         "Payment review only lists unresolved balances, and manual payment confirmation uses Record payment received wording to cover invoices, cash, and other payment methods."
       ],
-      "commits": ["3d1c5f7", "0972a16", "8ec7348", "9e43956"]
+      "commits": [
+        "3d1c5f7",
+        "0972a16",
+        "8ec7348",
+        "9e43956"
+      ],
+      "version": "1.4.0",
+      "retrospective": true
     },
     {
       "id": "2026-09-05-studio-branding",
       "date": "2026-09-05",
       "category": "Dashboard",
       "title": "Studio branding and distinct team icons",
-      "changes": ["The browser favicon uses the studio logo, and employees received distinct icon colors."],
-      "commits": ["c6a54fc"]
+      "changes": [
+        "The browser favicon uses the studio logo, and employees received distinct icon colors."
+      ],
+      "commits": [
+        "c6a54fc"
+      ],
+      "version": "1.3.1",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "The browser tab uses the studio logo, and teammate icons have distinct colors."
+        ]
+      }
     },
     {
       "id": "2026-09-05-deposits-tips",
@@ -280,7 +540,23 @@
         "Payments above the appointment price are treated as paid with a tip, while commission remains based on the appointment price.",
         "Added payment differences and tip totals. Calendar sync moved to every 30 minutes at this stage, then to five minutes on September 9."
       ],
-      "commits": ["fee3309", "9dcbdb4", "fdbce1d", "4062b7f", "a557d58", "55ab7da", "62180ab"]
+      "commits": [
+        "fee3309",
+        "9dcbdb4",
+        "fdbce1d",
+        "4062b7f",
+        "a557d58",
+        "55ab7da",
+        "62180ab"
+      ],
+      "version": "1.3.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Upcoming partial customer payments are labeled Deposit. After the appointment, an unresolved remainder is shown for review.",
+          "Customer tips no longer make a fully paid appointment look unpaid. Commission is based on the appointment price."
+        ]
+      }
     },
     {
       "id": "2026-09-05-category-reporting",
@@ -291,7 +567,17 @@
         "Grouped studio packages into appointment categories with filters and category revenue reporting.",
         "Expanded appointment and payout reporting across the studio's services."
       ],
-      "commits": ["5165914", "fa8e1d0", "7335e58", "7a1d1ac", "998dde6", "3c585aa", "42ef0d4"]
+      "commits": [
+        "5165914",
+        "fa8e1d0",
+        "7335e58",
+        "7a1d1ac",
+        "998dde6",
+        "3c585aa",
+        "42ef0d4"
+      ],
+      "version": "1.2.0",
+      "retrospective": true
     },
     {
       "id": "2026-09-05-login-email-aliases",
@@ -302,7 +588,23 @@
         "Simplified and centered sign-in, with the owner's profile labeled Smooth.",
         "Accepted Calendar invitations can be recognized across multiple email addresses belonging to the same employee."
       ],
-      "commits": ["7bbd01c", "e243040", "011bb22", "4ef1d79", "ab71122", "edeccc0", "959d54e"]
+      "commits": [
+        "7bbd01c",
+        "e243040",
+        "011bb22",
+        "4ef1d79",
+        "ab71122",
+        "edeccc0",
+        "959d54e"
+      ],
+      "version": "1.1.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "Sign-in is simpler and centered.",
+          "Accepted Calendar invitations can be recognized across the email addresses linked to your employee account."
+        ]
+      }
     },
     {
       "id": "2026-08-30-launch",
@@ -314,7 +616,18 @@
         "Connected Calendar appointments to earnings, payment status, payout records, and reporting.",
         "Added encrypted dashboard data, light and dark themes, and automated publishing."
       ],
-      "commits": ["29d2a25", "c9adb10"]
+      "commits": [
+        "29d2a25",
+        "c9adb10"
+      ],
+      "version": "1.0.0",
+      "retrospective": true,
+      "employee": {
+        "changes": [
+          "The team portal launched with your own password-protected dashboard.",
+          "View Calendar appointments, earnings, and payout information in light or dark mode."
+        ]
+      }
     }
   ]
 }

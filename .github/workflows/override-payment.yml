@@ -34,6 +34,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - uses: actions/configure-pages@v5
+        id: pages
       - run: npm ci
       - run: node scripts/set-payment-override.mjs --event "${{ inputs.event_id }}" --paid "${{ inputs.paid_status }}"
       - name: Refresh encrypted dashboards
@@ -57,6 +58,8 @@ jobs:
           git commit -m "payment: override ${{ inputs.event_id }}"
           git push
       - run: npm run build:github-pages
+        env:
+          GITHUB_PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
       - uses: actions/upload-pages-artifact@v3
         with: { path: out }
       - name: Deploy updated dashboard

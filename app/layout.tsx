@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import { dashboardBasePath } from "@/lib/site-path.mjs";
 import "./globals.css";
 
-const repositoryName = process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "smooth-studios-team-portal";
-const siteBasePath = process.env.GITHUB_ACTIONS === "true" ? `/${repositoryName}` : "";
+const siteBasePath = dashboardBasePath();
 const studioLogoUrl = `${siteBasePath}/smooth-studios-logo.png`;
 
 export const metadata: Metadata = {

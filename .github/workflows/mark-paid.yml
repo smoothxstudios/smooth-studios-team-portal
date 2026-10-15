@@ -36,6 +36,7 @@ jobs:
           node-version: 22
           cache: npm
       - uses: actions/configure-pages@v5
+        id: pages
       - run: npm ci
       - name: Update payout cutoff
         env:
@@ -63,6 +64,8 @@ jobs:
           git commit -m "payout: mark ${{ inputs.employee }} paid through ${{ inputs.paid_through }}"
           git push
       - run: npm run build:github-pages
+        env:
+          GITHUB_PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

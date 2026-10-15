@@ -3,7 +3,7 @@ import { TEAM, localInstant as parseLocalInstant, addLocalDays, assignmentConfli
 import { deliverPush, flushAlerts, publicPushKey, pushDeliveryMessage, pushEndpoint } from "./push.mjs";
 
 const users = TEAM.map(p => p.id);
-const origins = new Set(["https://smoothxstudios.github.io", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
+const origins = new Set(["https://smoothxstudios.github.io", "https://dashboard.smoothstudios.co", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
 const active = a => a.status === "pending" || a.status === "accepted";
 const guard = "EXISTS (SELECT 1 FROM team_state WHERE id = 1 AND mutation = ?)";
 class ApiError extends Error {

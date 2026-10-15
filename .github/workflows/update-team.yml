@@ -29,6 +29,7 @@ jobs:
           node-version: 22
           cache: npm
       - uses: actions/configure-pages@v5
+        id: pages
       - run: npm ci
       - run: npm test
       - name: Prepare private employee accounts
@@ -84,6 +85,8 @@ jobs:
           git pull --rebase origin main
           git push origin HEAD:main
       - run: npm run build:github-pages
+        env:
+          GITHUB_PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

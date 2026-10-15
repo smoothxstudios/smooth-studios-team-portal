@@ -1,12 +1,13 @@
 import type { NextConfig } from "next";
+import { dashboardBasePath } from "./lib/site-path.mjs";
 
 const isGitHubPages = process.env.GITHUB_ACTIONS === "true";
-const repositoryName = process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "smooth-studios-team-portal";
+const siteBasePath = dashboardBasePath();
 
 const nextConfig: NextConfig = {
   output: isGitHubPages ? "export" : undefined,
-  basePath: isGitHubPages ? `/${repositoryName}` : "",
-  assetPrefix: isGitHubPages ? `/${repositoryName}` : "",
+  basePath: siteBasePath,
+  assetPrefix: siteBasePath,
   trailingSlash: true,
   images: { unoptimized: true },
 };

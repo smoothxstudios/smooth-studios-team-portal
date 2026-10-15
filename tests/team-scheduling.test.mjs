@@ -120,6 +120,18 @@ test("shared login verifies identity without exposing dashboard data and restric
   assert.equal(response.headers.get("cache-control"), "no-store");
 });
 
+test("custom dashboard origin supports preflight and authenticated scheduling without opening other origins", async () => {
+  const f = fixture();
+  const origin = "https://dashboard.smoothstudios.co";
+  const preflight = await worker.fetch(new Request("https://api.example.invalid/schedule", { method: "OPTIONS", headers: { origin } }), f.env, { waitUntil() {} });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), origin);
+  assert.match(preflight.headers.get("access-control-allow-headers"), /Authorization/);
+  assert.equal((await f.call("jordyn", "/schedule", undefined, "GET", { origin })).status, 200);
+  assert.equal((await f.call(null, "/schedule", undefined, "GET", { origin })).status, 401);
+  assert.equal((await f.call("owner", "/schedule", undefined, "GET", { origin: "https://dashboard.smoothstudios.co.untrusted.invalid" })).status, 403);
+});
+
 test("guideline questions are shared with the owner without exposing another employee's queue", async () => {
   const f = fixture();
   assert.equal((await f.call(null, "/guidelines/questions")).status, 401);

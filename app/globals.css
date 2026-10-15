@@ -205,6 +205,8 @@ button { cursor: pointer; }
 .dashboard-release-search input { min-height: 44px; height: 100%; padding-left: 38px; font-size: 16px; background: var(--card); }
 .dashboard-release-filters select { width: 100%; min-height: 44px; max-width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px 28px 8px 10px; background: var(--card); color: var(--foreground); font-size: 16px; }
 .dashboard-release-count { margin: 0; font-size: 12px; color: var(--muted-foreground); }
+.dashboard-release-owner-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted-foreground); }
+.dashboard-release-owner-tools button { min-height: 44px; white-space: normal; }
 .dashboard-release-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 5px; }
 .dashboard-release-entry { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
 .dashboard-release-entry.is-current { border-left: 3px solid var(--primary); }

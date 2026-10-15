@@ -26,6 +26,7 @@ jobs:
           node-version: 22
           cache: npm
       - uses: actions/configure-pages@v5
+        id: pages
       - run: npm ci
       - name: Sync Calendar, rental team notes, and encrypted dashboards
         env:
@@ -49,6 +50,8 @@ jobs:
           git diff --cached --quiet || git commit -m "data: refresh encrypted calendar dashboards"
           git push
       - run: npm run build:github-pages
+        env:
+          GITHUB_PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

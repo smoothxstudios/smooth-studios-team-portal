@@ -15,6 +15,10 @@ for (const [index, release] of manifest.releases.entries()) {
     throw new Error(`Incomplete or duplicate dashboard release: ${release.id}`);
   }
   if (index && manifest.releases[index - 1].date < release.date) throw new Error("Dashboard release notes must be newest first.");
+  if (release.version && !/^\d+\.\d+\.\d+$/.test(release.version)) throw new Error(`Invalid release version: ${release.id}`);
+  if (release.employee && (!Array.isArray(release.employee.changes) || !release.employee.changes.length || release.employee.changes.some(change => typeof change !== "string" || !change.trim()))) {
+    throw new Error(`Employee notes must be explicitly curated: ${release.id}`);
+  }
   ids.add(release.id);
 }
 console.log(`Dashboard v${manifest.currentVersion}: ${manifest.releases.length} dated updates verified.`);

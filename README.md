@@ -141,9 +141,17 @@ The dashboard verifies that the encrypted workflow token belongs to `smoothxstud
 
 ## Dashboard versions and update history
 
-The footer on sign-in and dashboard pages shows the current app version and release date. **What changed** opens searchable notes grouped by topic, including retrospective entries back to the August 30, 2026 launch. Earlier updates were not individually versioned; numbered release notes begin with v0.1.1. Dates use Eastern time.
+The footer on sign-in and dashboard pages shows the current app version and release date. After sign-in, **What changed** opens searchable notes grouped by topic, back to the August 30, 2026 launch. Employees see explicitly curated visual and day-to-day feature notes. The owner sees the complete history and can preview the employee view. Sign-in itself exposes no history controls. These are public product notes, so never include secrets or private business records.
+
+At the owner's request, earlier milestones now have retrospective version labels: v1 begins with the reporting portal and v2 with live scheduling. New capabilities advance the minor number; fixes advance the patch. Earlier entries are marked retrospective rather than implying that those labels appeared on the original builds. The October 15 correction establishes v2.8.1. Dates use Eastern time.
 
 For each dashboard fix or upgrade, bump the version in `package.json`, both root version fields in `package-lock.json`, and `config/dashboard-releases.json`. Prepend a short release note and retain the earlier entries. Both build commands check that these versions agree. Routine data syncs and business-record updates do not change the app version. See `AGENTS.md` for the release-maintenance rules.
+
+### Custom dashboard address
+
+The application is prepared for `https://dashboard.smoothstudios.co`. GitHub Pages settings must set the custom domain to `dashboard.smoothstudios.co`, and the domain's DNS needs a CNAME with name `dashboard` and target `smoothxstudios.github.io`. Enable HTTPS when GitHub's certificate is ready. Do not change the studio website's root or www records. This Actions-based site does not use a repository CNAME file to configure Pages.
+
+Every Pages build takes `GITHUB_PAGES_BASE_PATH` from `actions/configure-pages`. It remains `/smooth-studios-team-portal` on the original URL and becomes empty for the custom domain; asset paths, favicon, and app manifest follow the same setting. After changing the domain, run the dashboard deployment again. The team API allows both exact origins. Sign in again on the new domain, and re-enable push notifications there; browser permissions and local drafts belong to the origin where they were created.
 
 ## Local development
 
