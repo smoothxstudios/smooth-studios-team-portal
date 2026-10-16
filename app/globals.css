@@ -1546,6 +1546,10 @@ button { cursor: pointer; }
 .notification-summary > small { color: var(--muted-foreground); text-align: right; }
 .schedule-push[open] > div, .schedule-push[open] > p { margin-top: 16px; }
 .notification-summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 5px; border-radius: 4px; }
+.notification-feedback > p { margin: 0; }
+.notification-feedback ol { margin: 10px 0 0; padding-left: 20px; list-style: decimal; }
+.notification-feedback li + li { margin-top: 9px; }
+.notification-feedback .notification-help-hint { margin-top: 12px; font-size: 13px; }
 
 /* Quick sign-in, creative work, and studio reference. */
 .quick-login { display: grid; gap: 9px; margin: 0 0 24px; }

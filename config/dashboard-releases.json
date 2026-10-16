@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.20.0",
+  "currentVersion": "2.20.1",
   "releases": [
+    {
+      "id": "2026-10-16-notification-permission-help",
+      "version": "2.20.1",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Clear steps for blocked notifications",
+      "changes": [
+        "Blocked notification alerts show device-specific recovery steps, including removing and re-adding the iPhone Home Screen app if permission settings do not resolve the issue.",
+        "Settings → Help includes a searchable “Notifications were not allowed” question with reinstall, permission, and test instructions.",
+        "Dismissed permission prompts explain how to try again, while connection errors retain their own feedback."
+      ],
+      "employee": {
+        "title": "Help with blocked notifications",
+        "changes": [
+          "Notification alerts explain what to do next when permission is blocked.",
+          "Search Settings → Help for “notifications not allowed” or “re-add app” to find the iPhone recovery steps."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-advance-balances-and-searchable-help",
       "version": "2.20.0",

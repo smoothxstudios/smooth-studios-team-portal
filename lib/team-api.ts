@@ -55,8 +55,15 @@ export async function teamPushIsEnabled(token: string, key: string | null) {
   return result.registered;
 }
 
+export class PushPermissionError extends Error {
+  constructor(public permission: NotificationPermission) {
+    super(permission === "denied" ? "Notifications were not allowed." : "Notifications weren’t enabled. Tap Enable on this device again and choose Allow.");
+    this.name = "PushPermissionError";
+  }
+}
+
 export async function enableTeamPush(token: string, key: string, permission: NotificationPermission) {
-  if (permission !== "granted") throw new Error("Notifications were not allowed. You can still view and accept assignments in the portal.");
+  if (permission !== "granted") throw new PushPermissionError(permission);
   const registration = await teamWorker();
   let subscription = await registration.pushManager.getSubscription();
   if (subscription && !matchesPushKey(subscription, key)) {

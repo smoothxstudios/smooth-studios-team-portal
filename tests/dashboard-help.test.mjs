@@ -10,6 +10,8 @@ test('help understands common natural questions, aliases and notification typos'
     ['how do I add my school classes', 'block-time'],
     ['FaceID is not working', 'fix-sign-in'],
     ['how do I submit my video files', 'creative-submit'],
+    ['Notifications were not allowed', 'notifications-not-allowed'],
+    ['how do I delete and readd the app for notifications', 'notifications-not-allowed'],
   ];
   for (const [query,id] of cases) assert.ok(searchHelp(query,false).slice(0,4).some(item=>item.id===id), query);
 });
