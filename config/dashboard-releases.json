@@ -1,6 +1,23 @@
 {
-  "currentVersion": "2.21.2",
+  "currentVersion": "2.21.3",
   "releases": [
+    {
+      "id": "2026-10-16-raised-mobile-toolbar",
+      "version": "2.21.3",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Mobile toolbar raised slightly",
+      "changes": [
+        "The floating mobile toolbar sits a little higher, with matching page clearance to keep the end of the page accessible."
+      ],
+      "employee": {
+        "title": "Toolbar lifted a little",
+        "changes": [
+          "The mobile toolbar now floats a little higher above the bottom edge."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-compact-pill-toolbar",
       "version": "2.21.2",
