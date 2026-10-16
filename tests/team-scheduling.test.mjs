@@ -13,6 +13,7 @@ const seed = await readFile(new URL("../team-api/migrations/0001_initial_state.s
 const questionsSchema = await readFile(new URL("../team-api/migrations/0002_guideline_questions.sql", import.meta.url), "utf8");
 const preferencesSchema = await readFile(new URL("../team-api/migrations/0003_work_preferences.sql", import.meta.url), "utf8");
 const notificationSchema = await readFile(new URL("../team-api/migrations/0009_push_notifications.sql", import.meta.url), "utf8");
+const specificNotificationSchema = await readFile(new URL("../team-api/migrations/0010_specific_notifications.sql", import.meta.url), "utf8");
 const ids = [...TEAM.map(person => person.id), "sync"];
 const tokens = Object.fromEntries(await Promise.all(ids.map(async id => [id, await teamToken(`synthetic-test-password-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(ids.map(async id => [id, await tokenHash(tokens[id])])));
@@ -21,7 +22,7 @@ mock.timers.enable({ apis: ["Date"], now });
 test.after(() => mock.timers.reset());
 
 class D1TestDatabase {
-  constructor() { this.sqlite = new DatabaseSync(":memory:"); this.sqlite.exec(schema); this.sqlite.exec(seed); this.sqlite.exec(questionsSchema); this.sqlite.exec(preferencesSchema); this.sqlite.exec(notificationSchema); }
+  constructor() { this.sqlite = new DatabaseSync(":memory:"); this.sqlite.exec(schema); this.sqlite.exec(seed); this.sqlite.exec(questionsSchema); this.sqlite.exec(preferencesSchema); this.sqlite.exec(notificationSchema); this.sqlite.exec(specificNotificationSchema); }
   prepare(sql) {
     const sqlite = this.sqlite;
     let args = [];

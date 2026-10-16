@@ -8,16 +8,20 @@ const notices = {
   test: { title: "Notifications are connected", body: "This device can receive Smooth Studios alerts.", hash: "#scheduling" },
 };
 self.addEventListener("push", event => {
-  let type = "schedule";
+  let type = "schedule", payload;
   try {
-    const requested = event.data?.json()?.type;
-    if (Object.hasOwn(notices, requested)) type = requested;
+    const requested = event.data?.json();
+    if (Object.hasOwn(notices, requested?.type)) { type = requested.type; payload = requested; }
   } catch { /* Old subscriptions receive a generic schedule alert. */ }
   const notice = notices[type];
-  event.waitUntil(self.registration.showNotification(`Smooth Studios · ${notice.title}`, {
-    body: notice.body,
+  const clean = (value, max) => typeof value === "string" ? Array.from(value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, " ").replace(/\s+/g, " ").trim()).slice(0, max).join("") : "";
+  const title = clean(payload?.title, 80), body = clean(payload?.body, 360);
+  const id = typeof payload?.id === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(payload.id) ? payload.id : null;
+  // Lead with the response; the OS already displays the studio app name/icon.
+  event.waitUntil(self.registration.showNotification(title && body ? title : notice.title, {
+    body: title && body ? body : notice.body,
     icon: new URL("smooth-studios-logo.png", self.registration.scope).href,
-    tag: `smooth-${type}`,
+    tag: id ? `smooth-${type}-${id}` : `smooth-${type}`,
     renotify: true,
     data: { type },
   }));

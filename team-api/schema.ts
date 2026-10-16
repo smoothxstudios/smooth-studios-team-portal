@@ -91,7 +91,7 @@ export const devices = sqliteTable("team_devices", {
   createdAt: text("created_at").notNull(),
 });
 
-// One coalesced, durable alert per person. No client details on lock screens.
+// Legacy queue is drained during the rollout; new events use the queue below.
 export const alerts = sqliteTable("team_alerts", {
   userId: text("user_id").primaryKey(),
   id: text("id").notNull(),
@@ -99,6 +99,12 @@ export const alerts = sqliteTable("team_alerts", {
   dueAt: integer("due_at").notNull(),
   kind: text("kind").notNull().default("schedule"),
 });
+
+export const notificationEvents = sqliteTable("team_notification_events", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull(),
+  kind: text("kind").notNull().default("schedule"), payload: text("payload").notNull(),
+  attempts: integer("attempts").notNull().default(0), dueAt: integer("due_at").notNull(),
+}, table => [index("team_notification_events_due").on(table.dueAt)]);
 
 export const guidelineQuestions = sqliteTable("guideline_questions", {
   id: text("id").primaryKey(),

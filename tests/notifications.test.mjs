@@ -7,6 +7,7 @@ import { QUIZ_INTERVAL_MS } from "../lib/team-engagement.mjs";
 import { encryptPush, subscriptionKeys } from "../team-api/push-encryption.mjs";
 import { flushAlerts } from "../team-api/push.mjs";
 import { sendQuizReminders } from "../team-api/quiz-notifications.mjs";
+import { notificationTime, notificationDetails, assignmentNotifications } from "../team-api/notification-content.mjs";
 import worker from "../team-api/worker.mjs";
 import { fixture, device, answerCurrent } from "./helpers/notification-fixture.mjs";
 const now = Date.parse("2026-10-16T18:00:00Z");
@@ -47,11 +48,15 @@ test("a task assignment immediately sends an encrypted assignment alert only to 
   await f.call("jordyn", "/push/device", mine); await f.call("rayne", "/push/device", other);
   f.DB.sqlite.prepare("UPDATE team_state SET synced_at = ? WHERE id = 1").run(new Date(now).toISOString());
   const sent = [];
-  t.mock.method(globalThis, "fetch", async (url, options) => { sent.push(url); assert.deepEqual(mine.decrypt(options.body), { type: "assignment" }); return new Response(null, { status: 201 }); });
+  t.mock.method(globalThis, "fetch", async (url, options) => { sent.push({ url, payload: mine.decrypt(options.body) }); return new Response(null, { status: 201 }); });
   const result = await f.call("owner", "/assignments", { revision: 0, employeeId: "jordyn", startLocal: "2026-10-17T13:00", endLocal: "2026-10-17T14:00", title: "Synthetic task", instructions: "Private instructions" });
   assert.equal(result.status, 200, JSON.stringify(result)); await Promise.all(f.pending);
-  assert.deepEqual(sent, [mine.endpoint]);
-  assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) n FROM team_alerts").get().n, 0);
+  assert.deepEqual(sent.map(item => item.url), [mine.endpoint]);
+  assert.equal(sent[0].payload.type, "assignment");
+  assert.equal(sent[0].payload.title, "New task assignment");
+  assert.equal(sent[0].payload.body, "Synthetic task · Sat, Oct 17 · 1:00 PM–2:00 PM EDT. Tap to accept or decline.");
+  assert.doesNotMatch(JSON.stringify(sent), /Private instructions/);
+  assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) n FROM team_notification_events").get().n, 0);
   f.close();
 });
 
@@ -73,7 +78,7 @@ test("concurrent flushes claim once and retry only the failed device, at most fo
 
 test("quiz cron follows two-hour spacing, reserves individual questions offline, deduplicates and stops after three", async () => {
   const f = await fixture(), d = device("quiz"); await f.call("jordyn", "/push/device", d);
-  const sent = [], provider = async (url, options) => { assert.equal(url, d.endpoint); assert.deepEqual(d.decrypt(options.body), { type: "quiz" }); sent.push(options); return new Response(null, { status: 201 }); };
+  const sent = [], provider = async (url, options) => { sent.push({ url, payload: d.decrypt(options.body) }); return new Response(null, { status: 201 }); };
   await sendQuizReminders(f.env, provider); // No check-in today: no automatic new day.
   assert.equal(sent.length, 0);
   await answerCurrent(f); // First answer at 2pm, then close the dashboard.
@@ -91,6 +96,7 @@ test("quiz cron follows two-hour spacing, reserves individual questions offline,
   const end = (await f.call("jordyn")).data;
   assert.equal(end.answeredToday, 3); assert.equal(end.summary.points, 30);
   assert.equal(new Set(end.quiz.map(q => q.question.tier)).size, 3);
+  assert.ok(sent.every(item => item.url === d.endpoint && item.payload.type === "quiz"));
   f.close();
 });
 
@@ -137,4 +143,67 @@ test("service worker shows distinct alerts and opens only approved dashboard des
   assert.match(shown[0].title, /New assignment/); assert.match(shown[1].title, /Daily Quiz/);
   assert.notEqual(shown[0].tag, shown[1].tag);
   assert.deepEqual(opened, [`${scope}#scheduling`, `${scope}#daily-quiz`, `${scope}#scheduling`, `${scope}#scheduling`]);
+
+  async function show(payload) { let pending; handlers.push({ data: { json: () => payload }, waitUntil: p => pending = p }); await pending; return shown.at(-1); }
+  const accepted = await show({ type: "schedule", id: "response-1", title: "Jordyn accepted a rental", body: "Studio A Rental · Fri, Oct 16 · 3:00 PM–4:00 PM EDT.", url: "https://untrusted.invalid" });
+  const declined = await show({ type: "schedule", id: "response-2", title: "Rayne declined a rental", body: "Studio B Rental · Sat, Oct 17 · 3:00 PM–4:00 PM EDT." });
+  assert.equal(accepted.title, "Jordyn accepted a rental");
+  assert.match(accepted.body, /Studio A Rental/);
+  assert.notEqual(accepted.tag, declined.tag);
+  assert.equal((await show({ type: "schedule", id: "response-1", title: accepted.title, body: accepted.body })).tag, accepted.tag);
+  let pending; handlers.notificationclick({ notification: { ...accepted, close() {} }, waitUntil: p => pending = p }); await pending;
+  assert.equal(opened.at(-1), `${scope}#scheduling`);
+  assert.equal((await show({ type: "unknown", title: "Untrusted", body: "Untrusted" })).title, "Schedule update");
+  assert.equal((await show({ type: "schedule", title: {}, body: "broken" })).title, "Schedule update");
+  assert.equal((await show(null)).title, "Schedule update");
+});
+
+test("two booking responses queue separately and send specific encrypted alerts only to Smooth", async () => {
+  const f = await fixture(), owner = device("owner-responses"), unrelated = device("unrelated");
+  await f.call("owner", "/push/device", owner); await f.call("akiva", "/push/device", unrelated);
+  const vapid = f.env.VAPID_JWK; delete f.env.VAPID_JWK; // Hold automatic deliveries until both responses are queued.
+  const appointments = [
+    { id: "synthetic-rental-1", title: "Studio A Rental", customer: "PRIVATE CLIENT", start: "2026-10-17T17:00:00Z", end: "2026-10-17T18:00:00Z", priceCents: 10000, acceptedEmployeeIds: [] },
+    { id: "synthetic-rental-2", title: "Studio B Rental", customer: "PRIVATE CLIENT", start: "2026-10-18T19:00:00Z", end: "2026-10-18T20:00:00Z", priceCents: 10000, acceptedEmployeeIds: [] },
+  ];
+  assert.equal((await f.call("sync", "/sync/import", { generation: "test", appointments })).status, 200);
+  assert.equal((await f.call("sync", "/sync/commit", { generation: "test", count: 2 })).status, 200);
+  const state = () => f.call("owner", "/schedule");
+  for (const [index, employeeId, status] of [[0, "jordyn", "accepted"], [1, "rayne", "declined"]]) {
+    assert.equal((await f.call("owner", "/assignments", { revision: (await state()).data.revision, employeeId, appointmentId: appointments[index].id, instructions: "PRIVATE INSTRUCTIONS" })).status, 200);
+    const latest = (await state()).data, item = latest.assignments.find(item => item.employeeId === employeeId);
+    assert.equal((await f.call("akiva", `/assignments/${item.id}`, { revision: latest.revision, status })).status, 404);
+    assert.equal((await f.call(employeeId, `/assignments/${item.id}`, { revision: latest.revision - 1, status })).status, 409);
+    assert.equal((await f.call(employeeId, `/assignments/${item.id}`, { revision: latest.revision, status })).status, 200);
+    assert.equal((await f.call(employeeId, `/assignments/${item.id}`, { revision: (await state()).data.revision, status })).status, 409);
+  }
+  await Promise.all(f.pending);
+  assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) n FROM team_notification_events WHERE user_id = 'owner'").get().n, 2);
+  f.env.VAPID_JWK = vapid;
+  const sent = [];
+  await Promise.all([flushAlerts(f.env, async (url, options) => { sent.push({ url, options, payload: owner.decrypt(options.body) }); return new Response(null, { status: 201 }); }), flushAlerts(f.env, async (url, options) => { sent.push({ url, options, payload: owner.decrypt(options.body) }); return new Response(null, { status: 201 }); })]);
+  assert.equal(sent.length, 2); assert.ok(sent.every(item => item.url === owner.endpoint));
+  const accepted = sent.find(item => item.payload.title === "Jordyn accepted a rental");
+  const declined = sent.find(item => item.payload.title === "Rayne declined a rental");
+  assert.equal(accepted.payload.body, "Studio A Rental · Sat, Oct 17 · 1:00 PM–2:00 PM EDT.");
+  assert.equal(declined.payload.body, "Studio B Rental · Sun, Oct 18 · 3:00 PM–4:00 PM EDT. Choose another team member.");
+  assert.doesNotMatch(JSON.stringify(sent.map(item => item.payload)), /PRIVATE|10000|instructions|priceCents|customer/i);
+  assert.notEqual(accepted.payload.id, declined.payload.id);
+  assert.notEqual(accepted.options.headers.Topic, declined.options.headers.Topic);
+  assert.ok(sent.every(item => /^[A-Za-z0-9_-]{32}$/.test(item.options.headers.Topic)));
+  assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) n FROM team_notification_events").get().n, 0);
+  f.close();
+});
+
+test("notification dates use studio time across midnight and DST; content is bounded and excludes unrelated fields", () => {
+  assert.equal(notificationTime("2026-10-18T03:00:00Z", "2026-10-18T05:00:00Z"), "Sat, Oct 17, 11:00 PM EDT–Sun, Oct 18, 1:00 AM EDT");
+  assert.equal(notificationTime("2026-11-01T05:30:00Z", "2026-11-01T06:30:00Z"), "Sun, Nov 1 · 1:30 AM EDT–1:30 AM EST");
+  assert.equal(notificationTime("2026-12-01T17:00:00Z", "2026-12-01T18:00:00Z"), "Tue, Dec 1 · 12:00 PM–1:00 PM EST");
+  const details = notificationDetails({ title: "\nHello\u202e there", body: "x".repeat(500), url: "private", instructions: "private" });
+  assert.deepEqual(details, { title: "Hello there", body: "x".repeat(360) });
+  const item = { employeeId: "jordyn", appointmentId: "rental", title: "Studio A Rental", start: "2026-10-17T17:00:00Z", end: "2026-10-17T18:00:00Z" };
+  const notices = assignmentNotifications(item, "rescheduled", ["owner", "jordyn"]);
+  assert.equal(notices[0].title, "Jordyn’s rental time changed");
+  assert.equal(notices[1].title, "Rental time changed");
+  assert.match(notices[1].body, /accept the new time/);
 });

@@ -4,6 +4,7 @@ import { deliverPush, flushAlerts, publicPushKey, pushDeliveryMessage, pushEndpo
 import { engagementRoute } from "./engagement.mjs";
 import { subscriptionKeys } from "./push-encryption.mjs";
 import { sendQuizReminders } from "./quiz-notifications.mjs";
+import { assignmentNotifications, blockNotifications } from "./notification-content.mjs";
 
 const users = TEAM.map(p => p.id);
 const origins = new Set(["https://smoothxstudios.github.io", "https://dashboard.smoothstudios.co", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
@@ -83,13 +84,15 @@ async function snapshot(db) {
 function expectedRevision(input, state) {
   if (!Number.isInteger(input.revision) || input.revision !== state.revision) fail(409, "The schedule changed. Refresh, review it, and try again.");
 }
-async function commit(db, state, makeStatements, alertUsers = [], alertKind = "schedule") {
+async function commit(db, state, makeStatements, notifications = []) {
   const id = crypto.randomUUID();
   const statements = [db.prepare("UPDATE team_state SET revision = revision + 1, mutation = ? WHERE id = 1 AND revision = ?").bind(id, state.revision), ...makeStatements(id)];
-  if (alertUsers.length) statements.push(db.prepare(`INSERT INTO team_alerts (user_id, id, attempts, due_at, kind)
-    SELECT value, ?, 0, ?, ? FROM json_each(?) WHERE ${guard}
-    ON CONFLICT(user_id) DO UPDATE SET id = excluded.id, attempts = 0, due_at = excluded.due_at, kind = excluded.kind`)
-    .bind(id, Date.now(), alertKind, JSON.stringify([...new Set(alertUsers)]), id));
+  if (notifications.length) statements.push(db.prepare(`INSERT INTO team_notification_events (id, user_id, kind, payload, due_at)
+    SELECT json_extract(value, '$.id'), json_extract(value, '$.userId'), json_extract(value, '$.kind'),
+      json_extract(value, '$.payload'), ? FROM json_each(?) WHERE ${guard}`)
+    .bind(Date.now(), JSON.stringify(notifications.map(({ userId, kind, title, body }) => ({
+      id: crypto.randomUUID(), userId, kind, payload: JSON.stringify({ title, body }),
+    }))), id));
   const result = await db.batch(statements);
   if (!result[0].meta.changes) fail(409, "The schedule changed. Refresh, review it, and try again.");
 }
@@ -109,7 +112,7 @@ async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 2 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -182,7 +185,8 @@ async function route(request, env, ctx) {
   if (request.method === "GET" && url.pathname === "/sync/accepted") {
     const assignments = await jsonRows(db, "SELECT data FROM team_assignments");
     const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices").first();
-    const alerts = await db.prepare("SELECT COUNT(*) AS count, COALESCE(SUM(CASE WHEN attempts > 0 THEN 1 ELSE 0 END), 0) AS retrying FROM team_alerts").first();
+    const alerts = await db.prepare(`SELECT COUNT(*) AS count, COALESCE(SUM(CASE WHEN attempts > 0 THEN 1 ELSE 0 END), 0) AS retrying
+      FROM (SELECT attempts FROM team_alerts UNION ALL SELECT attempts FROM team_notification_events)`).first();
     return { assignments: assignments
       .filter(a => a.status === "accepted" && a.appointmentId)
       .map(({ appointmentId, employeeId, start, end }) => ({ appointmentId, employeeId, start, end })),
@@ -213,18 +217,18 @@ async function route(request, env, ctx) {
     const input = await body(request), generation = text(input.generation, 80), s = await snapshot(db);
     const next = await jsonRows(db, "SELECT data FROM team_appointments WHERE generation = ?", generation);
     if (!Number.isInteger(input.count) || next.length !== input.count) fail(409, "The calendar import is incomplete.");
-    const changes = [], notify = [];
+    const changes = [], notifications = [];
     const appointmentsById = new Map(next.map(a => [a.id, a]));
     for (const a of s.assignments.filter(a => a.appointmentId && active(a))) {
       const appointment = appointmentsById.get(a.appointmentId);
       if (!appointment) {
         changes.push({ ...a, status: "cancelled", note: "Appointment removed from Calendar.", updatedAt: new Date().toISOString() });
-        notify.push(a.employeeId);
+        notifications.push(...assignmentNotifications(a, "removed", [a.employeeId, "owner"]));
       } else if (Date.parse(a.start) !== Date.parse(appointment.start) || Date.parse(a.end) !== Date.parse(appointment.end)) {
         const status = Date.parse(appointment.start) > Date.now() ? "pending" : "cancelled";
         changes.push({ ...a, start: appointment.start, end: appointment.end, status, conflictOverride: undefined,
           note: status === "pending" ? "Calendar time changed. Please accept the new time." : "Time changed to a past appointment. Smooth must review it.", updatedAt: new Date().toISOString() });
-        notify.push(a.employeeId);
+        notifications.push(...assignmentNotifications({ ...a, start: appointment.start, end: appointment.end }, status === "pending" ? "rescheduled" : "past", [a.employeeId, "owner"]));
       }
     }
     await commit(db, s.state, mutation => [
@@ -232,10 +236,10 @@ async function route(request, env, ctx) {
       db.prepare(`UPDATE team_assignments SET data = (SELECT value FROM json_each(?) WHERE json_extract(value, '$.id') = team_assignments.id)
         WHERE id IN (SELECT json_extract(value, '$.id') FROM json_each(?)) AND ${guard}`)
         .bind(JSON.stringify(changes), JSON.stringify(changes), mutation),
-    ], notify.length ? [...notify, "owner"] : []);
+    ], notifications);
     // The old snapshot remains available until the atomic generation switch.
     await db.prepare("DELETE FROM team_appointments WHERE generation != ?").bind(generation).run();
-    if (notify.length) ctx.waitUntil(flushAlerts(env));
+    if (notifications.length) ctx.waitUntil(flushAlerts(env));
     return { synced: next.length };
   }
   if (["POST", "PATCH", "DELETE"].includes(request.method) &&
@@ -304,7 +308,7 @@ async function route(request, env, ctx) {
     const item = { id: crypto.randomUUID(), userId, startLocal, endLocal, repeatUntil,
       reason: text(input.reason, 120), createdAt: new Date().toISOString() };
     await commit(db, s.state, mutation => [db.prepare(`INSERT INTO team_blocks (id, user_id, data) SELECT ?, ?, ? WHERE ${guard}`)
-      .bind(item.id, userId, JSON.stringify(item), mutation)], user === "owner" ? [userId] : ["owner"]);
+      .bind(item.id, userId, JSON.stringify(item), mutation)], blockNotifications(item, false, user === "owner" ? [userId] : ["owner"]));
     ctx.waitUntil(flushAlerts(env));
     return { saved: true };
   }
@@ -313,7 +317,7 @@ async function route(request, env, ctx) {
     expectedRevision(input, s.state);
     const item = s.blocks.find(b => b.id === url.pathname.slice(8));
     if (!item || (user !== "owner" && item.userId !== user)) fail(404, "Block not found.");
-    await commit(db, s.state, mutation => [db.prepare(`DELETE FROM team_blocks WHERE id = ? AND ${guard}`).bind(item.id, mutation)], user === "owner" ? [item.userId] : ["owner"]);
+    await commit(db, s.state, mutation => [db.prepare(`DELETE FROM team_blocks WHERE id = ? AND ${guard}`).bind(item.id, mutation)], blockNotifications(item, true, user === "owner" ? [item.userId] : ["owner"]));
     ctx.waitUntil(flushAlerts(env));
     return { deleted: true };
   }
@@ -342,7 +346,7 @@ async function route(request, env, ctx) {
       status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       ...(input.overrideConflicts ? { conflictOverride: approveConflict({ start, end }) } : {}) };
     const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices WHERE user_id = ?").bind(employeeId).first();
-    await commit(db, s.state, mutation => [saveAssignment(db, item, mutation)], [employeeId], "assignment");
+    await commit(db, s.state, mutation => [saveAssignment(db, item, mutation)], assignmentNotifications(item, "offered", [employeeId]));
     ctx.waitUntil(flushAlerts(env));
     return { saved: true, notification: devices.count
       ? "Offer saved. A notification was queued for their enabled devices."
@@ -359,7 +363,7 @@ async function route(request, env, ctx) {
       if (!active(item) || Date.parse(item.start) <= Date.now()) fail(409, "Only upcoming active offers can receive a conflict override.");
       await commit(db, s.state, mutation => [saveAssignment(db, {
         ...item, conflictOverride: approveConflict(item), updatedAt: new Date().toISOString(),
-      }, mutation)], [item.employeeId]);
+      }, mutation)], assignmentNotifications(item, "conflict", [item.employeeId]));
       ctx.waitUntil(flushAlerts(env));
       return { saved: true, notification: "Time conflict approved. The employee can now accept this offer; their response is still required." };
     }
@@ -375,7 +379,7 @@ async function route(request, env, ctx) {
       }
     }
     await commit(db, s.state, mutation => [saveAssignment(db, { ...item, status: input.status, updatedAt: new Date().toISOString() }, mutation)],
-      user === "owner" ? [item.employeeId] : ["owner"]);
+      assignmentNotifications(item, input.status, user === "owner" ? [item.employeeId] : ["owner"]));
     ctx.waitUntil(flushAlerts(env));
     return { saved: true };
   }

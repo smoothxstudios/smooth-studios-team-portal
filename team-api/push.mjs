@@ -1,5 +1,6 @@
 import { base64url, unbase64url } from "../lib/team-auth.mjs";
 import { encryptPush } from "./push-encryption.mjs";
+import { notificationDetails } from "./notification-content.mjs";
 
 export function pushEndpoint(value) {
   if (typeof value !== "string" || value.length > 2048) throw new Error("Unsupported push endpoint.");
@@ -28,18 +29,23 @@ export async function vapidAuthorization(endpoint, jwk, now = Date.now()) {
   return `vapid t=${input}.${base64url(new Uint8Array(signature))}, k=${publicPushKey(jwk)}`;
 }
 
-// Only an alert type is sent, encrypted for this device. Legacy registrations
-// retain generic schedule alerts until their next dashboard visit adds keys.
-export async function deliverPush(endpoint, jwk, send = fetch, { keys, kind = "schedule", ttl = 86400 } = {}) {
+// Details are allowlisted and encrypted separately for each device. Legacy
+// registrations retain generic alerts until a dashboard visit adds keys.
+export async function deliverPush(endpoint, jwk, send = fetch, { keys, kind = "schedule", ttl = 86400, details, notificationId } = {}) {
   const url = pushEndpoint(endpoint);
   if (!["schedule", "assignment", "quiz", "test"].includes(kind)) throw new Error("Invalid notification type.");
-  const payload = keys ? await encryptPush(keys, new TextEncoder().encode(JSON.stringify({ type: kind }))) : new Uint8Array(0);
+  const eventId = typeof notificationId === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(notificationId) ? notificationId : null;
+  const content = { type: kind, ...notificationDetails(details), ...(eventId ? { id: eventId } : {}) };
+  const payload = keys ? await encryptPush(keys, new TextEncoder().encode(JSON.stringify(content))) : new Uint8Array(0);
+  // Web Push topics are public, opaque, and limited to 32 URL-safe characters.
+  // A retry replaces its own pending alert; separate bookings stay separate.
+  const topic = eventId ? base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(eventId)))).slice(0, 32) : `smooth-${kind}`;
   const response = await send(url, {
     // Workerd rejects redirect: "error" before sending. Manual mode returns
     // redirects as rejected deliveries without forwarding VAPID credentials.
     method: "POST", redirect: "manual", body: payload,
     headers: { Authorization: await vapidAuthorization(url, jwk), TTL: String(Math.max(0, Math.min(86400, Math.floor(ttl)))),
-      Urgency: kind === "quiz" ? "normal" : "high", Topic: `smooth-${kind}`,
+      Urgency: kind === "quiz" ? "normal" : "high", Topic: topic,
       ...(keys ? { "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream" } : {}) },
     signal: AbortSignal.timeout(8000),
   });
@@ -62,6 +68,8 @@ export function pushDeliveryMessage(result) {
 // the same alert together. Successful devices are never retried because a
 // different device failed. A lost provider response can still require a retry.
 export async function sendAlert(env, alert, send = fetch, now = Date.now()) {
+  let details;
+  try { details = JSON.parse(alert.payload); } catch { /* Legacy and quiz alerts use the default copy. */ }
   const devices = (await env.DB.prepare(`SELECT * FROM team_devices WHERE user_id = ?
     ${alert.kind === "quiz" ? "AND p256dh IS NOT NULL AND auth IS NOT NULL" : ""} LIMIT 3`).bind(alert.user_id).all()).results;
   await Promise.all(devices.map(async device => {
@@ -76,6 +84,7 @@ export async function sendAlert(env, alert, send = fetch, now = Date.now()) {
       const result = await deliverPush(device.endpoint, JSON.parse(env.VAPID_JWK), send, {
         keys: device.p256dh && device.auth ? { p256dh: device.p256dh, auth: device.auth } : null,
         kind: alert.kind ?? "schedule", ttl: alert.expires_at ? Math.max(0, Math.min(300, (alert.expires_at - now) / 1000)) : 86400,
+        details, notificationId: alert.id,
       });
       completed = result.accepted || result.expired;
       if (result.expired) await env.DB.prepare("DELETE FROM team_devices WHERE id = ? AND user_id = ?").bind(device.id, device.user_id).run();
@@ -92,14 +101,17 @@ export async function sendAlert(env, alert, send = fetch, now = Date.now()) {
 
 export async function flushAlerts(env, send = fetch) {
   if (!env.VAPID_JWK) return;
-  const alerts = (await env.DB.prepare("SELECT * FROM team_alerts WHERE due_at <= ? ORDER BY due_at LIMIT 8").bind(Date.now()).all()).results;
+  const queues = ["team_notification_events", "team_alerts"];
+  const alerts = (await Promise.all(queues.map(async queue =>
+    (await env.DB.prepare(`SELECT * FROM ${queue} WHERE due_at <= ? ORDER BY due_at LIMIT 8`).bind(Date.now()).all()).results.map(alert => ({ ...alert, queue }))
+  ))).flat();
   await Promise.all(alerts.map(async alert => {
     const retry = await sendAlert(env, alert, send);
     if (retry) {
-      await env.DB.prepare("UPDATE team_alerts SET attempts = attempts + 1, due_at = ? WHERE user_id = ? AND id = ?")
+      await env.DB.prepare(`UPDATE ${alert.queue} SET attempts = attempts + 1, due_at = ? WHERE user_id = ? AND id = ?`)
         .bind(Date.now() + 5 * 60_000, alert.user_id, alert.id).run();
     } else {
-      await env.DB.prepare("DELETE FROM team_alerts WHERE user_id = ? AND id = ?").bind(alert.user_id, alert.id).run();
+      await env.DB.prepare(`DELETE FROM ${alert.queue} WHERE user_id = ? AND id = ?`).bind(alert.user_id, alert.id).run();
     }
   }));
 }

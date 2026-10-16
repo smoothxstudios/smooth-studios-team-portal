@@ -1,6 +1,28 @@
 {
-  "currentVersion": "2.14.0",
+  "currentVersion": "2.14.1",
   "releases": [
+    {
+      "id": "2026-10-16-specific-notifications",
+      "version": "2.14.1",
+      "date": "2026-10-16",
+      "category": "Team",
+      "title": "Specific booking and assignment notifications",
+      "changes": [
+        "Employee responses now name the person and say whether they accepted or declined, with the rental or task name, date, and Eastern time.",
+        "New offers, cancellations, changed rental times, conflict approvals, and availability blocks include relevant schedule details. Notification titles lead with the update so they are easier to read on a phone.",
+        "Separate events have separate queued alerts and notification cards, so responses to different bookings do not replace each other. Retries keep the same alert identity.",
+        "Existing device subscriptions and pending legacy alerts are preserved during the update."
+      ],
+      "employee": {
+        "title": "Clearer assignment notifications",
+        "changes": [
+          "New assignment alerts show the rental or task name, date, and time. Tap the alert to review and respond.",
+          "Cancellations, rental time changes, and approved time conflicts explain what changed.",
+          "Different assignment updates stay separate in your notifications."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-assignment-quiz-notifications",
       "version": "2.14.0",
