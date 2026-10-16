@@ -582,6 +582,8 @@ button { cursor: pointer; }
 .calendar-dot span { width: 7px; height: 7px; border-radius: 50%; background: #1f9d63; box-shadow: 0 0 0 4px rgba(31,157,99,.12); }
 .calendar-dot.preview span { background: #efaa20; box-shadow: 0 0 0 4px rgba(239,170,32,.13); }
 .studio-nav { padding: 15px 10px; gap: 7px !important; }
+.studio-nav .sidebar-external-icon { margin-left: auto; width: 14px; height: 14px; flex-shrink: 0; }
+.studio-nav.studio-settings-nav { padding: 0 0 4px; }
 .studio-nav [data-slot="sidebar-menu-button"] { min-height: 44px; height: auto !important; gap: 11px !important; padding: 12px 13px !important; border-radius: 11px !important; color: var(--muted-foreground); font-family: inherit; font-size: .875rem; font-weight: 650; line-height: 1.4; text-decoration: none; }
 .studio-nav [data-slot="sidebar-menu-button"][data-active="true"] { position: relative; color: var(--sidebar-accent-foreground); background: var(--sidebar-accent); }
 .studio-nav [data-slot="sidebar-menu-button"][data-active="true"]::before { content: ""; position: absolute; left: -10px; width: 3px; height: 23px; border-radius: 0 4px 4px 0; background: #e10000; }
@@ -1627,6 +1629,11 @@ button { cursor: pointer; }
 .rental-check-item > span { font-size: 15px; line-height: 1.55; }
 .rental-check-item small { display: flex; align-items: center; gap: 5px; margin-top: 6px; color: #138453; font-size: 12px; }
 .rental-check-item.is-checked > span { color: var(--muted-foreground); }
+.rental-check-row { display: flex; align-items: flex-start; gap: 8px; border-top: 1px solid var(--border); }
+.rental-check-row .rental-check-item { flex: 1; min-width: 0; border-top: 0; }
+.checklist-edit-button { margin-top: 10px; min-width: 44px; min-height: 44px; }
+.checklist-manage-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 18px; background: var(--muted); border-radius: 12px; }
+.checklist-manage-bar p { color: var(--muted-foreground); font-size: 14px; }
 @media (max-width: 700px) {
   .creative-grid, .studio-info-grid, .creative-form-row { grid-template-columns: 1fr; }
   .creative-heading { flex-wrap: wrap; }

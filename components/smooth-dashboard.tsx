@@ -28,6 +28,7 @@ import {
   Clock3,
   Eye,
   EyeOff,
+  ExternalLink,
   Fingerprint,
   FolderOpen,
   GitBranch,
@@ -153,7 +154,7 @@ function DashboardNavigation({ isOwner, accountId, view, onNavigate }: { isOwner
   const closeMobileMenu = () => { if (isMobile) setOpenMobile(false); };
 
   return <nav aria-label="Dashboard sections"><SidebarMenu className="studio-nav">
-    {(isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).map(item => (
+    {(isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).filter(item => item.key !== "settings").map(item => (
       <SidebarMenuItem key={item.key}>
         <SidebarMenuButton aria-current={view === item.key ? "page" : undefined} isActive={view === item.key}
           onClick={() => { onNavigate(item.key); closeMobileMenu(); }} tooltip={item.label}>
@@ -161,17 +162,26 @@ function DashboardNavigation({ isOwner, accountId, view, onNavigate }: { isOwner
         </SidebarMenuButton>
       </SidebarMenuItem>
     ))}
-    <SidebarMenuItem><SidebarMenuButton asChild tooltip="Production dashboard">
-      <a href={`https://smooth-studios-production.smoothxstudios.workers.dev/?from=studio&account=${encodeURIComponent(accountId === "owner" ? "smooth" : accountId)}`} target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu}>
-        <Link2 /><span>Productions</span>
+    <SidebarMenuItem><SidebarMenuButton asChild tooltip="Productions · opens in a new tab">
+      <a href={`https://smooth-studios-production.smoothxstudios.workers.dev/?from=studio&account=${encodeURIComponent(accountId === "owner" ? "smooth" : accountId)}`} target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu} aria-label="Productions (opens in a new tab)" title="Opens in a new tab">
+        <Link2 /><span>Productions</span><ExternalLink className="sidebar-external-icon" aria-hidden="true" />
       </a>
     </SidebarMenuButton></SidebarMenuItem>
-    <SidebarMenuItem><SidebarMenuButton asChild tooltip="Content Vault">
-      <a href="https://content.smoothstudios.co/" target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu}>
-        <FolderOpen /><span>Content Vault</span>
+    <SidebarMenuItem><SidebarMenuButton asChild tooltip="Content Vault · opens in a new tab">
+      <a href="https://content.smoothstudios.co/" target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu} aria-label="Content Vault (opens in a new tab)" title="Opens in a new tab">
+        <FolderOpen /><span>Content Vault</span><ExternalLink className="sidebar-external-icon" aria-hidden="true" />
       </a>
     </SidebarMenuButton></SidebarMenuItem>
   </SidebarMenu></nav>;
+}
+
+function SettingsNavigation({ active, onOpen }: { active: boolean; onOpen: () => void }) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  return <nav aria-label="Account settings"><SidebarMenu className="studio-nav studio-settings-nav"><SidebarMenuItem>
+    <SidebarMenuButton aria-current={active ? "page" : undefined} isActive={active} tooltip="Settings" onClick={() => { onOpen(); if (isMobile) setOpenMobile(false); }}>
+      <Settings /><span>Settings</span>
+    </SidebarMenuButton>
+  </SidebarMenuItem></SidebarMenu></nav>;
 }
 
 function CloseMobileMenu() {
@@ -1205,6 +1215,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
           {!isOwner && <SmoothStarSidebar />}
+          <SettingsNavigation active={view === "settings"} onOpen={() => { setSettingsTab("preferences"); setView("settings"); }} />
           <div className="sidebar-user"><span className="user-avatar" style={{ background: teamAccent(payload.user.id, payload.user.accent) }}>{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" onClick={onLogout}><LogOut size={16} /></button></div>
         </SidebarFooter>
       </Sidebar>

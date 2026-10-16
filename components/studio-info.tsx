@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ClipboardCheck, Copy, Eye, EyeOff, Phone, Plus, RefreshCw, RotateCcw, Search } from "lucide-react";
+import { Check, ClipboardCheck, Copy, Eye, EyeOff, Pencil, Phone, Plus, RefreshCw, RotateCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,18 +34,19 @@ export function StudioInfoPage({ token, isOwner, userId, section }: { token: str
       {data && !entries.length && <p className="creative-empty">{data.entries.length ? "No matching information. Try another word or category." : "Studio information is being prepared."}</p>}
       {data?.updatedAt && <p className="creative-hint">Updated {date(data.updatedAt)} Eastern</p>}
       {editor && data && <InfoEditor key={editor.id} entry={editor} data={data} token={token} onClose={() => setEditor(null)} onSave={load} />}
-    </> : data && <RentalChecklist key={userId} template={data.checklist} userId={userId} />}
+    </> : data && <RentalChecklist key={userId} data={data} userId={userId} isOwner={isOwner} token={token} onSave={load} />}
   </section>;
 }
 
 function InfoCard({ entry, onEdit }: { entry: InfoEntry; onEdit?: () => void }) {
   const [shown, setShown] = useState(false), [copied, setCopied] = useState(false), [error, setError] = useState("");
-  return <article className="studio-info-card"><h4>{entry.label}</h4><div className={`studio-info-value${entry.kind === "secret" ? " is-secret" : ""}`}>{entry.kind === "secret" && !shown ? "••••••" : entry.kind === "link" ? <a href={entry.value} target="_blank" rel="noopener noreferrer">{entry.value}</a> : entry.value}</div>{entry.note && <p>{entry.note}</p>}<div className="studio-info-actions">
+  const canCopy = ["secret", "phone", "link"].includes(entry.kind);
+  return <article className="studio-info-card"><h4>{entry.label}</h4><div className={`studio-info-value${entry.kind === "secret" ? " is-secret" : ""}`}>{entry.kind === "secret" && !shown ? "••••••" : entry.kind === "link" ? <a href={entry.value} target="_blank" rel="noopener noreferrer">{entry.value}</a> : entry.value}</div>{entry.note && <p>{entry.note}</p>}{(canCopy || onEdit) && <div className="studio-info-actions">
     {entry.kind === "secret" && <Button variant="outline" size="sm" onClick={() => setShown(value => !value)}>{shown ? <EyeOff size={15} /> : <Eye size={15} />}{shown ? "Hide" : "Show"}</Button>}
-    <Button variant="ghost" size="sm" onClick={async () => { try { await navigator.clipboard.writeText(entry.value); setCopied(true); setError(""); } catch { setShown(true); setError("Select and copy the value above."); } }}><Copy size={15} />{copied ? "Copied" : "Copy"}</Button>
+    {canCopy && <Button variant="ghost" size="sm" onClick={async () => { try { await navigator.clipboard.writeText(entry.value); setCopied(true); setError(""); } catch { setShown(true); setError("Select and copy the value above."); } }}><Copy size={15} />{copied ? "Copied" : "Copy"}</Button>}
     {entry.kind === "phone" && <a className="studio-call" href={`tel:${entry.value.replace(/[^+0-9]/g, "")}`}><Phone size={15} />Call</a>}
     {onEdit && <Button variant="ghost" size="sm" onClick={onEdit}>Edit</Button>}
-    </div>{error && <small role="status">{error}</small>}</article>;
+    </div>}{error && <small role="status">{error}</small>}</article>;
 }
 
 function InfoEditor({ entry, data, token, onClose, onSave }: { entry: InfoEntry; data: StudioReference; token: string; onClose: () => void; onSave: () => Promise<void> }) {
@@ -67,7 +68,9 @@ function InfoEditor({ entry, data, token, onClose, onSave }: { entry: InfoEntry;
   </form></DialogContent></Dialog>;
 }
 
-function RentalChecklist({ template, userId }: { template: ChecklistItem[]; userId: string }) {
+function RentalChecklist({ data, userId, isOwner, token, onSave }: { data: StudioReference; userId: string; isOwner: boolean; token: string; onSave: () => Promise<void> }) {
+  const template = data.checklist;
+  const [managing, setManaging] = useState(false), [editor, setEditor] = useState<ChecklistItem | null>(null);
   const [checked, setChecked] = useState<string[]>([]), [ready, setReady] = useState(false);
   const storageKey = `smooth-rental-checklist:v1:${userId}`;
   useEffect(() => {
@@ -86,15 +89,43 @@ function RentalChecklist({ template, userId }: { template: ChecklistItem[]; user
   };
   const count = template.filter(item => checked.includes(item.id)).length;
   return <>
-    <div className="creative-heading"><div><h2>Studio rental checklist</h2><p>Use this for any rental. Reset it before starting the next one.</p></div><Button variant="outline" disabled={!ready || !count} onClick={() => update([])}><RotateCcw size={16} />Reset checklist</Button></div>
-    {!template.length ? <p className="creative-empty">The rental checklist is being prepared.</p> : <article className="rental-checklist panel">
+    <div className="creative-heading"><div><h2>Studio rental checklist</h2><p>Use this for any rental. Reset it before starting the next one.</p></div><div className="creative-toolbar-buttons">
+      {isOwner && <Button variant={managing ? "default" : "outline"} onClick={() => setManaging(value => !value)}>{managing ? <Check size={16} /> : <Pencil size={16} />}{managing ? "Done editing" : "Edit checklist"}</Button>}
+      <Button variant="outline" disabled={!ready || !count} onClick={() => update([])}><RotateCcw size={16} />Reset checklist</Button>
+    </div></div>
+    {isOwner && managing && <div className="checklist-manage-bar"><p>Changes update the checklist for the whole team.</p><Button disabled={template.length >= 80} onClick={() => setEditor({ id: crypto.randomUUID(), phase: template[0]?.phase ?? "Before the rental", label: "" })}><Plus size={16} />Add step</Button></div>}
+    {!template.length ? <p className="creative-empty">{isOwner ? "No steps yet. Choose Edit checklist to add your first step." : "The rental checklist is being prepared."}</p> : <article className="rental-checklist panel">
       <header><div><h3><ClipboardCheck size={21} />Every rental</h3><p>Prepare the studio, welcome the client, and leave it ready for the next rental.</p></div><strong aria-live="polite">{count}/{template.length} done</strong></header>
       <progress value={count} max={template.length} aria-label="Rental checklist completion" />
       {[...new Set(template.map(item => item.phase))].map(phase => <section className="checklist-phase" key={phase}><h4>{phase}</h4>{template.filter(item => item.phase === phase).map(item => {
         const done = checked.includes(item.id);
-        return <label className={`rental-check-item${done ? " is-checked" : ""}`} key={item.id}><input type="checkbox" disabled={!ready} checked={done} onChange={event => update(event.target.checked ? [...checked, item.id] : checked.filter(id => id !== item.id))} /><span>{item.label}</span></label>;
+        return <div className="rental-check-row" key={item.id}><label className={`rental-check-item${done ? " is-checked" : ""}`}><input type="checkbox" disabled={!ready || managing} checked={done} onChange={event => update(event.target.checked ? [...checked, item.id] : checked.filter(id => id !== item.id))} /><span>{item.label}</span></label>{isOwner && managing && <Button className="checklist-edit-button" variant="ghost" size="icon" onClick={() => setEditor(item)} aria-label={`Edit step: ${item.label}`} title="Edit step"><Pencil size={16} /></Button>}</div>;
       })}</section>)}
       <p className="creative-hint">Your checks stay in this tab until you reset the list or close the tab.</p>
     </article>}
+    {isOwner && editor && <ChecklistEditor key={editor.id} item={editor} data={data} token={token} onSave={onSave} onClose={() => setEditor(null)} />}
   </>;
+}
+
+function ChecklistEditor({ item, data, token, onSave, onClose }: { item: ChecklistItem; data: StudioReference; token: string; onSave: () => Promise<void>; onClose: () => void }) {
+  const [draft, setDraft] = useState(item), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [remove, setRemove] = useState(false);
+  const existing = data.checklist.some(step => step.id === item.id);
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault(); setBusy(true); setError("");
+    try {
+      const checklist = remove ? data.checklist.filter(step => step.id !== item.id)
+        : existing ? data.checklist.map(step => step.id === item.id ? draft : step) : [...data.checklist, draft];
+      await teamRequest(token, "/studio-reference", { ...data, checklist }, "PATCH");
+      await onSave(); onClose();
+    } catch (error) { setError(error instanceof Error ? error.message : "The checklist couldn’t be saved."); }
+    finally { setBusy(false); }
+  };
+  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent className="creative-dialog"><DialogHeader><DialogTitle>{remove ? "Remove this step?" : existing ? "Edit checklist step" : "Add checklist step"}</DialogTitle><DialogDescription>{remove ? item.label : "Keep each step short and easy to follow."}</DialogDescription></DialogHeader>
+    <form className="creative-editor" onSubmit={save}>
+      {!remove && <><label>Section<Input required maxLength={80} list="rental-checklist-sections" value={draft.phase} onChange={event => setDraft({ ...draft, phase: event.target.value })} placeholder="Before the rental" /><datalist id="rental-checklist-sections">{[...new Set(data.checklist.map(step => step.phase))].map(phase => <option key={phase} value={phase} />)}</datalist></label><label>Step<Textarea required maxLength={500} value={draft.label} onChange={event => setDraft({ ...draft, label: event.target.value })} placeholder="Describe what needs to be done." /></label></>}
+      {error && <p className="login-error" role="alert">{error}</p>}
+      <DialogFooter>{existing && !remove && <Button variant="ghost" type="button" disabled={busy} onClick={() => setRemove(true)}>Remove step</Button>}<Button variant="outline" type="button" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy || (!remove && (!draft.phase.trim() || !draft.label.trim()))}>{busy ? "Saving…" : remove ? "Remove step" : "Save step"}</Button></DialogFooter>
+    </form>
+  </DialogContent></Dialog>;
 }

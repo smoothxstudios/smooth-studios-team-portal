@@ -1,6 +1,30 @@
 {
-  "currentVersion": "2.17.0",
+  "currentVersion": "2.18.0",
   "releases": [
+    {
+      "id": "2026-10-16-checklist-editing-and-sidebar",
+      "version": "2.18.0",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Editable rental checklist and clearer navigation",
+      "changes": [
+        "Smooth can add, edit, categorize, and remove rental checklist steps from Settings. Saved changes are shared with the team; editing controls stay out of the employee view.",
+        "Productions and Content Vault display an external-link icon and indicate that they open in a new tab.",
+        "Settings stays at the bottom of the sidebar, just above your profile, on desktop and mobile.",
+        "The owner contact is labelled Smooth in Studio Info.",
+        "Copy buttons appear for codes, passwords, phone numbers, and links, keeping ordinary text cards simpler."
+      ],
+      "employee": {
+        "title": "Clearer sidebar links and studio details",
+        "changes": [
+          "Productions and Content Vault display an external-link icon and indicate that they open in a new tab.",
+          "Settings stays at the bottom of the sidebar, just above your profile, on desktop and mobile.",
+          "The owner contact is labelled Smooth in Studio Info.",
+          "Copy buttons appear for codes, passwords, phone numbers, and links, keeping ordinary text cards simpler."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-settings-and-simple-sign-in",
       "version": "2.17.0",
