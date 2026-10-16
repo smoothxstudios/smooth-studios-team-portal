@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.21.1",
+  "currentVersion": "2.21.2",
   "releases": [
+    {
+      "id": "2026-10-16-compact-pill-toolbar",
+      "version": "2.21.2",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Smaller, rounder mobile toolbar",
+      "changes": [
+        "The mobile toolbar is narrower and shorter, with smaller icons, fully rounded edges, and more space on either side.",
+        "Home stays centered, and the selected tab has a rounded highlight."
+      ],
+      "employee": {
+        "title": "A more compact toolbar",
+        "changes": [
+          "The floating mobile toolbar is smaller and pill-shaped, with Home still in the middle."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-floating-centered-home-toolbar",
       "version": "2.21.1",
