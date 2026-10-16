@@ -86,6 +86,8 @@ export const devices = sqliteTable("team_devices", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh"),
+  auth: text("auth"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -95,6 +97,7 @@ export const alerts = sqliteTable("team_alerts", {
   id: text("id").notNull(),
   attempts: integer("attempts").notNull().default(0),
   dueAt: integer("due_at").notNull(),
+  kind: text("kind").notNull().default("schedule"),
 });
 
 export const guidelineQuestions = sqliteTable("guideline_questions", {
@@ -106,3 +109,14 @@ export const guidelineQuestions = sqliteTable("guideline_questions", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 }, table => [uniqueIndex("guideline_questions_author_text").on(table.askedBy, table.normalized), index("guideline_questions_status").on(table.status, table.createdAt)]);
+
+export const quizReminders = sqliteTable("team_quiz_reminders", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull(), day: text("day").notNull(),
+  questionId: text("question_id").notNull(), createdAt: integer("created_at").notNull(), expiresAt: integer("expires_at").notNull(),
+}, table => [uniqueIndex("team_quiz_reminders_question").on(table.userId, table.day, table.questionId), index("team_quiz_reminders_day").on(table.day)]);
+
+export const pushDeliveries = sqliteTable("team_push_deliveries", {
+  alertId: text("alert_id").notNull(), deviceId: text("device_id").notNull(),
+  attempts: integer("attempts").notNull().default(0), dueAt: integer("due_at").notNull().default(0),
+  leaseUntil: integer("lease_until").notNull().default(0), completedAt: integer("completed_at"), createdAt: integer("created_at").notNull(),
+}, table => [primaryKey({ columns: [table.alertId, table.deviceId] }), index("team_push_deliveries_created").on(table.createdAt)]);

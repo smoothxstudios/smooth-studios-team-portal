@@ -70,6 +70,7 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [quizLinkRequest, setQuizLinkRequest] = useState(0);
   const requestSequence = useRef(0), busyRef = useRef(false), shown = useRef(new Set<string>());
   const moodRequestId = useRef("");
   const popupRef = useRef<HTMLDivElement>(null);
@@ -96,12 +97,27 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
     document.addEventListener("visibilitychange", refresh); window.addEventListener("focus", refresh);
     return () => { mounted.current = false; requestSequence.current++; window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); window.removeEventListener("focus", refresh); };
   }, [load, enabled]);
+  useEffect(() => {
+    const checkLink = () => { if (window.location.hash === "#daily-quiz") setQuizLinkRequest(value => value + 1); };
+    checkLink(); window.addEventListener("hashchange", checkLink);
+    return () => window.removeEventListener("hashchange", checkLink);
+  }, []);
   const current = state?.quiz.find(item => item.question.id === state.currentQuestionId);
   useEffect(() => { moodRequestId.current = ""; }, [state?.moodRevision]);
   useEffect(() => { setOption(""); setCelebration(""); if (popupRef.current) popupRef.current.scrollTop = 0; }, [current?.question.id]);
   useEffect(() => { if (!homeActive) setPanel(null); }, [homeActive]);
   useEffect(() => {
-    if (!state || panel || progressOpen || busy || error || document.querySelector('[role="dialog"][data-state="open"]')) return;
+    if (!state || busy || error) return;
+    // An explicit notification click takes priority over the automatic mood
+    // prompt and is preserved through unlocking/loading the dashboard.
+    if (homeActive && window.location.hash === "#daily-quiz") {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      shown.current.add(`question:${state.currentQuestionId}`);
+      setProgressOpen(false); setPanel("question");
+      if (state.questionDue) void save("/engagement/dismiss", { kind: "question", day: state.day, questionId: state.currentQuestionId }, () => {});
+      return;
+    }
+    if (panel || progressOpen || document.querySelector('[role="dialog"][data-state="open"]')) return;
     const kind = nextEngagementPrompt(state, homeActive) as "mood" | "question" | null;
     if (!kind) return;
     const key = kind === "mood" ? `mood:${state.moodRevision ?? 0}:${state.nextMoodAt}` : `question:${state.currentQuestionId}`;
@@ -111,7 +127,7 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
       // Each server-issued question prompts once, including across devices.
       void save("/engagement/dismiss", { kind, day: state.day, questionId: state.currentQuestionId }, () => {});
     }
-  }, [state, panel, progressOpen, busy, error, homeActive]);
+  }, [state, panel, progressOpen, busy, error, homeActive, quizLinkRequest]);
 
   async function save(path: string, data: unknown, onSuccess: (result: EmployeeEngagement) => void) {
     if (busyRef.current) return;

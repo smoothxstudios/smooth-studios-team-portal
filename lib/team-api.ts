@@ -50,7 +50,8 @@ async function currentTeamSubscription() {
 export async function teamPushIsEnabled(token: string, key: string | null) {
   const subscription = await currentTeamSubscription();
   if (!subscription || !key || !matchesPushKey(subscription, key)) return false;
-  const result = await teamRequest<{ registered: boolean }>(token, "/push/device/status", { endpoint: subscription.endpoint });
+  await teamWorker(); // Update the notification handler and upgrade existing devices.
+  const result = await teamRequest<{ registered: boolean }>(token, "/push/device/status", { endpoint: subscription.endpoint, keys: subscription.toJSON().keys });
   return result.registered;
 }
 
@@ -66,7 +67,7 @@ export async function enableTeamPush(token: string, key: string, permission: Not
   if (!subscription) subscription = await registration.pushManager.subscribe({
     userVisibleOnly: true, applicationServerKey: unbase64url(key),
   });
-  await teamRequest(token, "/push/device", { endpoint: subscription.endpoint });
+  await teamRequest(token, "/push/device", { endpoint: subscription.endpoint, keys: subscription.toJSON().keys });
 }
 
 export async function testTeamPush(token: string, key: string | null) {

@@ -8,7 +8,7 @@ import { teamToken, tokenHash } from "../lib/team-auth.mjs";
 import { TEMP_CHECK_INTERVAL_MS, QUIZ_INTERVAL_MS, MOODS, QUIZ_TIERS, nextEngagementPrompt, starProgress } from "../lib/team-engagement.mjs";
 import { dailyQuestion, employeeQuestionCandidates, publicQuestion, QUESTION_BANK, QUESTION_BANKS } from "../team-api/creative-questions.mjs";
 
-const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
+const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql", "0009_push_notifications.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
 const tokens = Object.fromEntries(await Promise.all([...TEAM.map(p => p.id), "sync"].map(async id => [id, await teamToken(`synthetic-engagement-test-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(Object.entries(tokens).map(async ([id, token]) => [id, await tokenHash(token)])));
 const now = Date.parse("2026-10-15T17:00:00Z"), today = "2026-10-15";

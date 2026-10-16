@@ -1,6 +1,28 @@
 {
-  "currentVersion": "2.13.2",
+  "currentVersion": "2.14.0",
   "releases": [
+    {
+      "id": "2026-10-16-assignment-quiz-notifications",
+      "version": "2.14.0",
+      "date": "2026-10-16",
+      "category": "Team",
+      "title": "Assignment alerts and Daily Quiz reminders",
+      "changes": [
+        "New rental and task offers send an assignment alert to the assigned employee’s enabled devices. Tapping it opens their schedule to review and respond.",
+        "Daily Quiz sends a reminder when the next question is ready after the two-hour wait, even with the app closed. The five-minute notification check respects the daily limit, Eastern midnight, and questions already shown or answered.",
+        "Notification setup, device status, and a test button are available in a compact section on Home and Schedule. Existing enabled devices upgrade when their dashboard is opened.",
+        "Each device has its own delivery receipt and retry limit so one failed device does not repeat an alert on devices that already received it. Lock-screen alerts contain no client, payment, or quiz-answer details."
+      ],
+      "employee": {
+        "title": "Get notified about assignments and your next quiz",
+        "changes": [
+          "Enable notifications from Home or Schedule to receive new rental and task offers. Tap an assignment alert to review and respond.",
+          "After your daily check-in, get a reminder when your next Daily Quiz question is ready. Questions keep their two-hour spacing and three-question daily limit.",
+          "Tap a quiz alert to open Daily Quiz. The Notifications section shows whether alerts are on for this device and includes Send test."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-15-cleaner-owner-dashboard",
       "version": "2.13.2",

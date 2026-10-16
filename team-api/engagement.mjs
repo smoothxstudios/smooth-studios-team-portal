@@ -37,8 +37,8 @@ const pendingOfferSql = `SELECT o.* FROM team_quiz_offers o WHERE o.user_id = ? 
   AND (o.reset_ready = 1 OR COALESCE((SELECT MAX(created_at) FROM team_quiz_attempts a
     WHERE a.user_id = o.user_id AND a.day = o.day AND a.reset_at IS NULL), 0) <= ?)
   ORDER BY o.reset_ready DESC, o.slot LIMIT 1`;
-async function pendingOffer(db, user, day) {
-  return db.prepare(pendingOfferSql).bind(user, day, Date.now() - QUIZ_INTERVAL_MS).first();
+async function pendingOffer(db, user, day, now = Date.now()) {
+  return db.prepare(pendingOfferSql).bind(user, day, now - QUIZ_INTERVAL_MS).first();
 }
 const unusedQuestion = `WITH candidate AS (
   SELECT c.value AS data FROM json_each(?) c
@@ -48,8 +48,8 @@ const unusedQuestion = `WITH candidate AS (
     AND json_extract(a.data, '$.question.prompt') = json_extract(c.value, '$.prompt'))
   ORDER BY CAST(c.key AS INTEGER) LIMIT 1
 )`;
-async function offerQuestion(db, user, day, now) {
-  const pending = await pendingOffer(db, user, day);
+export async function offerQuestion(db, user, day, now) {
+  const pending = await pendingOffer(db, user, day, now);
   if (pending) {
     // Only replace an unanswered pre-update offer when its prompt was also issued
     // to someone else. Unique snapshots and all submitted answers stay untouched.
@@ -66,7 +66,7 @@ async function offerQuestion(db, user, day, now) {
               AND json_extract(a.data, '$.question.prompt') = json_extract(o.data, '$.prompt')))`)
         .bind(JSON.stringify(employeeQuestionCandidates(day, pending.tier, user)), day, day,
           user, day, pending.slot, pending.data).run();
-      return pendingOffer(db, user, day);
+      return pendingOffer(db, user, day, now);
     }
     return pending;
   }
@@ -85,7 +85,7 @@ async function offerQuestion(db, user, day, now) {
         AND NOT EXISTS (SELECT 1 FROM team_quiz_attempts a WHERE a.user_id = o.user_id AND a.day = o.day AND a.tier = o.tier AND a.reset_at IS NULL))`)
     .bind(JSON.stringify(employeeQuestionCandidates(day, tier, user)), day, day, user, day, attempts.length + 1, tier, now,
       user, day, attempts.length, user, day, now - QUIZ_INTERVAL_MS, user, day).run();
-  return pendingOffer(db, user, day);
+  return pendingOffer(db, user, day, now);
 }
 async function employeeState(db, user, now) {
   const day = studioLocal(now).slice(0, 10);

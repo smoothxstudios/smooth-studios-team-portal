@@ -67,7 +67,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         if (ready) {
           const result = await teamRequest<TeamSchedule>(token, "/schedule");
           if (!disposed && version === requestVersion.current) { setSchedule(result); setError(""); setNeedsRefresh(false); }
-          if (!isHome && !availabilityOnly) try {
+          if (!availabilityOnly) try {
             const registered = await teamPushIsEnabled(token, result.pushPublicKey);
             if (!disposed) setPushEnabled(registered);
           } catch {
@@ -229,11 +229,15 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         {isOwner && visibleAssignments.some(a => !["pending", "accepted"].includes(a.status) || !future(a.end)) && <details className="schedule-history"><summary>Past offers & responses</summary>{visibleAssignments.filter(a => !["pending", "accepted"].includes(a.status) || !future(a.end)).slice(-50).reverse().map(a => <div key={a.id}><Person id={a.employeeId} /><span>{date(a.start)} · {a.title}</span><span>{a.status}</span></div>)}</details>}
       </article>
 
-      <article className="schedule-panel schedule-push"><div><h3><Bell size={20} />Schedule notifications</h3><p>Receive a general alert, tap it, unlock your dashboard, and accept or decline here. No texts are sent.</p><p className="schedule-small">On iPhone: Safari → Share → Add to Home Screen. Open that icon, unlock, then enable notifications. Closing the app or locking your phone keeps alerts on. Using Log out in the dashboard disables them on this device.</p>{!pushSupported && <p className="schedule-warning">This browser session does not support push. Use the Home Screen app on iPhone or a supported browser.</p>}</div><div className="schedule-actions">
-        {pushEnabled ? <><Button variant="outline" disabled={busy} onClick={() => void pushAction("test")}>Send test</Button><Button variant="outline" disabled={busy} onClick={() => void pushAction("disable")}>Disable this device</Button></> : <Button disabled={busy || !pushSupported || !schedule.pushPublicKey} onClick={() => void pushAction("enable")}><Bell size={16} />Enable on this device</Button>}
-      </div>{pushFeedback && <p className={pushFeedback.ok ? "schedule-success" : "schedule-warning"} role={pushFeedback.ok ? "status" : "alert"}>{pushFeedback.text}</p>}{isOwner && <p className="schedule-small">Registered devices: {TEAM.map(p => `${p.name} ${schedule.devices[p.id] ?? 0}`).join(" · ")}. Registration does not guarantee delivery; focus mode and device settings can suppress alerts.</p>}</article>
+
       <p className="schedule-small">Studio rental offers and acceptances are listed in the Google Calendar event’s description after syncing. Existing Calendar invitations remain valid. Custom tasks stay in this dashboard.</p>
     </>}
+
+    {schedule && !availabilityOnly && (isHome || isOwner || scheduleTab === "upcoming") && (
+      <details className="schedule-panel schedule-push"><summary className="notification-summary"><span><Bell size={18} />Notifications</span><small>{pushEnabled ? "On for this device" : "Set up alerts"}</small></summary><div><p>{isOwner ? "Receive schedule changes and employee responses." : "Get an alert when Smooth assigns you a rental or task, and when your next Daily Quiz question is ready."}</p>{!isOwner && <p className="schedule-small">Quiz reminders follow your daily check-in, with two hours between questions. One reminder per new question, up to three questions a day. Tap an alert to open the right section.</p>}<p className="schedule-small">On iPhone: Safari → Share → Add to Home Screen. Open that icon, unlock, then enable notifications. Closing the app or locking your phone keeps alerts on. Using Log out in the dashboard disables them on this device.</p>{!pushSupported && <p className="schedule-warning">This browser session does not support push. Use the Home Screen app on iPhone or a supported browser.</p>}</div><div className="schedule-actions">
+        {pushEnabled ? <><Button variant="outline" disabled={busy} onClick={() => void pushAction("test")}>Send test</Button><Button variant="outline" disabled={busy} onClick={() => void pushAction("disable")}>Disable this device</Button></> : <Button disabled={busy || !pushSupported || !schedule.pushPublicKey} onClick={() => void pushAction("enable")}><Bell size={16} />Enable on this device</Button>}
+      </div>{pushFeedback && <p className={pushFeedback.ok ? "schedule-success" : "schedule-warning"} role={pushFeedback.ok ? "status" : "alert"}>{pushFeedback.text}</p>}{isOwner && <p className="schedule-small">Registered devices: {TEAM.map(p => `${p.name} ${schedule.devices[p.id] ?? 0}`).join(" · ")}. Registration does not guarantee delivery; focus mode and device settings can suppress alerts.</p>}</details>
+    )}
 
     <Dialog open={blockOpen} onOpenChange={open => { if (!busy) setBlockOpen(open); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Block time</DialogTitle><DialogDescription>Class, personal time, or another commitment. Times are Eastern. Existing assignments are not cancelled.</DialogDescription></DialogHeader>
       <form onSubmit={async e => { e.preventDefault(); if (await mutate("/blocks", { ...block, repeatUntil: block.weekly ? block.repeatUntil : null })) setBlockOpen(false); }}>

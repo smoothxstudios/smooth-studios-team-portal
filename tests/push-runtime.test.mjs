@@ -15,6 +15,7 @@ test("Cloudflare runtime sends authenticated pushes and never follows provider r
     const keys = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
     const jwk = await crypto.subtle.exportKey("jwk", keys.privateKey);
     await writeFile(join(directory, "push.mjs"), await readFile(new URL("../team-api/push.mjs", import.meta.url)));
+    await writeFile(join(directory, "encryption.mjs"), await readFile(new URL("../team-api/push-encryption.mjs", import.meta.url)));
     await writeFile(join(directory, "auth.mjs"), await readFile(new URL("../lib/team-auth.mjs", import.meta.url)));
     await writeFile(join(directory, "runner.mjs"), `
       import { deliverPush } from "./team-api/push.mjs";
@@ -33,12 +34,22 @@ test("Cloudflare runtime sends authenticated pushes and never follows provider r
             throw new Error("Unexpected delivery result: " + JSON.stringify(result));
           }
         }
+        const receiver = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+        const encode = bytes => btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+        const keys = { p256dh: encode(new Uint8Array(await crypto.subtle.exportKey("raw", receiver.publicKey))), auth: encode(crypto.getRandomValues(new Uint8Array(16))) };
+        const encrypted = await deliverPush("https://web.push.apple.com/encrypted", jwk, fetch, { keys, kind: "quiz", ttl: 300 });
+        if (!encrypted.accepted) throw new Error("Workerd encrypted push failed.");
       }};
     `);
     await writeFile(join(directory, "provider.mjs"), `
       export default { async fetch(request) {
         const url = new URL(request.url);
         if (url.hostname === "must-not-follow.invalid") throw new Error("Push followed a redirect.");
+        if (url.pathname === "/encrypted") {
+          const body = new Uint8Array(await request.arrayBuffer());
+          if (body.length <= 86 || body[20] !== 65 || request.headers.get("Content-Encoding") !== "aes128gcm" || request.headers.get("Topic") !== "smooth-quiz" || request.headers.get("TTL") !== "300") throw new Error("Invalid encrypted push in Workerd.");
+          return new Response(null, { status: 201 });
+        }
         if (request.method !== "POST" || await request.text() !== "" ||
             !/^vapid t=.+, k=.+$/.test(request.headers.get("Authorization") || "") ||
             request.headers.get("TTL") !== "86400" || request.headers.get("Urgency") !== "high") {
@@ -58,6 +69,7 @@ test("Cloudflare runtime sends authenticated pushes and never follows provider r
           modules = [
             (name = "runner.mjs", esModule = embed "runner.mjs"),
             (name = "team-api/push.mjs", esModule = embed "push.mjs"),
+            (name = "team-api/push-encryption.mjs", esModule = embed "encryption.mjs"),
             (name = "lib/team-auth.mjs", esModule = embed "auth.mjs")
           ]
         )),

@@ -2,6 +2,8 @@ import { tokenHash } from "../lib/team-auth.mjs";
 import { TEAM, localInstant as parseLocalInstant, addLocalDays, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
 import { deliverPush, flushAlerts, publicPushKey, pushDeliveryMessage, pushEndpoint } from "./push.mjs";
 import { engagementRoute } from "./engagement.mjs";
+import { subscriptionKeys } from "./push-encryption.mjs";
+import { sendQuizReminders } from "./quiz-notifications.mjs";
 
 const users = TEAM.map(p => p.id);
 const origins = new Set(["https://smoothxstudios.github.io", "https://dashboard.smoothstudios.co", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
@@ -81,13 +83,13 @@ async function snapshot(db) {
 function expectedRevision(input, state) {
   if (!Number.isInteger(input.revision) || input.revision !== state.revision) fail(409, "The schedule changed. Refresh, review it, and try again.");
 }
-async function commit(db, state, makeStatements, alertUsers = []) {
+async function commit(db, state, makeStatements, alertUsers = [], alertKind = "schedule") {
   const id = crypto.randomUUID();
   const statements = [db.prepare("UPDATE team_state SET revision = revision + 1, mutation = ? WHERE id = 1 AND revision = ?").bind(id, state.revision), ...makeStatements(id)];
-  if (alertUsers.length) statements.push(db.prepare(`INSERT INTO team_alerts (user_id, id, attempts, due_at)
-    SELECT value, ?, 0, ? FROM json_each(?) WHERE ${guard}
-    ON CONFLICT(user_id) DO UPDATE SET id = excluded.id, attempts = 0, due_at = excluded.due_at`)
-    .bind(id, Date.now(), JSON.stringify([...new Set(alertUsers)]), id));
+  if (alertUsers.length) statements.push(db.prepare(`INSERT INTO team_alerts (user_id, id, attempts, due_at, kind)
+    SELECT value, ?, 0, ?, ? FROM json_each(?) WHERE ${guard}
+    ON CONFLICT(user_id) DO UPDATE SET id = excluded.id, attempts = 0, due_at = excluded.due_at, kind = excluded.kind`)
+    .bind(id, Date.now(), alertKind, JSON.stringify([...new Set(alertUsers)]), id));
   const result = await db.batch(statements);
   if (!result[0].meta.changes) fail(409, "The schedule changed. Refresh, review it, and try again.");
 }
@@ -107,7 +109,7 @@ async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 2 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -340,7 +342,7 @@ async function route(request, env, ctx) {
       status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       ...(input.overrideConflicts ? { conflictOverride: approveConflict({ start, end }) } : {}) };
     const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices WHERE user_id = ?").bind(employeeId).first();
-    await commit(db, s.state, mutation => [saveAssignment(db, item, mutation)], [employeeId]);
+    await commit(db, s.state, mutation => [saveAssignment(db, item, mutation)], [employeeId], "assignment");
     ctx.waitUntil(flushAlerts(env));
     return { saved: true, notification: devices.count
       ? "Offer saved. A notification was queued for their enabled devices."
@@ -381,7 +383,18 @@ async function route(request, env, ctx) {
     const input = await body(request);
     let endpoint;
     try { endpoint = pushEndpoint(input.endpoint); } catch { fail(400, "This push endpoint is invalid or unsupported."); }
-    const device = await db.prepare("SELECT id FROM team_devices WHERE id = ? AND user_id = ?").bind(await tokenHash(endpoint), user).first();
+    const id = await tokenHash(endpoint);
+    const device = await db.prepare("SELECT * FROM team_devices WHERE id = ? AND user_id = ?").bind(id, user).first();
+    // Upgrade only an existing owned registration. A status check must never
+    // turn notifications back on after the user disabled them.
+    if (device && input.keys != null) {
+      let keys;
+      try { keys = await subscriptionKeys(input.keys); } catch { fail(400, "Reconnect notifications on this device to refresh its subscription."); }
+      if (device.p256dh !== keys.p256dh || device.auth !== keys.auth) {
+        await db.prepare("UPDATE team_devices SET p256dh = ?, auth = ? WHERE id = ? AND user_id = ?")
+          .bind(keys.p256dh, keys.auth, id, user).run();
+      }
+    }
     return { registered: Boolean(device) };
   }
   if (["POST", "DELETE"].includes(request.method) && url.pathname === "/push/device") {
@@ -394,11 +407,15 @@ async function route(request, env, ctx) {
       return { removed: true };
     }
     if (!env.VAPID_JWK) fail(503, "Push notifications have not been configured.");
-    const result = await db.prepare(`INSERT INTO team_devices (id, user_id, endpoint, created_at)
-      SELECT ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM team_devices WHERE user_id = ?) < 3
+    let keys;
+    try { keys = await subscriptionKeys(input.keys); } catch { fail(400, "This push subscription is invalid. Reconnect notifications on this device."); }
+    const result = await db.prepare(`INSERT INTO team_devices (id, user_id, endpoint, created_at, p256dh, auth)
+      SELECT ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM team_devices WHERE user_id = ?) < 3
       OR EXISTS (SELECT 1 FROM team_devices WHERE id = ? AND user_id = ?)
-      ON CONFLICT(id) DO UPDATE SET created_at = excluded.created_at WHERE team_devices.user_id = excluded.user_id`)
-      .bind(id, user, endpoint, new Date().toISOString(), user, id, user).run();
+      ON CONFLICT(id) DO UPDATE SET created_at = excluded.created_at,
+        p256dh = COALESCE(excluded.p256dh, team_devices.p256dh), auth = COALESCE(excluded.auth, team_devices.auth)
+        WHERE team_devices.user_id = excluded.user_id`)
+      .bind(id, user, endpoint, new Date().toISOString(), keys?.p256dh ?? null, keys?.auth ?? null, user, id, user).run();
     if (!result.meta.changes) fail(409, "This device is registered to another login, or you have three devices already. Disable notifications on an old device first.");
     return { registered: true };
   }
@@ -409,10 +426,10 @@ async function route(request, env, ctx) {
     let endpoint;
     try { endpoint = pushEndpoint(input.endpoint); } catch { fail(400, "This push endpoint is invalid or unsupported."); }
     const id = await tokenHash(endpoint);
-    const device = await db.prepare("SELECT id FROM team_devices WHERE id = ? AND user_id = ?").bind(id, user).first();
+    const device = await db.prepare("SELECT * FROM team_devices WHERE id = ? AND user_id = ?").bind(id, user).first();
     if (!device) fail(409, "Enable notifications on this device first.");
     let result;
-    try { result = await deliverPush(endpoint, JSON.parse(env.VAPID_JWK)); }
+    try { result = await deliverPush(endpoint, JSON.parse(env.VAPID_JWK), fetch, { kind: "test", keys: device.p256dh && device.auth ? { p256dh: device.p256dh, auth: device.auth } : null }); }
     catch { fail(502, "The notification service could not be reached. Try again shortly."); }
     if (result.expired) await db.prepare("DELETE FROM team_devices WHERE id = ? AND user_id = ?").bind(id, user).run();
     return { ...result, message: pushDeliveryMessage(result) };
@@ -434,6 +451,8 @@ const worker = {
       return new Response(JSON.stringify({ error: status === 500 ? "Scheduling is temporarily unavailable. Your change was not confirmed; refresh before retrying." : error.message }), { status, headers });
     }
   },
-  async scheduled(_event, env, ctx) { ctx.waitUntil(flushAlerts(env)); },
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(Promise.all([flushAlerts(env), sendQuizReminders(env)]));
+  },
 };
 export default worker;

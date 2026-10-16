@@ -58,7 +58,7 @@ for (let attempt = 0; attempt < 10; attempt++) {
   try {
     const health = await fetch(`${TEAM_API_URL}/health`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
     const status = health.ok && await health.json();
-    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5);
+    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 2);
   } catch { /* A transient deployment response is retried within this bound. */ }
   if (ready) break;
   if (attempt < 9) await new Promise(resolve => setTimeout(resolve, 2000));

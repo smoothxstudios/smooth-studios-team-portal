@@ -1237,3 +1237,10 @@ button { cursor: pointer; }
   .owner-dashboard .empty-state p { font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .owner-reports-toggle svg { transition: none; } }
+
+/* Compact notification controls shared by Home and Schedule. */
+.notification-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+.notification-summary > span { display: inline-flex; align-items: center; gap: 9px; font-weight: 650; }
+.notification-summary > small { color: var(--muted-foreground); text-align: right; }
+.schedule-push[open] > div, .schedule-push[open] > p { margin-top: 16px; }
+.notification-summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 5px; border-radius: 4px; }

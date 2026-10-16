@@ -1,4 +1,5 @@
 import { base64url, unbase64url } from "../lib/team-auth.mjs";
+import { encryptPush } from "./push-encryption.mjs";
 
 export function pushEndpoint(value) {
   if (typeof value !== "string" || value.length > 2048) throw new Error("Unsupported push endpoint.");
@@ -27,15 +28,19 @@ export async function vapidAuthorization(endpoint, jwk, now = Date.now()) {
   return `vapid t=${input}.${base64url(new Uint8Array(signature))}, k=${publicPushKey(jwk)}`;
 }
 
-// Empty pushes are intentional: the SW displays a generic alert. No private
-// payload is sent to a push provider. VAPID still authenticates the sender.
-export async function deliverPush(endpoint, jwk, send = fetch) {
+// Only an alert type is sent, encrypted for this device. Legacy registrations
+// retain generic schedule alerts until their next dashboard visit adds keys.
+export async function deliverPush(endpoint, jwk, send = fetch, { keys, kind = "schedule", ttl = 86400 } = {}) {
   const url = pushEndpoint(endpoint);
+  if (!["schedule", "assignment", "quiz", "test"].includes(kind)) throw new Error("Invalid notification type.");
+  const payload = keys ? await encryptPush(keys, new TextEncoder().encode(JSON.stringify({ type: kind }))) : new Uint8Array(0);
   const response = await send(url, {
     // Workerd rejects redirect: "error" before sending. Manual mode returns
     // redirects as rejected deliveries without forwarding VAPID credentials.
-    method: "POST", redirect: "manual", body: new Uint8Array(0),
-    headers: { Authorization: await vapidAuthorization(url, jwk), TTL: "86400", Urgency: "high", Topic: "smooth-schedule" },
+    method: "POST", redirect: "manual", body: payload,
+    headers: { Authorization: await vapidAuthorization(url, jwk), TTL: String(Math.max(0, Math.min(86400, Math.floor(ttl)))),
+      Urgency: kind === "quiz" ? "normal" : "high", Topic: `smooth-${kind}`,
+      ...(keys ? { "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream" } : {}) },
     signal: AbortSignal.timeout(8000),
   });
   if (response.body) await response.body.cancel();
@@ -53,25 +58,48 @@ export function pushDeliveryMessage(result) {
   return `${result.provider} could not accept the notification (HTTP ${result.status}). Please share this message with Smooth so delivery can be checked.`;
 }
 
+// A short atomic lease prevents overlapping requests/cron ticks from sending
+// the same alert together. Successful devices are never retried because a
+// different device failed. A lost provider response can still require a retry.
+export async function sendAlert(env, alert, send = fetch, now = Date.now()) {
+  const devices = (await env.DB.prepare(`SELECT * FROM team_devices WHERE user_id = ?
+    ${alert.kind === "quiz" ? "AND p256dh IS NOT NULL AND auth IS NOT NULL" : ""} LIMIT 3`).bind(alert.user_id).all()).results;
+  await Promise.all(devices.map(async device => {
+    await env.DB.prepare(`INSERT OR IGNORE INTO team_push_deliveries (alert_id, device_id, created_at) VALUES (?, ?, ?)`)
+      .bind(alert.id, device.id, now).run();
+    const claim = await env.DB.prepare(`UPDATE team_push_deliveries SET attempts = attempts + 1, lease_until = ?
+      WHERE alert_id = ? AND device_id = ? AND completed_at IS NULL AND attempts < 4 AND due_at <= ? AND lease_until <= ?`)
+      .bind(now + 60_000, alert.id, device.id, now, now).run();
+    if (!claim.meta.changes) return;
+    let completed = false;
+    try {
+      const result = await deliverPush(device.endpoint, JSON.parse(env.VAPID_JWK), send, {
+        keys: device.p256dh && device.auth ? { p256dh: device.p256dh, auth: device.auth } : null,
+        kind: alert.kind ?? "schedule", ttl: alert.expires_at ? Math.max(0, Math.min(300, (alert.expires_at - now) / 1000)) : 86400,
+      });
+      completed = result.accepted || result.expired;
+      if (result.expired) await env.DB.prepare("DELETE FROM team_devices WHERE id = ? AND user_id = ?").bind(device.id, device.user_id).run();
+    } catch { /* Retry transient provider/network errors without logging endpoints. */ }
+    await env.DB.prepare(`UPDATE team_push_deliveries SET completed_at = ?, lease_until = 0, due_at = ?
+      WHERE alert_id = ? AND device_id = ?`).bind(completed ? now : null, now + 5 * 60_000, alert.id, device.id).run();
+  }));
+  const pending = await env.DB.prepare(`SELECT COUNT(*) AS count FROM team_push_deliveries p
+    JOIN team_devices d ON d.id = p.device_id WHERE p.alert_id = ? AND d.user_id = ?
+    AND p.completed_at IS NULL AND (p.attempts < 4 OR p.lease_until > ?)`)
+    .bind(alert.id, alert.user_id, now).first();
+  return pending.count > 0;
+}
+
 export async function flushAlerts(env, send = fetch) {
   if (!env.VAPID_JWK) return;
-  const jwk = JSON.parse(env.VAPID_JWK);
-  const alerts = (await env.DB.prepare("SELECT * FROM team_alerts WHERE due_at <= ? AND attempts < 4 LIMIT 4").bind(Date.now()).all()).results;
-  for (const alert of alerts) {
-    const devices = (await env.DB.prepare("SELECT * FROM team_devices WHERE user_id = ? LIMIT 3").bind(alert.user_id).all()).results;
-    let retry = false;
-    for (const device of devices) {
-      try {
-        const result = await deliverPush(device.endpoint, jwk, send);
-        if (result.expired) await env.DB.prepare("DELETE FROM team_devices WHERE id = ? AND user_id = ?").bind(device.id, device.user_id).run();
-        else if (!result.accepted) retry = true;
-      } catch { retry = true; }
-    }
+  const alerts = (await env.DB.prepare("SELECT * FROM team_alerts WHERE due_at <= ? ORDER BY due_at LIMIT 8").bind(Date.now()).all()).results;
+  await Promise.all(alerts.map(async alert => {
+    const retry = await sendAlert(env, alert, send);
     if (retry) {
       await env.DB.prepare("UPDATE team_alerts SET attempts = attempts + 1, due_at = ? WHERE user_id = ? AND id = ?")
         .bind(Date.now() + 5 * 60_000, alert.user_id, alert.id).run();
     } else {
       await env.DB.prepare("DELETE FROM team_alerts WHERE user_id = ? AND id = ?").bind(alert.user_id, alert.id).run();
     }
-  }
+  }));
 }

@@ -994,6 +994,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
   useEffect(() => {
     const openSchedule = () => {
       if (window.location.hash === "#scheduling") setView("scheduling");
+      if (window.location.hash === "#daily-quiz") setView("overview");
       if (["#guidelines", "#guidelines-questions"].includes(window.location.hash)) setView("guide");
     };
     openSchedule();
