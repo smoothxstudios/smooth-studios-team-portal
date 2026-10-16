@@ -1540,7 +1540,7 @@ button { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) { .owner-reports-toggle svg { transition: none; } }
 
-/* Notification controls in employee Settings and the owner schedule. */
+/* Notification controls in Settings for every account. */
 .notification-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
 .notification-summary > span { display: inline-flex; align-items: center; gap: 9px; font-weight: 650; }
 .notification-summary > small { color: var(--muted-foreground); text-align: right; }
@@ -1559,7 +1559,7 @@ button { cursor: pointer; }
 .login-account-switch:disabled { opacity: .5; }
 .login-preparing { text-align: center; color: var(--muted-foreground); padding: 24px 0; }
 .dashboard-settings { display: grid; gap: 24px; max-width: 1050px; min-width: 0; }
-.settings-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; width: 100%; padding: 5px; gap: 5px; border-radius: 14px; }
+.settings-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); height: auto; width: 100%; padding: 5px; gap: 5px; border-radius: 14px; }
 .settings-tabs [role=tab] { min-height: 48px; height: auto; gap: 8px; padding: 10px 12px; border-radius: 10px; white-space: normal; text-align: center; }
 .settings-tabs [role=tab][data-state=active] { background: #c90000; color: #fff; font-weight: 700; box-shadow: 0 2px 5px rgb(0 0 0 / 12%); }
 .settings-tabs [role=tab]:focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
@@ -1706,4 +1706,46 @@ button { cursor: pointer; }
   .rental-checklist header { flex-wrap: wrap; }
   .creative-card { padding: 19px; }
   .creative-actions > button { min-height: 44px; }
+}
+
+.payroll-advances { display: grid; gap: 14px; padding: 0 24px 24px; }
+.payroll-advance { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+.payroll-advance > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 14px; }
+.payroll-advance span { color: var(--muted-foreground); }
+.payroll-advance progress { width: 100%; height: 7px; accent-color: #198653; }
+
+.dashboard-help { display: grid; gap: 20px; min-width: 0; }
+.dashboard-help > header h2 { font-size: 25px; font-weight: 700; letter-spacing: -.6px; }
+.dashboard-help > header p { margin-top: 7px; font-size: 14px; color: var(--muted-foreground); }
+.help-search { position: relative; display: flex; align-items: center; }
+.help-search > svg { position: absolute; left: 16px; color: var(--muted-foreground); pointer-events: none; }
+.help-search input { padding: 16px 48px; min-height: 56px; height: auto; border-radius: 14px; font-size: 16px; background: var(--card); }
+.help-search > button { position: absolute; right: 5px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; }
+.help-categories { display: flex; gap: 8px; flex-wrap: wrap; }
+.help-categories button { padding: 9px 14px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; min-height: 40px; background: var(--card); }
+.help-categories button[aria-pressed=true] { background: #c90000; border-color: #c90000; color: white; }
+.help-result-count { font-size: 13px; color: var(--muted-foreground); overflow-wrap: anywhere; }
+.help-articles { display: grid; gap: 12px; }
+.help-article { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.help-article > summary { display: flex; gap: 14px; align-items: flex-start; padding: 20px; cursor: pointer; list-style: none; }
+.help-article > summary::-webkit-details-marker { display: none; }
+.help-article > summary > svg { flex: 0 0 auto; margin-top: 4px; color: var(--muted-foreground); }
+.help-article > summary > svg:last-child { margin-left: auto; }
+.help-article[open] > summary > svg:last-child { transform: rotate(180deg); }
+.help-article small { font-size: 12px; color: var(--muted-foreground); }
+.help-article h3 { font-size: 16px; line-height: 1.5; font-weight: 650; }
+.help-article summary p { margin-top: 5px; font-size: 14px; line-height: 1.6; color: var(--muted-foreground); }
+.help-article-body { border-top: 1px solid var(--border); padding: 20px 24px 20px 52px; }
+.help-article-body ol { list-style: decimal; padding-left: 18px; font-size: 14px; line-height: 1.7; }
+.help-article-body li { margin-bottom: 12px; padding-left: 4px; }
+.help-article-body > small { display: block; margin-top: 16px; }
+.help-empty { display: grid; justify-items: center; gap: 10px; padding: 36px 20px; text-align: center; color: var(--muted-foreground); }
+.help-empty h3 { font-weight: 650; color: var(--foreground); }
+.help-empty button { min-height: 44px; text-decoration: underline; text-underline-offset: 4px; }
+.help-article > summary:focus-visible, .help-categories button:focus-visible, .help-search button:focus-visible { outline: 3px solid var(--ring); outline-offset: -3px; }
+@media (max-width: 640px) {
+  .help-article > summary { padding: 16px; gap: 10px; }
+  .help-article-body { padding: 16px 20px 16px 28px; }
+  .help-categories { gap: 7px; }
+  .help-categories button { font-size: 12px; padding: 8px 12px; }
 }

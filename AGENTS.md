@@ -12,3 +12,10 @@ The owner wants a visible version and retrospective notes for every dashboard fi
 - The version footer is shared by sign-in and the owner/employee dashboard. Keep it small, keyboard-accessible, and usable on mobile. Existing history remains searchable through What changed.
 - Both build commands validate the release metadata. Verify the actual GitHub Pages build before publishing. Preserve concurrent data commits and do not migrate the existing GitHub Pages hosting.
 - All workflows that build Pages must pass `actions/configure-pages`'s `base_path` output as `GITHUB_PAGES_BASE_PATH`. Empty means the custom domain's root; unset falls back to the original project path. Keep `app/layout.tsx` and `next.config.ts` on the shared `dashboardBasePath` helper. Never switch the live domain by changing only a CNAME file.
+
+# Dashboard Help
+
+- Settings → Help is the in-app user guide. For every published user-facing feature or behavior change, update the relevant articles in `lib/dashboard-help.mjs` in the same batch. Add an article when a new task is introduced, remove obsolete instructions, and set changed articles' `updated` date to the release date.
+- Use actual page and button labels, plain “How do I…?” titles, short steps, and useful search aliases. Cover owner and employee workflows separately when their screens differ. Never include credentials, access codes, individual pay amounts, or private studio policies in this public source.
+- Keep owner instructions filtered out of employee search results and category lists. Retain natural-language, synonym, and typo matching when changing Help search.
+- Update Help to describe the resulting behavior, alongside the version notes required above. Routine data refreshes do not need new articles or dates.

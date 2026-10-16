@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { employeeHomeWork } from "@/lib/employee-home.mjs";
 import { categorizeAppointment } from "@/lib/appointment-categories.mjs";
 import { STUDIO_ZONE } from "@/lib/team-schedule.mjs";
-import type { Rental } from "@/lib/dashboard-types";
+import type { Rental, AdvanceBalance } from "@/lib/dashboard-types";
 import type { TeamAssignment, TeamSchedule } from "@/lib/team-api";
 
 export type EmployeeHomeOptions = {
   rentals: Rental[];
   owed: number;
+  advance?: AdvanceBalance;
   onSchedule: () => void;
   onAvailability: () => void;
   onEarnings: () => void;
@@ -55,7 +56,7 @@ export function EmployeeHome({ userId, schedule, loading, options, onBlockTime, 
       })}</div> : <div className="employee-empty"><CalendarDays size={28} /><h3>{schedule ? "You’re all caught up" : "No upcoming work in the last sync"}</h3><p>{schedule ? "Your next assignment will appear here. Keep your availability up to date so Smooth can schedule you." : "Check Schedule for new offers and your latest availability."}</p></div>}
     </section>}
 
-    <section className="panel employee-pay" aria-label="Pay owed"><div className="employee-pay-label"><Banknote size={21} /><div><h2>Pay owed</h2><p>Earned and awaiting payout</p></div></div><strong>{(options.owed / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}</strong><Button variant="ghost" onClick={options.onEarnings}>View earnings <ArrowRight size={16} /></Button></section>
+    <section className="panel employee-pay" aria-label={options.advance?.remainingCents ? "Advance remaining" : "Pay owed"}><div className="employee-pay-label"><Banknote size={21} /><div><h2>{options.advance?.remainingCents ? "Advance remaining" : "Pay owed"}</h2><p>{options.advance?.remainingCents ? "Earned work reduces this balance" : "Earned and awaiting payout"}</p></div></div><strong>{((options.advance?.remainingCents || options.owed) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}</strong><Button variant="ghost" onClick={options.onEarnings}>View earnings <ArrowRight size={16} /></Button></section>
 
     <nav className="employee-shortcuts" aria-label="Employee shortcuts">
       <button className="panel employee-shortcut" onClick={options.onAvailability ?? (schedule ? onBlockTime : options.onSchedule)}><span className="employee-shortcut-icon"><Plus size={22} /></span><span><strong>Availability</strong><small>Choose work days or block time</small></span><ArrowRight size={18} /></button>

@@ -12,6 +12,9 @@ export type Employee = {
 export type EmployeePayout = {
   amountCents: number;
   paidAmountCents?: number;
+  recordedPaidAmountCents?: number;
+  cashPaidCents?: number;
+  advanceAppliedCents?: number;
   outstandingCents?: number;
   compensationLabel?: string;
   compensationConfigured?: boolean;
@@ -92,7 +95,15 @@ export type Rental = {
   employeePayouts: Record<string, EmployeePayout>;
 };
 
+export type AdvanceBalance = { employeeId: string; totalCents: number; appliedCents: number; remainingCents: number };
+export type PayrollState = {
+  version: 1; syncedAt: string | null; balances: AdvanceBalance[];
+  allocations: { employeeId: string; kind: "rental" | "creative"; sourceId: string; amountCents: number; cashFloorCents: number }[];
+  reviewCount: number;
+};
+
 export type DashboardPayload = {
+  payroll?: PayrollState;
   version: 1;
   source: "sample" | "google-calendar";
   generatedAt: string;

@@ -1,4 +1,5 @@
 import { TEAM, localInstant } from "../lib/team-schedule.mjs";
+import { reconcileAdvances, creativeAdvanceAmounts, withCreativeAdvance } from "./payroll.mjs";
 import { creativeOwed } from "../lib/creative-work.mjs";
 import { notificationText } from "./notification-content.mjs";
 import { flushAlerts } from "./push.mjs";
@@ -27,7 +28,9 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
   if (request.method === "GET" && url.pathname === "/creative-work") {
     const rows = await (isOwner ? db.prepare("SELECT data FROM team_creative_assignments")
       : db.prepare("SELECT data FROM team_creative_assignments WHERE employee_id = ?").bind(user)).all();
-    return { assignments: rows.results.map(row => JSON.parse(row.data)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
+    await reconcileAdvances(db);
+    const amounts = await creativeAdvanceAmounts(db, isOwner ? null : user);
+    return { assignments: rows.results.map(row => { const item = JSON.parse(row.data); return { ...item, advanceAppliedCents: Math.min(item.amountCents, amounts.get(item.id) ?? 0) }; }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
   }
   if (!(request.method === "POST" && url.pathname === "/creative-work") && !(request.method === "PATCH" && id)) fail(404, "Creative assignment not found.");
   const input = await body(request), now = new Date().toISOString();
@@ -44,7 +47,7 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
     if (!/^[a-f0-9-]{36}$/.test(input.id ?? "")) fail(400, "Create a fresh assignment and try again.");
     if (!TEAM.some(p => p.id === input.employeeId && p.id !== "owner") || !JSON.parse(env.TEAM_TOKEN_HASHES)[input.employeeId]) fail(400, "Choose an employee with an active dashboard account.");
     const existing = await db.prepare("SELECT data FROM team_creative_assignments WHERE id = ?").bind(input.id).first();
-    if (existing) return { assignment: JSON.parse(existing.data), duplicate: true };
+    if (existing) return { assignment: await withCreativeAdvance(db, JSON.parse(existing.data)), duplicate: true };
     item = { id: input.id, employeeId: input.employeeId, ...terms(), status: "offered", version: 1,
       createdAt: now, updatedAt: now, approvedAt: null, submissions: [], payments: [], history: [] };
     event = "assigned";
@@ -90,7 +93,8 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
         requireOwner();
         if (item.status !== "approved") fail(409, "Approve the submitted work before recording a payout.");
         const amountCents = amount(input.amountCents);
-        if (amountCents > creativeOwed(item)) fail(400, "The payout cannot exceed the remaining approved earnings.");
+        await reconcileAdvances(db);
+        if (amountCents > creativeOwed(await withCreativeAdvance(db, item))) fail(400, "The payout cannot exceed the remaining approved earnings.");
         const method = text(input.method ?? "", 80, false);
         item.payments = [...item.payments, { id: crypto.randomUUID(), amountCents, method, paidAt: now }];
         event = "payment recorded"; break;
@@ -104,8 +108,9 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
   // guarded by this exact mutation, so stale retries cannot duplicate earnings,
   // payouts, submissions or alerts. D1 batches run transactionally.
   const write = previous
-    ? db.prepare("UPDATE team_creative_assignments SET data = ?, version = ?, mutation = ? WHERE id = ? AND version = ?")
-      .bind(JSON.stringify(item), item.version, mutation, item.id, previous.version)
+    ? db.prepare(`UPDATE team_creative_assignments SET data = ?, version = ?, mutation = ? WHERE id = ? AND version = ?
+        AND (? != 'pay' OR COALESCE((SELECT SUM(amount_cents) FROM payroll_advance_allocations WHERE source_kind = 'creative' AND source_id = team_creative_assignments.id),0) + ? <= ?)`)
+      .bind(JSON.stringify(item), item.version, mutation, item.id, previous.version, input.action, item.payments.reduce((sum, payment) => sum + payment.amountCents, 0), item.amountCents)
     : db.prepare("INSERT OR IGNORE INTO team_creative_assignments (id, employee_id, version, mutation, data) VALUES (?, ?, ?, ?, ?)")
       .bind(item.id, item.employeeId, item.version, mutation, JSON.stringify(item));
   const name = TEAM.find(p => p.id === item.employeeId).name;
@@ -119,5 +124,6 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
   ]);
   if (!result[0].meta.changes) fail(409, "This assignment changed. Refresh before trying again.");
   ctx.waitUntil(flushAlerts(env));
-  return { assignment: item };
+  await reconcileAdvances(db);
+  return { assignment: await withCreativeAdvance(db, item) };
 }

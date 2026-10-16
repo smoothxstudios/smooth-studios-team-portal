@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { buildDashboardPayloads, decryptPayload, writeEncryptedDashboards } from "./lib/dashboard-data.mjs";
 import { readTeamSettings, resolveEmployees, teamPasswords } from "./lib/team-settings.mjs";
 import { fetchStripeSnapshot } from "./lib/stripe-data.mjs";
+import { syncPayroll } from "./lib/payroll-sync.mjs";
 import { syncTeamSchedule } from "./lib/team-api.mjs";
 import { syncCalendarAssignmentNotes } from "./lib/calendar-assignments.mjs";
 
@@ -124,6 +125,7 @@ if (teamEnabled) {
     ...(calendarAssignmentSync.status === "needs_access" ? { serviceAccountEmail: serviceAccount.client_email } : {}) };
   process.stdout.write(`Calendar assignment notes: ${calendarAssignmentSync.status}; ${calendarAssignmentSync.updated} updated; ${calendarAssignmentSync.failed} need attention.\n`);
 }
+if (teamEnabled) await syncPayroll(payloads, passwords.owner);
 // Credentials stay only in the owner's encrypted view for private handoff.
 payloads.owner.teamAccess = Object.fromEntries(Object.keys(settings.employees).map(id => [id, { password: passwords[id] }]));
 await writeEncryptedDashboards({ payloads, passwords, outputDirectory: path.join(root, "public/data"), config });

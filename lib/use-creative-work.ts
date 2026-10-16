@@ -5,6 +5,7 @@ import { teamRequest } from "@/lib/team-api";
 export type CreativeAssignment = {
   id: string; employeeId: string; version: number; title: string; instructions: string; references: string[];
   dueAt: string; amountCents: number; status: "offered" | "accepted" | "submitted" | "revision" | "approved" | "declined" | "cancelled";
+  advanceAppliedCents?: number;
   createdAt: string; updatedAt: string; approvedAt: string | null;
   submissions: { id: string; submittedAt: string; links: string[]; note: string }[];
   payments: { id: string; amountCents: number; paidAt: string; method: string }[];
@@ -39,6 +40,7 @@ export function useCreativeWork(token: string) {
       requestId.current++;
       setItems(previous => [result.assignment, ...previous.filter(entry => entry.id !== result.assignment.id)]);
       setError(""); setLoading(false); setLoaded(true);
+      window.dispatchEvent(new Event("smooth-payroll-updated"));
       return result.assignment;
     } catch (error) { await refresh(); throw error; }
   };

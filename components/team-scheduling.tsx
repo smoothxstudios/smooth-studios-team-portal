@@ -8,7 +8,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { teamPushIsEnabled, teamRequest, type TeamSchedule, type TeamAssignment, type TimeBlock, type WorkPreference } from "@/lib/team-api";
 import type { DashboardPayload } from "@/lib/dashboard-types";
-import { NotificationSettings } from "@/components/notification-settings";
 import { EmployeeHome, type EmployeeHomeOptions } from "@/components/employee-home";
 import { TeamAvailability } from "@/components/team-availability";
 import { OwnerScheduleAgenda } from "@/components/owner-schedule-agenda";
@@ -65,8 +64,8 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         if (ready) {
           const result = await teamRequest<TeamSchedule>(token, "/schedule");
           if (!disposed && version === requestVersion.current) { setSchedule(result); setError(""); setNeedsRefresh(false); }
-          // Keep already-enabled employee devices current without showing controls here.
-          if (!isOwner && !availabilityOnly) {
+          // Keep already-enabled devices current without showing controls here.
+          if (!availabilityOnly) {
             try { await teamPushIsEnabled(token, result.pushPublicKey); } catch { /* Settings handles setup feedback. */ }
           }
         }
@@ -196,7 +195,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
           {!occurrences.length && !preferred.length && !offers.length && !calendar.length && <p className="schedule-empty-day">No recorded commitments</p>}
           {preferred.map(p => <div className="schedule-entry preferred" key={`${p.id}-${p.start}`}><Person id={p.userId} /><strong>Wants to work</strong><span>{p.allDay ? "Full day" : `${time(p.start)}–${time(p.end)}`}</span>{p.note && <small>{p.note}</small>}</div>)}
           {occurrences.map(b => <div className="schedule-entry blocked" key={`${b.id}-${b.start}`}><Person id={b.userId} /><strong>{b.reason}</strong><span>{time(b.start)}–{time(b.end)} · Blocked</span></div>)}
-          {calendar.map(a => <div className="schedule-entry" key={a.id}><strong>{a.customer ? `${a.customer} · ` : ""}{a.title}</strong><span>{time(a.start)}–{time(a.end)}</span><small className={a.acceptedEmployeeIds.length ? "schedule-calendar-accepted" : undefined}>{a.acceptedEmployeeIds.length ? <><Check size={14} aria-hidden="true" />Calendar accepted: {a.acceptedEmployeeIds.map(personName).join(", ")}</> : offers.some(o => o.appointmentId === a.id) ? "Portal offer below" : "No accepted team member"}</small>{onChecklist && /studio.*rental|rental.*studio/i.test(a.title) && a.acceptedEmployeeIds.includes(userId) && <button onClick={() => onChecklist()}>Rental checklist →</button>}{isOwner && future(a.start) && <button onClick={() => openAssignment(a.id)}>Assign person →</button>}</div>)}
+          {calendar.map(a => <div className="schedule-entry" key={a.id}><strong>{a.customer ? `${a.customer} · ` : ""}{a.title}</strong><span>{time(a.start)}–{time(a.end)}</span><small className={a.acceptedEmployeeIds.length ? "schedule-calendar-accepted" : undefined}>{a.acceptedEmployeeIds.length ? <><Check size={14} aria-hidden="true" />Calendar accepted: {a.acceptedEmployeeIds.map(personName).join(", ")}</> : offers.some(o => o.appointmentId === a.id) ? "Portal offer below" : "No accepted team member"}</small>{isOwner && future(a.start) && <button onClick={() => openAssignment(a.id)}>Assign person →</button>}</div>)}
           {offers.map(a => <div className={`schedule-entry ${a.status}`} key={a.id}><Person id={a.employeeId} /><strong>{a.title}</strong><span>{time(a.start)}–{time(a.end)} · {a.status}</span></div>)}
         </div>;
       })}</div></article>
@@ -211,7 +210,6 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       </>}
     </>}
 
-    {schedule && isOwner && !availabilityOnly && <NotificationSettings token={token} isOwner schedule={schedule} />}
 
     <Dialog open={blockOpen} onOpenChange={open => { if (!busy) setBlockOpen(open); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Block time</DialogTitle><DialogDescription>Class, personal time, or another commitment. Existing assignments are not cancelled.</DialogDescription></DialogHeader>
       <form onSubmit={async e => { e.preventDefault(); if (await mutate("/blocks", { ...block, repeatUntil: block.weekly ? block.repeatUntil : null })) setBlockOpen(false); }}>

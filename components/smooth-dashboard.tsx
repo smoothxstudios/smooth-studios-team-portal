@@ -105,6 +105,9 @@ import { TeamSchedulingPage } from "@/components/team-scheduling";
 import { DashboardSettings } from "@/components/dashboard-settings";
 import { StudioInfoPage } from "@/components/studio-info";
 import { CreativeWorkPage, CreativeWorkPreview } from "@/components/creative-work";
+import { usePayroll } from "@/lib/use-payroll";
+import { applyRentalAdvances } from "@/lib/payroll-advances.mjs";
+import type { PayrollState } from "@/lib/dashboard-types";
 import { useCreativeWork, type CreativeAssignment } from "@/lib/use-creative-work";
 import { creativeEarnings, creativeEarningDate } from "@/lib/creative-work.mjs";
 import { rememberProfile, rememberedProfile, quickSignInRecord, quickSignInPassword, quickSignInError } from "@/lib/quick-sign-in.mjs";
@@ -266,6 +269,7 @@ function unpaidEarnings(payout?: EmployeePayout) {
 
 function EmployeeEarnings({ payout }: { payout?: EmployeePayout }) {
   return <div className="payment-amount"><strong className="share-amount">{payout?.compensationConfigured === false ? "Rate needed" : dollars(payout?.amountCents ?? 0, true)}</strong>
+    {Boolean(payout?.advanceAppliedCents) && <span className="payment-detail">{dollars(payout!.advanceAppliedCents!, true)} covered by advance</span>}
     {payout?.compensationLabel && <span className="payment-detail">{payout.compensationLabel}</span>}
     {paidEarnings(payout) > 0 && unpaidEarnings(payout) > 0 && <span className="payment-detail payment-detail-review">{dollars(paidEarnings(payout), true)} paid · {dollars(unpaidEarnings(payout), true)} still owed</span>}
   </div>;
@@ -715,11 +719,12 @@ function EmptyState({ title, copy }: { title: string; copy: string }) {
   return <div className="empty-state"><CalendarDays size={28} /><strong>{title}</strong><p>{copy}</p></div>;
 }
 
-function TeamPage({ employees, rentals, creative, teamAccess, onSetup }: { employees: Employee[]; rentals: Rental[]; creative: CreativeAssignment[]; teamAccess?: DashboardPayload["teamAccess"]; onSetup: () => void }) {
+function TeamPage({ employees, rentals, creative, payroll, teamAccess, onSetup }: { employees: Employee[]; rentals: Rental[]; creative: CreativeAssignment[]; payroll?: PayrollState; teamAccess?: DashboardPayload["teamAccess"]; onSetup: () => void }) {
   const [copied, setCopied] = useState("");
   return (
     <div className="team-page-grid">
       {employees.map((employee) => {
+        const advance = payroll?.balances.find(item => item.employeeId === employee.id);
         const assigned = rentals.filter((rental) => rental.assignedEmployeeIds.includes(employee.id));
         const creativePay = creativeEarnings(creative.filter(item => item.employeeId === employee.id)).metrics;
         const paid = creativePay.paid + assigned.reduce((sum, rental) => sum + paidEarnings(rental.employeePayouts[employee.id]), 0);
@@ -728,7 +733,7 @@ function TeamPage({ employees, rentals, creative, teamAccess, onSetup }: { emplo
         return (
           <article className="panel employee-card" key={employee.id}>
             <div className="employee-card-head"><span className="employee-avatar large" style={{ background: teamAccent(employee.id, employee.accent) }}>{employee.name.slice(0, 1)}</span><div><h2>{employee.name}</h2><p>{employee.email ?? (employee.onboarding ? "Account setup needed" : "")}</p></div>{!(employee.onboarding && !employee.accessReady) && <StatusBadge state={next ? "upcoming" : "paid"} />}</div>
-            <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>Still owed</span><strong>{dollars(owed)}</strong></div><div><span>Appointments</span><strong>{assigned.length}</strong></div></div>
+            <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>{advance?.remainingCents ? "Advance remaining" : "Still owed"}</span><strong>{dollars(advance?.remainingCents || owed, true)}</strong></div><div><span>Appointments</span><strong>{assigned.length}</strong></div></div>
             <div className="employee-next"><CalendarDays size={16} /><span>Next accepted appointment</span><strong>{next ? formatDate(next.start, true) : "None scheduled"}</strong></div>
             {employee.onboarding && !employee.accessReady && <Button className="team-setup-action" variant="outline" onClick={onSetup}>Set up private account</Button>}
             {teamAccess?.[employee.id] && <Button className="team-setup-action" variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(teamAccess[employee.id].password); setCopied(employee.id); } catch { setCopied(`unavailable:${employee.id}`); } }}>{copied === employee.id ? "Password copied" : "Copy sign-in password"}</Button>}
@@ -751,8 +756,10 @@ function PayoutPage({
   rentals,
   setPaidThrough,
   setPayoutEmployee,
+  payroll,
 }: {
   employeeId?: string;
+  payroll?: PayrollState;
   employees: Employee[];
   metrics: { revenue: number; owed: number; paid: number; projected: number };
   monthly: Array<{ month: string; paid: number; owed: number }>;
@@ -765,6 +772,7 @@ function PayoutPage({
 }) {
   const isOwner = !employeeId;
   const selectedEmployee = employees.find((employee) => employee.id === payoutEmployee);
+  const advance = payroll?.balances.find(item => item.employeeId === employeeId);
   const payoutScopeLabel = selectedEmployee?.name ?? "All employees";
   const eligibleAppointments = rentals.filter((rental) => eligibleForPayout(rental, paidThrough, payoutEmployee)).length;
   const hasChartData = monthly.some(month => month.paid > 0 || month.owed > 0);
@@ -772,7 +780,8 @@ function PayoutPage({
     <section className={`payout-layout${isOwner ? "" : " employee-payout-layout"}`}>
       <article className="panel payout-chart-panel">
         <div className="panel-heading"><div>{isOwner && <p className="eyebrow">Weekly · monthly · yearly</p>}<h2>{isOwner ? "Team payouts" : "Earnings summary"}</h2></div></div>
-        <div className="payout-summary"><div><span>{isOwner ? "Paid to team" : "Paid"}</span><strong>{dollars(metrics.paid)}</strong></div><div><span>{isOwner ? "Earned, unpaid" : "Pay owed"}</span><strong>{dollars(metrics.owed)}</strong></div><div><span>{isOwner ? "Projected" : "Upcoming estimate"}</span><strong>{dollars(metrics.projected)}</strong></div></div>
+        <div className="payout-summary"><div><span>{isOwner ? "Paid to team" : "Paid"}</span><strong>{dollars(metrics.paid)}</strong></div><div><span>{isOwner ? "Earned, unpaid" : advance?.remainingCents ? "Advance remaining" : "Pay owed"}</span><strong>{dollars(!isOwner && advance?.remainingCents ? advance.remainingCents : metrics.owed, true)}</strong></div><div><span>{isOwner ? "Projected" : "Upcoming estimate"}</span><strong>{dollars(metrics.projected)}</strong></div></div>
+        {payroll?.balances.length ? <div className="payroll-advances">{payroll.balances.filter(item => isOwner || item.employeeId === employeeId).map(item => <div key={item.employeeId} className="payroll-advance"><div><strong>{isOwner ? `${employees.find(person => person.id === item.employeeId)?.name ?? item.employeeId} · ` : ""}{item.remainingCents > 0 ? "Advance balance" : "Advance cleared"}</strong><span>{dollars(item.appliedCents, true)} applied · {dollars(item.remainingCents, true)} remaining</span></div><progress max={item.totalCents} value={item.appliedCents} aria-label="Advance cleared" /></div>)}</div> : null}
         {(isOwner || hasChartData) ? <div className="bar-chart-wrap">
           <ResponsiveContainer height="100%" width="100%">
             <BarChart data={monthly} margin={{ left: -20, right: 0 }}>
@@ -1064,6 +1073,7 @@ function StripeMatchForm({
 function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string; schedulingToken: string }) {
   const [view, setView] = useState<ViewKey>("overview");
   const openChecklist = () => setView("checklists");
+  const payroll = usePayroll(schedulingToken, payload.payroll);
   const creative = useCreativeWork(schedulingToken);
   const creativeTotals = useMemo(() => creativeEarnings(creative.items), [creative.items]);
   const currentYear = Number(studioLocal(Date.now()).slice(0, 4));
@@ -1096,7 +1106,8 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
   const [workflowRequest, setWorkflowRequest] = useState<OwnerWorkflowRequest | null>(null);
   const isOwner = payload.role === "owner";
   const employeeId = isOwner ? undefined : payload.user.id;
-  const rentals = useMemo(() => [...payload.rentals].sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime()), [payload.rentals]);
+  const rentals = useMemo(() => applyRentalAdvances(payload.rentals, payroll.state).sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime()), [payload.rentals, payroll.state]);
+  const advance = payroll.state?.balances.find(item => item.employeeId === employeeId);
   const visibleRentals = useMemo(() => employeeId ? rentals.filter((rental) => rental.assignedEmployeeIds.includes(employeeId)) : rentals, [employeeId, rentals]);
   const pastRentals = visibleRentals.filter(rental => Date.parse(rental.end) <= Date.now());
   const employeeEarnings = useMemo(() => {
@@ -1262,10 +1273,12 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Creative work totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "overview" && !isOwner && <CreativeWorkPreview state={creative} isOwner={false} onOpen={() => setView("creative")} />}
+          {view === "payouts" && payroll.error && <p className="schedule-warning" role="status">{payroll.error}</p>}
+          {view === "payouts" && isOwner && Boolean(payroll.state?.reviewCount) && <p className="schedule-warning" role="status">A previously credited earning changed in Calendar. Its advance credit is preserved and needs review.</p>}
           {view === "settings" && <DashboardSettings token={schedulingToken} profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} dark={dark} onThemeChange={setDark} onSync={isOwner ? openCalendarSync : undefined} lastSynced={`${formatDate(payload.generatedAt, true)} · ${formatTime(payload.generatedAt)}`} />}
           {view === "checklists" && <StudioInfoPage token={schedulingToken} isOwner={isOwner} userId={payload.user.id} section="checklists" />}
           {view === "creative" && <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} />}
-          {view === "overview" && !isOwner && <TeamSchedulingPage onChecklist={openChecklist} token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide"), onChecklist: openChecklist }} />}
+          {view === "overview" && !isOwner && <TeamSchedulingPage onChecklist={openChecklist} token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, advance, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide"), onChecklist: openChecklist }} />}
           {view === "overview" && isOwner && (
             <div className="owner-overview">
               <OwnerFinancialSummary rentals={visibleRentals} creative={creative} upcomingCount={upcoming.length} totalOwed={metrics.owed} onSchedule={() => setView("scheduling")} onPayouts={() => setView("payouts")} />
@@ -1322,12 +1335,12 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
           </article>}
           {view === "team" && isOwner && <Tabs defaultValue="people" className="owner-team-tabs">
             <TabsList aria-label="Team sections"><TabsTrigger value="people">People</TabsTrigger><TabsTrigger value="engagement">Check-ins &amp; rewards</TabsTrigger></TabsList>
-            <TabsContent value="people"><TeamPage employees={payload.employees} rentals={rentals} creative={creative.items} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} /></TabsContent>
+            <TabsContent value="people"><TeamPage payroll={payroll.state} employees={payload.employees} rentals={rentals} creative={creative.items} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} /></TabsContent>
             <TabsContent value="engagement"><TeamEngagementReview token={schedulingToken} /></TabsContent>
           </Tabs>}
           {view === "payouts" && <>
             {!isOwner && <div className="employee-earnings-heading"><div><h2>My earnings</h2><p>Appointment and creative work earnings by year.</p></div><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
-            <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
+            <PayoutPage payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
             <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} earningsOnly year={isOwner ? undefined : earningsYear} />
             {!isOwner && earningsYear === currentYear && <PeriodTotals creative={creative.items} employeeId={employeeId} rentals={visibleRentals} />}
             {!isOwner && employeeEarnings.rentals.length > 0 && <article className="panel employee-earnings-details"><div className="panel-heading"><div><h2>Earnings by appointment</h2><p>Upcoming amounts are estimates. Custom assignments are listed in Schedule.</p></div></div><RentalTable employeeId={employeeId} rentals={employeeEarnings.rentals} /></article>}

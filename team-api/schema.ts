@@ -141,3 +141,21 @@ export const pushDeliveries = sqliteTable("team_push_deliveries", {
   attempts: integer("attempts").notNull().default(0), dueAt: integer("due_at").notNull().default(0),
   leaseUntil: integer("lease_until").notNull().default(0), completedAt: integer("completed_at"), createdAt: integer("created_at").notNull(),
 }, table => [primaryKey({ columns: [table.alertId, table.deviceId] }), index("team_push_deliveries_created").on(table.createdAt)]);
+
+// Advance credits settle earned work; original cash-payment records stay intact.
+export const payrollState = sqliteTable("payroll_state", {
+  id: integer("id").primaryKey(), generation: text("generation").notNull().default(""), syncedAt: text("synced_at"),
+});
+export const payrollRentalEarnings = sqliteTable("payroll_rental_earnings", {
+  generation: text("generation").notNull(), employeeId: text("employee_id").notNull(), rentalId: text("rental_id").notNull(),
+  amountCents: integer("amount_cents").notNull(), paidCents: integer("paid_cents").notNull(), earnedAt: text("earned_at").notNull(),
+  eligible: integer("eligible").notNull(), asOf: text("as_of").notNull(),
+}, table => [primaryKey({ columns: [table.generation, table.employeeId, table.rentalId] })]);
+export const payrollAdvances = sqliteTable("payroll_advances", {
+  id: text("id").primaryKey(), employeeId: text("employee_id").notNull(), amountCents: integer("amount_cents").notNull(),
+  createdAt: text("created_at").notNull(), basis: text("basis").notNull(),
+}, table => [index("payroll_advances_employee").on(table.employeeId, table.createdAt)]);
+export const payrollAdvanceAllocations = sqliteTable("payroll_advance_allocations", {
+  advanceId: text("advance_id").notNull().references(() => payrollAdvances.id), sourceKind: text("source_kind").notNull(), sourceId: text("source_id").notNull(),
+  amountCents: integer("amount_cents").notNull(), cashFloorCents: integer("cash_floor_cents").notNull().default(0), createdAt: text("created_at").notNull(),
+}, table => [primaryKey({ columns: [table.advanceId, table.sourceKind, table.sourceId] }), index("payroll_allocations_source").on(table.sourceKind, table.sourceId)]);

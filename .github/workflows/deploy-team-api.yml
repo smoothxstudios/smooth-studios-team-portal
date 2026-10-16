@@ -9,6 +9,8 @@ on:
       - "scripts/deploy-team-api.mjs"
       - "scripts/import-studio-reference.mjs"
       - "data/studio-reference-import.json"
+      - "data/payroll-advance-import.json"
+      - "scripts/lib/payroll-sync.mjs"
       - "scripts/lib/employee-pay.mjs"
       - "scripts/lib/team-settings.mjs"
       - "config/studio.config.json"

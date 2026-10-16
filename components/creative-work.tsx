@@ -84,6 +84,7 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit }: { item: Creati
   };
   return <div className="creative-details">
     <div className="creative-totals"><div><span>Agreed pay</span><strong>{dollars(item.amountCents)}</strong></div><div><span>Paid</span><strong>{dollars(paid)}</strong></div><div><span>{item.status === "approved" ? "Owed" : "After approval"}</span><strong>{dollars(item.status === "approved" ? owed : openStatuses.includes(item.status) ? item.amountCents : 0)}</strong></div></div>
+    {Boolean(item.advanceAppliedCents) && <p className="creative-hint">{dollars(item.advanceAppliedCents!)} of these earnings is covered by the advance.</p>}
     <section><h3>Brief</h3><p className="creative-prose">{item.instructions}</p>{item.references.length > 0 && <WorkLinks links={item.references} />}</section>
     {item.submissions.length > 0 && <section><h3>Submissions</h3>{[...item.submissions].reverse().map((submission, index) => <div key={submission.id} className="creative-submission"><strong>{index === 0 ? "Latest submission" : "Earlier submission"} · {date(submission.submittedAt)}</strong><WorkLinks links={submission.links} />{submission.note && <p className="creative-prose">{submission.note}</p>}</div>)}</section>}
     {item.history.some(entry => entry.note) && <section><h3>Feedback</h3>{[...item.history].reverse().filter(entry => entry.note).map(entry => <div key={entry.id} className="creative-submission"><strong>{entry.event} · {date(entry.at)}</strong><p className="creative-prose">{entry.note}</p></div>)}</section>}
@@ -99,7 +100,7 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit }: { item: Creati
     {action && <form className="creative-action-form" onSubmit={submit}>
       <h3>{{ submit: "Submit your work", approve: "Approve submitted work", revise: "Request changes", pay: "Record a payout", cancel: "Cancel this assignment?", decline: "Decline this assignment?" }[action]}</h3>
       {action === "submit" && <><p>Upload your files to the Content Vault or your sharing service, then add links Smooth can open.</p><label>Submission links · one per line<Textarea required maxLength={20500} value={links} onChange={event => setLinks(event.target.value)} placeholder="https://…" /></label><label>Submission notes · optional<Textarea maxLength={4000} value={note} onChange={event => setNote(event.target.value)} /></label></>}
-      {action === "approve" && <p>Approving adds <strong>{dollars(item.amountCents)}</strong> to {name(item.employeeId)}’s earned, unpaid balance.</p>}
+      {action === "approve" && <p>Approving adds <strong>{dollars(item.amountCents)}</strong> to {name(item.employeeId)}’s earnings. Any remaining advance is applied first.</p>}
       {action === "revise" && <label>Feedback · optional<Textarea maxLength={4000} value={note} onChange={event => setNote(event.target.value)} placeholder="What should be adjusted?" /></label>}
       {action === "cancel" && <p>This closes the assignment. No earnings have been approved for it.</p>}
       {action === "decline" && <p>Smooth will see that you declined this offer.</p>}

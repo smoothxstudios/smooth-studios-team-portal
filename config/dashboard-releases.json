@@ -1,6 +1,29 @@
 {
-  "currentVersion": "2.19.0",
+  "currentVersion": "2.20.0",
   "releases": [
+    {
+      "id": "2026-10-16-advance-balances-and-searchable-help",
+      "version": "2.20.0",
+      "date": "2026-10-16",
+      "category": "Features",
+      "title": "Advance balances and searchable Help",
+      "changes": [
+        "Recorded advances apply to unpaid and future earned appointments and approved creative work, with existing cash payments preserved.",
+        "Advance remaining replaces pay owed while credit is available. Normal owed balances return once it clears, including any earnings above the remaining advance.",
+        "Find step-by-step articles in Settings → Help with natural-language search and separate owner and employee guidance.",
+        "Removed repeated Rental checklist links from calendar cards. The checklist remains under Resources.",
+        "Smooth’s notification controls moved from Team Schedule to Settings → Preferences, matching the employee settings location."
+      ],
+      "employee": {
+        "title": "Help when you need it",
+        "changes": [
+          "Search Settings → Help for how to use the dashboard, manage assignments, find earnings, and set up your device.",
+          "If you have an advance, see its remaining balance and how earned work clears it.",
+          "Find Rental Checklist under Resources; repeated calendar-card links have been removed."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-owner-week-month-finances",
       "version": "2.19.0",
