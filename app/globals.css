@@ -1784,14 +1784,21 @@ button { cursor: pointer; }
 .alerts-empty h3 { color: var(--foreground); font-size: 18px; margin: 0; }
 .alerts-filters button:focus-visible, .mobile-toolbar button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .mobile-toolbar { display: none; }
-.mobile-more-trigger { display: none; }
+.mobile-menu-trigger { display: none; }
 @media (max-width: 767px) {
-  .mobile-more-trigger { display: inline-flex; min-height: 44px; gap: 6px; padding-inline: 12px; border-radius: 999px; font-size: 13px; }
+  .mobile-menu-trigger { display: inline-flex; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; }
+  .mobile-menu-trigger > svg { width: 22px; height: 22px; }
   .dashboard-main { padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
-  .mobile-toolbar { position: fixed; z-index: 20; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: max(24px, env(safe-area-inset-left, 0px)); right: max(24px, env(safe-area-inset-right, 0px)); max-width: 352px; margin-inline: auto; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); box-shadow: 0 6px 24px #00000018, 0 2px 6px #0000000d; }
-  .mobile-toolbar button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; min-height: 48px; border-radius: 999px; font-size: 11px; line-height: 1.2; font-weight: 600; color: var(--muted-foreground); }
-  .mobile-toolbar button[aria-current="page"] { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); font-weight: 750; }
-  .toolbar-icon { position: relative; display: flex; }
+  .mobile-toolbar { position: fixed; z-index: 20; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: max(24px, env(safe-area-inset-left, 0px)); right: max(24px, env(safe-area-inset-right, 0px)); max-width: 352px; margin-inline: auto; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); box-shadow: 0 6px 24px #00000018, 0 2px 6px #0000000d; isolation: isolate; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .mobile-toolbar-indicator { position: absolute; z-index: -1; pointer-events: none; left: 6px; top: 4px; bottom: 4px; width: calc((100% - 20px) / 5); border-radius: 999px; background: var(--sidebar-accent); opacity: 0; transform: translate3d(calc(var(--toolbar-position, 0) * (100% + 2px)), 0, 0); transition: transform 260ms cubic-bezier(.22, 1.2, .36, 1), opacity 140ms ease; }
+  .mobile-toolbar-indicator[data-visible="true"] { opacity: 1; }
+  .mobile-toolbar[data-dragging="true"] .mobile-toolbar-indicator { transition: opacity 140ms ease; }
+  .mobile-toolbar button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; min-height: 48px; border-radius: 999px; font-size: 11px; line-height: 1.2; font-weight: 600; color: var(--muted-foreground); background: transparent; -webkit-tap-highlight-color: transparent; transition: color 140ms ease; }
+  .mobile-toolbar button[aria-current="page"], .mobile-toolbar button[data-preview="true"] { color: var(--sidebar-accent-foreground); font-weight: 750; }
+  .mobile-toolbar[data-dragging="true"] button[aria-current="page"]:not([data-preview="true"]) { color: var(--muted-foreground); font-weight: 600; }
+  .toolbar-icon { position: relative; display: flex; transition: transform 200ms cubic-bezier(.22, 1.2, .36, 1); }
+  .mobile-toolbar button[aria-current="page"] .toolbar-icon, .mobile-toolbar button[data-preview="true"] .toolbar-icon { transform: translateY(-1px) scale(1.08); }
+  .mobile-toolbar[data-dragging="true"] button[aria-current="page"]:not([data-preview="true"]) .toolbar-icon { transform: none; }
   .toolbar-icon > svg { width: 19px; height: 19px; }
   .toolbar-icon .alerts-count { position: absolute; left: 12px; top: -6px; min-width: 17px; height: 17px; padding: 0 4px; font-size: 10px; border: 1px solid var(--card); }
   .topbar-alerts { display: none; }
@@ -1802,4 +1809,8 @@ button { cursor: pointer; }
   .alert-title h3 { font-size: 15px; }
   .alert-actions { gap: 6px; }
   .alert-actions button { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobile-toolbar-indicator, .mobile-toolbar button, .mobile-toolbar .toolbar-icon { transition: none !important; }
+  .mobile-toolbar .toolbar-icon { transform: none !important; }
 }

@@ -1,6 +1,28 @@
 {
-  "currentVersion": "2.22.1",
+  "currentVersion": "2.23.0",
   "releases": [
+    {
+      "id": "2026-10-16-sliding-mobile-toolbar",
+      "version": "2.23.0",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Slide between mobile tabs",
+      "changes": [
+        "The owner toolbar is Home, Team, Schedule, Alerts, and Payouts from left to right, with Schedule centered.",
+        "Tap a tab or slide across the toolbar and release to open it. A rounded highlight follows the finger and settles on the selected page; scrolling and reduced-motion preferences are respected.",
+        "The top menu is a three-line icon with no More label or surrounding border. Settings remains at the bottom of the sidebar.",
+        "Employee shortcuts are Home, Work, Schedule, Alerts, and Earnings. Help reflects the updated navigation."
+      ],
+      "employee": {
+        "title": "Slide between your shortcuts",
+        "changes": [
+          "The floating toolbar is Home, Work, Schedule, Alerts, and Earnings, with Schedule in the middle.",
+          "Tap a tab, or slide your finger across the toolbar and release to open the highlighted page.",
+          "Open the sidebar using the three-line icon at the top, or swipe right from the left edge. Settings is at the bottom of the sidebar."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-past-creative-work",
       "version": "2.22.1",

@@ -106,6 +106,7 @@ import { DashboardSettings } from "@/components/dashboard-settings";
 import { StudioInfoPage } from "@/components/studio-info";
 import { CreativeWorkPage, CreativeWorkPreview } from "@/components/creative-work";
 import { AlertsPage, UnreadBadge } from "@/components/alerts";
+import { MobileToolbar } from "@/components/mobile-toolbar";
 import { useAlerts, type DashboardAlert } from "@/lib/use-alerts";
 import { usePayroll } from "@/lib/use-payroll";
 import { applyRentalAdvances } from "@/lib/payroll-advances.mjs";
@@ -208,24 +209,9 @@ function DashboardNavigation({ isOwner, accountId, view, onNavigate, unread }: {
   </nav>;
 }
 
-function MobileToolbar({ view, unread, onNavigate }: { view: ViewKey; unread: number; onNavigate: (view: ViewKey) => void }) {
-  const { setOpenMobile } = useSidebar();
-  const items: { key: ViewKey; label: string; icon: typeof House }[] = [
-    { key: "alerts", label: "Alerts", icon: Bell }, { key: "creative", label: "Work", icon: ClipboardList },
-    { key: "overview", label: "Home", icon: House }, { key: "scheduling", label: "Schedule", icon: CalendarDays },
-    { key: "settings", label: "Settings", icon: Settings },
-  ];
-  return <nav className="mobile-toolbar" aria-label="Quick navigation">
-    {items.map(item => <button key={item.key} aria-label={item.key === "creative" ? "Creative Work" : item.label} aria-current={view === item.key ? "page" : undefined}
-      onClick={() => { setOpenMobile(false); onNavigate(item.key); }}>
-      <span className="toolbar-icon"><item.icon size={21} aria-hidden="true" />{item.key === "alerts" && <UnreadBadge count={unread} />}</span><span>{item.label}</span>
-    </button>)}
-  </nav>;
-}
-
-function MobileMoreButton() {
+function MobileMenuButton() {
   const { openMobile, setOpenMobile } = useSidebar();
-  return <Button className="mobile-more-trigger" variant="outline" aria-label="More dashboard sections" aria-expanded={openMobile} onClick={() => setOpenMobile(!openMobile)}><Menu size={18} aria-hidden="true" /><span>More</span></Button>;
+  return <Button className="mobile-menu-trigger" variant="ghost" size="icon" aria-label="Open navigation menu" aria-expanded={openMobile} onClick={() => setOpenMobile(!openMobile)}><Menu size={22} aria-hidden="true" /></Button>;
 }
 
 function SettingsNavigation({ active, onOpen }: { active: boolean; onOpen: () => void }) {
@@ -1305,7 +1291,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
       <SidebarInset className={`dashboard-main${isOwner ? " owner-dashboard" : ""}`}>
         <header className="dashboard-topbar">
           <div className="topbar-title"><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div>
-          <div className="topbar-actions"><MobileMoreButton />{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
+          <div className="topbar-actions"><MobileMenuButton />{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
         </header>
 
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
@@ -1390,7 +1376,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
         </div>
         <DashboardVersionFooter viewer={isOwner ? "owner" : "employee"} />
       </SidebarInset>
-      <MobileToolbar view={view} unread={alerts.unreadCount} onNavigate={navigate} />
+      <MobileToolbar isOwner={isOwner} view={view} unread={alerts.unreadCount} onNavigate={navigate} />
       {isOwner && (
         <>
           <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={setPaymentOverrideOpen} open={paymentOverrideOpen} reviewRentals={reviewRentals} />
