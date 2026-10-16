@@ -7,7 +7,18 @@ const leadingSection = /^\[Smooth Studios rental team\][\s\S]*?\[\/Smooth Studio
 const isRental = title => /\bstudio(?:\s+[a-z])?\s+rental\b/i.test(title ?? "");
 const teamIds = new Set(TEAM.filter(p => p.id !== "owner").map(p => p.id));
 
-export function rentalTeamDescription(description, assignments) {
+function employeeCalendarResponses(event, employees) {
+  const normalize = value => typeof value === "string" ? value.trim().toLowerCase() : "";
+  return employees.filter(person => teamIds.has(person.id)).flatMap(person => {
+    const emails = new Set((person.invitationEmails ?? [person.email]).map(normalize).filter(Boolean));
+    const responses = (event.attendees ?? []).filter(guest => emails.has(normalize(guest.email))).map(guest => guest.responseStatus);
+    // An employee may use more than one configured Calendar invitation address.
+    const status = ["accepted", "tentative", "needsAction"].find(value => responses.includes(value));
+    return status ? [{ employeeId: person.id, status }] : [];
+  });
+}
+
+export function rentalTeamDescription(description, assignments, calendarResponses = []) {
   const original = description ?? "";
   // New notes lead the description so the confirmation is visible when the
   // event opens. Strip both this format and the former appended format while
@@ -16,10 +27,13 @@ export function rentalTeamDescription(description, assignments) {
   if (otherNotes.includes(begin) || otherNotes.includes(end)) throw new Error("The rental team note markers were edited. Review the event description.");
   const people = TEAM.filter(p => teamIds.has(p.id)).flatMap(person => {
     const matches = assignments.filter(a => a.employeeId === person.id && ["pending", "accepted"].includes(a.status));
-    if (!matches.length) return [];
-    return [matches.some(a => a.status === "accepted")
-      ? `✅ ${person.name} — Accepted in app`
-      : `○ ${person.name} — Awaiting app response`];
+    const calendarStatus = calendarResponses.find(response => response.employeeId === person.id)?.status;
+    if (matches.some(a => a.status === "accepted")) return [`✅ ${person.name} — Accepted in app`];
+    if (matches.length) return [`○ ${person.name} — Awaiting app response${calendarStatus === "accepted" ? " · ✅ Accepted in Google Calendar" : ""}`];
+    if (calendarStatus === "accepted") return [`✅ ${person.name} — Accepted in Google Calendar`];
+    if (calendarStatus === "tentative") return [`○ ${person.name} — Tentative in Google Calendar`];
+    if (calendarStatus === "needsAction") return [`○ ${person.name} — Awaiting Google Calendar response`];
+    return [];
   });
   if (!people.length) return otherNotes;
   return `${begin}\n${people.join("\n")}\n${end}${otherNotes ? `\n\n${otherNotes}` : ""}`;
@@ -27,21 +41,26 @@ export function rentalTeamDescription(description, assignments) {
 
 // Only the portal-owned description section is changed. Never change titles,
 // prices, times, attendees, or RSVP status, and never add Calendar invitations.
-export async function syncCalendarAssignmentNotes({ calendarId, accessToken, calendarEvents, rentals, assignments, fetcher = fetch }) {
+export async function syncCalendarAssignmentNotes({ calendarId, accessToken, calendarEvents, rentals, assignments, employees = [], fetcher = fetch }) {
   const eligible = new Set(rentals.filter(r => r.categoryId === "studio-rentals" || isRental(r.title)).map(r => r.id));
   const report = { status: "synced", updated: 0, failed: 0, checkedAt: new Date().toISOString() };
   for (const original of calendarEvents) {
     if (original.status === "cancelled") continue;
     const candidates = assignments.filter(a => a.appointmentId === original.id && teamIds.has(a.employeeId));
-    if ((!eligible.has(original.id) || !candidates.some(a => ["pending", "accepted"].includes(a.status))) && !original.description?.includes(begin)) continue;
+    const responses = employeeCalendarResponses(original, employees);
+    if ((!eligible.has(original.id) || (!candidates.some(a => ["pending", "accepted"].includes(a.status)) && !responses.length)) && !original.description?.includes(begin)) continue;
     const url = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(original.id)}`);
     url.searchParams.set("sendUpdates", "none");
     let event = original, saved = false;
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
-        const matching = eligible.has(event.id) && isRental(event.summary) ? candidates.filter(a =>
+        const rental = eligible.has(event.id) && isRental(event.summary);
+        const matching = rental ? candidates.filter(a =>
           Date.parse(a.start) === Date.parse(event.start?.dateTime) && Date.parse(a.end) === Date.parse(event.end?.dateTime)) : [];
-        const description = rentalTeamDescription(event.description, matching);
+        // Read RSVPs from the current event, including after an ETag conflict.
+        // This also covers rentals that predate app assignments without creating
+        // app acceptances or changing Calendar guests, payments, or payroll.
+        const description = rentalTeamDescription(event.description, matching, rental ? employeeCalendarResponses(event, employees) : []);
         if (description === (event.description ?? "")) { saved = true; break; }
         if (!event.etag) throw new Error("Calendar did not supply a version for this event.");
         const response = await fetcher(url, {

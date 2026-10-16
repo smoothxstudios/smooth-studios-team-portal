@@ -116,7 +116,7 @@ let payloads = buildDashboardPayloads(payloadOptions);
 if (teamEnabled) {
   const portal = await syncTeamSchedule(payloads.owner.rentals, passwords.owner);
   const calendarAssignmentSync = await syncCalendarAssignmentNotes({ calendarId, accessToken, calendarEvents,
-    rentals: payloads.owner.rentals, assignments: portal.calendarAssignments });
+    rentals: payloads.owner.rentals, assignments: portal.calendarAssignments, employees: config.employees });
   payloads = buildDashboardPayloads({ ...payloadOptions, portalAssignments: portal.assignments });
   // Owner-only, encrypted setup feedback. Failed note writes do not discard
   // accepted work or stop Calendar/Stripe and payroll refreshes.

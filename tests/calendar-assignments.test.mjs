@@ -10,6 +10,7 @@ const event = { id: "synthetic-rental", summary: "Synthetic Customer: Studio A R
 const pending = { appointmentId: event.id, employeeId: "jordyn", status: "pending", start: event.start.dateTime, end: event.end.dateTime };
 const rentals = [{ id: event.id, title: "Studio A Rental", categoryId: "other" }];
 const args = { calendarId: "synthetic-calendar@example.invalid", accessToken: "synthetic-test-only", calendarEvents: [event], rentals, assignments: [pending] };
+const employees = [{ id: "jordyn", invitationEmails: ["current@example.invalid", "fixture@example.invalid"] }];
 
 test("team notes preserve booking text exactly and distinguish an offer from acceptance", () => {
   const offer = rentalTeamDescription(original, [pending, pending]);
@@ -113,4 +114,81 @@ test("cancelled offers remove only the portal note; permission and quota problem
   assert.equal(limited.status, "retrying");
   const failed = await syncCalendarAssignmentNotes({ ...args, fetcher: async () => { throw new Error("Network unavailable"); } });
   assert.equal(failed.status, "retrying");
+});
+
+test("historical Google-only rentals receive a source-labelled check at the top without creating app acceptance", async () => {
+  const historic = { ...event, start: { dateTime: "2026-01-06T18:00:00Z" }, end: { dateTime: "2026-01-06T19:00:00Z" },
+    attendees: [{ email: " FIXTURE@EXAMPLE.INVALID ", responseStatus: "accepted" },
+      { email: "current@example.invalid", responseStatus: "needsAction" },
+      { email: "client@example.invalid", responseStatus: "accepted" }] };
+  let patched;
+  const result = await syncCalendarAssignmentNotes({ ...args, employees, assignments: [], calendarEvents: [historic], fetcher: async (url, options) => {
+    assert.equal(url.searchParams.get("sendUpdates"), "none");
+    assert.equal(options.headers["If-Match"], historic.etag);
+    const data = JSON.parse(options.body);
+    assert.deepEqual(Object.keys(data), ["description"]);
+    patched = data.description;
+    assert.ok(patched.startsWith("[Smooth Studios rental team]\n✅ Jordyn — Accepted in Google Calendar\n"));
+    assert.ok(patched.endsWith(original));
+    assert.deepEqual(parseCalendarDescription(patched), parseCalendarDescription(original));
+    assert.equal((patched.match(/Jordyn/g) ?? []).length, 1);
+    assert.doesNotMatch(patched, /Accepted in app|client@example/);
+    return Response.json({});
+  } });
+  assert.equal(result.updated, 1);
+  assert.equal(result.failed, 0);
+  await syncCalendarAssignmentNotes({ ...args, employees, assignments: [], calendarEvents: [{ ...historic, description: patched }],
+    fetcher: async () => assert.fail("Historical backfill is idempotent") });
+  await syncCalendarAssignmentNotes({ ...args, employees: [{ id: "owner", email: "fixture@example.invalid" }], assignments: [],
+    fetcher: async () => assert.fail("Clients and the owner are not employee confirmations") });
+  await syncCalendarAssignmentNotes({ ...args, employees, assignments: [], calendarEvents: [{ ...historic, summary: "Studio Photoshoot" }],
+    rentals: [{ ...rentals[0], title: "Studio Photoshoot" }], fetcher: async () => assert.fail("Only studio rentals get retrospective notes") });
+});
+
+test("Google RSVP state never turns a pending app offer or tentative invitation into app acceptance", () => {
+  const accepted = [{ employeeId: "jordyn", status: "accepted" }];
+  const both = rentalTeamDescription(original, [pending], accepted);
+  assert.match(both, /○ Jordyn — Awaiting app response · ✅ Accepted in Google Calendar/);
+  assert.doesNotMatch(both, /Accepted in app/);
+  const app = rentalTeamDescription(both, [{ ...pending, status: "accepted" }], accepted);
+  assert.match(app, /✅ Jordyn — Accepted in app/);
+  assert.equal((app.match(/Jordyn/g) ?? []).length, 1);
+  for (const [status, message] of [["needsAction", "Awaiting Google Calendar response"], ["tentative", "Tentative in Google Calendar"]]) {
+    const note = rentalTeamDescription(original, [], [{ employeeId: "jordyn", status }]);
+    assert.ok(note.includes(`○ Jordyn — ${message}`));
+    assert.doesNotMatch(note, /✅|Accepted in app/);
+  }
+  assert.equal(rentalTeamDescription(original, [], [{ employeeId: "jordyn", status: "declined" }]), original);
+  const cancelled = rentalTeamDescription(original, [{ ...pending, status: "cancelled" }], accepted);
+  assert.match(cancelled, /✅ Jordyn — Accepted in Google Calendar/);
+  assert.doesNotMatch(cancelled, /Accepted in app/);
+});
+
+test("retrospective notes recheck employee RSVPs after concurrent Calendar changes", async () => {
+  const description = rentalTeamDescription(original, [], [{ employeeId: "jordyn", status: "accepted" }]);
+  const changedBooking = `${original}Preserve this new booking note.\n`;
+  const latestDescription = description.replace(original, changedBooking);
+  let calls = 0;
+  const result = await syncCalendarAssignmentNotes({ ...args, employees, assignments: [], fetcher: async (_url, options) => {
+    calls++;
+    if (calls === 1) return new Response(null, { status: 412 });
+    if (calls === 2) return Response.json({ ...event, etag: '"v2"', description: latestDescription,
+      attendees: [{ email: "fixture@example.invalid", responseStatus: "declined" }] });
+    assert.equal(options.headers["If-Match"], '"v2"');
+    assert.deepEqual(JSON.parse(options.body), { description: changedBooking });
+    return Response.json({});
+  } });
+  assert.equal(calls, 3);
+  assert.equal(result.updated, 1);
+  assert.equal(result.failed, 0);
+});
+
+test("removing or declining a Google-only invitation removes its previous note", async () => {
+  const description = rentalTeamDescription(original, [], [{ employeeId: "jordyn", status: "accepted" }]);
+  for (const attendees of [[], [{ email: "fixture@example.invalid", responseStatus: "declined" }]]) {
+    const result = await syncCalendarAssignmentNotes({ ...args, employees, assignments: [], calendarEvents: [{ ...event, description, attendees }],
+      fetcher: async (_url, options) => { assert.deepEqual(JSON.parse(options.body), { description: original }); return Response.json({}); } });
+    assert.equal(result.updated, 1);
+    assert.equal(result.failed, 0);
+  }
 });

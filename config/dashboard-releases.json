@@ -1,6 +1,19 @@
 {
-  "currentVersion": "2.15.0",
+  "currentVersion": "2.15.1",
   "releases": [
+    {
+      "id": "2026-10-16-retrospective-calendar-verification",
+      "version": "2.15.1",
+      "date": "2026-10-16",
+      "category": "Team",
+      "title": "Verification for existing Calendar rentals",
+      "changes": [
+        "Existing studio rentals in the imported Calendar history now show employee confirmations at the top of their event descriptions, including rentals assigned before the app was introduced.",
+        "An accepted Google Calendar invitation displays a green check labelled Accepted in Google Calendar. App acceptances retain their own label, and pending or tentative responses remain distinct.",
+        "The sync uses recorded responses, preserves booking details, and refreshes confirmations when an employee changes their RSVP. It does not create historical app acceptances or change payroll."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-16-full-team-calendar",
       "version": "2.15.0",
