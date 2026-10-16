@@ -24,13 +24,14 @@ test("real owner history is complete while employee search content contains no a
   const employee = releaseHistoryForViewer(history.releases, "employee");
   const owner = releaseHistoryForViewer(history.releases, "owner");
   assert.equal(owner.length, history.releases.length);
-  for (const id of ["2026-10-14-shared-identity", "2026-09-05-owner-controls", "2026-09-05-stripe", "2026-09-05-category-reporting"]) {
+  for (const id of ["2026-10-15-owner-check-in-resets", "2026-10-14-shared-identity", "2026-09-05-owner-controls", "2026-09-05-stripe", "2026-09-05-category-reporting"]) {
     assert.ok(owner.some(note => note.id === id));
     assert.ok(!employee.some(note => note.id === id));
   }
   assert.ok(employee.some(note => note.id === "2026-10-15-employee-home"));
   assert.doesNotMatch(JSON.stringify(employee), /backend|encrypted|workflow|token|publishing|deploy/i);
-  assert.equal(employee[0].version, history.currentVersion);
+  assert.equal(owner[0].version, history.currentVersion);
+  assert.equal(employee[0].version, history.releases.find(note => note.employee)?.version);
 });
 
 test("custom-domain builds and project-URL builds keep their own asset base paths", () => {

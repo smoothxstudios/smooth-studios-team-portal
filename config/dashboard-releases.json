@@ -1,6 +1,20 @@
 {
-  "currentVersion": "2.12.1",
+  "currentVersion": "2.13.0",
   "releases": [
+    {
+      "id": "2026-10-15-owner-check-in-resets",
+      "version": "2.13.0",
+      "date": "2026-10-15",
+      "category": "Team",
+      "title": "Reset daily check-ins and manage SmoothStars",
+      "changes": [
+        "Smooth can reset an employee’s Temp Check for today from Team, keeping earlier days and reopening the check-in immediately.",
+        "Smooth can reopen a selected question from today, reverse its awarded points without making the balance negative, and let the employee try again. Other answers are kept.",
+        "SmoothStars can be removed individually or in a chosen quantity without changing points. Removed stickers stay removed, and future point milestones still earn new ones.",
+        "Each reset or reward adjustment requires a reason and is recorded in history. Stale requests and repeated clicks cannot erase a new response or apply the same adjustment twice."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-15-individual-quizzes-check-in-spacing",
       "version": "2.12.1",

@@ -25,12 +25,12 @@ function StarGoal({ summary }: { summary: StudioStars }) {
 
 function StarCollection({ summary }: { summary: StudioStars }) {
   return <div className="smoothstar-collection" aria-label={`${summary.stars} SmoothStars collected`}>
-    <Star size={32} aria-hidden="true" /><div><strong>{summary.stars}</strong><span>SmoothStars collected</span><small>{summary.earnedStars} from points · {summary.awardedStars} awarded by Smooth</small></div>
+    <Star size={32} aria-hidden="true" /><div><strong>{summary.stars}</strong><span>SmoothStars collected</span><small>{summary.earnedStars} earned · {summary.awardedStars} awarded{summary.removedStars > 0 ? ` · ${summary.removedStars} removed` : ""}</small></div>
   </div>;
 }
 function RewardHistory({ rewards }: { rewards: RewardChange[] }) {
   if (!rewards.length) return null;
-  return <><h3 className="creative-history-title">Points & star activity</h3><div className="reward-history">{rewards.map(reward => <div key={reward.id}><div className="engagement-row"><strong>{reward.kind === "star" ? "+1 SmoothStar" : `${reward.amount > 0 ? "+" : ""}${reward.amount} points`}</strong><small>{clock(reward.createdAt)}</small></div><p>{reward.reason}</p></div>)}</div></>;
+  return <><h3 className="creative-history-title">Points & star activity</h3><div className="reward-history">{rewards.map(reward => <div key={reward.id}><div className="engagement-row"><strong>{`${reward.amount > 0 ? "+" : ""}${reward.amount} ${reward.kind === "star" ? Math.abs(reward.amount) === 1 ? "SmoothStar" : "SmoothStars" : "points"}`}</strong><small>{clock(reward.createdAt)}</small></div><p>{reward.reason}</p></div>)}</div></>;
 }
 function NextQuizTime({ state }: { state: EmployeeEngagement }) {
   return state.nextQuestionAt ? <p className="quiz-next-time"><Clock3 size={16} aria-hidden="true" /><span>Next question: <strong>{clock(state.nextQuestionAt)} Eastern</strong></span></p> : <p className="engagement-muted quiz-tomorrow">Come back tomorrow for a new question.</p>;
@@ -97,13 +97,14 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
     return () => { mounted.current = false; requestSequence.current++; window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); window.removeEventListener("focus", refresh); };
   }, [load, enabled]);
   const current = state?.quiz.find(item => item.question.id === state.currentQuestionId);
+  useEffect(() => { moodRequestId.current = ""; }, [state?.moodRevision]);
   useEffect(() => { setOption(""); setCelebration(""); if (popupRef.current) popupRef.current.scrollTop = 0; }, [current?.question.id]);
   useEffect(() => { if (!homeActive) setPanel(null); }, [homeActive]);
   useEffect(() => {
     if (!state || panel || progressOpen || busy || error || document.querySelector('[role="dialog"][data-state="open"]')) return;
     const kind = nextEngagementPrompt(state, homeActive) as "mood" | "question" | null;
     if (!kind) return;
-    const key = kind === "mood" ? `mood:${state.nextMoodAt}` : `question:${state.currentQuestionId}`;
+    const key = kind === "mood" ? `mood:${state.moodRevision ?? 0}:${state.nextMoodAt}` : `question:${state.currentQuestionId}`;
     if (shown.current.has(key)) return;
     shown.current.add(key); setPanel(kind);
     if (kind === "question") {
@@ -218,10 +219,11 @@ export function TeamEngagementReview({ token }: { token: string }) {
   const [action, setAction] = useState("add");
   const [amount, setAmount] = useState("5");
   const [reason, setReason] = useState("");
+  const [questionId, setQuestionId] = useState("");
   const [saving, setSaving] = useState(false);
   const [rewardError, setRewardError] = useState("");
   const [rewardNotice, setRewardNotice] = useState("");
-  useEffect(() => { setAction("add"); setAmount("5"); setReason(""); setRewardError(""); setRewardNotice(""); rewardRequest.current = { key: "", id: "" }; }, [selected]);
+  useEffect(() => { setAction("add"); setAmount("5"); setReason(""); setQuestionId(""); setRewardError(""); setRewardNotice(""); rewardRequest.current = { key: "", id: "" }; }, [selected]);
   const load = useCallback(async () => {
     const request = ++sequence.current; setBusy(true);
     try { const result = await teamRequest<TeamEngagement>(token, "/engagement/team"); if (result.quizVersion !== 3) throw new Error("Quiz update pending"); if (request === sequence.current) { setState(result); setError(""); } }
@@ -230,22 +232,36 @@ export function TeamEngagementReview({ token }: { token: string }) {
   }, [token]);
   useEffect(() => { void load(); return () => { sequence.current++; }; }, [load]);
   const member = state?.members.find(person => person.userId === selected);
-  const numericAmount = Number(amount), signedAmount = action === "remove" ? -numericAmount : numericAmount;
+  const todaysQuestions = member?.todayQuiz ?? [];
+  const resetQuestion = todaysQuestions.find(item => item.question.id === questionId) ?? todaysQuestions.find(item => !item.attempt) ?? todaysQuestions.at(-1);
+  const resetting = action === "reset-mood" || action === "reset-question";
+  const starAction = action === "star" || action === "remove-stars";
+  const numericAmount = Number(amount), signedAmount = ["remove", "remove-stars"].includes(action) ? -numericAmount : numericAmount;
   const validAmount = Number.isSafeInteger(numericAmount) && numericAmount > 0 && numericAmount <= 10000;
-  const validReward = Boolean(member && reason.trim() && (action === "star" || (validAmount && member.summary.points + signedAmount >= 0)));
+  const pointsRemoved = Math.min(resetQuestion?.attempt?.points ?? 0, member?.summary.points ?? 0);
+  const supportsControls = state?.ownerControlsVersion === 1;
+  const validReward = Boolean(member && reason.trim() && (resetting ? supportsControls && (action === "reset-mood" || resetQuestion) :
+    action === "star" || (validAmount && (action === "remove-stars" ? supportsControls && numericAmount <= member.summary.stars : member.summary.points + signedAmount >= 0))));
+  const actionLabel = action === "star" ? "Award SmoothStar" : action === "remove-stars" ? "Remove SmoothStars" : action === "remove" ? "Remove points" :
+    action === "reset-mood" ? "Reset today's Temp Check" : action === "reset-question" ? "Reset question" : "Add points";
   async function saveReward() {
-    if (!member || !validReward || busy || savingRef.current) return;
-    const payload = { userId: member.userId, kind: action === "star" ? "star" : "points", amount: action === "star" ? 1 : signedAmount, reason: reason.trim() };
+    if (!member || !state || !validReward || busy || savingRef.current) return;
+    const payload = resetting ? { userId: member.userId, reason: reason.trim(), day: state.day,
+      ...(action === "reset-mood" ? { kind: "mood", moodRevision: member.moodRevision } : {
+        kind: "question", tier: resetQuestion!.question.tier, questionId: resetQuestion!.question.id, attemptedAt: resetQuestion!.attempt?.createdAt ?? null,
+      }) } : { userId: member.userId, kind: starAction ? "star" : "points", amount: action === "star" ? 1 : signedAmount, reason: reason.trim() };
     const key = JSON.stringify(payload);
     if (rewardRequest.current.key !== key) rewardRequest.current = { key, id: crypto.randomUUID() };
     savingRef.current = true; setSaving(true); setRewardError(""); setRewardNotice("");
     const request = ++sequence.current;
     try {
-      const result = await teamRequest<TeamEngagement>(token, "/engagement/rewards", { ...payload, requestId: rewardRequest.current.id });
+      const result = await teamRequest<TeamEngagement>(token, resetting ? "/engagement/reset" : "/engagement/rewards", { ...payload, requestId: rewardRequest.current.id });
       if (result.quizVersion !== 3) throw new Error("SmoothStars is updating. Please refresh in a moment.");
       if (request === sequence.current) {
-        setState(result); setRewardNotice(payload.kind === "star" ? `Awarded a SmoothStar to ${member.name}.` : `Updated ${member.name}'s points.`);
-        setReason(""); rewardRequest.current = { key: "", id: "" };
+        setState(result); setRewardNotice(action === "reset-mood" ? `Today's Temp Check is ready again for ${member.name}.` :
+          action === "reset-question" ? `${member.name}'s question is ready to retry.` : action === "remove-stars" ? `Removed ${numericAmount} ${numericAmount === 1 ? "SmoothStar" : "SmoothStars"} from ${member.name}.` :
+          action === "star" ? `Awarded a SmoothStar to ${member.name}.` : `Updated ${member.name}'s points.`);
+        setReason(""); setQuestionId(""); rewardRequest.current = { key: "", id: "" };
       }
     } catch (e) { if (request === sequence.current) setRewardError(e instanceof Error ? e.message : "That wasn't saved. Try again."); }
     finally { savingRef.current = false; setSaving(false); }
@@ -266,17 +282,23 @@ export function TeamEngagementReview({ token }: { token: string }) {
     <Dialog open={Boolean(member)} onOpenChange={open => { if (!open && !saving) setSelected(""); }}><DialogContent className="schedule-modal studio-stars-dialog"><DialogHeader><DialogTitle>{member?.name} · Check-ins & SmoothStars</DialogTitle><DialogDescription>Self-reported moods and recorded daily answers. All dates are Eastern.</DialogDescription></DialogHeader>
       {member && <><StarCollection summary={member.summary} /><StarGoal summary={member.summary} />
         <form className="reward-controls" onSubmit={event => { event.preventDefault(); void saveReward(); }}>
-          <h3>Manage points & SmoothStars</h3>
+          <h3>Manage check-ins, points & SmoothStars</h3>
           <fieldset disabled={saving || busy}>
-            <div className="reward-control-fields"><label>Action<select value={action} onChange={event => setAction(event.target.value)}><option value="add">Add points</option><option value="remove">Remove points</option><option value="star">Award a SmoothStar</option></select></label>
-            {action !== "star" && <label>Points<input type="number" min="1" max="10000" step="1" inputMode="numeric" value={amount} onChange={event => setAmount(event.target.value)} required /></label>}</div>
+            <div className="reward-control-fields"><label>Action<select aria-label="Action" value={action} onChange={event => { setAction(event.target.value); setAmount(event.target.value === "remove-stars" ? "1" : "5"); setRewardError(""); setRewardNotice(""); }}><option value="add">Add points</option><option value="remove">Remove points</option><option value="star">Award a SmoothStar</option><option value="remove-stars" disabled={!supportsControls}>Remove SmoothStars</option><option value="reset-mood" disabled={!supportsControls}>Reset today's Temp Check</option><option value="reset-question" disabled={!supportsControls}>Reset a question for today</option></select></label>
+            {!resetting && action !== "star" && <label>{action === "remove-stars" ? "SmoothStars" : "Points"}<input type="number" min="1" max="10000" step="1" inputMode="numeric" value={amount} onChange={event => setAmount(event.target.value)} required /></label>}</div>
+            {action === "reset-question" && <><label>Today's question<select aria-label="Today's question" value={resetQuestion?.question.id ?? ""} onChange={event => setQuestionId(event.target.value)} disabled={!todaysQuestions.length}><option value="" disabled>Choose a question</option>{todaysQuestions.map(item => <option key={item.question.id} value={item.question.id}>{tierLabel(item.question.tier)} · {item.attempt ? `${item.attempt.correct ? "Correct" : "Incorrect"} · ${item.attempt.points} points` : "Not answered"}</option>)}</select></label>{resetQuestion ? <p className="engagement-muted">{resetQuestion.question.prompt}</p> : <p className="engagement-muted">No question has been opened today. Have them open Daily Quiz first.</p>}</>}
             <label>Reason<input type="text" maxLength={240} value={reason} onChange={event => setReason(event.target.value)} placeholder="e.g. Great teamwork on a rental" required /></label>
-            <p className="engagement-muted">{action === "star" ? `${member.name} will have ${member.summary.stars + 1} SmoothStars. Points stay the same.` : validAmount ? `${member.name}: ${member.summary.points} → ${member.summary.points + signedAmount} points. Collected stickers are kept.` : "Enter a whole number of points."}</p>
+            <p className="engagement-muted">{action === "reset-mood" ? `Clears today's Temp Check entries for ${member.name} and lets them check in again now. Earlier days stay in their history.` :
+              action === "reset-question" ? `Reopens this question now and removes ${pointsRemoved} points from the available balance. Other answers and collected stickers stay. Any other unanswered question waits until two hours after this retry.` :
+              action === "star" ? `${member.name} will have ${member.summary.stars + 1} SmoothStars. Points stay the same.` :
+              action === "remove-stars" ? `${member.name}: ${member.summary.stars} → ${validAmount ? Math.max(0, member.summary.stars - numericAmount) : "—"} SmoothStars. Points and the next points milestone stay the same.` :
+              validAmount ? `${member.name}: ${member.summary.points} → ${member.summary.points + signedAmount} points. Collected stickers are kept.` : "Enter a whole number of points."}</p>
             {action === "remove" && validAmount && member.summary.points + signedAmount < 0 && <p className="engagement-error">Choose an amount up to {member.summary.points} points.</p>}
-            <Button type="submit" disabled={saving || busy || !validReward}>{saving ? "Saving…" : action === "star" ? "Award SmoothStar" : action === "remove" ? "Remove points" : "Add points"}</Button>
+            {action === "remove-stars" && validAmount && numericAmount > member.summary.stars && <p className="engagement-error">They have {member.summary.stars} SmoothStars available to remove.</p>}
+            <Button type="submit" disabled={saving || busy || !validReward}>{saving ? "Saving…" : actionLabel}</Button>
           </fieldset>
           {rewardError && <p className="engagement-error" role="alert">{rewardError}</p>}{rewardNotice && <p className="engagement-feedback" role="status">{rewardNotice}</p>}
-        </form><RewardHistory rewards={member.rewards} /><p className="engagement-muted">{member.summary.correct} correct · {member.summary.incorrect} incorrect · {member.summary.answered} answered</p><h3 className="creative-history-title">Recent Temp Checks</h3><div className="team-mood-history">{member.moods.length ? member.moods.map(checkin => { const mood = moodFor(checkin.mood); return <div key={checkin.id}><strong><span aria-hidden="true">{mood?.emoji}</span> {mood?.label}</strong><span>{clock(checkin.createdAt)}</span></div>; }) : <p className="engagement-muted">No check-ins recorded yet.</p>}</div><h3 className="creative-history-title">Recent quiz answers</h3><AttemptHistory attempts={member.history} /></>}
+        </form>{Boolean(member.resets?.length) && <details className="engagement-reset-history"><summary>Recent resets</summary><div className="reward-history">{member.resets.map(reset => <div key={reset.id}><strong>{reset.kind === "mood" ? "Temp Check reset" : `${tierLabel(reset.tier ?? "")} question reset · −${reset.pointsRemoved} points`}</strong><p>{reset.reason}</p><small>{clock(reset.createdAt)}</small></div>)}</div></details>}<RewardHistory rewards={member.rewards} /><p className="engagement-muted">{member.summary.correct} correct · {member.summary.incorrect} incorrect · {member.summary.answered} answered</p><h3 className="creative-history-title">Recent Temp Checks</h3><div className="team-mood-history">{member.moods.length ? member.moods.map(checkin => { const mood = moodFor(checkin.mood); return <div key={checkin.id}><strong><span aria-hidden="true">{mood?.emoji}</span> {mood?.label}</strong><span>{clock(checkin.createdAt)}</span></div>; }) : <p className="engagement-muted">No check-ins recorded yet.</p>}</div><h3 className="creative-history-title">Recent quiz answers</h3><AttemptHistory attempts={member.history} /></>}
     </DialogContent></Dialog>
   </section>;
 }

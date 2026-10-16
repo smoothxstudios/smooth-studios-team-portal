@@ -156,6 +156,8 @@
 .reward-history > div { border-bottom: 1px solid var(--border); padding: 10px 0; font-size: 12px; }
 .reward-history small, .reward-history p { color: var(--muted-foreground); font-size: 11px; line-height: 1.6; }
 .reward-history p { margin-top: 4px; overflow-wrap: anywhere; }
+.engagement-reset-history { margin: 16px 0; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
+.engagement-reset-history > summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .quiz-tomorrow { margin: 10px 0; }
 .creative-choices { display: grid; gap: 6px; min-width: 0; }
 .creative-choices label { display: flex; align-items: center; gap: 9px; padding: 9px 11px; min-height: 44px; font-size: 13px; line-height: 1.45; border: 1px solid var(--border); border-radius: 11px; cursor: pointer; }

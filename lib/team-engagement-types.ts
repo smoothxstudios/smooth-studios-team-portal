@@ -9,14 +9,14 @@ export type CreativeAttempt = {
   source: { label: string; url: string };
 };
 export type StudioStars = {
-  points: number; stars: number; earnedStars: number; awardedStars: number; progress: number; goal: number; remaining: number;
+  points: number; stars: number; earnedStars: number; awardedStars: number; removedStars: number; progress: number; goal: number; remaining: number;
   answered: number; correct: number; incorrect: number;
 };
 export type RewardChange = { id: string; kind: "points" | "star"; amount: number; reason: string; createdAt: string };
 export type MoodCheckin = { id: string; mood: string; createdAt: string };
 export type EmployeeEngagement = {
   quizVersion: 3;
-  serverNow: number; day: string; moodDue: boolean; nextMoodAt: number;
+  serverNow: number; day: string; moodDue: boolean; nextMoodAt: number; moodRevision: number;
   lastMood: MoodCheckin | null; questionDue: boolean; available: boolean;
   currentQuestionId: string | null; answeredToday: number; nextQuestionAt: number | null;
   quiz: { question: CreativeQuestion; attempt: CreativeAttempt | null }[];
@@ -24,8 +24,12 @@ export type EmployeeEngagement = {
 };
 export type TeamEngagement = {
   quizVersion: 3;
+  ownerControlsVersion: 1;
   serverNow: number; day: string; members: {
     userId: string; name: string; color: string; summary: StudioStars;
     history: CreativeAttempt[]; moods: MoodCheckin[]; today: CreativeAttempt[]; rewards: RewardChange[];
+    moodRevision: number;
+    todayQuiz: { question: CreativeQuestion; attempt: CreativeAttempt | null }[];
+    resets: { id: string; kind: "mood" | "question"; tier: QuizTier | null; reason: string; pointsRemoved: number; createdAt: string }[];
   }[];
 };

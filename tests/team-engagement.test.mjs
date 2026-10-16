@@ -8,7 +8,7 @@ import { teamToken, tokenHash } from "../lib/team-auth.mjs";
 import { TEMP_CHECK_INTERVAL_MS, QUIZ_INTERVAL_MS, MOODS, QUIZ_TIERS, nextEngagementPrompt, starProgress } from "../lib/team-engagement.mjs";
 import { dailyQuestion, employeeQuestionCandidates, publicQuestion, QUESTION_BANK, QUESTION_BANKS } from "../team-api/creative-questions.mjs";
 
-const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
+const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
 const tokens = Object.fromEntries(await Promise.all([...TEAM.map(p => p.id), "sync"].map(async id => [id, await teamToken(`synthetic-engagement-test-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(Object.entries(tokens).map(async ([id, token]) => [id, await tokenHash(token)])));
 const now = Date.parse("2026-10-15T17:00:00Z"), today = "2026-10-15";
@@ -17,13 +17,13 @@ test.beforeEach(() => mock.timers.setTime(now));
 test.after(() => mock.timers.reset());
 
 class D1 {
-  constructor() { this.sqlite = new DatabaseSync(":memory:"); migrations.forEach(sql => this.sqlite.exec(sql)); }
+  constructor() { this.sqlite = new DatabaseSync(":memory:"); this.queries = 0; this.errors = []; migrations.forEach(sql => this.sqlite.exec(sql)); }
   prepare(sql) {
-    const db = this.sqlite; let args = [];
+    const db = this.sqlite, owner = this; let args = [];
     return { bind(...values) { args = values; return this; },
-      async first() { return db.prepare(sql).get(...args) ?? null; },
-      async all() { return { results: db.prepare(sql).all(...args) }; },
-      runSync() { return { meta: { changes: Number(db.prepare(sql).run(...args).changes) } }; },
+      async first() { owner.queries++; return db.prepare(sql).get(...args) ?? null; },
+      async all() { owner.queries++; return { results: db.prepare(sql).all(...args) }; },
+      runSync() { owner.queries++; try { return { meta: { changes: Number(db.prepare(sql).run(...args).changes) } }; } catch(error) { owner.errors.push(error.message); throw error; } },
       async run() { return this.runSync(); } };
   }
   async batch(statements) {
@@ -59,6 +59,12 @@ async function offered(f, user, correct = true) {
 }
 const adjustment = (amount = 10, extra = {}) => ({ requestId: crypto.randomUUID(), userId: "jordyn", kind: "points", amount, reason: "Synthetic test reward", ...extra });
 const reportMember = (data, id = "jordyn") => data.members.find(p => p.userId === id);
+async function resetInput(f, kind = "question", user = "jordyn", tier) {
+  const report = (await f.call("owner", "/engagement/team")).data, member = reportMember(report, user);
+  const question = tier ? member.todayQuiz.find(item => item.question.tier === tier) : member.todayQuiz.at(-1);
+  return { requestId: crypto.randomUUID(), userId: user, day: report.day, kind, reason: "Synthetic reset correction",
+    ...(kind === "mood" ? { moodRevision: member.moodRevision } : { tier: question.question.tier, questionId: question.question.id, attemptedAt: question.attempt?.createdAt ?? null }) };
+}
 
 test("private employee state exposes only one server-issued question and no unanswered key", async () => {
   const f = fixture();
@@ -74,7 +80,7 @@ test("private employee state exposes only one server-issued question and no unan
   const q = current(state).question;
   assert.equal(q.options.length, 4);
   for (const key of ["correctOptionId", "explanation", "source"]) assert.ok(!(key in q));
-  assert.equal((await f.call("owner", "/health")).data.engagementVersion, 4);
+  assert.equal((await f.call("owner", "/health")).data.engagementVersion, 5);
 });
 
 test("moods remain private and independent of quiz points, assignments, and notifications", async () => {
@@ -179,7 +185,7 @@ test("shared unanswered legacy offers become distinct without changing submitted
   const completed = { day: today, tier: q.tier, createdAt: new Date(now).toISOString(), question: publicQuestion(q), selectedOptionId: q.correctOptionId,
     correctOptionId: q.correctOptionId, correct: true, points: q.points, explanation: q.explanation, source: q.source };
   const snapshot = JSON.stringify(completed);
-  f.DB.sqlite.prepare("INSERT INTO team_quiz_attempts VALUES (?, ?, ?, 1, ?, ?, ?)").run(people[0], today, q.tier, q.points, now, snapshot);
+  f.DB.sqlite.prepare("INSERT INTO team_quiz_attempts (user_id, day, tier, correct, points, created_at, data) VALUES (?, ?, ?, 1, ?, ?, ?)").run(people[0], today, q.tier, q.points, now, snapshot);
   const results = await Promise.all(people.map(user => f.call(user)));
   const questions = results.map(r => { assert.equal(r.status, 200); return current(r.data).question; });
   assert.equal(new Set(questions.map(item => item.prompt)).size, people.length);
@@ -197,7 +203,7 @@ test("shared unanswered legacy offers become distinct without changing submitted
 test("already answered questions without offers are excluded from new reservations", async () => {
   const f = fixture(), q = employeeQuestionCandidates(today, "easy", "jordyn")[0];
   const snapshot = JSON.stringify({ day: today, tier: "easy", createdAt: new Date(now).toISOString(), question: publicQuestion(q), points: 5, correct: true });
-  f.DB.sqlite.prepare("INSERT INTO team_quiz_attempts VALUES ('rayne', ?, 'easy', 1, 5, ?, ?)").run(today, now, snapshot);
+  f.DB.sqlite.prepare("INSERT INTO team_quiz_attempts (user_id, day, tier, correct, points, created_at, data) VALUES ('rayne', ?, 'easy', 1, 5, ?, ?)").run(today, now, snapshot);
   const random = mock.method(crypto, "getRandomValues", values => values.fill(0));
   try {
     const state = (await f.call("jordyn")).data;
@@ -238,7 +244,7 @@ test("one question per two hours, one of each tier, with no banked instant backl
 test("wrong answers stay final; concurrent submissions cannot duplicate a reward", async () => {
   const f = fixture(), wrong = await offered(f, "sorayia", false);
   const first = await f.call("sorayia", "/engagement/answer", wrong);
-  const retry = await f.call("sorayia", "/engagement/answer", answer(today, true, wrong.tier));
+  const retry = await f.call("sorayia", "/engagement/answer", { ...wrong, optionId: "option-0" });
   assert.deepEqual(current(retry.data).attempt, current(first.data).attempt);
   assert.equal(retry.data.summary.points, 0);
   assert.equal(retry.data.summary.incorrect, 1);
@@ -324,13 +330,13 @@ test("migration preserves old snapshots and points; late old-worker answers star
   const input = await offered(f, "jordyn"); assert.notEqual(input.tier, "medium");
   await f.call("jordyn", "/engagement/answer", input);
   const points = (await f.call("jordyn")).data.summary.points;
-  migrations.slice(5).forEach(sql => f.DB.sqlite.exec(sql));
+  migrations.slice(5, 8).forEach(sql => f.DB.sqlite.exec(sql));
   assert.equal((await f.call("jordyn")).data.summary.points, points);
   assert.equal(f.DB.sqlite.prepare("SELECT data FROM team_creative_attempts").get().data, json);
   // Seed a pre-migration database and run the additive account migration twice.
   const old = new DatabaseSync(":memory:"); migrations.slice(0, 6).forEach(sql => old.exec(sql));
-  old.prepare("INSERT INTO team_quiz_attempts VALUES (?, ?, ?, ?, ?, ?, ?)").run("amia", today, "medium", 1, 10, now, json);
-  migrations.slice(6).forEach(sql => old.exec(sql)); migrations.slice(6).forEach(sql => old.exec(sql));
+  old.prepare("INSERT INTO team_quiz_attempts (user_id, day, tier, correct, points, created_at, data) VALUES (?, ?, ?, ?, ?, ?, ?)").run("amia", today, "medium", 1, 10, now, json);
+  migrations.slice(6).forEach(sql => old.exec(sql)); old.exec(migrations[6]);
   assert.equal(old.prepare("SELECT points FROM team_reward_accounts").get().points, 10);
 });
 
@@ -363,7 +369,7 @@ test("owner can add/remove points and award a separate SmoothStar with a private
 test("only the owner can administer valid adjustments for active employees", async () => {
   const f = fixture();
   for (const user of ["jordyn", "sync"]) assert.equal((await f.call(user, "/engagement/rewards", adjustment())).status, 403);
-  for (const extra of [{userId:"owner"}, {userId:"unknown"}, {amount:0}, {amount:1.5}, {amount:10001}, {kind:"star",amount:2}, {kind:"star",amount:-1}, {reason:" "}, {reason:"x".repeat(241)}, {requestId:"bad"}, {kind:"bad"}]) assert.equal((await f.call("owner", "/engagement/rewards", adjustment(10, extra))).status, 400);
+  for (const extra of [{userId:"owner"}, {userId:"unknown"}, {amount:0}, {amount:1.5}, {amount:10001}, {kind:"star",amount:2}, {kind:"star",amount:-10001}, {reason:" "}, {reason:"x".repeat(241)}, {requestId:"bad"}, {kind:"bad"}]) assert.equal((await f.call("owner", "/engagement/rewards", adjustment(10, extra))).status, 400);
   f.env.TEAM_TOKEN_HASHES = JSON.stringify(Object.fromEntries(Object.entries(hashes).filter(([id]) => id !== "amia")));
   assert.equal((await f.call("owner", "/engagement/rewards", adjustment(10, { userId: "amia" }))).status, 400);
   assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_reward_changes").get().n, 0);
@@ -423,5 +429,171 @@ test("Home-only prompt order and star goals account for permanent and awarded st
   assert.equal(starProgress(90).remaining, 10);
   assert.equal(starProgress(100).stars, 1);
   assert.equal(starProgress(230).progress, 30);
-  assert.deepEqual(starProgress(30, 150, 2), { points: 30, stars: 3, earnedStars: 1, awardedStars: 2, progress: 0, goal: 200, remaining: 170 });
+  assert.deepEqual(starProgress(30, 150, 2), { points: 30, stars: 3, earnedStars: 1, awardedStars: 2, removedStars: 0, progress: 0, goal: 200, remaining: 170 });
+});
+
+test("owner resets only today's Temp Checks and a replay cannot hide a new check-in", async () => {
+  const f = fixture(), yesterday = now - 86400000;
+  f.DB.sqlite.prepare("INSERT INTO team_mood_checkins (id, user_id, mood, created_at) VALUES ('earlier', 'jordyn', 'okay', ?)").run(yesterday);
+  const first = mood('happy'); await f.call('jordyn', '/engagement/mood', first);
+  const input = await resetInput(f, 'mood');
+  f.DB.queries = 0;
+  const result = await f.call('owner', '/engagement/reset', input);
+  assert.equal(result.status, 200); assert.ok(f.DB.queries <= 50);
+  assert.deepEqual(reportMember(result.data).moods.map(m => m.id), ['earlier']);
+  const due = (await f.call('jordyn')).data;
+  assert.equal(due.moodDue, true); assert.equal(due.summary.points, 0);
+  assert.ok(due.moodRevision > input.moodRevision);
+  await f.call('jordyn', '/engagement/mood', first); // stale request stays idempotent
+  assert.equal((await f.call('jordyn')).data.moodDue, true);
+  mock.timers.setTime(now + 1000);
+  await f.call('jordyn', '/engagement/mood', mood('chilling'));
+  const fresh = (await f.call('jordyn')).data;
+  await Promise.all(Array.from({length: 4}, () => f.call('owner', '/engagement/reset', input)));
+  assert.equal((await f.call('jordyn')).data.lastMood.id, fresh.lastMood.id);
+  assert.equal((await f.call('jordyn')).data.moodDue, false);
+  assert.equal((await f.call('owner', '/engagement/reset', {...input, requestId: crypto.randomUUID()})).status, 409);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) n FROM team_engagement_resets').get().n, 1);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) n FROM team_mood_checkins').get().n, 3);
+});
+
+test("resetting a correct question reverses its points once and permits one new scored attempt", async () => {
+  const f = fixture(), original = await offered(f, 'jordyn');
+  const answered = (await f.call('jordyn', '/engagement/answer', original)).data;
+  const input = await resetInput(f);
+  mock.timers.setTime(now + 1000);
+  const resets = await Promise.all(Array.from({length: 6}, () => f.call('owner', '/engagement/reset', input)));
+  assert.ok(resets.every(r => r.status === 200));
+  const state = (await f.call('jordyn')).data;
+  assert.equal(state.summary.points, 0); assert.equal(state.summary.answered, 0);
+  assert.equal(state.available, true); assert.equal(state.questionDue, true);
+  assert.notEqual(state.currentQuestionId, original.questionId);
+  assert.equal(current(state).question.prompt, current(answered).question.prompt);
+  assert.equal((await f.call('jordyn', '/engagement/answer', original)).status, 409);
+  const archived = JSON.parse(f.DB.sqlite.prepare('SELECT previous_data FROM team_engagement_resets').get().previous_data);
+  assert.deepEqual(archived.attempt, current(answered).attempt);
+  const retry = await offered(f, 'jordyn');
+  const results = await Promise.all(Array.from({length: 6}, () => f.call('jordyn', '/engagement/answer', retry)));
+  assert.ok(results.every(r => r.status === 200), JSON.stringify({results, errors:f.DB.errors}));
+  const final = (await f.call('jordyn')).data;
+  assert.equal(final.summary.points, answered.summary.points); assert.equal(final.summary.answered, 1);
+  await f.call('owner', '/engagement/reset', input); // delayed owner retry preserves the new answer
+  assert.deepEqual((await f.call('jordyn')).data.summary, final.summary);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) n FROM team_reward_changes').get().n, 1);
+});
+
+test("resetting an earlier question holds another pending question until two hours after the retry", async () => {
+  const f = fixture(), first = await offered(f, 'jordyn');
+  await f.call('jordyn', '/engagement/answer', first);
+  mock.timers.setTime(now + QUIZ_INTERVAL_MS);
+  const second = await offered(f, 'jordyn'), input = await resetInput(f, 'question', 'jordyn', first.tier);
+  assert.equal((await f.call('owner', '/engagement/reset', input)).status, 200);
+  let state = (await f.call('jordyn')).data;
+  assert.equal(current(state).question.tier, first.tier); assert.equal(state.quiz.length, 1);
+  assert.equal((await f.call('jordyn', '/engagement/answer', second)).status, 409);
+  mock.timers.setTime(now + QUIZ_INTERVAL_MS + 1000);
+  await f.call('jordyn', '/engagement/answer', await offered(f, 'jordyn'));
+  state = (await f.call('jordyn')).data;
+  assert.equal(state.available, false); assert.equal(state.nextQuestionAt, now + 2 * QUIZ_INTERVAL_MS + 1000);
+  mock.timers.setTime(state.nextQuestionAt);
+  assert.equal((await f.call('jordyn')).data.currentQuestionId, second.questionId);
+  await f.call('jordyn', '/engagement/answer', second);
+  mock.timers.setTime(Date.now() + QUIZ_INTERVAL_MS);
+  await f.call('jordyn', '/engagement/answer', await offered(f, 'jordyn'));
+  const final = (await f.call('jordyn')).data;
+  assert.equal(final.summary.points, 30); assert.equal(final.answeredToday, 3); assert.equal(final.available, false);
+});
+
+test("unanswered and incorrect questions can be reset, and depleted points never become negative", async () => {
+  const f = fixture(); await offered(f, 'jordyn');
+  let input = await resetInput(f);
+  await f.call('jordyn', '/engagement/dismiss', {kind:'question', day:today, questionId:input.questionId});
+  assert.equal((await f.call('owner', '/engagement/reset', input)).status, 200);
+  assert.equal((await f.call('jordyn')).data.questionDue, true);
+  assert.equal((await f.call('jordyn', '/engagement/answer', await offered(f, 'jordyn', false))).status, 200);
+  input = await resetInput(f); assert.equal((await f.call('owner', '/engagement/reset', input)).status, 200);
+  assert.equal((await f.call('jordyn')).data.summary.incorrect, 0);
+  const good = await offered(f, 'jordyn'); assert.equal((await f.call('jordyn', '/engagement/answer', good)).status, 200);
+  const earned = (await f.call('jordyn')).data.summary.points;
+  assert.ok(earned > 0);
+  assert.equal((await f.call('owner', '/engagement/rewards', adjustment(-earned))).status, 200);
+  input = await resetInput(f); assert.equal((await f.call('owner', '/engagement/reset', input)).status, 200);
+  assert.equal((await f.call('jordyn')).data.summary.points, 0);
+  assert.equal((await f.call('jordyn', '/engagement/answer', await offered(f, 'jordyn'))).status, 200);
+  assert.equal((await f.call('jordyn')).data.summary.points, earned);
+});
+
+test("today's imported legacy question can be reset without reimporting its old result", async () => {
+  const f = fixture(), q = dailyQuestion(today, 'medium');
+  const old = {day:today, tier:'medium', createdAt:new Date(now).toISOString(), question:publicQuestion(q), selectedOptionId:q.correctOptionId, correctOptionId:q.correctOptionId, correct:true, points:10, explanation:q.explanation, source:q.source};
+  f.DB.sqlite.prepare('INSERT INTO team_creative_attempts VALUES (?, ?, 1, 10, ?, ?)').run('jordyn', today, now, JSON.stringify(old));
+  f.DB.sqlite.prepare('INSERT INTO team_creative_attempts VALUES (?, ?, 1, 10, ?, ?)').run('rayne', today, now, JSON.stringify(old));
+  const input = await resetInput(f);
+  assert.equal(input.questionId, q.id);
+  assert.equal((await f.call('owner', '/engagement/reset', input)).status, 200);
+  assert.equal((await f.call('jordyn')).data.summary.points, 0);
+  assert.equal((await f.call('jordyn')).data.answeredToday, 0);
+  assert.equal(current((await f.call('jordyn')).data).question.prompt, q.prompt);
+  await f.call('jordyn', '/engagement/answer', await offered(f, 'jordyn'));
+  assert.equal((await f.call('jordyn')).data.summary.points, 10);
+  assert.equal(f.DB.sqlite.prepare('SELECT data FROM team_creative_attempts').get().data, JSON.stringify(old));
+});
+
+test("employee resets are owner-only, current-day only, and reject stale targets and reused IDs", async () => {
+  const f = fixture(), answerInput = await offered(f, 'jordyn'), input = await resetInput(f);
+  for (const user of ['jordyn', 'rayne', 'sync']) assert.equal((await f.call(user, '/engagement/reset', input)).status, 403);
+  for (const extra of [{userId:'owner'}, {userId:'unknown'}, {tier:'expert'}, {reason:' '}, {requestId:'bad'}, {kind:'unknown'}]) assert.equal((await f.call('owner', '/engagement/reset', {...input,...extra})).status, 400);
+  assert.equal((await f.call('owner', '/engagement/reset', {...input,day:'2026-10-14'})).status, 409);
+  await f.call('jordyn', '/engagement/answer', answerInput);
+  assert.equal((await f.call('owner', '/engagement/reset', input)).status, 409);
+  const fresh = await resetInput(f);
+  assert.equal((await f.call('owner', '/engagement/reset', fresh)).status, 200);
+  assert.equal((await f.call('owner', '/engagement/reset', {...fresh,reason:'Different action'})).status, 409);
+  mock.timers.setTime(Date.parse('2026-10-16T04:00:00Z'));
+  assert.equal((await f.call('owner', '/engagement/reset', fresh)).status, 409);
+});
+
+test("a simultaneous answer and reset cannot apply an unseen score reversal or accept an old question", async () => {
+  const f = fixture(), answerInput = await offered(f, 'jordyn'), input = await resetInput(f);
+  const [reset, answerResult] = await Promise.all([f.call('owner', '/engagement/reset', input), f.call('jordyn', '/engagement/answer', answerInput)]);
+  assert.deepEqual([reset.status,answerResult.status].sort(), [200,409]);
+  const state = (await f.call('jordyn')).data;
+  if (reset.status === 200) { assert.equal(state.summary.points,0); assert.equal(state.available,true); assert.notEqual(state.currentQuestionId,answerInput.questionId); }
+  else { assert.equal(state.available,false); assert.equal(state.summary.answered,1); }
+});
+
+test("SmoothStars can be removed from earned and awarded totals without reducing points or regrowing on refresh", async () => {
+  const f = fixture(); await f.call('owner','/engagement/rewards',adjustment(100));
+  await f.call('owner','/engagement/rewards',adjustment(1,{kind:'star'}));
+  const remove = adjustment(-2,{kind:'star'});
+  const responses = await Promise.all(Array.from({length:5},()=>f.call('owner','/engagement/rewards',remove)));
+  assert.ok(responses.every(r=>r.status===200));
+  let summary = (await f.call('jordyn')).data.summary;
+  assert.equal(summary.stars,0); assert.equal(summary.removedStars,2); assert.equal(summary.points,100); assert.equal(summary.goal,200);
+  assert.equal((await f.call('owner','/engagement/rewards',adjustment(-1,{kind:'star'}))).status,409);
+  await f.call('owner','/engagement/rewards',adjustment(-50)); await f.call('owner','/engagement/rewards',adjustment(50));
+  assert.equal((await f.call('jordyn')).data.summary.stars,0);
+  await f.call('owner','/engagement/rewards',adjustment(100));
+  summary = (await f.call('jordyn')).data.summary;
+  assert.equal(summary.stars,1); assert.equal(summary.goal,300);
+  f.DB.queries=0; await f.call('owner','/engagement/rewards',adjustment(-1,{kind:'star'})); assert.ok(f.DB.queries<=50);
+  assert.equal((await f.call('rayne')).data.summary.stars,0);
+  assert.ok((await f.call('jordyn')).data.rewards.some(r=>r.kind==='star'&&r.amount===-2));
+});
+
+test("competing star removals cannot take the collection below zero", async () => {
+  const f=fixture(); await f.call('owner','/engagement/rewards',adjustment(1,{kind:'star'}));
+  const results=await Promise.all([f.call('owner','/engagement/rewards',adjustment(-1,{kind:'star'})),f.call('owner','/engagement/rewards',adjustment(-1,{kind:'star'}))]);
+  assert.deepEqual(results.map(r=>r.status).sort(),[200,409]); assert.equal((await f.call('jordyn')).data.summary.stars,0);
+});
+
+test("owner-control migration preserves all preexisting reward entries and balances", () => {
+  const db=new DatabaseSync(':memory:'); migrations.slice(0,8).forEach(sql=>db.exec(sql));
+  db.prepare("INSERT INTO team_reward_changes VALUES ('points', 'jordyn', 'points', 150, 'Synthetic old award', 'owner', ?)").run(now);
+  db.prepare("INSERT INTO team_reward_changes VALUES ('star', 'jordyn', 'star', 1, 'Synthetic old star', 'owner', ?)").run(now);
+  const ledger=db.prepare('SELECT * FROM team_reward_changes ORDER BY id').all(),before=db.prepare('SELECT * FROM team_reward_accounts').get();
+  db.exec(migrations[8]);
+  assert.deepEqual(db.prepare('SELECT * FROM team_reward_changes ORDER BY id').all(),ledger);
+  assert.deepEqual({...db.prepare('SELECT * FROM team_reward_accounts').get()},{...before,removed_stars:0});
+  db.close();
 });
