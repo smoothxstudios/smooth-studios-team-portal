@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.24.1",
+  "currentVersion": "2.24.2",
   "releases": [
+    {
+      "id": "2026-10-16-time-block-revision-recovery",
+      "version": "2.24.2",
+      "date": "2026-10-16",
+      "category": "Scheduling",
+      "title": "Time blocks recover when the schedule updates",
+      "changes": [
+        "When saving a new blocked-time entry finds a newer schedule revision, the dashboard retrieves the current schedule and retries once without clearing the form.",
+        "Before retrying it checks for an identical existing block, preventing a recurring commitment from being added twice.",
+        "If a second schedule change interrupts the retry, the form stays open with a clearer next step. Assignment responses, overrides, and deletions retain their original concurrency checks."
+      ],
+      "employee": {
+        "title": "Smoother time-block saving",
+        "changes": [
+          "If your schedule updates while you save a new unavailable-time block, the dashboard refreshes it and retries once without losing the dates, hours, or reason.",
+          "An already-saved matching block is not added again. If the schedule changes twice, the form stays open so you can try again."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-quicker-refresh-return",
       "version": "2.24.1",
