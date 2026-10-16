@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { teamRequest } from "@/lib/team-api";
+import { useRefreshSource } from "@/components/dashboard-refresh";
 
 export type DashboardAlert = {
   id: string; sequence: number; kind: string; title: string; body: string;
@@ -17,7 +18,7 @@ export function useAlerts(token: string, active: boolean) {
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const requestId = useRef(0), operation = useRef(false), pages = useRef(1);
   const refresh = useCallback(async () => {
-    if (operation.current) return;
+    if (operation.current) return false;
     const current = ++requestId.current;
     try {
       if (!active) {
@@ -32,9 +33,11 @@ export function useAlerts(token: string, active: boolean) {
         }
         if (current === requestId.current) { setPage(result); setError(""); }
       }
-    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "Alerts couldn’t be loaded. Try again."); }
+      return true;
+    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "Alerts couldn’t be loaded. Try again."); return false; }
     finally { if (current === requestId.current) setLoading(false); }
   }, [token, active, filter]);
+  useRefreshSource(refresh);
   useEffect(() => {
     const start = window.setTimeout(() => void refresh(), 0);
     const update = () => { if (document.visibilityState === "visible") void refresh(); };

@@ -1,6 +1,31 @@
 {
-  "currentVersion": "2.23.0",
+  "currentVersion": "2.24.0",
   "releases": [
+    {
+      "id": "2026-10-16-mobile-refresh-motion",
+      "version": "2.24.0",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Pull to refresh and smoother mobile navigation",
+      "changes": [
+        "Pull down at the top of a mobile page to refresh its latest available data while keeping the account signed in, the current page, and filters.",
+        "The mobile toolbar tracks finger movement more smoothly, slides away while scrolling down, and returns on an upward scroll.",
+        "The three-line menu button sits at the top left. The sidebar backdrop fades in and out with the drawer.",
+        "The phone sidebar scrolls within its fixed header and footer without stretching past the ends. Scrolling over another tab no longer leaves a false selected highlight.",
+        "Team → People uses smaller cards with compact pay totals and a single-line next accepted date. The repeated status badge and oversized spacing are removed.",
+        "Help explains pull-to-refresh, the hiding toolbar, and the five-minute Calendar and Stripe import schedule."
+      ],
+      "employee": {
+        "title": "Refresh with a pull and smoother navigation",
+        "changes": [
+          "Pull down at the top of a mobile page to refresh its latest available data while keeping the account signed in, the current page, and filters.",
+          "The mobile toolbar tracks finger movement more smoothly, slides away while scrolling down, and returns on an upward scroll.",
+          "The three-line menu button sits at the top left. The sidebar backdrop fades in and out with the drawer.",
+          "The phone sidebar scrolls within its fixed header and footer without stretching past the ends. Scrolling over another tab no longer leaves a false selected highlight."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-sliding-mobile-toolbar",
       "version": "2.23.0",

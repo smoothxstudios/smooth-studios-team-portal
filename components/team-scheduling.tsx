@@ -11,6 +11,7 @@ import type { DashboardPayload } from "@/lib/dashboard-types";
 import { EmployeeHome, type EmployeeHomeOptions } from "@/components/employee-home";
 import { TeamAvailability } from "@/components/team-availability";
 import { OwnerScheduleAgenda } from "@/components/owner-schedule-agenda";
+import { useRefreshSource } from "@/components/dashboard-refresh";
 import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps, workPreferenceMatch } from "@/lib/team-schedule.mjs";
 
 const personName = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
@@ -127,11 +128,13 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     setError(""); setBlock({ userId: isOwner ? id ?? (filter !== "all" ? filter : userId) : userId, reason: "Class", ...initialPeriod(), repeatUntil: "", weekly: false }); setBlockOpen(true);
   }
   async function refreshManually() {
+    if (mutationInFlight.current || busy) return false;
     setBusy(true); setError("");
-    try { await load(); setEnabled(true); }
-    catch (e) { setError(e instanceof Error ? e.message : "Refresh failed."); }
+    try { await load(); setEnabled(true); return true; }
+    catch (e) { setError(e instanceof Error ? e.message : "Refresh failed."); return false; }
     finally { setBusy(false); }
   }
+  useRefreshSource(refreshManually);
   function assignmentCard(item: TeamAssignment) {
     const appointment = schedule?.appointments.find(a => a.id === item.appointmentId);
     const busyConflicts = schedule ? assignmentConflicts(item.employeeId, item, schedule.blocks, schedule.assignments, schedule.appointments, item.id) : [];

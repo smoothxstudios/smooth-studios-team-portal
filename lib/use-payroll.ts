@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { teamRequest } from "@/lib/team-api";
 import type { PayrollState } from "@/lib/dashboard-types";
+import { useRefreshSource } from "@/components/dashboard-refresh";
 
 export function usePayroll(token: string, initial?: PayrollState) {
   const [state, setState] = useState(initial), [error, setError] = useState("");
@@ -11,8 +12,10 @@ export function usePayroll(token: string, initial?: PayrollState) {
     try {
       const next = await teamRequest<PayrollState>(token, "/payroll");
       if (current === sequence.current) { setState(next); setError(""); }
-    } catch { if (current === sequence.current) setError("Advance balances could not refresh. Showing the last synced balances."); }
+      return true;
+    } catch { if (current === sequence.current) setError("Advance balances could not refresh. Showing the last synced balances."); return false; }
   }, [token]);
+  useRefreshSource(refresh);
   useEffect(() => {
     const initial = window.setTimeout(() => void refresh(), 0);
     const update = () => { if (document.visibilityState === "visible") void refresh(); };

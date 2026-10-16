@@ -1,6 +1,7 @@
 "use client";
 
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRefreshSource } from "@/components/dashboard-refresh";
 import {
   BookOpen,
   Download,
@@ -146,8 +147,10 @@ export function StudioGuidePage({
     try {
       const result = await teamRequest<{ questions: GuidelineQuestionRequest[] }>(teamToken, "/guidelines/questions");
       setRequests(result.questions); setQueueError("");
-    } catch { setQueueError("The shared question queue could not be reached. Saved guidelines and suggested questions are still available."); }
+      return true;
+    } catch { setQueueError("The shared question queue could not be reached. Saved guidelines and suggested questions are still available."); return false; }
   }, [teamToken]);
+  useRefreshSource(reloadQuestions);
   useEffect(() => {
     void reloadQuestions();
     const refresh = () => { if (!document.hidden) void reloadQuestions(); };

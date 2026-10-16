@@ -119,3 +119,35 @@ test('zoomed and desktop views do not intercept gestures, and cleanup removes li
   assert.equal(f.drag().defaultPrevented, false);
   f.send('pointerup', f.center(4)); assert.deepEqual(f.selected, [2]);
 });
+
+// Keep enough hysteresis to avoid flickering with finger jitter or iOS bounce.
+const { toolbarScrollState, attachToolbarScroll } = await import('../lib/mobile-toolbar.mjs');
+test('toolbar hides on downward travel and returns promptly on upward travel or at the top', () => {
+  let state = { y: 0, direction: 0, travel: 0, hidden: false };
+  state = toolbarScrollState(state, 70, 1000); assert.equal(state.hidden, false);
+  state = toolbarScrollState(state, 120, 1000); assert.equal(state.hidden, true);
+  for (const y of [118, 121, 119, 122]) { state = toolbarScrollState(state, y, 1000); assert.equal(state.hidden, true); }
+  state = toolbarScrollState(state, 110, 1000); assert.equal(state.hidden, false);
+  state = toolbarScrollState(state, 170, 1000); assert.equal(state.hidden, true);
+  state = toolbarScrollState(state, -20, 1000); assert.equal(state.hidden, false);
+});
+
+test('bottom bounce does not masquerade as an upward scroll', () => {
+  let state = { y: 1000, direction: 1, travel: 100, hidden: true };
+  for (const y of [1050, 1100, 1040, 1000]) { state = toolbarScrollState(state, y, 1000); assert.equal(state.hidden, true); }
+  state = toolbarScrollState(state, 980, 1000); assert.equal(state.hidden, false);
+});
+
+test('scroll events are painted once per frame and keyboard focus restores the toolbar', () => {
+  const win = new EventTarget(), nav = new EventTarget(); let callback, id = 0, focused = false;
+  Object.assign(win, { scrollY: 0, innerWidth: 390, innerHeight: 800,
+    requestAnimationFrame: next => { callback = next; return ++id; }, cancelAnimationFrame: () => { callback = null; } });
+  nav.ownerDocument = { defaultView: win, documentElement: { scrollHeight: 2000 } };
+  nav.dataset = {}; nav.querySelector = () => focused;
+  const cleanup = attachToolbarScroll(nav);
+  win.scrollY = 130; win.dispatchEvent(new Event('scroll')); win.dispatchEvent(new Event('scroll'));
+  assert.equal(id, 1); callback(); assert.equal(nav.dataset.scrollHidden, 'true');
+  nav.dispatchEvent(new Event('focusin')); assert.equal(nav.dataset.scrollHidden, 'false');
+  focused = true; win.scrollY = 200; win.dispatchEvent(new Event('scroll')); callback(); assert.equal(nav.dataset.scrollHidden, 'false');
+  cleanup(); win.scrollY = 400; win.dispatchEvent(new Event('scroll')); assert.equal(callback, null);
+});

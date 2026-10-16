@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DashboardRefreshProvider, PullToRefresh, useRefreshSource } from "@/components/dashboard-refresh";
+import { refreshDashboardSnapshot } from "@/lib/dashboard-refresh.mjs";
 import {
   Area,
   AreaChart,
@@ -741,9 +743,9 @@ function TeamPage({ employees, rentals, creative, payroll, teamAccess, onSetup }
         const next = assigned.find((rental) => rentalState(rental, employee.id) === "upcoming");
         return (
           <article className="panel employee-card" key={employee.id}>
-            <div className="employee-card-head"><span className="employee-avatar large" style={{ background: teamAccent(employee.id, employee.accent) }}>{employee.name.slice(0, 1)}</span><div><h2>{employee.name}</h2><p>{employee.email ?? (employee.onboarding ? "Account setup needed" : "")}</p></div>{!(employee.onboarding && !employee.accessReady) && <StatusBadge state={next ? "upcoming" : "paid"} />}</div>
-            <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>{advance?.remainingCents ? "Advance remaining" : "Still owed"}</span><strong>{dollars(advance?.remainingCents || owed, true)}</strong></div><div><span>Appointments</span><strong>{assigned.length}</strong></div></div>
-            <div className="employee-next"><CalendarDays size={16} /><span>Next accepted appointment</span><strong>{next ? formatDate(next.start, true) : "None scheduled"}</strong></div>
+            <div className="employee-card-head"><span className="employee-avatar large" style={{ background: teamAccent(employee.id, employee.accent) }}>{employee.name.slice(0, 1)}</span><div><h2>{employee.name}</h2><p title={employee.email}>{employee.email ?? (employee.onboarding ? "Account setup needed" : "")}</p></div></div>
+            <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>{advance?.remainingCents ? "Advance left" : "Still owed"}</span><strong>{dollars(advance?.remainingCents || owed, true)}</strong></div><div><span>Appointments</span><strong>{assigned.length}</strong></div></div>
+            <div className="employee-next"><CalendarDays size={14} /><span>Next accepted</span><strong>{next ? formatDate(next.start, true) : "None scheduled"}</strong></div>
             {employee.onboarding && !employee.accessReady && <Button className="team-setup-action" variant="outline" onClick={onSetup}>Set up private account</Button>}
             {teamAccess?.[employee.id] && <Button className="team-setup-action" variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(teamAccess[employee.id].password); setCopied(employee.id); } catch { setCopied(`unavailable:${employee.id}`); } }}>{copied === employee.id ? "Password copied" : "Copy sign-in password"}</Button>}
             {copied === `unavailable:${employee.id}` && teamAccess?.[employee.id] && <p className="team-account-password">{teamAccess[employee.id].password}</p>}
@@ -1079,7 +1081,8 @@ function StripeMatchForm({
   );
 }
 
-function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string; schedulingToken: string }) {
+function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; onRefresh: () => Promise<boolean>; sessionPassword: string; schedulingToken: string }) {
+  useRefreshSource(onRefresh);
   const [view, setView] = useState<ViewKey>("overview");
   const [focusedAlert, setFocusedAlert] = useState<{ target: string; id: string } | null>(null);
   const [alertWorkLoading, setAlertWorkLoading] = useState(false);
@@ -1290,10 +1293,11 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
 
       <SidebarInset className={`dashboard-main${isOwner ? " owner-dashboard" : ""}`}>
         <header className="dashboard-topbar">
-          <div className="topbar-title"><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div>
-          <div className="topbar-actions"><MobileMenuButton />{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
+          <div className="topbar-heading"><MobileMenuButton /><div className="topbar-title"><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div></div>
+          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
         </header>
-
+        <PullToRefresh key={view} page={view} />
+        <div className="dashboard-refresh-body">
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
           {view === "alerts" && <AlertsPage state={alerts} onOpen={alert => void openAlert(alert)} />}
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
@@ -1375,6 +1379,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
           {(view === "scheduling" || view === "availability") && <TeamSchedulingPage onChecklist={openChecklist} focusId={focusedAlert?.target === "scheduling" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} availabilityOnly={view === "availability"} onAvailability={() => setView("availability")} isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
         </div>
         <DashboardVersionFooter viewer={isOwner ? "owner" : "employee"} />
+        </div>
       </SidebarInset>
       <MobileToolbar isOwner={isOwner} view={view} unread={alerts.unreadCount} onNavigate={navigate} />
       {isOwner && (
@@ -1395,6 +1400,15 @@ export function SmoothDashboard() {
   const [dark, setDark] = useState(false);
   const [sessionPassword, setSessionPassword] = useState("");
   const [schedulingToken, setSchedulingToken] = useState("");
+  const sessionEpoch = useRef(0);
+  const refreshSnapshot = useCallback(async () => {
+    if (!payload || !sessionPassword) return false;
+    const epoch = sessionEpoch.current;
+    return refreshDashboardSnapshot({
+      profile: { id: payload.user.id, role: payload.role }, password: sessionPassword,
+      decrypt: decryptDashboard, isCurrent: () => epoch === sessionEpoch.current, onSnapshot: setPayload,
+    });
+  }, [payload, sessionPassword]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("smooth-theme");
@@ -1437,12 +1451,15 @@ export function SmoothDashboard() {
   }, [dark]);
 
   const unlock = async (profile: AccessProfile, password: string) => {
+    const epoch = ++sessionEpoch.current;
     const response = await fetch(`./data/${profile.id}.json`, { cache: "no-store" });
     if (!response.ok) throw new Error("Dashboard data is unavailable");
     const envelope = await response.json() as EncryptedEnvelope;
     const unlocked = await decryptDashboard(envelope, password);
     if (unlocked.user.id !== profile.id || unlocked.role !== profile.role) throw new Error("Invalid dashboard payload");
-    setSchedulingToken(await teamToken(password, profile.id));
+    const token = await teamToken(password, profile.id);
+    if (epoch !== sessionEpoch.current) return;
+    setSchedulingToken(token);
     setSessionPassword(password);
     rememberProfile(profile.id);
     // A fresh sign-in always starts at Home; notification links still navigate an open session.
@@ -1451,5 +1468,5 @@ export function SmoothDashboard() {
   };
 
   if (!payload) return <LoginScreen onUnlock={unlock} profiles={profiles} />;
-  return <DashboardView dark={dark} onLogout={() => { void disableTeamPush(schedulingToken).catch(() => {}); setPayload(null); setSessionPassword(""); setSchedulingToken(""); }} payload={payload} sessionPassword={sessionPassword} schedulingToken={schedulingToken} setDark={setDark} />;
+  return <DashboardRefreshProvider><DashboardView dark={dark} onRefresh={refreshSnapshot} onLogout={() => { sessionEpoch.current++; void disableTeamPush(schedulingToken).catch(() => {}); setPayload(null); setSessionPassword(""); setSchedulingToken(""); }} payload={payload} sessionPassword={sessionPassword} schedulingToken={schedulingToken} setDark={setDark} /></DashboardRefreshProvider>;
 }

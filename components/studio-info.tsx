@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { teamRequest } from "@/lib/team-api";
+import { useRefreshSource } from "@/components/dashboard-refresh";
 import { STUDIO_INFO_CATEGORIES, studioInfoEntries } from "@/lib/studio-reference.mjs";
 
 type InfoEntry = { id: string; category: string; label: string; value: string; note: string; kind: "text" | "secret" | "phone" | "link" };
@@ -18,9 +19,10 @@ export function StudioInfoPage({ token, isOwner, userId, section }: { token: str
   const [data, setData] = useState<StudioReference | null>(null), [error, setError] = useState("");
   const [search, setSearch] = useState(""), [category, setCategory] = useState("all"), [editor, setEditor] = useState<InfoEntry | null>(null);
   const load = useCallback(async () => {
-    try { const next = await teamRequest<StudioReference>(token, "/studio-reference"); setData({ ...next, entries: studioInfoEntries(next.entries) }); setError(""); }
-    catch (error) { setError(error instanceof Error ? error.message : "Studio information couldn’t load."); }
+    try { const next = await teamRequest<StudioReference>(token, "/studio-reference"); setData({ ...next, entries: studioInfoEntries(next.entries) }); setError(""); return true; }
+    catch (error) { setError(error instanceof Error ? error.message : "Studio information couldn’t load."); return false; }
   }, [token]);
+  useRefreshSource(load);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
   const entries = data?.entries.filter(item => (category === "all" || item.category === category) &&
     `${item.label} ${item.category} ${item.note} ${item.kind === "secret" ? "" : item.value}`.toLowerCase().includes(search.toLowerCase())) ?? [];
@@ -57,7 +59,7 @@ function InfoCard({ entry, onEdit, expandMatch }: { entry: InfoEntry; onEdit?: (
   return <article className="studio-info-card"><h4>{entry.label}</h4>{content}</article>;
 }
 
-function InfoEditor({ entry, data, token, onClose, onSave }: { entry: InfoEntry; data: StudioReference; token: string; onClose: () => void; onSave: () => Promise<void> }) {
+function InfoEditor({ entry, data, token, onClose, onSave }: { entry: InfoEntry; data: StudioReference; token: string; onClose: () => void; onSave: () => Promise<unknown> }) {
   const [draft, setDraft] = useState(entry), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [remove, setRemove] = useState(false);
   const save = async (event: React.FormEvent) => {
@@ -76,7 +78,7 @@ function InfoEditor({ entry, data, token, onClose, onSave }: { entry: InfoEntry;
   </form></DialogContent></Dialog>;
 }
 
-function RentalChecklist({ data, userId, isOwner, token, onSave }: { data: StudioReference; userId: string; isOwner: boolean; token: string; onSave: () => Promise<void> }) {
+function RentalChecklist({ data, userId, isOwner, token, onSave }: { data: StudioReference; userId: string; isOwner: boolean; token: string; onSave: () => Promise<unknown> }) {
   const template = data.checklist;
   const [managing, setManaging] = useState(false), [editor, setEditor] = useState<ChecklistItem | null>(null);
   const [checked, setChecked] = useState<string[]>([]), [ready, setReady] = useState(false);
@@ -115,7 +117,7 @@ function RentalChecklist({ data, userId, isOwner, token, onSave }: { data: Studi
   </>;
 }
 
-function ChecklistEditor({ item, data, token, onSave, onClose }: { item: ChecklistItem; data: StudioReference; token: string; onSave: () => Promise<void>; onClose: () => void }) {
+function ChecklistEditor({ item, data, token, onSave, onClose }: { item: ChecklistItem; data: StudioReference; token: string; onSave: () => Promise<unknown>; onClose: () => void }) {
   const [draft, setDraft] = useState(item), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [remove, setRemove] = useState(false);
   const existing = data.checklist.some(step => step.id === item.id);

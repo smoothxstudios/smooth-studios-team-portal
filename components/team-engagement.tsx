@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSidebar } from "@/components/ui/sidebar";
 import { teamRequest } from "@/lib/team-api";
+import { useRefreshSource } from "@/components/dashboard-refresh";
 import { MOODS, nextEngagementPrompt, QUIZ_TIERS, STAR_POINTS } from "@/lib/team-engagement.mjs";
 import type { CreativeAttempt, EmployeeEngagement, RewardChange, StudioStars, TeamEngagement } from "@/lib/team-engagement-types";
 
@@ -80,13 +81,15 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
     return result;
   };
   const load = useCallback(async () => {
-    if (!enabled || busyRef.current) return;
+    if (!enabled || busyRef.current) return false;
     const sequence = ++requestSequence.current;
     try {
       const result = checkedState(await teamRequest<EmployeeEngagement>(token, "/engagement"));
       if (mounted.current && sequence === requestSequence.current) { setState(result); setError(""); }
-    } catch { if (mounted.current && sequence === requestSequence.current) setError("Check-ins couldn't load. Try refreshing in a moment."); }
+      return true;
+    } catch { if (mounted.current && sequence === requestSequence.current) setError("Check-ins couldn't load. Try refreshing in a moment."); return false; }
   }, [token, enabled]);
+  useRefreshSource(load, enabled);
 
   useEffect(() => {
     mounted.current = true;
@@ -240,11 +243,13 @@ export function TeamEngagementReview({ token }: { token: string }) {
   const [rewardNotice, setRewardNotice] = useState("");
   useEffect(() => { setAction("add"); setAmount("5"); setQuestionId(""); setRewardError(""); setRewardNotice(""); rewardRequest.current = { key: "", id: "" }; }, [selected]);
   const load = useCallback(async () => {
+    if (savingRef.current) return false;
     const request = ++sequence.current; setBusy(true);
-    try { const result = await teamRequest<TeamEngagement>(token, "/engagement/team"); if (result.quizVersion !== 3) throw new Error("Quiz update pending"); if (request === sequence.current) { setState(result); setError(""); } }
-    catch { if (request === sequence.current) setError("Team check-ins couldn't load. Try refreshing."); }
+    try { const result = await teamRequest<TeamEngagement>(token, "/engagement/team"); if (result.quizVersion !== 3) throw new Error("Quiz update pending"); if (request === sequence.current) { setState(result); setError(""); } return true; }
+    catch { if (request === sequence.current) setError("Team check-ins couldn't load. Try refreshing."); return false; }
     finally { if (request === sequence.current) setBusy(false); }
   }, [token]);
+  useRefreshSource(load);
   useEffect(() => { void load(); return () => { sequence.current++; }; }, [load]);
   const member = state?.members.find(person => person.userId === selected);
   const todaysQuestions = member?.todayQuiz ?? [];

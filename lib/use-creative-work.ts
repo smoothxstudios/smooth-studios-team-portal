@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { teamRequest } from "@/lib/team-api";
+import { useRefreshSource } from "@/components/dashboard-refresh";
 
 export type CreativeAssignment = {
   id: string; employeeId: string; version: number; title: string; instructions: string; references: string[];
@@ -22,9 +23,11 @@ export function useCreativeWork(token: string) {
     try {
       const result = await teamRequest<{ assignments: CreativeAssignment[] }>(token, "/creative-work");
       if (current === requestId.current) { setItems(result.assignments); setError(""); setLoaded(true); }
-    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "Creative work couldn’t be loaded."); }
+      return true;
+    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "Creative work couldn’t be loaded."); return false; }
     finally { if (current === requestId.current) setLoading(false); }
   }, [token]);
+  useRefreshSource(refresh);
   useEffect(() => {
     const initial = window.setTimeout(() => void refresh(), 0);
     const invalidate = () => { requestId.current++; };
