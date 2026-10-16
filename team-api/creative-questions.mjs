@@ -1,5 +1,7 @@
 // Server-only question bank. Do not import this module into client components.
 // Explanations and correct choices are returned only after a recorded attempt.
+import { QUIZ_TIERS } from "../lib/team-engagement.mjs";
+
 const sources = {
   shutter: { label: "RED · Shutter angle", url: "https://docs.red.com/955-0196_v1.6/Content/4_Menus/Image_LUT/Shutter.htm" },
   exposure: { label: "Nikon · Exposure basics", url: "https://www.nikonusa.com/learn-and-explore/c/tips-and-techniques/a-basic-look-at-the-basics-of-exposure" },
@@ -47,17 +49,46 @@ const craft = [
   question("audio-test", "Audio", "Before recording an interview, which check is most useful for choosing an input level?", "Have the speaker talk at their expected volume while you monitor", ["Choose gain using only the room's silence", "Use the highest gain available", "Set gain from the camera's white balance"], "Set and test the recording level using the actual voice and expected loudness, leaving room for louder moments.", sources.gain),
 ];
 
-// Interleave topics so employees do not receive a week of the same calculation.
-export const QUESTION_BANK = [];
-for (let i = 0; i < Math.max(shutter.length, frameRates.length, exposure.length, craft.length); i++) {
-  for (const group of [shutter, craft, exposure, frameRates]) if (group[i]) QUESTION_BANK.push(group[i]);
-}
+// Difficulty is authored, not assigned randomly to the same bank.
+const advanced = [
+  [24, 100, 90], [25, 200, 45], [30, 400, 90], [50, 800, 45],
+].map(([fps, iso, angle]) => {
+  const factor = 2 * 180 / angle;
+  return question(`compensate-${fps}`, "Video + exposure", `You switch from ${fps} fps / 180° to ${fps * 2} fps / ${angle}°. Aperture and continuous light stay fixed. Starting at ISO ${iso}, which ISO preserves brightness?`,
+    `ISO ${iso * factor}`, [`ISO ${iso}`, `ISO ${iso * factor / 2}`, `ISO ${iso * factor * 2}`],
+    `Exposure time is shutter angle ÷ (360 × fps). Doubling frame rate and changing 180° to ${angle}° makes exposure time ${factor} times shorter. Compensate with ${factor} times the ISO: ${iso} × ${factor} = ${iso * factor}.`, sources.exposure);
+});
+const angles = [[24, 96], [30, 80], [48, 240], [60, 100], [100, 500], [120, 320]].map(([fps, denominator]) => {
+  const angle = 360 * fps / denominator;
+  return question(`angle-${fps}`, "Video", `At ${fps} fps, you need exactly 1/${denominator} second per frame. What shutter angle achieves that, and how does its exposure time compare with 180°?`,
+    `${angle}°; ${angle < 180 ? "shorter" : "longer"} exposure`, [`${angle}°; ${angle < 180 ? "longer" : "shorter"} exposure`, `180°; the same exposure`, `${angle / 2}°; shorter exposure`],
+    `Angle = 360 × fps × exposure time = 360 × ${fps} ÷ ${denominator} = ${angle}°. At a fixed frame rate, ${angle < 180 ? "a smaller" : "a larger"} angle gives ${angle < 180 ? "less" : "more"} exposure time than 180°.`, sources.shutter);
+});
+const combinedExposure = [
+  [100, 4, 8, 125, 500], [200, 4, 8, 250, 500], [400, 8, 4, 125, 1000], [800, 8, 4, 250, 500],
+  [100, 2, 4, 500, 250], [400, 4, 8, 500, 125],
+].map(([iso, beforeF, afterF, beforeSpeed, afterSpeed], index) => {
+  const apertureFactor = (afterF / beforeF) ** 2, shutterFactor = afterSpeed / beforeSpeed;
+  const neededIso = iso * apertureFactor * shutterFactor;
+  return question(`combined-stops-${index}`, "Exposure", `Under fixed continuous light, you change f/${beforeF} to f/${afterF} AND 1/${beforeSpeed} to 1/${afterSpeed} second. Starting at ISO ${iso}, which ISO preserves brightness?`,
+    `ISO ${neededIso}`, [`ISO ${neededIso / 2}`, `ISO ${neededIso * 2}`, `ISO ${neededIso * 4}`],
+    `Account for both changes: ISO × (new f-number ÷ old f-number)² × (new shutter denominator ÷ old denominator). Here: ${iso} × ${apertureFactor} × ${shutterFactor} = ISO ${neededIso}.`, sources.exposure);
+});
+const interleave = groups => Array.from({ length: Math.max(...groups.map(g => g.length)) }, (_, i) => groups.flatMap(g => g[i] ? [g[i]] : [])).flat();
+export const QUESTION_BANKS = {
+  easy: craft.filter(q => !["motion-blur", "motion-smear", "shutter-fps"].includes(q.id)),
+  medium: interleave([shutter, frameRates, exposure, craft.filter(q => ["motion-blur", "motion-smear", "shutter-fps"].includes(q.id))]),
+  hard: interleave([advanced, angles, combinedExposure]),
+};
+export const QUESTION_BANK = Object.values(QUESTION_BANKS).flat();
 
-export function dailyQuestion(day) {
+export function dailyQuestion(day, tier = "medium") {
+  const difficulty = QUIZ_TIERS.find(item => item.id === tier);
+  if (!difficulty) throw new Error("Invalid question tier.");
   const epoch = Date.parse("2026-10-15T00:00:00Z"), date = Date.parse(`${day}T00:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(date) || new Date(date).toISOString().slice(0, 10) !== day) throw new Error("Invalid question date.");
-  const ordinal = Math.round((date - epoch) / 86400_000);
-  const item = QUESTION_BANK[((ordinal % QUESTION_BANK.length) + QUESTION_BANK.length) % QUESTION_BANK.length];
+  const ordinal = Math.round((date - epoch) / 86400_000), bank = QUESTION_BANKS[tier];
+  const item = bank[((ordinal % bank.length) + bank.length) % bank.length];
   let seed = [...`${day}:${item.id}`].reduce((n, c) => Math.imul(n ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
   const choices = item.choices.map((text, i) => ({ id: `choice-${i}`, text }));
   for (let i = choices.length - 1; i > 0; i--) {
@@ -66,12 +97,12 @@ export function dailyQuestion(day) {
   }
   // Opaque display IDs must not reveal that the first authored option is correct.
   const correctIndex = choices.findIndex(choice => choice.text === item.correct);
-  return { id: `v1:${day}:${item.id}`, day, category: item.category, prompt: item.prompt,
+  return { id: `v2:${day}:${tier}:${item.id}`, day, tier, points: difficulty.points, category: item.category, prompt: item.prompt,
     options: choices.map((choice, i) => ({ id: `option-${i}`, text: choice.text })),
     correctOptionId: `option-${correctIndex}`, explanation: item.explanation, source: item.source };
 }
 
 export function publicQuestion(question) {
-  const { id, day, category, prompt, options } = question;
-  return { id, day, category, prompt, options };
+  const { id, day, tier, points, category, prompt, options } = question;
+  return { id, day, tier, points, category, prompt, options };
 }

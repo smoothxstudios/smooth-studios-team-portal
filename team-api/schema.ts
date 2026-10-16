@@ -44,6 +44,12 @@ export const creativeAttempts = sqliteTable("team_creative_attempts", {
   createdAt: integer("created_at").notNull(), data: text("data").notNull(),
 }, table => [primaryKey({ columns: [table.userId, table.day] })]);
 
+export const quizAttempts = sqliteTable("team_quiz_attempts", {
+  userId: text("user_id").notNull(), day: text("day").notNull(), tier: text("tier").notNull(),
+  correct: integer("correct").notNull(), points: integer("points").notNull(),
+  createdAt: integer("created_at").notNull(), data: text("data").notNull(),
+}, table => [primaryKey({ columns: [table.userId, table.day, table.tier] })]);
+
 export const assignments = sqliteTable("team_assignments", {
   id: text("id").primaryKey(),
   employeeId: text("employee_id").notNull(),

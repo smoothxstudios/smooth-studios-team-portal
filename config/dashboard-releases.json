@@ -1,6 +1,30 @@
 {
-  "currentVersion": "2.10.0",
+  "currentVersion": "2.11.0",
   "releases": [
+    {
+      "id": "2026-10-15-daily-quiz-smoothstars",
+      "version": "2.11.0",
+      "date": "2026-10-15",
+      "category": "Team",
+      "title": "Compact check-ins, Daily Quiz tiers, and SmoothStars",
+      "changes": [
+        "Temp Check and Daily Quiz use smaller centered popups. All six moods, including Chilling, fit in one row.",
+        "Temp Check and Daily Quiz tabs and automatic prompts appear only on Home. Points and SmoothStar progress now live in the sidebar.",
+        "Each day offers one Easy question worth 5 points, one Medium worth 10, and one Very Hard worth 15. Correct answers play a brief celebration that respects reduced-motion settings.",
+        "Every 100 points earns a SmoothStar sticker. Quiz wording is shorter, and completed quizzes invite employees to come back tomorrow.",
+        "Smooth can review all three daily answers and tier-specific scores in Team. Earlier scores and answer history remain intact.",
+        "An additive database migration, server-graded tier limits, and duplicate protection preserve prior records and prevent extra awards across devices."
+      ],
+      "employee": {
+        "changes": [
+          "Smaller centered Temp Check and Daily Quiz popups appear only on Home. Chilling joins the six mood choices in one row.",
+          "Answer up to three questions daily: Easy for 5 points, Medium for 10, and Very Hard for 15. A correct answer plays a quick celebration.",
+          "Find your points and SmoothStar progress in the sidebar. Every 100 points earns a SmoothStar; your previous points and answers are kept.",
+          "Daily Quiz replaces Daily creative, with shorter wording and difficulty buttons to move between today’s questions."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-15-temp-check-studio-stars",
       "version": "2.10.0",

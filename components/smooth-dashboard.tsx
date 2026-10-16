@@ -98,7 +98,7 @@ import { TeamAccountSetup, type NewTeamSettings } from "@/components/team-accoun
 import { TEAM, studioLocal } from "@/lib/team-schedule.mjs";
 import { employeeEarningsForYear } from "@/lib/employee-home.mjs";
 import { TeamSchedulingPage } from "@/components/team-scheduling";
-import { EmployeeEngagementBar, TeamEngagementReview } from "@/components/team-engagement";
+import { EmployeeEngagementBar, EmployeeEngagementProvider, SmoothStarSidebar, TeamEngagementReview } from "@/components/team-engagement";
 import { DashboardVersionFooter } from "@/components/dashboard-version-footer";
 import { teamToken } from "@/lib/team-auth.mjs";
 import { disableTeamPush } from "@/lib/team-api";
@@ -1142,6 +1142,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
 
   return (
     <SidebarProvider>
+      <EmployeeEngagementProvider key={payload.user.id} token={schedulingToken} enabled={!isOwner} homeActive={view === "overview"}>
       {isOwner && <TeamAccountSetup open={teamSetupOpen} onOpenChange={setTeamSetupOpen} employees={payload.employees} busy={teamSetupBusy} onSubmit={prepareTeamSetup} enabled={Boolean(payload.workflowAccess)} />}
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
         <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact />{isOwner && <span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span>}</SidebarHeader>
@@ -1149,6 +1150,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
           <SidebarGroup><SidebarGroupContent><DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={setView} /></SidebarGroupContent></SidebarGroup>
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
+          {!isOwner && <SmoothStarSidebar />}
           <ThemeControl dark={dark} onChange={setDark} />
           <div className="sidebar-user"><span className="user-avatar" style={{ background: teamAccent(payload.user.id, payload.user.accent) }}>{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" onClick={onLogout}><LogOut size={16} /></button></div>
         </SidebarFooter>
@@ -1161,7 +1163,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
         </header>
 
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
-          {!isOwner && <EmployeeEngagementBar key={payload.user.id} token={schedulingToken} />}
+          {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {view === "overview" && !isOwner && <TeamSchedulingPage token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide") }} />}
           {view === "overview" && isOwner && (
             <>
@@ -1235,6 +1237,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
           <GithubWorkflowDialog access={payload.workflowAccess} onOpenChange={setWorkflowOpen} open={workflowOpen} request={workflowRequest} />
         </>
       )}
+      </EmployeeEngagementProvider>
     </SidebarProvider>
   );
 }
