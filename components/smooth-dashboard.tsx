@@ -211,8 +211,8 @@ function DashboardNavigation({ isOwner, accountId, view, onNavigate, unread }: {
 function MobileToolbar({ view, unread, onNavigate }: { view: ViewKey; unread: number; onNavigate: (view: ViewKey) => void }) {
   const { openMobile, setOpenMobile } = useSidebar();
   const items: { key: ViewKey; label: string; icon: typeof House }[] = [
-    { key: "overview", label: "Home", icon: House }, { key: "scheduling", label: "Schedule", icon: CalendarDays },
-    { key: "creative", label: "Work", icon: ClipboardList }, { key: "alerts", label: "Alerts", icon: Bell },
+    { key: "scheduling", label: "Schedule", icon: CalendarDays }, { key: "creative", label: "Work", icon: ClipboardList },
+    { key: "overview", label: "Home", icon: House }, { key: "alerts", label: "Alerts", icon: Bell },
   ];
   return <nav className="mobile-toolbar" aria-label="Quick navigation">
     {items.map(item => <button key={item.key} aria-label={item.key === "creative" ? "Creative Work" : item.label} aria-current={view === item.key ? "page" : undefined}

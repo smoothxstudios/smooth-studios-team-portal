@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.21.0",
+  "currentVersion": "2.21.1",
   "releases": [
+    {
+      "id": "2026-10-16-floating-centered-home-toolbar",
+      "version": "2.21.1",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Floating mobile toolbar with Home centered",
+      "changes": [
+        "Home is centered in the mobile toolbar, between Work and Alerts.",
+        "The rounded toolbar floats above the bottom edge and phone safe area, with extra space for page content and the version footer."
+      ],
+      "employee": {
+        "title": "Home in the middle",
+        "changes": [
+          "Find Home in the center of the mobile toolbar.",
+          "The toolbar floats above the bottom edge so its buttons stay easy to reach."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-alerts-inbox-mobile-toolbar",
       "version": "2.21.0",
