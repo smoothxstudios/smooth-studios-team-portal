@@ -1,6 +1,31 @@
 {
-  "currentVersion": "2.18.1",
+  "currentVersion": "2.18.2",
   "releases": [
+    {
+      "id": "2026-10-16-clearer-sidebar-navigation",
+      "version": "2.18.2",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "A more intuitive sidebar",
+      "changes": [
+        "Home stays first. Work, Management, and Resources group related pages together, with external apps separated from Studio Guidelines.",
+        "Employees see My Schedule, My Availability, Creative Work, and Earnings together under My work. Management stays in the owner menu.",
+        "The current page has a clearer red highlight and arrow. Menu rows have consistent icons, spacing, and comfortable tap targets.",
+        "Settings and the account controls stay at the bottom. SmoothStar progress scrolls with the menu so it does not crowd navigation on smaller screens.",
+        "Removed the extra sign-in text below the Continue button. Quick sign-in settings clarify that unlocking uses the device’s existing screen lock."
+      ],
+      "employee": {
+        "title": "Easier navigation",
+        "changes": [
+          "Find My Schedule, My Availability, Creative Work, and Earnings together under My work, with Home first.",
+          "Studio Guidelines, Productions, and Content Vault are grouped under Resources. External apps keep their new-tab indicators.",
+          "The current page is easier to spot. Settings stays at the bottom, and choosing a page closes the mobile menu.",
+          "SmoothStar progress remains in the sidebar below Resources.",
+          "Removed the extra sign-in text below the Continue button. Quick sign-in settings clarify that unlocking uses the device’s existing screen lock."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-dashboard-sign-in-label",
       "version": "2.18.1",

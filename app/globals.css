@@ -575,19 +575,31 @@ button { cursor: pointer; }
 
 /* Dashboard shell */
 .dashboard-sidebar { border-right: 1px solid var(--sidebar-border) !important; }
-.sidebar-brand { position: relative; align-items: center; padding: 24px 18px 16px !important; }
+.sidebar-brand { position: relative; align-items: center; padding: 16px 18px 12px !important; }
+.sidebar-brand .studio-logo-compact { width: 104px; height: 64px; }
 .mobile-sidebar-close { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; }
 .studio-logo-compact { width: 112px; height: 72px; margin: 0; }
 .calendar-dot { display: flex; align-items: center; gap: 7px; color: var(--muted-foreground); font-size: 10px; font-weight: 650; }
 .calendar-dot span { width: 7px; height: 7px; border-radius: 50%; background: #1f9d63; box-shadow: 0 0 0 4px rgba(31,157,99,.12); }
 .calendar-dot.preview span { background: #efaa20; box-shadow: 0 0 0 4px rgba(239,170,32,.13); }
-.studio-nav { padding: 15px 10px; gap: 7px !important; }
-.studio-nav .sidebar-external-icon { margin-left: auto; width: 14px; height: 14px; flex-shrink: 0; }
-.studio-nav.studio-settings-nav { padding: 0 0 4px; }
-.studio-nav [data-slot="sidebar-menu-button"] { min-height: 44px; height: auto !important; gap: 11px !important; padding: 12px 13px !important; border-radius: 11px !important; color: var(--muted-foreground); font-family: inherit; font-size: .875rem; font-weight: 650; line-height: 1.4; text-decoration: none; }
-.studio-nav [data-slot="sidebar-menu-button"][data-active="true"] { position: relative; color: var(--sidebar-accent-foreground); background: var(--sidebar-accent); }
-.studio-nav [data-slot="sidebar-menu-button"][data-active="true"]::before { content: ""; position: absolute; left: -10px; width: 3px; height: 23px; border-radius: 0 4px 4px 0; background: #e10000; }
-.studio-sidebar-footer { padding: 14px !important; border-top: 1px solid var(--sidebar-border); }
+.studio-sidebar-content { overscroll-behavior: contain; scrollbar-width: thin; }
+.studio-navigation { display: flex; flex: 0 0 auto; flex-direction: column; gap: 14px; padding: 6px 12px 16px; }
+.studio-nav-group { padding: 0 !important; }
+.studio-nav-heading { height: auto; min-height: 25px; margin: 0; padding: 0 12px 7px; color: var(--muted-foreground); font-size: 10px; font-weight: 750; letter-spacing: .09em; line-height: 1.5; text-transform: uppercase; }
+.studio-nav { padding: 0; gap: 3px !important; }
+.studio-nav .sidebar-external-icon, .studio-nav .sidebar-current-icon { margin-left: auto; width: 14px; height: 14px; flex-shrink: 0; }
+.studio-nav .sidebar-external-icon { opacity: .7; }
+.studio-nav.studio-settings-nav { padding: 0; }
+.studio-connected-start { margin-top: 5px; padding-top: 7px; border-top: 1px solid var(--sidebar-border); }
+.studio-nav [data-slot="sidebar-menu-button"] { min-height: 44px; height: auto !important; gap: 10px !important; padding: 10px 12px !important; border-radius: 10px !important; color: var(--sidebar-foreground); font-family: inherit; font-size: .875rem; font-weight: 550; line-height: 1.4; text-decoration: none; }
+.studio-nav [data-slot="sidebar-menu-button"] > svg:first-child { width: 18px; height: 18px; flex-shrink: 0; color: var(--muted-foreground); }
+.studio-nav [data-slot="sidebar-menu-button"] > span { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.studio-nav [data-slot="sidebar-menu-button"]:hover { color: var(--sidebar-accent-foreground); background: var(--sidebar-accent); }
+.studio-nav [data-slot="sidebar-menu-button"][data-active="true"] { color: var(--sidebar-accent-foreground); background: var(--sidebar-accent); font-weight: 750; box-shadow: inset 3px 0 0 var(--sidebar-primary); }
+.studio-nav [data-slot="sidebar-menu-button"][data-active="true"] > svg:first-child, .studio-nav [data-slot="sidebar-menu-button"]:hover > svg:first-child { color: inherit; }
+.studio-nav [data-slot="sidebar-menu-button"]:focus-visible { outline: 2px solid var(--sidebar-ring); outline-offset: 2px; }
+.sidebar-progress { margin: 0 12px 14px; }
+.studio-sidebar-footer { flex-shrink: 0; gap: 4px !important; padding: 10px 12px !important; border-top: 1px solid var(--sidebar-border); background: var(--sidebar); }
 .theme-control { height: 40px; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px; border-radius: 11px; color: var(--muted-foreground); background: var(--muted); }
 .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 9px; border-radius: 12px; }
 .user-avatar { width: 35px; height: 35px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 11px; color: #fff; background: #e10000; font-size: 14px; font-weight: 800; box-shadow: 3px 3px 0 #202024; }
@@ -595,7 +607,9 @@ button { cursor: pointer; }
 .sidebar-user strong, .sidebar-user span { display: block; }
 .sidebar-user strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-user div span { margin-top: 2px; color: var(--muted-foreground); font-size: 10px; }
-.sidebar-user button { padding: 5px; border: 0; color: var(--muted-foreground); background: transparent; }
+.sidebar-user button { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; padding: 5px; border: 0; border-radius: 10px; color: var(--muted-foreground); background: transparent; }
+.sidebar-user button:hover { color: var(--foreground); background: var(--muted); }
+.sidebar-user button:focus-visible { outline: 2px solid var(--sidebar-ring); outline-offset: 2px; }
 .dashboard-main { min-width: 0; min-height: 100svh; background: var(--background) !important; }
 .dashboard-topbar { position: sticky; z-index: 9; top: 0; min-height: 82px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px clamp(18px,3vw,38px); border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--background) 89%, transparent); backdrop-filter: blur(16px); }
 .topbar-title { display: flex; align-items: center; gap: 12px; }
@@ -1136,7 +1150,7 @@ button { cursor: pointer; }
     padding-bottom: env(safe-area-inset-bottom);
   }
   .sidebar-brand, .studio-sidebar-footer { flex-shrink: 0; }
-  .studio-nav { padding-top: 8px; }
+  .studio-nav-heading { font-size: 11px; }
   .studio-nav [data-slot="sidebar-menu-button"] { min-height: 48px; font-size: 1rem; }
   .studio-nav [data-slot="sidebar-menu-button"] > span { white-space: normal; overflow: visible; }
   .calendar-dot, .sidebar-user div span { font-size: .75rem; }

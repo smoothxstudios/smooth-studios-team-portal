@@ -19,6 +19,7 @@ import {
   BookOpen,
   CalendarDays,
   CalendarCheck,
+  CalendarClock,
   ClipboardList,
   Check,
   ChevronDown,
@@ -32,6 +33,7 @@ import {
   Fingerprint,
   FolderOpen,
   GitBranch,
+  House,
   Landmark,
   LayoutDashboard,
   Link2,
@@ -73,6 +75,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -134,52 +137,76 @@ type CustomerPaymentState = "paid" | "deposit" | "review" | "pending";
 type AppointmentStatus = RentalState | "customer-paid" | "upcoming-paid" | "deposit" | "review";
 type PaymentFilter = "all" | CustomerPaymentState;
 
-const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ownerOnly?: boolean }[] = [
-  { key: "overview", label: "Home", icon: LayoutDashboard },
-  { key: "scheduling", label: "Team Schedule", icon: CalendarDays },
-  { key: "availability", label: "Availability", icon: CalendarCheck },
-  { key: "creative", label: "Creative Work", icon: ClipboardList },
-  { key: "rentals", label: "Appointments", icon: CalendarDays },
-  { key: "team", label: "Team", icon: Users, ownerOnly: true },
-  { key: "payouts", label: "Payouts", icon: WalletCards },
-  { key: "guide", label: "Studio Guidelines", icon: BookOpen },
-  { key: "settings", label: "Settings", icon: Settings },
+type NavigationGroup = "home" | "work" | "management" | "resources" | "settings";
+type NavigationItem = { key: ViewKey; label: string; icon: typeof LayoutDashboard; group: NavigationGroup; ownerOnly?: boolean };
+
+const NAV_ITEMS: NavigationItem[] = [
+  { key: "overview", label: "Home", icon: House, group: "home" },
+  { key: "scheduling", label: "Team Schedule", icon: CalendarDays, group: "work" },
+  { key: "availability", label: "Availability", icon: CalendarCheck, group: "work" },
+  { key: "creative", label: "Creative Work", icon: ClipboardList, group: "work" },
+  { key: "rentals", label: "Appointments", icon: CalendarClock, group: "management", ownerOnly: true },
+  { key: "team", label: "Team", icon: Users, group: "management", ownerOnly: true },
+  { key: "payouts", label: "Payouts", icon: WalletCards, group: "management" },
+  { key: "guide", label: "Studio Guidelines", icon: BookOpen, group: "resources" },
+  { key: "settings", label: "Settings", icon: Settings, group: "settings" },
 ];
-const EMPLOYEE_NAV_ITEMS = NAV_ITEMS.filter(item => !item.ownerOnly && item.key !== "rentals").map(item => ({
-  ...item, label: item.key === "overview" ? "Home" : item.key === "scheduling" ? "Schedule" : item.key === "payouts" ? "Earnings" : item.label,
+const EMPLOYEE_NAV_ITEMS: NavigationItem[] = NAV_ITEMS.filter(item => !item.ownerOnly).map(item => ({
+  ...item,
+  label: item.key === "scheduling" ? "My Schedule" : item.key === "availability" ? "My Availability" : item.key === "payouts" ? "Earnings" : item.label,
+  group: item.key === "payouts" ? "work" : item.group,
 }));
 
 function DashboardNavigation({ isOwner, accountId, view, onNavigate }: { isOwner: boolean; accountId: string; view: ViewKey; onNavigate: (view: ViewKey) => void }) {
   const { isMobile, setOpenMobile } = useSidebar();
   const closeMobileMenu = () => { if (isMobile) setOpenMobile(false); };
+  const items = isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS;
+  const groups: { key: NavigationGroup; label: string }[] = [
+    { key: "home", label: "Start" },
+    { key: "work", label: isOwner ? "Work" : "My work" },
+    { key: "management", label: "Management" },
+    { key: "resources", label: "Resources" },
+  ];
 
-  return <nav aria-label="Dashboard sections"><SidebarMenu className="studio-nav">
-    {(isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).filter(item => item.key !== "settings").map(item => (
-      <SidebarMenuItem key={item.key}>
-        <SidebarMenuButton aria-current={view === item.key ? "page" : undefined} isActive={view === item.key}
-          onClick={() => { onNavigate(item.key); closeMobileMenu(); }} tooltip={item.label}>
-          <item.icon /><span>{item.label}</span>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    ))}
-    <SidebarMenuItem><SidebarMenuButton asChild tooltip="Productions · opens in a new tab">
-      <a href={`https://smooth-studios-production.smoothxstudios.workers.dev/?from=studio&account=${encodeURIComponent(accountId === "owner" ? "smooth" : accountId)}`} target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu} aria-label="Productions (opens in a new tab)" title="Opens in a new tab">
-        <Link2 /><span>Productions</span><ExternalLink className="sidebar-external-icon" aria-hidden="true" />
-      </a>
-    </SidebarMenuButton></SidebarMenuItem>
-    <SidebarMenuItem><SidebarMenuButton asChild tooltip="Content Vault · opens in a new tab">
-      <a href="https://content.smoothstudios.co/" target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu} aria-label="Content Vault (opens in a new tab)" title="Opens in a new tab">
-        <FolderOpen /><span>Content Vault</span><ExternalLink className="sidebar-external-icon" aria-hidden="true" />
-      </a>
-    </SidebarMenuButton></SidebarMenuItem>
-  </SidebarMenu></nav>;
+  return <nav aria-label="Dashboard sections" className="studio-navigation">
+    {groups.map(group => {
+      const groupItems = items.filter(item => item.group === group.key);
+      if (!groupItems.length) return null;
+      return <SidebarGroup key={group.key} className="studio-nav-group" role="group" aria-label={group.label}>
+        {group.key !== "home" && <SidebarGroupLabel asChild className="studio-nav-heading"><h2>{group.label}</h2></SidebarGroupLabel>}
+        <SidebarGroupContent><SidebarMenu className="studio-nav">
+          {groupItems.map(item => (
+            <SidebarMenuItem key={item.key}>
+              <SidebarMenuButton aria-current={view === item.key ? "page" : undefined} isActive={view === item.key}
+                onClick={() => { onNavigate(item.key); closeMobileMenu(); }} tooltip={item.label}>
+                <item.icon aria-hidden="true" /><span>{item.label}</span>
+                {view === item.key && <ChevronRight className="sidebar-current-icon" aria-hidden="true" />}
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+          {group.key === "resources" && <>
+            <SidebarMenuItem className="studio-connected-start"><SidebarMenuButton asChild tooltip="Productions · opens in a new tab">
+              <a href={`https://smooth-studios-production.smoothxstudios.workers.dev/?from=studio&account=${encodeURIComponent(accountId === "owner" ? "smooth" : accountId)}`} target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu} aria-label="Productions (opens in a new tab)" title="Opens in a new tab">
+                <Link2 aria-hidden="true" /><span>Productions</span><ExternalLink className="sidebar-external-icon" aria-hidden="true" />
+              </a>
+            </SidebarMenuButton></SidebarMenuItem>
+            <SidebarMenuItem><SidebarMenuButton asChild tooltip="Content Vault · opens in a new tab">
+              <a href="https://content.smoothstudios.co/" target="_blank" rel="noopener noreferrer" onClick={closeMobileMenu} aria-label="Content Vault (opens in a new tab)" title="Opens in a new tab">
+                <FolderOpen aria-hidden="true" /><span>Content Vault</span><ExternalLink className="sidebar-external-icon" aria-hidden="true" />
+              </a>
+            </SidebarMenuButton></SidebarMenuItem>
+          </>}
+        </SidebarMenu></SidebarGroupContent>
+      </SidebarGroup>;
+    })}
+  </nav>;
 }
 
 function SettingsNavigation({ active, onOpen }: { active: boolean; onOpen: () => void }) {
   const { isMobile, setOpenMobile } = useSidebar();
   return <nav aria-label="Account settings"><SidebarMenu className="studio-nav studio-settings-nav"><SidebarMenuItem>
     <SidebarMenuButton aria-current={active ? "page" : undefined} isActive={active} tooltip="Settings" onClick={() => { onOpen(); if (isMobile) setOpenMobile(false); }}>
-      <Settings /><span>Settings</span>
+      <Settings aria-hidden="true" /><span>Settings</span>{active && <ChevronRight className="sidebar-current-icon" aria-hidden="true" />}
     </SidebarMenuButton>
   </SidebarMenuItem></SidebarMenu></nav>;
 }
@@ -373,7 +400,7 @@ function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[]; onUnlo
           <p className="eyebrow">Dashboard</p>
           <h1>Sign in</h1>
         </div>
-        {!selection ? <p className="login-preparing" role="status">Preparing sign-in…</p> : quickReady && !usePassword ? <><div className="quick-login"><Button disabled={loading} onClick={quickUnlock}><Fingerprint size={20} />{loading ? "Opening…" : `Continue as ${profile?.label ?? selectedId}`}</Button><p>Face ID, fingerprint, or device PIN</p></div>
+        {!selection ? <p className="login-preparing" role="status">Preparing sign-in…</p> : quickReady && !usePassword ? <><div className="quick-login"><Button disabled={loading} onClick={quickUnlock}><Fingerprint size={20} />{loading ? "Opening…" : `Continue as ${profile?.label ?? selectedId}`}</Button></div>
           {error && <p className="login-error" role="alert">{error}</p>}
           <button className="login-account-switch" disabled={loading} onClick={() => { setUsePassword(true); setPassword(""); setShowPassword(false); setError(""); }}>Sign in to another account</button>
         </> : <form onSubmit={submit}>
@@ -1210,13 +1237,13 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
       {isOwner && <TeamAccountSetup open={teamSetupOpen} onOpenChange={setTeamSetupOpen} employees={payload.employees} busy={teamSetupBusy} onSubmit={prepareTeamSetup} enabled={Boolean(payload.workflowAccess)} />}
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
         <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact />{isOwner && <span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span>}</SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup><SidebarGroupContent><DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={next => { if (next === "settings") setSettingsTab("preferences"); setView(next); }} /></SidebarGroupContent></SidebarGroup>
+        <SidebarContent className="studio-sidebar-content">
+          <DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={setView} />
+          {!isOwner && <div className="sidebar-progress"><SmoothStarSidebar /></div>}
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
-          {!isOwner && <SmoothStarSidebar />}
           <SettingsNavigation active={view === "settings"} onOpen={() => { setSettingsTab("preferences"); setView("settings"); }} />
-          <div className="sidebar-user"><span className="user-avatar" style={{ background: teamAccent(payload.user.id, payload.user.accent) }}>{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" onClick={onLogout}><LogOut size={16} /></button></div>
+          <div className="sidebar-user"><span className="user-avatar" style={{ background: teamAccent(payload.user.id, payload.user.accent) }}>{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" title="Log out" onClick={onLogout}><LogOut size={18} /></button></div>
         </SidebarFooter>
       </Sidebar>
 
