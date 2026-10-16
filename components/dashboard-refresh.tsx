@@ -55,12 +55,11 @@ export function PullToRefresh({ page }: { page: string }) {
       onRelease: () => {
         busy = true; paint(52, false); setPhase("refreshing"); setError("");
         void coordinator.run().then(() => {
-          if (!disposed) setPhase("success");
+          if (!disposed) { setPhase("success"); dismiss = window.setTimeout(hide, 350); }
         }).catch((cause: unknown) => {
-          if (!disposed) { paint(80, false); setError(cause instanceof Error ? cause.message : "Couldn’t refresh. Pull again to retry."); setPhase("error"); }
+          if (!disposed) { paint(80, false); setError(cause instanceof Error ? cause.message : "Couldn’t refresh. Pull again to retry."); setPhase("error"); dismiss = window.setTimeout(hide, 3000); }
         }).finally(() => {
           busy = false;
-          if (!disposed) dismiss = window.setTimeout(hide, 3000);
         });
       },
     });
