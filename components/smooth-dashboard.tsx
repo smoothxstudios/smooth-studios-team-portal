@@ -209,18 +209,23 @@ function DashboardNavigation({ isOwner, accountId, view, onNavigate, unread }: {
 }
 
 function MobileToolbar({ view, unread, onNavigate }: { view: ViewKey; unread: number; onNavigate: (view: ViewKey) => void }) {
-  const { openMobile, setOpenMobile } = useSidebar();
+  const { setOpenMobile } = useSidebar();
   const items: { key: ViewKey; label: string; icon: typeof House }[] = [
-    { key: "scheduling", label: "Schedule", icon: CalendarDays }, { key: "creative", label: "Work", icon: ClipboardList },
-    { key: "overview", label: "Home", icon: House }, { key: "alerts", label: "Alerts", icon: Bell },
+    { key: "alerts", label: "Alerts", icon: Bell }, { key: "creative", label: "Work", icon: ClipboardList },
+    { key: "overview", label: "Home", icon: House }, { key: "scheduling", label: "Schedule", icon: CalendarDays },
+    { key: "settings", label: "Settings", icon: Settings },
   ];
   return <nav className="mobile-toolbar" aria-label="Quick navigation">
     {items.map(item => <button key={item.key} aria-label={item.key === "creative" ? "Creative Work" : item.label} aria-current={view === item.key ? "page" : undefined}
       onClick={() => { setOpenMobile(false); onNavigate(item.key); }}>
       <span className="toolbar-icon"><item.icon size={21} aria-hidden="true" />{item.key === "alerts" && <UnreadBadge count={unread} />}</span><span>{item.label}</span>
     </button>)}
-    <button aria-label="More dashboard sections" aria-expanded={openMobile} className={!items.some(item => item.key === view) ? "is-current-section" : ""} onClick={() => setOpenMobile(!openMobile)}><span className="toolbar-icon"><Menu size={21} aria-hidden="true" /></span><span>More</span></button>
   </nav>;
+}
+
+function MobileMoreButton() {
+  const { openMobile, setOpenMobile } = useSidebar();
+  return <Button className="mobile-more-trigger" variant="outline" aria-label="More dashboard sections" aria-expanded={openMobile} onClick={() => setOpenMobile(!openMobile)}><Menu size={18} aria-hidden="true" /><span>More</span></Button>;
 }
 
 function SettingsNavigation({ active, onOpen }: { active: boolean; onOpen: () => void }) {
@@ -1300,7 +1305,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
       <SidebarInset className={`dashboard-main${isOwner ? " owner-dashboard" : ""}`}>
         <header className="dashboard-topbar">
           <div className="topbar-title"><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div>
-          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
+          <div className="topbar-actions"><MobileMoreButton />{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
         </header>
 
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>

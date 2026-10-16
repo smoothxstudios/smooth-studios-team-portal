@@ -6,6 +6,7 @@ import { PanelLeftIcon } from "lucide-react"
 import { Slot } from "radix-ui"
 
 import { useIsMobile } from "@/hooks/use-mobile"
+import { attachSidebarSwipe } from "@/lib/sidebar-swipe.mjs"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -164,6 +165,11 @@ function Sidebar({
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+
+  React.useEffect(() => {
+    if (!isMobile || openMobile || side !== "left" || collapsible === "none") return
+    return attachSidebarSwipe(document, () => setOpenMobile(true))
+  }, [isMobile, openMobile, side, collapsible, setOpenMobile])
 
   if (collapsible === "none") {
     return (
