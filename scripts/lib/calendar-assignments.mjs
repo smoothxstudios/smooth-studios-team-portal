@@ -3,20 +3,26 @@ import { TEAM } from "../../lib/team-schedule.mjs";
 const begin = "[Smooth Studios rental team]";
 const end = "[/Smooth Studios rental team]";
 const section = /(?:\n\n)?\[Smooth Studios rental team\][\s\S]*?\[\/Smooth Studios rental team\]/g;
+const leadingSection = /^\[Smooth Studios rental team\][\s\S]*?\[\/Smooth Studios rental team\](?:\n\n)?/;
 const isRental = title => /\bstudio(?:\s+[a-z])?\s+rental\b/i.test(title ?? "");
 const teamIds = new Set(TEAM.filter(p => p.id !== "owner").map(p => p.id));
 
 export function rentalTeamDescription(description, assignments) {
   const original = description ?? "";
-  const otherNotes = original.replace(section, "");
+  // New notes lead the description so the confirmation is visible when the
+  // event opens. Strip both this format and the former appended format while
+  // preserving the booking text (including its original whitespace) exactly.
+  const otherNotes = original.replace(leadingSection, "").replace(section, "");
   if (otherNotes.includes(begin) || otherNotes.includes(end)) throw new Error("The rental team note markers were edited. Review the event description.");
   const people = TEAM.filter(p => teamIds.has(p.id)).flatMap(person => {
     const matches = assignments.filter(a => a.employeeId === person.id && ["pending", "accepted"].includes(a.status));
     if (!matches.length) return [];
-    return [`${person.name} — ${matches.some(a => a.status === "accepted") ? "Accepted" : "Assigned · awaiting response"}`];
+    return [matches.some(a => a.status === "accepted")
+      ? `✓ ${person.name} — Accepted in app`
+      : `○ ${person.name} — Awaiting app response`];
   });
   if (!people.length) return otherNotes;
-  return `${otherNotes}${otherNotes ? "\n\n" : ""}${begin}\n${people.join("\n")}\n${end}`;
+  return `${begin}\n${people.join("\n")}\n${end}${otherNotes ? `\n\n${otherNotes}` : ""}`;
 }
 
 // Only the portal-owned description section is changed. Never change titles,

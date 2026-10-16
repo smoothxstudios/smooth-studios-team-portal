@@ -14,10 +14,30 @@ test("one Calendar booking groups all portal offers without duplicate staff", ()
   assert.equal(result.length, 1);
   assert.deepEqual(result[0].confirmedIds, ["jordyn"]);
   assert.deepEqual(result[0].pendingIds, ["akiva"]);
+  assert.deepEqual(result[0].confirmations, [
+    { employeeId: "jordyn", appStatus: "accepted", calendarAccepted: true },
+    { employeeId: "akiva", appStatus: "pending", calendarAccepted: false },
+  ]);
   assert.equal(result[0].assignments.length, 3);
   assert.equal(result[0].status, "confirmed");
   assert.equal(agendaMatchesStatus(result[0], "confirmed"), true);
   assert.equal(agendaMatchesStatus(result[0], "pending"), true, "extra pending staff remain findable on a confirmed booking");
+});
+
+test("app acceptance and Google RSVPs remain independent confirmation sources", () => {
+  const [item] = buildScheduleAgenda(schedule([
+    offer("a", "jordyn", "accepted"), offer("b", "akiva"),
+    offer("c", "amia", "declined"), offer("d", "terrill", "cancelled"),
+  ], [{ ...booking, acceptedEmployeeIds: ["akiva", "rayne"] }]), options);
+  assert.deepEqual(item.confirmations, [
+    { employeeId: "akiva", appStatus: "pending", calendarAccepted: true },
+    { employeeId: "rayne", appStatus: null, calendarAccepted: true },
+    { employeeId: "jordyn", appStatus: "accepted", calendarAccepted: false },
+  ]);
+  assert.equal(agendaMatchesStatus(item, "pending", "akiva"), true, "Calendar acceptance must not hide a pending app response");
+  assert.equal(agendaMatchesStatus(item, "confirmed", "akiva"), true);
+  assert.equal(item.confirmations.find(p => p.employeeId === "jordyn").calendarAccepted, false, "app acceptance does not fabricate a Google RSVP");
+  assert.equal(item.confirmations.find(p => p.employeeId === "rayne").appStatus, null, "a Google RSVP does not fabricate app acceptance");
 });
 
 test("employee filters find their pending Calendar offer, but not a different person's status", () => {

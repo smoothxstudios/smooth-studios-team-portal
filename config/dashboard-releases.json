@@ -1,6 +1,20 @@
 {
-  "currentVersion": "2.14.2",
+  "currentVersion": "2.14.3",
   "releases": [
+    {
+      "id": "2026-10-16-calendar-confirmation-checks",
+      "version": "2.14.3",
+      "date": "2026-10-16",
+      "category": "Team",
+      "title": "Calendar-style scheduling and clear acceptance checks",
+      "changes": [
+        "The owner schedule uses circular dates, color-coded event cards, and employee initials with green acceptance checks for a more familiar calendar view.",
+        "Each employee’s response identifies Accepted in app or Calendar accepted. Both appear when confirmed in both places; a Google RSVP no longer hides a pending app response.",
+        "Studio rental team notes appear at the top of the Google Calendar description, with a check for Accepted in app or a pending response marker. The scheduled sync carries the app response over as a backup copy; Google guest RSVP checks remain separate.",
+        "Booking details and other Calendar notes are preserved when team notes move, update, or are removed."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-16-mobile-team-schedule",
       "version": "2.14.2",

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { rentalTeamDescription, syncCalendarAssignmentNotes } from "../scripts/lib/calendar-assignments.mjs";
+import { parseCalendarDescription } from "../scripts/lib/dashboard-data.mjs";
 
 const original = "<b>Booking details</b>\nPrice: $100.00\nPaid Online: $25.00\nBackdrop: Blue\n";
 const event = { id: "synthetic-rental", summary: "Synthetic Customer: Studio A Rental", description: original, etag: '"v1"',
@@ -12,15 +13,32 @@ const args = { calendarId: "synthetic-calendar@example.invalid", accessToken: "s
 
 test("team notes preserve booking text exactly and distinguish an offer from acceptance", () => {
   const offer = rentalTeamDescription(original, [pending, pending]);
-  assert.ok(offer.startsWith(original));
+  assert.ok(offer.endsWith(original));
+  assert.deepEqual(parseCalendarDescription(offer), parseCalendarDescription(original));
+  assert.ok(offer.startsWith("[Smooth Studios rental team]\n○ Jordyn — Awaiting app response"));
   assert.equal((offer.match(/Jordyn/g) ?? []).length, 1);
-  assert.match(offer, /awaiting response/);
+  assert.match(offer, /Awaiting app response/);
   const accepted = rentalTeamDescription(offer, [{ ...pending, status: "accepted" }]);
-  assert.match(accepted, /Jordyn — Accepted/);
-  assert.doesNotMatch(accepted, /awaiting response/);
+  assert.match(accepted, /✓ Jordyn — Accepted in app/);
+  assert.doesNotMatch(accepted, /Awaiting app response/);
   assert.equal(rentalTeamDescription(accepted, [{ ...pending, status: "cancelled" }]), original);
   assert.equal(rentalTeamDescription(offer, [{ ...pending, status: "declined" }]), original);
   assert.equal(rentalTeamDescription(accepted, [{ ...pending, status: "accepted" }]), accepted);
+});
+test("previous appended notes move to the top without changing booking whitespace", () => {
+  const booking = `\n\n${original}\n`;
+  const legacy = `${booking}\n\n[Smooth Studios rental team]\nJordyn — Accepted\n[/Smooth Studios rental team]`;
+  const accepted = [{ ...pending, status: "accepted" }];
+  const updated = rentalTeamDescription(legacy, accepted);
+  assert.ok(updated.startsWith("[Smooth Studios rental team]\n✓ Jordyn — Accepted in app"));
+  assert.ok(updated.endsWith(booking));
+  assert.equal((updated.match(/\[Smooth Studios rental team\]/g) ?? []).length, 1);
+  assert.equal(rentalTeamDescription(updated, accepted), updated, "repeated sync does not add whitespace");
+  assert.equal(rentalTeamDescription(updated, []), booking, "removal restores exact original booking content");
+  const noteOnly = rentalTeamDescription("", accepted);
+  assert.equal(rentalTeamDescription(noteOnly, accepted), noteOnly);
+  assert.equal(rentalTeamDescription(noteOnly, []), "");
+  assert.throws(() => rentalTeamDescription(`${original}[Smooth Studios rental team]\nEdited marker`, accepted), /markers were edited/);
 });
 test("writeback patches only rental descriptions, suppresses notifications, and skips repeat writes", async () => {
   let patched;
@@ -51,7 +69,21 @@ test("concurrent Calendar edits are preserved when the version changes", async (
       return Response.json({ ...event, etag: '"v2"', description: `${original}Client added a note.` });
     }
     assert.equal(options.headers["If-Match"], '"v2"');
-    assert.ok(JSON.parse(options.body).description.startsWith(`${original}Client added a note.`));
+    assert.ok(JSON.parse(options.body).description.endsWith(`${original}Client added a note.`));
+    return Response.json({});
+  } });
+  assert.equal(calls, 3);
+  assert.equal(result.updated, 1);
+});
+test("a concurrently moved rental clears its old managed acceptance while retaining booking notes", async () => {
+  const description = rentalTeamDescription(original, [{ ...pending, status: "accepted" }]);
+  let calls = 0;
+  const result = await syncCalendarAssignmentNotes({ ...args, calendarEvents: [{ ...event, description }], fetcher: async (_url, options) => {
+    calls++;
+    if (calls === 1) return new Response(null, { status: 412 });
+    if (calls === 2) return Response.json({ ...event, description, etag: '"v2"', start: { dateTime: "2026-10-06T13:00:00Z" }, end: { dateTime: "2026-10-06T14:00:00Z" } });
+    assert.equal(options.headers["If-Match"], '"v2"');
+    assert.deepEqual(JSON.parse(options.body), { description: original });
     return Response.json({});
   } });
   assert.equal(calls, 3);
