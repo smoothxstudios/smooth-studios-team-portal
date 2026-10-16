@@ -1,6 +1,33 @@
 {
-  "currentVersion": "2.18.2",
+  "currentVersion": "2.18.3",
   "releases": [
+    {
+      "id": "2026-10-16-compact-info-and-sign-in-recovery",
+      "version": "2.18.3",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Compact resources, quick sign-in recovery, and SmoothStar goals",
+      "changes": [
+        "Contacts expand when opened, and matching contacts open during a search. Contacts, Access, and Wi-Fi use compact grouped panels.",
+        "Quick sign-in can reconnect an existing saved passkey and be tested from Settings. Failed sign-ins offer a direct password fallback.",
+        "Passkey requests prefer this device and retain the authenticator connection hints returned during setup. Reconnecting verifies the selected account and preserves the existing encrypted sign-in if recovery fails.",
+        "Sync now and its last-update time moved to Settings → Preferences. The sidebar connection label and the introductory paragraph in What changed were removed.",
+        "The contact label Tay — Secretary is now Tay, with its existing number and notes preserved.",
+        "Rental Checklist opens directly from Resources in the sidebar. Home and schedule shortcuts open the same checklist.",
+        "Future SmoothStars require 500 points. Existing stars, points, and progress are preserved, including manual awards and removals."
+      ],
+      "employee": {
+        "title": "Easier resources and a new SmoothStar goal",
+        "changes": [
+          "Contacts expand when opened, and matching contacts open during a search. Contacts, Access, and Wi-Fi use compact grouped panels.",
+          "Reconnect a saved passkey or test quick sign-in in Settings. Failed sign-ins offer a Use password button.",
+          "The contact label is now Tay. What changed opens directly to its history controls.",
+          "Find Rental Checklist under Resources in the sidebar.",
+          "The next SmoothStar takes 500 points. Existing SmoothStars and points are kept."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-clearer-sidebar-navigation",
       "version": "2.18.2",

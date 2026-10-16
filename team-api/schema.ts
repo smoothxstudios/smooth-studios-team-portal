@@ -74,6 +74,8 @@ export const rewardAccounts = sqliteTable("team_reward_accounts", {
   userId: text("user_id").primaryKey(), points: integer("points").notNull().default(0),
   peakPoints: integer("peak_points").notNull().default(0), awardedStars: integer("awarded_stars").notNull().default(0),
   removedStars: integer("removed_stars").notNull().default(0),
+  baselineStars: integer("baseline_stars").notNull().default(0),
+  baselinePoints: integer("baseline_points").notNull().default(0),
 });
 export const rewardChanges = sqliteTable("team_reward_changes", {
   id: text("id").primaryKey(), userId: text("user_id").notNull(), kind: text("kind").notNull(),

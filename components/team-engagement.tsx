@@ -195,7 +195,7 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
         {error && <p className="engagement-error" role="alert">{error} <button disabled={busy} type="button" onClick={() => void load()}>Refresh</button></p>}
       </DialogContent>
     </Dialog>
-    <Dialog open={enabled && progressOpen} onOpenChange={setProgressOpen}><DialogContent className="schedule-modal studio-stars-dialog"><DialogHeader><DialogTitle>My SmoothStars</DialogTitle><DialogDescription>Easy: 5 points. Medium: 10. Very Hard: 15. Reach each 100-point milestone to earn a SmoothStar. Smooth can also award stickers directly.</DialogDescription></DialogHeader>
+    <Dialog open={enabled && progressOpen} onOpenChange={setProgressOpen}><DialogContent className="schedule-modal studio-stars-dialog"><DialogHeader><DialogTitle>My SmoothStars</DialogTitle><DialogDescription>Easy: 5 points. Medium: 10. Very Hard: 15. Earn a SmoothStar for every {STAR_POINTS} points toward your next goal. Smooth can also award stickers directly.</DialogDescription></DialogHeader>
       {state && <><StarCollection summary={state.summary} /><div className="studio-sticker-wall" aria-label={`${state.summary.stars} SmoothStars collected`}>{Array.from({ length: Math.min(10, Math.max(1, state.summary.stars)) }, (_, i) => <span className={`studio-star-sticker${state.summary.stars ? " earned" : ""}`} key={i}><Star size={40} aria-hidden="true" /></span>)}{state.summary.stars > 10 && <strong>+{state.summary.stars - 10} more</strong>}</div><StarGoal summary={state.summary} /><p className="engagement-muted">{state.summary.correct} correct · {state.summary.incorrect} incorrect · {state.summary.answered} answered</p><h3 className="creative-history-title">Recent answers</h3><AttemptHistory attempts={state.history} /><RewardHistory rewards={state.rewards} /></>}
     </DialogContent></Dialog>
   </EngagementContext.Provider>;
@@ -284,7 +284,7 @@ export function TeamEngagementReview({ token }: { token: string }) {
   return <section className="panel team-engagement-review">
     <div className="panel-heading"><div><h2><Smile size={20} /> Temp Check & SmoothStars</h2><p>Employee check-ins and Daily Quiz results. Visible to you; employees see only their own.</p></div><Button variant="outline" disabled={busy || saving} onClick={() => void load()}><RefreshCw size={15} />{busy ? "Loading…" : "Refresh"}</Button></div>
     {error && <p className="engagement-error" role="alert">{error}</p>}
-    {state && <><p className="engagement-muted engagement-review-note">Easy: 5 points · Medium: 10 · Very Hard: 15 · 100 points per SmoothStar.</p><div className="team-checkin-grid">{state.members.map(person => {
+    {state && <><p className="engagement-muted engagement-review-note">Easy: 5 points · Medium: 10 · Very Hard: 15 · {STAR_POINTS} points per SmoothStar.</p><div className="team-checkin-grid">{state.members.map(person => {
       const mood = moodFor(person.moods[0]?.mood);
       return <button type="button" key={person.userId} className="team-checkin-card" onClick={() => setSelected(person.userId)}>
         <span className="engagement-row"><strong className="schedule-person"><i style={{ background: person.color }} />{person.name}</strong><ChevronRight size={16} /></span>

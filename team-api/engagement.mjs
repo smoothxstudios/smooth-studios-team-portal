@@ -1,5 +1,5 @@
 import { TEAM, studioLocal, localInstant, addLocalDays } from "../lib/team-schedule.mjs";
-import { MOODS, TEMP_CHECK_INTERVAL_MS, QUIZ_INTERVAL_MS, QUIZ_TIERS, starProgress } from "../lib/team-engagement.mjs";
+import { MOODS, TEMP_CHECK_INTERVAL_MS, QUIZ_INTERVAL_MS, QUIZ_TIERS, STAR_POINTS, starProgress } from "../lib/team-engagement.mjs";
 import { employeeQuestionCandidates, publicQuestion } from "./creative-questions.mjs";
 import { resetEngagement } from "./engagement-admin.mjs";
 
@@ -18,7 +18,7 @@ async function summary(db, user) {
     db.prepare("SELECT COUNT(*) AS answered, COALESCE(SUM(correct), 0) AS correct FROM team_quiz_attempts WHERE user_id = ? AND reset_at IS NULL").bind(user).first(),
     db.prepare("SELECT * FROM team_reward_accounts WHERE user_id = ?").bind(user).first(),
   ]);
-  return { ...starProgress(Number(account?.points ?? 0), Number(account?.peak_points ?? 0), Number(account?.awarded_stars ?? 0), Number(account?.removed_stars ?? 0)),
+  return { ...starProgress(Number(account?.points ?? 0), Number(account?.peak_points ?? 0), Number(account?.awarded_stars ?? 0), Number(account?.removed_stars ?? 0), Number(account?.baseline_stars ?? 0), Number(account?.baseline_points ?? 0)),
     answered: Number(row?.answered ?? 0), correct: Number(row?.correct ?? 0),
     incorrect: Number(row?.answered ?? 0) - Number(row?.correct ?? 0) };
 }
@@ -163,7 +163,7 @@ export async function engagementRoute({ request, db, user, env, body, fail }) {
       // The balance condition and trigger run atomically, including across owner tabs.
       await db.prepare(`INSERT OR IGNORE INTO team_reward_changes (id, user_id, kind, amount, reason, actor, created_at)
         SELECT ?, ?, ?, ?, ?, 'owner', ? WHERE CASE WHEN ? = 'star' THEN
-          COALESCE((SELECT CAST(peak_points / 100 AS INTEGER) + awarded_stars - removed_stars FROM team_reward_accounts WHERE user_id = ?), 0) + ? >= 0
+          COALESCE((SELECT baseline_stars + CAST(MAX(0, peak_points - baseline_points) / ${STAR_POINTS} AS INTEGER) + awarded_stars - removed_stars FROM team_reward_accounts WHERE user_id = ?), 0) + ? >= 0
         ELSE COALESCE((SELECT points FROM team_reward_accounts WHERE user_id = ?), 0) + ? >= 0 END`)
         .bind(id, input.userId, input.kind, input.amount, reason, now, input.kind, input.userId, input.amount, input.userId, input.amount).run();
       const saved = await db.prepare("SELECT * FROM team_reward_changes WHERE id = ?").bind(id).first();

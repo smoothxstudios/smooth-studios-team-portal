@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { ChevronDown, History, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import history from "@/config/dashboard-releases.json";
 import { groupReleaseDays, releaseHistoryForViewer } from "@/lib/dashboard-releases.mjs";
@@ -32,11 +32,10 @@ export function DashboardVersionFooter({ compact = false, viewer = "signed-out" 
     <div className="dashboard-version-meta"><span className="dashboard-version-badge">v{history.currentVersion}</span><span>Updated <time dateTime={latest.date}>{dateLabel(latest.date)}</time></span></div>
     {viewer !== "signed-out" && <Dialog>
       <DialogTrigger asChild><Button type="button" variant="ghost" className="dashboard-version-link"><History size={15} aria-hidden="true" />What changed</Button></DialogTrigger>
-      <DialogContent className="dashboard-release-dialog" onOpenAutoFocus={event => { event.preventDefault(); titleRef.current?.focus(); }}>
+      <DialogContent className="dashboard-release-dialog" aria-describedby={undefined} onOpenAutoFocus={event => { event.preventDefault(); titleRef.current?.focus(); }}>
         <DialogHeader>
           <p className="eyebrow">Smooth Studios · v{history.currentVersion}</p>
           <DialogTitle ref={titleRef} tabIndex={-1}>What changed</DialogTitle>
-          <DialogDescription>{isOwnerView ? "Your full history, including administrative and behind-the-scenes changes." : "Design improvements and updates to the tools you use."} Updates share one box per day, with each version’s changes listed inside. Dates use Eastern time.</DialogDescription>
         </DialogHeader>
         {viewer === "owner" && <div className="dashboard-release-owner-tools"><span>{previewEmployee ? "Previewing employee updates" : "Full owner history"}</span><Button type="button" size="sm" variant="outline" onClick={() => { setPreviewEmployee(value => !value); setCategory("all"); setQuery(""); }}>{previewEmployee ? "Back to full history" : "Preview employee updates"}</Button></div>}
         <div className="dashboard-release-filters">

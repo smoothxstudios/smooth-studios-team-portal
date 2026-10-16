@@ -8,7 +8,7 @@ import { teamToken, tokenHash } from "../lib/team-auth.mjs";
 import { TEMP_CHECK_INTERVAL_MS, QUIZ_INTERVAL_MS, MOODS, QUIZ_TIERS, nextEngagementPrompt, starProgress } from "../lib/team-engagement.mjs";
 import { dailyQuestion, employeeQuestionCandidates, publicQuestion, QUESTION_BANK, QUESTION_BANKS } from "../team-api/creative-questions.mjs";
 
-const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql", "0009_push_notifications.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
+const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql", "0009_push_notifications.sql", "0016_smoothstar_500_points.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
 const tokens = Object.fromEntries(await Promise.all([...TEAM.map(p => p.id), "sync"].map(async id => [id, await teamToken(`synthetic-engagement-test-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(Object.entries(tokens).map(async ([id, token]) => [id, await tokenHash(token)])));
 const now = Date.parse("2026-10-15T17:00:00Z"), today = "2026-10-15";
@@ -17,7 +17,7 @@ test.beforeEach(() => mock.timers.setTime(now));
 test.after(() => mock.timers.reset());
 
 class D1 {
-  constructor() { this.sqlite = new DatabaseSync(":memory:"); this.queries = 0; this.errors = []; migrations.forEach(sql => this.sqlite.exec(sql)); }
+  constructor(beforeStarMigration) { this.sqlite = new DatabaseSync(":memory:"); this.queries = 0; this.errors = []; migrations.forEach((sql, index) => { if (index === migrations.length - 1) beforeStarMigration?.(this.sqlite); this.sqlite.exec(sql); }); }
   prepare(sql) {
     const db = this.sqlite, owner = this; let args = [];
     return { bind(...values) { args = values; return this; },
@@ -32,8 +32,8 @@ class D1 {
     catch (error) { this.sqlite.exec("ROLLBACK"); throw error; }
   }
 }
-function fixture() {
-  const DB = new D1(), env = { DB, TEAM_TOKEN_HASHES: JSON.stringify(hashes) }, alerts = [];
+function fixture(beforeStarMigration) {
+  const DB = new D1(beforeStarMigration), env = { DB, TEAM_TOKEN_HASHES: JSON.stringify(hashes) }, alerts = [];
   const call = async (user, path = "/engagement", data, method = data ? "POST" : "GET") => {
     const response = await worker.fetch(new Request(`https://api.example.invalid${path}`, {
       method, headers: { "content-type": "application/json", origin: "https://dashboard.smoothstudios.co", ...(user ? { authorization: `Bearer ${tokens[user] ?? user}` } : {}) },
@@ -342,9 +342,9 @@ test("migration preserves old snapshots and points; late old-worker answers star
 
 test("owner can adjust points and award SmoothStars without typing a reason", async () => {
   const f = fixture();
-  let response = await f.call("owner", "/engagement/rewards", adjustment(95));
+  let response = await f.call("owner", "/engagement/rewards", adjustment(495));
   assert.equal(response.status, 200);
-  assert.equal(reportMember(response.data).summary.points, 95);
+  assert.equal(reportMember(response.data).summary.points, 495);
   assert.equal(reportMember(response.data).summary.answered, 0);
   const input = await offered(f, "jordyn"); await f.call("jordyn", "/engagement/answer", input);
   const afterQuiz = (await f.call("jordyn")).data.summary;
@@ -356,7 +356,7 @@ test("owner can adjust points and award SmoothStars without typing a reason", as
   response = await f.call("owner", "/engagement/rewards", adjustment(-80));
   assert.equal(reportMember(response.data).summary.points, afterQuiz.points - 80);
   assert.equal(reportMember(response.data).summary.stars, 2);
-  assert.equal(reportMember(response.data).summary.goal, 200);
+  assert.equal(reportMember(response.data).summary.goal, 1000);
   await f.call("owner", "/engagement/rewards", adjustment(80));
   const mine = (await f.call("jordyn")).data;
   assert.equal(mine.summary.stars, 2); // Re-adding removed points doesn't mint extra stars.
@@ -428,10 +428,49 @@ test("Home-only prompt order and star goals account for permanent and awarded st
   assert.equal(nextEngagementPrompt({ moodDue: false, questionDue: true, available: true }), "question");
   assert.equal(nextEngagementPrompt({ moodDue: false, questionDue: true, available: false }), null);
   assert.equal(nextEngagementPrompt({ moodDue: true, questionDue: true, available: true }, false), null);
-  assert.equal(starProgress(90).remaining, 10);
-  assert.equal(starProgress(100).stars, 1);
-  assert.equal(starProgress(230).progress, 30);
-  assert.deepEqual(starProgress(30, 150, 2), { points: 30, stars: 3, earnedStars: 1, awardedStars: 2, removedStars: 0, progress: 0, goal: 200, remaining: 170 });
+  assert.equal(starProgress(490).remaining, 10);
+  assert.equal(starProgress(499).stars, 0);
+  assert.equal(starProgress(500).stars, 1);
+  assert.equal(starProgress(1030).progress, 30);
+  assert.deepEqual(starProgress(30, 550, 2), { points: 30, stars: 3, earnedStars: 1, awardedStars: 2, removedStars: 0, progress: 0, goal: 1000, remaining: 970 });
+});
+
+test("the 500-point migration retains old stars, removals, and progress without re-awarding milestones", async () => {
+  let originalLedger;
+  const f = fixture(db => {
+    const insert = db.prepare("INSERT INTO team_reward_changes (id, user_id, kind, amount, reason, actor, created_at) VALUES (?, ?, ?, ?, 'Synthetic prior reward', 'owner', ?)");
+    insert.run('old-points', 'jordyn', 'points', 250, now);
+    insert.run('old-award', 'jordyn', 'star', 1, now);
+    insert.run('old-removal', 'jordyn', 'star', -2, now);
+    insert.run('old-deduction', 'jordyn', 'points', -50, now);
+    insert.run('old-progress', 'rayne', 'points', 50, now);
+    originalLedger = db.prepare('SELECT * FROM team_reward_changes ORDER BY id').all();
+  });
+  assert.deepEqual(f.DB.sqlite.prepare('SELECT * FROM team_reward_changes ORDER BY id').all(), originalLedger);
+  let state = (await f.call('jordyn')).data.summary;
+  assert.equal(state.points, 200);
+  assert.equal(state.stars, 1);
+  assert.equal(state.earnedStars, 2);
+  assert.equal(state.awardedStars, 1);
+  assert.equal(state.removedStars, 2);
+  assert.equal(state.goal, 700);
+  assert.equal(state.remaining, 500);
+  const partial = (await f.call('rayne')).data.summary;
+  assert.equal(partial.progress, 50);
+  assert.equal(partial.goal, 500);
+  assert.equal(partial.remaining, 450);
+  await f.call('owner', '/engagement/rewards', adjustment(499));
+  assert.equal((await f.call('jordyn')).data.summary.stars, 1);
+  await f.call('owner', '/engagement/rewards', adjustment(1));
+  state = (await f.call('jordyn')).data.summary;
+  assert.equal(state.stars, 2);
+  assert.equal(state.goal, 1200);
+  await f.call('owner', '/engagement/rewards', adjustment(-500));
+  await f.call('owner', '/engagement/rewards', adjustment(500));
+  assert.equal((await f.call('jordyn')).data.summary.stars, 2);
+  assert.equal((await f.call('owner', '/engagement/rewards', adjustment(-3, { kind: 'star' }))).status, 409);
+  assert.equal((await f.call('owner', '/engagement/rewards', adjustment(-2, { kind: 'star' }))).status, 200);
+  assert.equal((await f.call('jordyn')).data.summary.stars, 0);
 });
 
 test("owner resets only today's Temp Checks and a replay cannot hide a new check-in", async () => {
@@ -567,19 +606,19 @@ test("a simultaneous answer and reset cannot apply an unseen score reversal or a
 });
 
 test("SmoothStars can be removed from earned and awarded totals without reducing points or regrowing on refresh", async () => {
-  const f = fixture(); await f.call('owner','/engagement/rewards',adjustment(100));
+  const f = fixture(); await f.call('owner','/engagement/rewards',adjustment(500));
   await f.call('owner','/engagement/rewards',adjustment(1,{kind:'star'}));
   const remove = adjustment(-2,{kind:'star'});
   const responses = await Promise.all(Array.from({length:5},()=>f.call('owner','/engagement/rewards',remove)));
   assert.ok(responses.every(r=>r.status===200));
   let summary = (await f.call('jordyn')).data.summary;
-  assert.equal(summary.stars,0); assert.equal(summary.removedStars,2); assert.equal(summary.points,100); assert.equal(summary.goal,200);
+  assert.equal(summary.stars,0); assert.equal(summary.removedStars,2); assert.equal(summary.points,500); assert.equal(summary.goal,1000);
   assert.equal((await f.call('owner','/engagement/rewards',adjustment(-1,{kind:'star'}))).status,409);
   await f.call('owner','/engagement/rewards',adjustment(-50)); await f.call('owner','/engagement/rewards',adjustment(50));
   assert.equal((await f.call('jordyn')).data.summary.stars,0);
-  await f.call('owner','/engagement/rewards',adjustment(100));
+  await f.call('owner','/engagement/rewards',adjustment(500));
   summary = (await f.call('jordyn')).data.summary;
-  assert.equal(summary.stars,1); assert.equal(summary.goal,300);
+  assert.equal(summary.stars,1); assert.equal(summary.goal,1500);
   f.DB.queries=0; await f.call('owner','/engagement/rewards',adjustment(-1,{kind:'star'})); assert.ok(f.DB.queries<=50);
   assert.equal((await f.call('rayne')).data.summary.stars,0);
   assert.ok((await f.call('jordyn')).data.rewards.some(r=>r.kind==='star'&&r.amount===-2));

@@ -20,6 +20,7 @@ import {
   CalendarDays,
   CalendarCheck,
   CalendarClock,
+  ClipboardCheck,
   ClipboardList,
   Check,
   ChevronDown,
@@ -41,7 +42,6 @@ import {
   LogOut,
   Menu,
   ReceiptText,
-  RefreshCw,
   Search,
   Settings,
   ShieldCheck,
@@ -104,7 +104,8 @@ import { TeamAccountSetup, type NewTeamSettings } from "@/components/team-accoun
 import { TEAM, studioLocal } from "@/lib/team-schedule.mjs";
 import { employeeEarningsForYear } from "@/lib/employee-home.mjs";
 import { TeamSchedulingPage } from "@/components/team-scheduling";
-import { DashboardSettings, type SettingsTab } from "@/components/dashboard-settings";
+import { DashboardSettings } from "@/components/dashboard-settings";
+import { StudioInfoPage } from "@/components/studio-info";
 import { CreativeWorkPage, CreativeWorkPreview } from "@/components/creative-work";
 import { useCreativeWork, type CreativeAssignment } from "@/lib/use-creative-work";
 import { creativeEarnings, creativeEarningDate } from "@/lib/creative-work.mjs";
@@ -131,7 +132,7 @@ const STUDIO_TIME_ZONE = "America/New_York";
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 
-type ViewKey = "overview" | "rentals" | "team" | "payouts" | "guide" | "scheduling" | "availability" | "creative" | "settings";
+type ViewKey = "overview" | "rentals" | "team" | "payouts" | "guide" | "checklists" | "scheduling" | "availability" | "creative" | "settings";
 type RentalState = "upcoming" | "earned" | "paid" | "awaiting";
 type CustomerPaymentState = "paid" | "deposit" | "review" | "pending";
 type AppointmentStatus = RentalState | "customer-paid" | "upcoming-paid" | "deposit" | "review";
@@ -149,6 +150,7 @@ const NAV_ITEMS: NavigationItem[] = [
   { key: "team", label: "Team", icon: Users, group: "management", ownerOnly: true },
   { key: "payouts", label: "Payouts", icon: WalletCards, group: "management" },
   { key: "guide", label: "Studio Guidelines", icon: BookOpen, group: "resources" },
+  { key: "checklists", label: "Rental Checklist", icon: ClipboardCheck, group: "resources" },
   { key: "settings", label: "Settings", icon: Settings, group: "settings" },
 ];
 const EMPLOYEE_NAV_ITEMS: NavigationItem[] = NAV_ITEMS.filter(item => !item.ownerOnly).map(item => ({
@@ -401,7 +403,7 @@ function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[]; onUnlo
           <h1>Sign in</h1>
         </div>
         {!selection ? <p className="login-preparing" role="status">Preparing sign-in…</p> : quickReady && !usePassword ? <><div className="quick-login"><Button disabled={loading} onClick={quickUnlock}><Fingerprint size={20} />{loading ? "Opening…" : `Continue as ${profile?.label ?? selectedId}`}</Button></div>
-          {error && <p className="login-error" role="alert">{error}</p>}
+          {error && <div className="quick-sign-in-recovery"><p className="login-error" role="alert">{error}</p><Button variant="outline" disabled={loading} onClick={() => { setUsePassword(true); setPassword(""); setShowPassword(false); setError(""); }}>Use password</Button></div>}
           <button className="login-account-switch" disabled={loading} onClick={() => { setUsePassword(true); setPassword(""); setShowPassword(false); setError(""); }}>Sign in to another account</button>
         </> : <form onSubmit={submit}>
           <input type="hidden" name="username" autoComplete="username" value={selectedId === "owner" ? "smooth" : selectedId} />
@@ -1057,8 +1059,7 @@ function StripeMatchForm({
 
 function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string; schedulingToken: string }) {
   const [view, setView] = useState<ViewKey>("overview");
-  const [settingsTab, setSettingsTab] = useState<SettingsTab>("preferences");
-  const openChecklist = () => { setSettingsTab("checklists"); setView("settings"); };
+  const openChecklist = () => setView("checklists");
   const creative = useCreativeWork(schedulingToken);
   const creativeTotals = useMemo(() => creativeEarnings(creative.items), [creative.items]);
   const currentYear = Number(studioLocal(Date.now()).slice(0, 4));
@@ -1236,13 +1237,13 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
       <EmployeeEngagementProvider key={payload.user.id} token={schedulingToken} enabled={!isOwner} homeActive={view === "overview"}>
       {isOwner && <TeamAccountSetup open={teamSetupOpen} onOpenChange={setTeamSetupOpen} employees={payload.employees} busy={teamSetupBusy} onSubmit={prepareTeamSetup} enabled={Boolean(payload.workflowAccess)} />}
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
-        <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact />{isOwner && <span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span>}</SidebarHeader>
+        <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact /></SidebarHeader>
         <SidebarContent className="studio-sidebar-content">
           <DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={setView} />
           {!isOwner && <div className="sidebar-progress"><SmoothStarSidebar /></div>}
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
-          <SettingsNavigation active={view === "settings"} onOpen={() => { setSettingsTab("preferences"); setView("settings"); }} />
+          <SettingsNavigation active={view === "settings"} onOpen={() => setView("settings")} />
           <div className="sidebar-user"><span className="user-avatar" style={{ background: teamAccent(payload.user.id, payload.user.accent) }}>{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" title="Log out" onClick={onLogout}><LogOut size={18} /></button></div>
         </SidebarFooter>
       </Sidebar>
@@ -1250,14 +1251,15 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
       <SidebarInset className={`dashboard-main${isOwner ? " owner-dashboard" : ""}`}>
         <header className="dashboard-topbar">
           <div className="topbar-title"><SidebarTrigger className="mobile-menu-trigger" aria-label="Open navigation"><Menu /></SidebarTrigger><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div>
-          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}{isOwner && <><Button className="sync-now-button" aria-label="Sync now" onClick={openCalendarSync} size="sm" variant="outline"><RefreshCw size={15} /><span>Sync now</span></Button><span className="owner-sync-status">Updated {formatDate(payload.generatedAt, true)} · {formatTime(payload.generatedAt)}</span></>}</div>
+          {payload.source === "sample" && <div className="topbar-actions"><Badge className="sample-badge" variant="outline">Preview data</Badge></div>}
         </header>
 
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Creative work totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "overview" && <CreativeWorkPreview state={creative} isOwner={isOwner} onOpen={() => setView("creative")} />}
-          {view === "settings" && <DashboardSettings key={settingsTab} token={schedulingToken} profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} dark={dark} onThemeChange={setDark} initialTab={settingsTab} />}
+          {view === "settings" && <DashboardSettings token={schedulingToken} profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} dark={dark} onThemeChange={setDark} onSync={isOwner ? openCalendarSync : undefined} lastSynced={`${formatDate(payload.generatedAt, true)} · ${formatTime(payload.generatedAt)}`} />}
+          {view === "checklists" && <StudioInfoPage token={schedulingToken} isOwner={isOwner} userId={payload.user.id} section="checklists" />}
           {view === "creative" && <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} />}
           {view === "overview" && !isOwner && <TeamSchedulingPage onChecklist={openChecklist} token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide"), onChecklist: openChecklist }} />}
           {view === "overview" && isOwner && (
