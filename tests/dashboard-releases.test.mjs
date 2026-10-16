@@ -49,3 +49,15 @@ test("custom-domain builds and project-URL builds keep their own asset base path
   assert.equal(dashboardBasePath({ ...github, GITHUB_PAGES_BASE_PATH: "/smooth-studios-team-portal" }), "/smooth-studios-team-portal");
   assert.equal(dashboardBasePath({}), "");
 });
+
+test("one daily box retains each version with its own title and changes", () => {
+  const notes = [
+    { id: "new", date: "2026-10-16", version: "2.16.0", title: "New features", category: "Team", changes: ["Creative work"] },
+    { id: "old", date: "2026-10-16", version: "2.15.2", title: "Earlier fix", category: "Interface", changes: ["Grouped notes"] },
+    { id: "yesterday", date: "2026-10-15", version: "2.14.0", title: "Prior day", category: "Interface", changes: ["Mobile fixes"] },
+  ];
+  const days = groupReleaseDays(notes);
+  assert.equal(days.length, 2);
+  assert.deepEqual(days[0].releases, notes.slice(0, 2));
+  assert.deepEqual(days[0].releases.map(note => [note.version, note.changes]), [["2.16.0", ["Creative work"]], ["2.15.2", ["Grouped notes"]]]);
+});

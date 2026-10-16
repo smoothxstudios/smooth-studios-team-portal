@@ -5,6 +5,8 @@ import { engagementRoute } from "./engagement.mjs";
 import { subscriptionKeys } from "./push-encryption.mjs";
 import { sendQuizReminders } from "./quiz-notifications.mjs";
 import { assignmentNotifications, blockNotifications } from "./notification-content.mjs";
+import { creativeWorkRoute } from "./creative-work.mjs";
+import { studioReferenceRoute } from "./studio-reference.mjs";
 
 const users = TEAM.map(p => p.id);
 const origins = new Set(["https://smoothxstudios.github.io", "https://dashboard.smoothstudios.co", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
@@ -110,13 +112,20 @@ function approveConflict(period) {
 
 async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
+  if (request.method === "GET" && url.pathname === "/studio-reference/key") {
+    if (!env.STUDIO_REFERENCE_KEY) fail(503, "Secure import is not ready.");
+    const { kty, n, e } = JSON.parse(env.STUDIO_REFERENCE_KEY);
+    return { publicKey: { kty, n, e, alg: "RSA-OAEP-256", key_ops: ["encrypt"], ext: true } };
+  }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 1, studioReferenceVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
   else if (user === "sync") fail(403, "Sync access is restricted to synchronization endpoints.");
+  if (["/studio-reference", "/sync/studio-reference", "/rental-checklists"].includes(url.pathname) || url.pathname.startsWith("/rental-checklists/")) return studioReferenceRoute({ request, db, user, env, body, fail });
+  if (url.pathname === "/creative-work" || url.pathname.startsWith("/creative-work/")) return creativeWorkRoute({ request, db, user, env, ctx, body, fail });
   if (url.pathname === "/engagement" || url.pathname.startsWith("/engagement/")) return engagementRoute({ request, db, user, env, body, fail });
 
   // The content vault verifies existing dashboard credentials server-to-server.

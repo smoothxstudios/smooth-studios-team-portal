@@ -2,6 +2,7 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", event => event.waitUntil(self.clients.claim()));
 const notices = {
+  creative: { title: "Creative work update", body: "Open Creative Work to review your assignment, submission, or payment.", hash: "#creative-work" },
   assignment: { title: "New assignment", body: "You have a new rental or task offer. Open your dashboard to review and respond.", hash: "#scheduling" },
   schedule: { title: "Schedule update", body: "Open your dashboard to review your latest schedule and assignment responses.", hash: "#scheduling" },
   quiz: { title: "Daily Quiz is ready", body: "Your next creative question is ready. Answer it to earn points toward a SmoothStar.", hash: "#daily-quiz" },

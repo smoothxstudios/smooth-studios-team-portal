@@ -33,7 +33,7 @@ export async function vapidAuthorization(endpoint, jwk, now = Date.now()) {
 // registrations retain generic alerts until a dashboard visit adds keys.
 export async function deliverPush(endpoint, jwk, send = fetch, { keys, kind = "schedule", ttl = 86400, details, notificationId } = {}) {
   const url = pushEndpoint(endpoint);
-  if (!["schedule", "assignment", "quiz", "test"].includes(kind)) throw new Error("Invalid notification type.");
+  if (!["schedule", "assignment", "creative", "quiz", "test"].includes(kind)) throw new Error("Invalid notification type.");
   const eventId = typeof notificationId === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(notificationId) ? notificationId : null;
   const content = { type: kind, ...notificationDetails(details), ...(eventId ? { id: eventId } : {}) };
   const payload = keys ? await encryptPush(keys, new TextEncoder().encode(JSON.stringify(content))) : new Uint8Array(0);

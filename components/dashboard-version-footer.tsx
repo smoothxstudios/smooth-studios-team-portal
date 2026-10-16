@@ -36,7 +36,7 @@ export function DashboardVersionFooter({ compact = false, viewer = "signed-out" 
         <DialogHeader>
           <p className="eyebrow">Smooth Studios · v{history.currentVersion}</p>
           <DialogTitle ref={titleRef} tabIndex={-1}>What changed</DialogTitle>
-          <DialogDescription>{isOwnerView ? "Your full history, including administrative and behind-the-scenes changes." : "Design improvements and updates to the tools you use."} Updates from the same day are combined by topic. Dates use Eastern time.</DialogDescription>
+          <DialogDescription>{isOwnerView ? "Your full history, including administrative and behind-the-scenes changes." : "Design improvements and updates to the tools you use."} Updates share one box per day, with each version’s changes listed inside. Dates use Eastern time.</DialogDescription>
         </DialogHeader>
         {viewer === "owner" && <div className="dashboard-release-owner-tools"><span>{previewEmployee ? "Previewing employee updates" : "Full owner history"}</span><Button type="button" size="sm" variant="outline" onClick={() => { setPreviewEmployee(value => !value); setCategory("all"); setQuery(""); }}>{previewEmployee ? "Back to full history" : "Preview employee updates"}</Button></div>}
         <div className="dashboard-release-filters">
@@ -47,7 +47,7 @@ export function DashboardVersionFooter({ compact = false, viewer = "signed-out" 
         <div className="dashboard-release-list" aria-label="Release history" tabIndex={0}>
           {days.map((day, index) => <details className={`dashboard-release-entry${day.date === latest.date ? " is-current" : ""}`} key={`${day.date}-${query}-${category}-${isOwnerView}`} open={filtered || index === 0}>
             <summary><div><h3><time dateTime={day.date}>{dateLabel(day.date)}</time></h3><div className="dashboard-release-meta"><span>{day.sections.map(section => section.category).join(" · ")}</span>{day.versions.length > 0 && <span className="dashboard-version-badge">{day.versions.includes(history.currentVersion) ? "Current · " : ""}{day.versions.length > 1 ? `v${day.versions[day.versions.length - 1]}–v${day.versions[0]}` : `v${day.versions[0]}`}</span>}</div></div><ChevronDown size={18} aria-hidden="true" /></summary>
-            <div className="dashboard-release-day-content">{day.sections.map(section => <section className="dashboard-release-topic" key={section.category}><h4>{section.category}</h4><ul>{section.changes.map(change => <li key={change}>{change}</li>)}</ul></section>)}</div>
+            <div className="dashboard-release-day-content">{day.releases.map(release => <section className="dashboard-release-topic dashboard-release-version" key={release.id}><div className="dashboard-release-version-heading">{release.version && <span className="dashboard-version-badge">v{release.version}</span>}<h4>{release.title}</h4></div><p className="dashboard-release-version-category">{release.category}</p><ul>{release.changes.map(change => <li key={change}>{change}</li>)}</ul></section>)}</div>
             {day.retrospective && <p className="dashboard-release-retrospective">Includes earlier versions assigned retrospectively from feature milestones.</p>}
           </details>)}
           {!releases.length && <div className="dashboard-release-empty"><p>No updates match this search.</p><Button variant="outline" onClick={() => { setQuery(""); setCategory("all"); }}>Clear filters</Button></div>}

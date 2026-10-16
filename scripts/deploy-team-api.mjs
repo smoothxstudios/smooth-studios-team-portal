@@ -34,6 +34,10 @@ for (const { id } of TEAM) {
 hashes.sync = await tokenHash(await teamToken(process.env.DASHBOARD_PASSWORD_OWNER, "sync"));
 const existing = await secretRequest("GET");
 if (!Array.isArray(existing)) throw new Error("Could not verify existing Worker secrets. Push keys were not replaced.");
+if (!existing.some(secret => secret.name === "STUDIO_REFERENCE_KEY")) {
+  const keys = await crypto.subtle.generateKey({ name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["encrypt", "decrypt"]);
+  await secretRequest("PUT", { name: "STUDIO_REFERENCE_KEY", text: JSON.stringify(await crypto.subtle.exportKey("jwk", keys.privateKey)), type: "secret_text" });
+}
 if (!existing.some(secret => secret.name === "VAPID_JWK")) {
   const keys = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
   const jwk = await crypto.subtle.exportKey("jwk", keys.privateKey);
@@ -58,7 +62,7 @@ for (let attempt = 0; attempt < 10; attempt++) {
   try {
     const health = await fetch(`${TEAM_API_URL}/health`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
     const status = health.ok && await health.json();
-    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 3);
+    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 3 && status.creativeWorkVersion === 1 && status.studioReferenceVersion === 1);
   } catch { /* A transient deployment response is retried within this bound. */ }
   if (ready) break;
   if (attempt < 9) await new Promise(resolve => setTimeout(resolve, 2000));

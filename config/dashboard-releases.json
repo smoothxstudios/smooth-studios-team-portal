@@ -1,6 +1,32 @@
 {
-  "currentVersion": "2.15.2",
+  "currentVersion": "2.16.0",
   "releases": [
+    {
+      "id": "2026-10-16-studio-work-tools",
+      "version": "2.16.0",
+      "date": "2026-10-16",
+      "category": "Team",
+      "title": "Studio information, rental checklists, and creative work",
+      "changes": [
+        "Studio Info brings access details, contact numbers, pricing, and operating reminders into a searchable area for signed-in team members. Smooth can add, edit, or remove information; codes are hidden until revealed.",
+        "Each studio rental has a saved preparation, arrival, checkout, and closing checklist. Accepted staff and Smooth can update it, see who completed each item, and leave handoff notes.",
+        "Creative Work supports fixed-pay assignments independent of Calendar bookings. Employees accept offers and submit links; Smooth requests revisions, approves earnings, and records full or partial payouts. Approved pay flows into the earnings and team totals.",
+        "Quick sign-in remembers the last profile and offers opt-in device passkey unlocking for Smooth and employees, with password sign-in available. Each device must complete its setup from the sidebar.",
+        "What changed keeps one box per day while displaying each individual version, title, and its associated changes inside the box.",
+        "Private reference content is imported through an encrypted deployment package. It is served only after authentication; repeated imports preserve owner edits."
+      ],
+      "employee": {
+        "title": "Studio resources and creative assignments",
+        "changes": [
+          "Find access details, contact numbers, pricing, and operating reminders in Studio Info.",
+          "Open a saved checklist for each accepted studio rental, tick off preparation and closing tasks, and leave handoff notes.",
+          "Creative Work shows your briefs, deadlines, agreed pay, submissions, and feedback. Approved work is included in earnings.",
+          "Set up Quick sign-in from the sidebar to unlock with your device passkey when supported.",
+          "Daily update boxes retain the individual versions and changes."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-daily-update-notes",
       "version": "2.15.2",

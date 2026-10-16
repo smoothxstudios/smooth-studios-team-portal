@@ -7,6 +7,8 @@ on:
       - "team-api/**"
       - "lib/team-*.mjs"
       - "scripts/deploy-team-api.mjs"
+      - "scripts/import-studio-reference.mjs"
+      - "data/studio-reference-import.json"
       - "scripts/lib/employee-pay.mjs"
       - "scripts/lib/team-settings.mjs"
       - "config/studio.config.json"
@@ -46,6 +48,10 @@ jobs:
           DASHBOARD_PASSWORD_JORDYN: ${{ secrets.DASHBOARD_PASSWORD_JORDYN }}
           DASHBOARD_PASSWORD_RAYNE: ${{ secrets.DASHBOARD_PASSWORD_RAYNE }}
         run: node scripts/deploy-team-api.mjs
+      - name: Import encrypted studio reference if supplied
+        env:
+          DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}
+        run: node scripts/import-studio-reference.mjs
       - name: Import Calendar and enable scheduling after successful sync
         env:
           TEAM_API_BOOTSTRAP: "true"

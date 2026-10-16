@@ -26,6 +26,19 @@ export const workPreferences = sqliteTable("team_work_preferences", {
   data: text("data").notNull(),
 }, table => [index("team_work_preferences_user").on(table.userId)]);
 
+export const creativeAssignments = sqliteTable("team_creative_assignments", {
+  id: text("id").primaryKey(), employeeId: text("employee_id").notNull(),
+  version: integer("version").notNull().default(1), mutation: text("mutation").notNull(), data: text("data").notNull(),
+}, table => [index("team_creative_employee_idx").on(table.employeeId)]);
+
+export const studioReference = sqliteTable("studio_reference", {
+  id: integer("id").primaryKey(), revision: integer("revision").notNull().default(0),
+  data: text("data").notNull().default('{"entries":[],"checklist":[]}'), importedId: text("imported_id"), updatedAt: text("updated_at"),
+});
+export const rentalChecklists = sqliteTable("rental_checklists", {
+  id: text("id").primaryKey(), appointmentId: text("appointment_id").notNull(), version: integer("version").notNull().default(1), data: text("data").notNull(),
+}, table => [index("rental_checklist_appointment_idx").on(table.appointmentId)]);
+
 export const engagementState = sqliteTable("team_engagement_state", {
   userId: text("user_id").primaryKey(),
   nextMoodAt: integer("next_mood_at").notNull().default(0),
