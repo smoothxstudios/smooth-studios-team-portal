@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { releaseHistoryForViewer } from "../lib/dashboard-releases.mjs";
+import { groupReleaseDays, releaseHistoryForViewer } from "../lib/dashboard-releases.mjs";
 import { dashboardBasePath } from "../lib/site-path.mjs";
 
 const history = JSON.parse(readFileSync(new URL("../config/dashboard-releases.json", import.meta.url), "utf8"));
@@ -18,6 +18,14 @@ test("employee update history excludes administration and uses curated copy for 
   assert.deepEqual(releaseHistoryForViewer(notes, "signed-out"), []);
   assert.deepEqual(releaseHistoryForViewer(notes, "unknown"), []);
   assert.deepEqual(releaseHistoryForViewer(notes, "owner"), notes);
+  const employeeDays = groupReleaseDays(selected);
+  assert.equal(employeeDays.length, 1);
+  assert.deepEqual(employeeDays[0].sections, [{ category: "Scheduling", changes: ["Accepted assignments are green."] }]);
+  assert.doesNotMatch(JSON.stringify(employeeDays), /Accounts|Administrative|Worker tokens|Owner title|commits/);
+  const ownerDays = groupReleaseDays(releaseHistoryForViewer(notes, "owner"));
+  assert.equal(ownerDays.length, 1, "same-day owner updates share one entry");
+  assert.equal(ownerDays[0].sections.length, 2);
+  assert.deepEqual(groupReleaseDays(releaseHistoryForViewer(notes, "signed-out")), []);
 });
 
 test("real owner history is complete while employee search content contains no admin-only entries", () => {

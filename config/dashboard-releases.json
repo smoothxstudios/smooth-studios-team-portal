@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.15.1",
+  "currentVersion": "2.15.2",
   "releases": [
+    {
+      "id": "2026-10-16-daily-update-notes",
+      "version": "2.15.2",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Update notes organized by day",
+      "changes": [
+        "What changed combines updates from the same date into one entry, with changes organized by topic and the day’s version range shown together.",
+        "Search and topic filters still work across the complete history. The owner retains all notes; employee notes are selected before grouping so administrative changes stay out of their view."
+      ],
+      "employee": {
+        "title": "Daily update notes",
+        "changes": [
+          "What changed now combines updates from the same day into one entry, grouped by topic. Search still helps you find a specific improvement."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-retrospective-calendar-verification",
       "version": "2.15.1",

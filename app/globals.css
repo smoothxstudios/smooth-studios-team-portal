@@ -637,10 +637,12 @@ button { cursor: pointer; }
 .dashboard-release-entry[open] summary > svg { transform: rotate(180deg); }
 .dashboard-release-entry summary:focus-visible, .dashboard-release-list:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: 10px; }
 .dashboard-release-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--muted-foreground); font-size: 11px; }
-.dashboard-release-meta > span:not(.dashboard-version-badge) { padding-left: 10px; border-left: 1px solid var(--border); }
-.dashboard-release-entry h3 { margin: 7px 0 0; font-size: 15px; line-height: 1.45; font-weight: 650; overflow-wrap: anywhere; }
+.dashboard-release-entry h3 { margin: 0 0 7px; font-size: 16px; line-height: 1.45; font-weight: 650; overflow-wrap: anywhere; }
 .dashboard-release-entry ul { margin: 0; padding: 0 20px 18px 34px; list-style: disc; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
 .dashboard-release-entry li + li { margin-top: 7px; }
+.dashboard-release-topic + .dashboard-release-topic { padding-top: 16px; border-top: 1px solid var(--border); }
+.dashboard-release-topic h4 { margin: 0; padding: 0 16px 10px; font-size: 13px; line-height: 1.5; font-weight: 700; color: var(--foreground); }
+.dashboard-release-retrospective { margin: 0; padding: 0 16px 16px; font-size: 11px; line-height: 1.5; color: var(--muted-foreground); }
 .dashboard-release-empty { display: grid; justify-items: center; gap: 12px; padding: 30px 12px; color: var(--muted-foreground); font-size: 14px; }
 @media (max-width: 540px) {
   .dashboard-version-footer:not(.dashboard-version-compact) { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
