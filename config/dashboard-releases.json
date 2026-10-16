@@ -1,6 +1,30 @@
 {
-  "currentVersion": "2.11.0",
+  "currentVersion": "2.12.0",
   "releases": [
+    {
+      "id": "2026-10-15-paced-quizzes-smoothstar-rewards",
+      "version": "2.12.0",
+      "date": "2026-10-15",
+      "category": "Team",
+      "title": "Spaced Daily Quizzes and a clearer road to a SmoothStar",
+      "changes": [
+        "Temp Check has a red accent and roomier mood choices. Phones use two rows so every label stays on one line; the extra check-in privacy sentence is removed.",
+        "Daily Quiz offers one randomly selected remaining difficulty at a time. The next question unlocks two hours after answering, up to three daily questions, with a clear next-question time.",
+        "Questions now include more studio equipment, lighting, audio troubleshooting, color, composition, photo workflow, and video editing alongside camera settings.",
+        "The sidebar is now Road to a SmoothStar, with a visible collected-star count. My SmoothStars separates stickers earned from points from stickers awarded by Smooth.",
+        "Smooth can add or remove employee points and award a SmoothStar directly from Team, with a reason and adjustment history. Point deductions keep collected stickers and cannot create a negative balance.",
+        "Server-issued question snapshots, elapsed-time checks, atomic rewards, and retry protection keep quizzes and balances consistent across devices. Existing quiz scores, answers, and stars are preserved."
+      ],
+      "employee": {
+        "changes": [
+          "Temp Check now has a red accent and more space between moods. On phones, all six labels fit neatly across two rows.",
+          "Answer one Daily Quiz question at a time. Another random remaining difficulty unlocks two hours later, with up to three questions each day and 5, 10, or 15 points for a correct answer.",
+          "Practice a wider mix of studio equipment, lighting, audio, color, composition, photography, and video skills.",
+          "Road to a SmoothStar in your sidebar shows your points and SmoothStars collected. Open it to see earned and awarded stickers, quiz results, and point activity."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-15-daily-quiz-smoothstars",
       "version": "2.11.0",

@@ -115,12 +115,13 @@
 .engagement-popup h2 { font-size: 23px; line-height: 1.25; letter-spacing: -.035em; font-weight: 700; }
 .engagement-popup button[data-slot="button"] { min-height: 44px; font-size: 12px; }
 .engagement-muted { font-size: 13px; line-height: 1.6; color: var(--muted-foreground); }
-.temp-check-moods { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin: 15px 0 10px; }
-.temp-check-moods button { display: grid; justify-items: center; align-content: center; gap: 7px; min-height: 74px; min-width: 0; padding: 8px 2px; border: 1px solid var(--border); background: var(--background); border-radius: 13px; transition: background .15s, border-color .15s; }
-.temp-check-moods button:hover:not(:disabled) { background: #8273d715; border-color: #8273d7; }
+.temp-check-popup { width: min(550px, calc(100vw - 24px)); border-top-color: #e10000; }
+.temp-check-moods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(90px, 1.25fr) minmax(0, 1fr); gap: 9px; margin: 16px 0; }
+.temp-check-moods button { display: grid; justify-items: center; align-content: center; gap: 7px; min-height: 74px; min-width: 0; padding: 12px 4px; border: 1px solid var(--border); background: var(--background); border-radius: 13px; transition: background .15s, border-color .15s; }
+.temp-check-moods button:hover:not(:disabled) { background: #e1000009; border-color: #e1000055; }
 .temp-check-moods button:disabled { opacity: .5; }
 .temp-check-moods button > span { font-size: 27px; line-height: 1; }
-.temp-check-moods strong { font-size: 9px; line-height: 1.2; font-weight: 600; overflow-wrap: anywhere; min-height: 22px; display: grid; align-content: center; }
+.temp-check-moods strong { font-size: 10px; line-height: 1.4; font-weight: 600; white-space: nowrap; }
 .engagement-privacy { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; margin: 11px 0; }
 .temp-check-saved { display: grid; gap: 8px; background: var(--muted); border-radius: 14px; padding: 14px; margin-top: 12px; }
 .temp-check-saved > span { font-size: 36px; }
@@ -128,12 +129,33 @@
 .creative-question-meta { margin: 10px 0; color: var(--muted-foreground); font-size: 11px; }
 .creative-question-meta span:first-child { background: var(--muted); border-radius: 20px; padding: 5px 9px; }
 .engagement-popup .creative-question-title { font-size: 16px; font-weight: 650; line-height: 1.4; margin-bottom: 12px; }
-.quiz-tiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 15px; }
-.quiz-tiers button { display: grid; justify-items: center; align-content: center; gap: 3px; padding: 7px 4px; min-height: 49px; border: 1px solid var(--border); border-radius: 9px; background: var(--background); }
-.quiz-tiers button.selected { border-color: #8273d7; background: #8273d714; }
-.quiz-tiers button:disabled { opacity: .65; }
-.quiz-tiers strong { font-size: 11px; font-weight: 650; }
-.quiz-tiers span { display: flex; align-items: center; gap: 3px; font-size: 10px; color: var(--muted-foreground); }
+.quiz-current-tier { margin-top: 16px; font-size: 11px; }
+.quiz-current-tier > strong { padding: 5px 9px; border-radius: 20px; color: #6752ba; background: #8273d71a; }
+.dark .quiz-current-tier > strong { color: #c2b5ff; }
+.quiz-current-tier > span { color: var(--muted-foreground); }
+.quiz-next-time { display: flex; align-items: center; gap: 8px; padding: 12px 0; font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
+.quiz-next-time svg { flex-shrink: 0; }
+.quiz-next-time strong { color: var(--foreground); font-weight: 600; }
+.smoothstar-sidebar .smoothstar-heading { font-size: 11px; white-space: nowrap; }
+.smoothstar-sidebar-count { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+.smoothstar-sidebar-count b { font-size: 23px; line-height: 1; }
+.smoothstar-sidebar-count > span { font-size: 10px; color: var(--muted-foreground); }
+.smoothstar-collection { display: flex; align-items: center; gap: 15px; padding: 16px; border-radius: 15px; background: #e4b24012; }
+.smoothstar-collection > svg { color: #ad7714; fill: #f3c24f; flex-shrink: 0; }
+.smoothstar-collection > div { display: grid; gap: 4px; }
+.smoothstar-collection strong { font-size: 34px; line-height: 1; font-weight: 750; }
+.smoothstar-collection span { font-size: 14px; font-weight: 650; }
+.smoothstar-collection small { font-size: 11px; color: var(--muted-foreground); }
+.reward-controls { border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 12px 0; }
+.reward-controls h3 { font-size: 15px; font-weight: 650; margin-bottom: 14px; }
+.reward-controls fieldset { display: grid; gap: 12px; min-width: 0; }
+.reward-control-fields { display: flex; gap: 10px; flex-wrap: wrap; }
+.reward-controls label { display: grid; gap: 6px; font-size: 12px; font-weight: 600; flex: 1; min-width: 110px; }
+.reward-controls input, .reward-controls select { min-width: 0; width: 100%; min-height: 44px; background: var(--background); border: 1px solid var(--border); border-radius: 9px; padding: 9px; font-size: 16px; font-weight: 400; }
+.reward-controls fieldset:disabled { opacity: .65; }
+.reward-history > div { border-bottom: 1px solid var(--border); padding: 10px 0; font-size: 12px; }
+.reward-history small, .reward-history p { color: var(--muted-foreground); font-size: 11px; line-height: 1.6; }
+.reward-history p { margin-top: 4px; overflow-wrap: anywhere; }
 .quiz-tomorrow { margin: 10px 0; }
 .creative-choices { display: grid; gap: 6px; min-width: 0; }
 .creative-choices label { display: flex; align-items: center; gap: 9px; padding: 9px 11px; min-height: 44px; font-size: 13px; line-height: 1.45; border: 1px solid var(--border); border-radius: 11px; cursor: pointer; }
@@ -199,7 +221,9 @@
   .engagement-bar { padding: 6px 8px; gap: 0; }
   .engagement-links { width: 100%; justify-content: space-between; }
   .engagement-popup { padding: 14px 12px; }
-  .temp-check-moods { gap: 2px; }
+  .temp-check-popup { width: min(390px, calc(100vw - 24px)); }
+  .temp-check-moods { grid-template-columns: minmax(0, 1fr) minmax(96px, 1.2fr) minmax(0, 1fr); gap: 10px; }
+  .temp-check-moods strong { font-size: 11px; }
   .temp-check-moods button > span { font-size: 25px; }
   .team-checkin-grid { grid-template-columns: minmax(0, 1fr); padding: 0 18px 18px; }
   .engagement-review-note { padding: 0 18px 18px; }

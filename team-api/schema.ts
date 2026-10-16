@@ -50,6 +50,22 @@ export const quizAttempts = sqliteTable("team_quiz_attempts", {
   createdAt: integer("created_at").notNull(), data: text("data").notNull(),
 }, table => [primaryKey({ columns: [table.userId, table.day, table.tier] })]);
 
+export const quizOffers = sqliteTable("team_quiz_offers", {
+  userId: text("user_id").notNull(), day: text("day").notNull(), slot: integer("slot").notNull(),
+  tier: text("tier").notNull(), offeredAt: integer("offered_at").notNull(),
+  dismissedAt: integer("dismissed_at"), data: text("data").notNull(),
+}, table => [primaryKey({ columns: [table.userId, table.day, table.slot] }), uniqueIndex("team_quiz_offers_tier").on(table.userId, table.day, table.tier)]);
+
+export const rewardAccounts = sqliteTable("team_reward_accounts", {
+  userId: text("user_id").primaryKey(), points: integer("points").notNull().default(0),
+  peakPoints: integer("peak_points").notNull().default(0), awardedStars: integer("awarded_stars").notNull().default(0),
+});
+export const rewardChanges = sqliteTable("team_reward_changes", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull(), kind: text("kind").notNull(),
+  amount: integer("amount").notNull(), reason: text("reason").notNull(), actor: text("actor").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, table => [index("team_reward_changes_user_time").on(table.userId, table.createdAt)]);
+
 export const assignments = sqliteTable("team_assignments", {
   id: text("id").primaryKey(),
   employeeId: text("employee_id").notNull(),

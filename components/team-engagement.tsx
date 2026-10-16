@@ -1,13 +1,13 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronRight, RefreshCw, Smile, Sparkles, Star, X } from "lucide-react";
+import { Check, ChevronRight, Clock3, RefreshCw, Smile, Sparkles, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSidebar } from "@/components/ui/sidebar";
 import { teamRequest } from "@/lib/team-api";
 import { MOODS, nextEngagementPrompt, QUIZ_TIERS, STAR_POINTS } from "@/lib/team-engagement.mjs";
-import type { CreativeAttempt, EmployeeEngagement, QuizTier, StudioStars, TeamEngagement } from "@/lib/team-engagement-types";
+import type { CreativeAttempt, EmployeeEngagement, RewardChange, StudioStars, TeamEngagement } from "@/lib/team-engagement-types";
 
 const clock = (value: string | number) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 const dayLabel = (day: string) => new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(`${day}T12:00:00Z`));
@@ -17,10 +17,23 @@ const answerText = (attempt: CreativeAttempt, correct = false) => attempt.questi
 
 function StarGoal({ summary }: { summary: StudioStars }) {
   return <div className="studio-star-goal">
-    <div className="engagement-row"><strong><Star size={17} aria-hidden="true" /> {summary.points} points</strong><span>{summary.stars} {summary.stars === 1 ? "SmoothStar" : "SmoothStars"} earned</span></div>
-    <progress aria-label={`Progress toward SmoothStar ${summary.stars + 1}`} max={STAR_POINTS} value={summary.progress} />
-    <small>{summary.remaining} points to SmoothStar {summary.stars + 1} · Goal: {summary.goal} total points</small>
+    <div className="engagement-row"><strong><Star size={17} aria-hidden="true" /> {summary.points} points</strong><span>{summary.stars} {summary.stars === 1 ? "SmoothStar" : "SmoothStars"} collected</span></div>
+    <progress aria-label="Progress toward your next earned SmoothStar" max={STAR_POINTS} value={summary.progress} />
+    <small>{summary.remaining} points to your next earned SmoothStar · Goal: {summary.goal} total points</small>
   </div>;
+}
+
+function StarCollection({ summary }: { summary: StudioStars }) {
+  return <div className="smoothstar-collection" aria-label={`${summary.stars} SmoothStars collected`}>
+    <Star size={32} aria-hidden="true" /><div><strong>{summary.stars}</strong><span>SmoothStars collected</span><small>{summary.earnedStars} from points · {summary.awardedStars} awarded by Smooth</small></div>
+  </div>;
+}
+function RewardHistory({ rewards }: { rewards: RewardChange[] }) {
+  if (!rewards.length) return null;
+  return <><h3 className="creative-history-title">Points & star activity</h3><div className="reward-history">{rewards.map(reward => <div key={reward.id}><div className="engagement-row"><strong>{reward.kind === "star" ? "+1 SmoothStar" : `${reward.amount > 0 ? "+" : ""}${reward.amount} points`}</strong><small>{clock(reward.createdAt)}</small></div><p>{reward.reason}</p></div>)}</div></>;
+}
+function NextQuizTime({ state }: { state: EmployeeEngagement }) {
+  return state.nextQuestionAt ? <p className="quiz-next-time"><Clock3 size={16} aria-hidden="true" /><span>Next question: <strong>{clock(state.nextQuestionAt)} Eastern</strong></span></p> : <p className="engagement-muted quiz-tomorrow">Come back tomorrow for a new question.</p>;
 }
 
 function AnswerResult({ attempt, celebrate = false }: { attempt: CreativeAttempt; celebrate?: boolean }) {
@@ -52,7 +65,6 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
   const [state, setState] = useState<EmployeeEngagement | null>(null);
   const [panel, setPanel] = useState<"mood" | "question" | null>(null);
   const [progressOpen, setProgressOpen] = useState(false);
-  const [tier, setTier] = useState<QuizTier>("easy");
   const [option, setOption] = useState("");
   const [celebration, setCelebration] = useState("");
   const [busy, setBusy] = useState(false);
@@ -63,7 +75,7 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
   const popupRef = useRef<HTMLDivElement>(null);
   const mounted = useRef(false);
   const checkedState = (result: EmployeeEngagement) => {
-    if (result.quizVersion !== 2 || !Array.isArray(result.quiz)) throw new Error("Daily Quiz is updating. Please refresh in a moment.");
+    if (result.quizVersion !== 3 || !Array.isArray(result.quiz)) throw new Error("Daily Quiz is updating. Please refresh in a moment.");
     return result;
   };
   const load = useCallback(async () => {
@@ -84,20 +96,19 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
     document.addEventListener("visibilitychange", refresh); window.addEventListener("focus", refresh);
     return () => { mounted.current = false; requestSequence.current++; window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); window.removeEventListener("focus", refresh); };
   }, [load, enabled]);
-  const current = state?.quiz.find(item => item.question.tier === tier);
+  const current = state?.quiz.find(item => item.question.id === state.currentQuestionId);
   useEffect(() => { setOption(""); setCelebration(""); if (popupRef.current) popupRef.current.scrollTop = 0; }, [current?.question.id]);
   useEffect(() => { if (!homeActive) setPanel(null); }, [homeActive]);
   useEffect(() => {
     if (!state || panel || progressOpen || busy || error || document.querySelector('[role="dialog"][data-state="open"]')) return;
     const kind = nextEngagementPrompt(state, homeActive) as "mood" | "question" | null;
     if (!kind) return;
-    const key = kind === "mood" ? `mood:${state.nextMoodAt}` : `question:${state.day}`;
+    const key = kind === "mood" ? `mood:${state.nextMoodAt}` : `question:${state.currentQuestionId}`;
     if (shown.current.has(key)) return;
     shown.current.add(key); setPanel(kind);
     if (kind === "question") {
-      setTier(state.quiz.find(item => !item.attempt)!.question.tier);
-      // One automatic quiz popup per studio day; all three tiers stay on Home.
-      void save("/engagement/dismiss", { kind, day: state.day }, () => {});
+      // Each server-issued question prompts once, including across devices.
+      void save("/engagement/dismiss", { kind, day: state.day, questionId: state.currentQuestionId }, () => {});
     }
   }, [state, panel, progressOpen, busy, error, homeActive]);
 
@@ -120,12 +131,12 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
   function dismiss() {
     if (!state || !panel || busy) return;
     if ((panel === "question" && !state.questionDue) || (panel === "mood" && !state.moodDue)) { setPanel(null); return; }
-    void save("/engagement/dismiss", { kind: panel, day: state.day }, () => { setNotice(""); setPanel(null); });
+    void save("/engagement/dismiss", { kind: panel, day: state.day, questionId: state.currentQuestionId }, () => { setNotice(""); setPanel(null); });
   }
   function submitAnswer() {
-    if (!state || !current || !option || current.attempt) return;
+    if (!state || !current || !option || current.attempt || !state.available) return;
     const previousStars = state.summary.stars, submittedId = current.question.id;
-    void save("/engagement/answer", { day: state.day, tier, questionId: submittedId, optionId: option }, result => {
+    void save("/engagement/answer", { day: state.day, tier: current.question.tier, questionId: submittedId, optionId: option }, result => {
       const attempt = result.quiz.find(item => item.question.id === submittedId)?.attempt;
       if (attempt?.correct) setCelebration(submittedId);
       if (popupRef.current) popupRef.current.scrollTop = 0;
@@ -136,42 +147,39 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
     if (!homeActive || !state) return;
     setProgressOpen(false); setPanel(kind); setError(""); setCelebration("");
     if (kind === "question") {
-      setTier(state.quiz.find(item => !item.attempt)?.question.tier ?? "easy");
-      if (state.questionDue) void save("/engagement/dismiss", { kind, day: state.day }, () => {});
+      if (state.questionDue) void save("/engagement/dismiss", { kind, day: state.day, questionId: state.currentQuestionId }, () => {});
     }
   }
   const latestMood = moodFor(state?.lastMood?.mood);
-  const remaining = state?.quiz.filter(item => !item.attempt) ?? [];
   const context: EngagementContextValue = { state, busy, error, notice, homeActive, panel, openPanel,
     openProgress: () => { setPanel(null); setProgressOpen(true); }, refresh: () => void load() };
   return <EngagementContext.Provider value={enabled ? context : null}>
     {children}
     <Dialog open={Boolean(enabled && homeActive && state && panel)} onOpenChange={open => { if (!open) dismiss(); }}>
-      <DialogContent ref={popupRef} className="engagement-popup" showCloseButton={false}>
+      <DialogContent ref={popupRef} className={`engagement-popup${panel === "mood" ? " temp-check-popup" : ""}`} showCloseButton={false}>
         <div className="engagement-popup-heading"><DialogTitle>{panel === "mood" ? "Temp Check" : "Daily Quiz"}</DialogTitle><button type="button" className="engagement-close" aria-label={panel === "mood" ? "Dismiss Temp Check" : "Dismiss Daily Quiz"} disabled={busy} onClick={dismiss}><X size={19} /></button></div>
-        <DialogDescription className={panel === "mood" ? "engagement-muted" : "sr-only"}>{panel === "mood" ? state?.moodDue ? "How are you feeling?" : "You're checked in for now." : "Three questions each day: Easy, Medium, and Very Hard. Choose a difficulty."}</DialogDescription>
+        <DialogDescription className={panel === "mood" ? "engagement-muted" : "sr-only"}>{panel === "mood" ? state?.moodDue ? "How are you feeling?" : "You're checked in for now." : "One question at a time, with two hours between answers. Up to three different difficulties each day."}</DialogDescription>
         {state && (panel === "mood" ? <>
           {state.moodDue ? <div className="temp-check-moods">{MOODS.map(mood => <button type="button" key={mood.id} disabled={busy} onClick={() => recordMood(mood.id)} aria-label={`I'm feeling ${mood.label.toLowerCase()}`}><span aria-hidden="true">{mood.emoji}</span><strong>{mood.label}</strong></button>)}</div> : <div className="temp-check-saved">{latestMood ? <><span aria-hidden="true">{latestMood.emoji}</span><strong>{latestMood.label}</strong><small>{clock(state.lastMood!.createdAt)} Eastern</small></> : <strong>You skipped this check-in.</strong>}<p>Next Temp Check: {clock(state.nextMoodAt)} Eastern</p></div>}
-          <p className="engagement-privacy">Only you and Smooth can see your check-ins.</p>
           <Button variant="outline" disabled={busy} onClick={dismiss}>{state.moodDue ? "Skip for now" : "Done"}</Button>
         </> : current && <>
-          <div className="quiz-tiers" role="group" aria-label="Question difficulty">{state.quiz.map(item => <button type="button" key={item.question.tier} className={tier === item.question.tier ? "selected" : ""} aria-pressed={tier === item.question.tier} disabled={busy} onClick={() => setTier(item.question.tier)}><strong>{tierLabel(item.question.tier)}</strong><span>{item.attempt ? <>{item.attempt.correct ? <Check size={12} /> : <X size={12} />} +{item.attempt.points} pts</> : `${item.question.points} pts`}</span></button>)}</div>
-          <div className="engagement-row creative-question-meta"><span>{current.question.category}</span><span>{state.quiz.length - remaining.length}/3 answered · {dayLabel(state.day)}</span></div>
+          <div className="engagement-row quiz-current-tier"><strong>{tierLabel(current.question.tier)} · {current.question.points} points</strong><span>{state.answeredToday}/3 answered today</span></div>
+          <div className="creative-question-meta"><span>{current.question.category}</span></div>
           <h3 className="creative-question-title">{current.question.prompt}</h3>
           {current.attempt ? <>
             <AnswerResult key={current.question.id} attempt={current.attempt} celebrate={celebration === current.question.id} />
-            {remaining.length ? <div className="engagement-row"><Button variant="outline" disabled={busy} onClick={dismiss}>Done for now</Button><Button onClick={() => setTier(remaining[0].question.tier)}>Next question<ChevronRight size={15} /></Button></div> : <><p className="engagement-muted quiz-tomorrow">Come back tomorrow for a new question.</p><Button onClick={dismiss}>Done</Button></>}
+            <NextQuizTime state={state} /><Button variant="outline" disabled={busy} onClick={dismiss}>Done for now</Button>
           </> : <form onSubmit={event => { event.preventDefault(); submitAnswer(); }}>
             <fieldset className="creative-choices" disabled={busy}><legend className="sr-only">Choose one answer</legend>{current.question.options.map(choice => <label key={choice.id} className={option === choice.id ? "selected" : ""}><input type="radio" name="daily-quiz-answer" value={choice.id} checked={option === choice.id} onChange={() => setOption(choice.id)} /><span>{choice.text}</span></label>)}</fieldset>
-            <p className="engagement-privacy">One attempt per difficulty. You and Smooth can review your results.</p>
+            <p className="engagement-privacy">Your next question unlocks two hours after you answer.</p>
             <div className="engagement-row"><Button type="button" variant="outline" onClick={dismiss} disabled={busy}>Later</Button><Button type="submit" disabled={!option || busy}>{busy ? "Saving…" : "Submit answer"}<ChevronRight size={15} /></Button></div>
           </form>}
         </>)}
         {error && <p className="engagement-error" role="alert">{error} <button disabled={busy} type="button" onClick={() => void load()}>Refresh</button></p>}
       </DialogContent>
     </Dialog>
-    <Dialog open={enabled && progressOpen} onOpenChange={setProgressOpen}><DialogContent className="schedule-modal studio-stars-dialog"><DialogHeader><DialogTitle>My SmoothStars</DialogTitle><DialogDescription>Easy: 5 points. Medium: 10. Very Hard: 15. Every 100 points earns a SmoothStar sticker.</DialogDescription></DialogHeader>
-      {state && <><div className="studio-sticker-wall" aria-label={`${state.summary.stars} SmoothStars earned`}>{Array.from({ length: Math.min(10, Math.max(1, state.summary.stars)) }, (_, i) => <span className={`studio-star-sticker${state.summary.stars ? " earned" : ""}`} key={i}><Star size={40} aria-hidden="true" /></span>)}{state.summary.stars > 10 && <strong>+{state.summary.stars - 10} more</strong>}</div><StarGoal summary={state.summary} /><p className="engagement-muted">{state.summary.correct} correct · {state.summary.incorrect} incorrect · {state.summary.answered} answered</p><h3 className="creative-history-title">Recent answers</h3><AttemptHistory attempts={state.history} /></>}
+    <Dialog open={enabled && progressOpen} onOpenChange={setProgressOpen}><DialogContent className="schedule-modal studio-stars-dialog"><DialogHeader><DialogTitle>My SmoothStars</DialogTitle><DialogDescription>Easy: 5 points. Medium: 10. Very Hard: 15. Reach each 100-point milestone to earn a SmoothStar. Smooth can also award stickers directly.</DialogDescription></DialogHeader>
+      {state && <><StarCollection summary={state.summary} /><div className="studio-sticker-wall" aria-label={`${state.summary.stars} SmoothStars collected`}>{Array.from({ length: Math.min(10, Math.max(1, state.summary.stars)) }, (_, i) => <span className={`studio-star-sticker${state.summary.stars ? " earned" : ""}`} key={i}><Star size={40} aria-hidden="true" /></span>)}{state.summary.stars > 10 && <strong>+{state.summary.stars - 10} more</strong>}</div><StarGoal summary={state.summary} /><p className="engagement-muted">{state.summary.correct} correct · {state.summary.incorrect} incorrect · {state.summary.answered} answered</p><h3 className="creative-history-title">Recent answers</h3><AttemptHistory attempts={state.history} /><RewardHistory rewards={state.rewards} /></>}
     </DialogContent></Dialog>
   </EngagementContext.Provider>;
 }
@@ -183,7 +191,7 @@ export function EmployeeEngagementBar() {
   return <section className="engagement-widget" aria-label="Temp Check and Daily Quiz">
     <div className="engagement-bar engagement-links">
       <button type="button" disabled={!state || busy} onClick={() => openPanel("mood")} aria-expanded={panel === "mood"}><Smile size={17} /><span>Temp Check</span>{state?.moodDue && <i className="engagement-dot" aria-label="Due now" />}</button>
-      <button type="button" disabled={!state || busy} onClick={() => openPanel("question")} aria-expanded={panel === "question"}><Sparkles size={16} /><span>Daily Quiz</span>{state && <small>{state.quiz.filter(item => item.attempt).length}/3</small>}</button>
+      <button type="button" disabled={!state || busy} onClick={() => openPanel("question")} aria-expanded={panel === "question"}><Sparkles size={16} /><span>Daily Quiz</span>{state && <small>{state.answeredToday}/3</small>}{state?.available && <i className="engagement-dot" aria-label="Question ready" />}</button>
     </div>
     {notice && <p className="engagement-feedback" role="status">{notice}</p>}
     {error && !panel && <p className="engagement-error" role="alert">{error} <button type="button" disabled={busy} onClick={refresh}>Refresh</button></p>}
@@ -194,10 +202,10 @@ export function SmoothStarSidebar() {
   const engagement = useContext(EngagementContext), { setOpenMobile } = useSidebar();
   if (!engagement) return null;
   const { state, openProgress } = engagement;
-  return <button type="button" className="smoothstar-sidebar" disabled={!state} onClick={() => { setOpenMobile(false); openProgress(); }} aria-label={state ? `SmoothStars: ${state.summary.points} points, ${state.summary.stars} earned. View progress.` : "Loading SmoothStars"}>
-    <span className="engagement-row"><strong><Star size={16} aria-hidden="true" /> SmoothStars</strong><span>{state ? `${state.summary.points} pts` : "…"}</span></span>
+  return <button type="button" className="smoothstar-sidebar" disabled={!state} onClick={() => { setOpenMobile(false); openProgress(); }} aria-label={state ? `Road to a SmoothStar: ${state.summary.points} points, ${state.summary.stars} collected. View progress.` : "Loading SmoothStars"}>
+    <strong className="smoothstar-heading"><Star size={16} aria-hidden="true" /> Road to a SmoothStar</strong><span className="smoothstar-sidebar-count"><b>{state?.summary.stars ?? "—"}</b><span>SmoothStars collected</span></span>
     <progress aria-label="Progress toward your next SmoothStar" max={STAR_POINTS} value={state?.summary.progress ?? 0} />
-    <small>{state ? `${state.summary.stars} earned · ${state.summary.remaining} pts to next` : "Loading progress…"}<ChevronRight size={13} /></small>
+    <small>{state ? `${state.summary.points} pts · ${state.summary.remaining} to next` : "Loading progress…"}<ChevronRight size={13} /></small>
   </button>;
 }
 
@@ -206,17 +214,44 @@ export function TeamEngagementReview({ token }: { token: string }) {
   const [selected, setSelected] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const sequence = useRef(0);
+  const sequence = useRef(0), savingRef = useRef(false), rewardRequest = useRef({ key: "", id: "" });
+  const [action, setAction] = useState("add");
+  const [amount, setAmount] = useState("5");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [rewardError, setRewardError] = useState("");
+  const [rewardNotice, setRewardNotice] = useState("");
+  useEffect(() => { setAction("add"); setAmount("5"); setReason(""); setRewardError(""); setRewardNotice(""); rewardRequest.current = { key: "", id: "" }; }, [selected]);
   const load = useCallback(async () => {
     const request = ++sequence.current; setBusy(true);
-    try { const result = await teamRequest<TeamEngagement>(token, "/engagement/team"); if (result.quizVersion !== 2) throw new Error("Quiz update pending"); if (request === sequence.current) { setState(result); setError(""); } }
+    try { const result = await teamRequest<TeamEngagement>(token, "/engagement/team"); if (result.quizVersion !== 3) throw new Error("Quiz update pending"); if (request === sequence.current) { setState(result); setError(""); } }
     catch { if (request === sequence.current) setError("Team check-ins couldn't load. Try refreshing."); }
     finally { if (request === sequence.current) setBusy(false); }
   }, [token]);
   useEffect(() => { void load(); return () => { sequence.current++; }; }, [load]);
   const member = state?.members.find(person => person.userId === selected);
+  const numericAmount = Number(amount), signedAmount = action === "remove" ? -numericAmount : numericAmount;
+  const validAmount = Number.isSafeInteger(numericAmount) && numericAmount > 0 && numericAmount <= 10000;
+  const validReward = Boolean(member && reason.trim() && (action === "star" || (validAmount && member.summary.points + signedAmount >= 0)));
+  async function saveReward() {
+    if (!member || !validReward || busy || savingRef.current) return;
+    const payload = { userId: member.userId, kind: action === "star" ? "star" : "points", amount: action === "star" ? 1 : signedAmount, reason: reason.trim() };
+    const key = JSON.stringify(payload);
+    if (rewardRequest.current.key !== key) rewardRequest.current = { key, id: crypto.randomUUID() };
+    savingRef.current = true; setSaving(true); setRewardError(""); setRewardNotice("");
+    const request = ++sequence.current;
+    try {
+      const result = await teamRequest<TeamEngagement>(token, "/engagement/rewards", { ...payload, requestId: rewardRequest.current.id });
+      if (result.quizVersion !== 3) throw new Error("SmoothStars is updating. Please refresh in a moment.");
+      if (request === sequence.current) {
+        setState(result); setRewardNotice(payload.kind === "star" ? `Awarded a SmoothStar to ${member.name}.` : `Updated ${member.name}'s points.`);
+        setReason(""); rewardRequest.current = { key: "", id: "" };
+      }
+    } catch (e) { if (request === sequence.current) setRewardError(e instanceof Error ? e.message : "That wasn't saved. Try again."); }
+    finally { savingRef.current = false; setSaving(false); }
+  }
   return <section className="panel team-engagement-review">
-    <div className="panel-heading"><div><h2><Smile size={20} /> Temp Check & SmoothStars</h2><p>Employee check-ins and Daily Quiz results. Visible to you; employees see only their own.</p></div><Button variant="outline" disabled={busy} onClick={() => void load()}><RefreshCw size={15} />{busy ? "Loading…" : "Refresh"}</Button></div>
+    <div className="panel-heading"><div><h2><Smile size={20} /> Temp Check & SmoothStars</h2><p>Employee check-ins and Daily Quiz results. Visible to you; employees see only their own.</p></div><Button variant="outline" disabled={busy || saving} onClick={() => void load()}><RefreshCw size={15} />{busy ? "Loading…" : "Refresh"}</Button></div>
     {error && <p className="engagement-error" role="alert">{error}</p>}
     {state && <><p className="engagement-muted engagement-review-note">Easy: 5 points · Medium: 10 · Very Hard: 15 · 100 points per SmoothStar.</p><div className="team-checkin-grid">{state.members.map(person => {
       const mood = moodFor(person.moods[0]?.mood);
@@ -228,8 +263,20 @@ export function TeamEngagementReview({ token }: { token: string }) {
         <small>Today: {person.today.length}/3 answered · +{person.today.reduce((sum, attempt) => sum + attempt.points, 0)} points</small>
       </button>;
     })}</div></>}
-    <Dialog open={Boolean(member)} onOpenChange={open => { if (!open) setSelected(""); }}><DialogContent className="schedule-modal studio-stars-dialog"><DialogHeader><DialogTitle>{member?.name} · Check-ins & SmoothStars</DialogTitle><DialogDescription>Self-reported moods and recorded daily answers. All dates are Eastern.</DialogDescription></DialogHeader>
-      {member && <><StarGoal summary={member.summary} /><p className="engagement-muted">{member.summary.correct} correct · {member.summary.incorrect} incorrect · {member.summary.answered} answered</p><h3 className="creative-history-title">Recent Temp Checks</h3><div className="team-mood-history">{member.moods.length ? member.moods.map(checkin => { const mood = moodFor(checkin.mood); return <div key={checkin.id}><strong><span aria-hidden="true">{mood?.emoji}</span> {mood?.label}</strong><span>{clock(checkin.createdAt)}</span></div>; }) : <p className="engagement-muted">No check-ins recorded yet.</p>}</div><h3 className="creative-history-title">Recent quiz answers</h3><AttemptHistory attempts={member.history} /></>}
+    <Dialog open={Boolean(member)} onOpenChange={open => { if (!open && !saving) setSelected(""); }}><DialogContent className="schedule-modal studio-stars-dialog"><DialogHeader><DialogTitle>{member?.name} · Check-ins & SmoothStars</DialogTitle><DialogDescription>Self-reported moods and recorded daily answers. All dates are Eastern.</DialogDescription></DialogHeader>
+      {member && <><StarCollection summary={member.summary} /><StarGoal summary={member.summary} />
+        <form className="reward-controls" onSubmit={event => { event.preventDefault(); void saveReward(); }}>
+          <h3>Manage points & SmoothStars</h3>
+          <fieldset disabled={saving || busy}>
+            <div className="reward-control-fields"><label>Action<select value={action} onChange={event => setAction(event.target.value)}><option value="add">Add points</option><option value="remove">Remove points</option><option value="star">Award a SmoothStar</option></select></label>
+            {action !== "star" && <label>Points<input type="number" min="1" max="10000" step="1" inputMode="numeric" value={amount} onChange={event => setAmount(event.target.value)} required /></label>}</div>
+            <label>Reason<input type="text" maxLength={240} value={reason} onChange={event => setReason(event.target.value)} placeholder="e.g. Great teamwork on a rental" required /></label>
+            <p className="engagement-muted">{action === "star" ? `${member.name} will have ${member.summary.stars + 1} SmoothStars. Points stay the same.` : validAmount ? `${member.name}: ${member.summary.points} → ${member.summary.points + signedAmount} points. Collected stickers are kept.` : "Enter a whole number of points."}</p>
+            {action === "remove" && validAmount && member.summary.points + signedAmount < 0 && <p className="engagement-error">Choose an amount up to {member.summary.points} points.</p>}
+            <Button type="submit" disabled={saving || busy || !validReward}>{saving ? "Saving…" : action === "star" ? "Award SmoothStar" : action === "remove" ? "Remove points" : "Add points"}</Button>
+          </fieldset>
+          {rewardError && <p className="engagement-error" role="alert">{rewardError}</p>}{rewardNotice && <p className="engagement-feedback" role="status">{rewardNotice}</p>}
+        </form><RewardHistory rewards={member.rewards} /><p className="engagement-muted">{member.summary.correct} correct · {member.summary.incorrect} incorrect · {member.summary.answered} answered</p><h3 className="creative-history-title">Recent Temp Checks</h3><div className="team-mood-history">{member.moods.length ? member.moods.map(checkin => { const mood = moodFor(checkin.mood); return <div key={checkin.id}><strong><span aria-hidden="true">{mood?.emoji}</span> {mood?.label}</strong><span>{clock(checkin.createdAt)}</span></div>; }) : <p className="engagement-muted">No check-ins recorded yet.</p>}</div><h3 className="creative-history-title">Recent quiz answers</h3><AttemptHistory attempts={member.history} /></>}
     </DialogContent></Dialog>
   </section>;
 }

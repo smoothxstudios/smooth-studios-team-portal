@@ -9,21 +9,23 @@ export type CreativeAttempt = {
   source: { label: string; url: string };
 };
 export type StudioStars = {
-  points: number; stars: number; progress: number; goal: number; remaining: number;
+  points: number; stars: number; earnedStars: number; awardedStars: number; progress: number; goal: number; remaining: number;
   answered: number; correct: number; incorrect: number;
 };
+export type RewardChange = { id: string; kind: "points" | "star"; amount: number; reason: string; createdAt: string };
 export type MoodCheckin = { id: string; mood: string; createdAt: string };
 export type EmployeeEngagement = {
-  quizVersion: 2;
+  quizVersion: 3;
   serverNow: number; day: string; moodDue: boolean; nextMoodAt: number;
-  lastMood: MoodCheckin | null; questionDue: boolean;
+  lastMood: MoodCheckin | null; questionDue: boolean; available: boolean;
+  currentQuestionId: string | null; answeredToday: number; nextQuestionAt: number | null;
   quiz: { question: CreativeQuestion; attempt: CreativeAttempt | null }[];
-  summary: StudioStars; history: CreativeAttempt[];
+  summary: StudioStars; history: CreativeAttempt[]; rewards: RewardChange[];
 };
 export type TeamEngagement = {
-  quizVersion: 2;
+  quizVersion: 3;
   serverNow: number; day: string; members: {
     userId: string; name: string; color: string; summary: StudioStars;
-    history: CreativeAttempt[]; moods: MoodCheckin[]; today: CreativeAttempt[];
+    history: CreativeAttempt[]; moods: MoodCheckin[]; today: CreativeAttempt[]; rewards: RewardChange[];
   }[];
 };
