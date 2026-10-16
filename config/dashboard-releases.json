@@ -1,6 +1,29 @@
 {
-  "currentVersion": "2.20.1",
+  "currentVersion": "2.21.0",
   "releases": [
+    {
+      "id": "2026-10-16-alerts-inbox-mobile-toolbar",
+      "version": "2.21.0",
+      "date": "2026-10-16",
+      "category": "Features",
+      "title": "Alerts inbox and mobile toolbar",
+      "changes": [
+        "Alerts keeps notification history with unread badges, All and Unread filters, and read status that follows each account across devices.",
+        "Open related rental or creative assignments directly from an alert. Reading an offer does not accept it.",
+        "The mobile toolbar provides Home, Schedule, Work, Alerts, and More. Desktop keeps the sidebar and gains an Alerts bell.",
+        "Employee quiz pushes are titled Quiz Time. Reminders also appear in Alerts even when push is turned off.",
+        "Notification history is stored separately from push delivery; Help explains the inbox, toolbar, and quiz reminders."
+      ],
+      "employee": {
+        "title": "Your alerts in one place",
+        "changes": [
+          "Find assignment updates and quiz reminders in Alerts, with unread badges and links to the related work.",
+          "Use the mobile toolbar for Home, Schedule, Work, Alerts, and More.",
+          "Quiz Time push reminders open Daily Quiz. Missed reminders stay in Alerts, and read status syncs across your devices."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-notification-permission-help",
       "version": "2.20.1",

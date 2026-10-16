@@ -96,7 +96,7 @@ test("quiz cron follows two-hour spacing, reserves individual questions offline,
   const end = (await f.call("jordyn")).data;
   assert.equal(end.answeredToday, 3); assert.equal(end.summary.points, 30);
   assert.equal(new Set(end.quiz.map(q => q.question.tier)).size, 3);
-  assert.ok(sent.every(item => item.url === d.endpoint && item.payload.type === "quiz"));
+  assert.ok(sent.every(item => item.url === d.endpoint && item.payload.type === "quiz" && item.payload.title === "Quiz Time"));
   f.close();
 });
 
@@ -140,7 +140,7 @@ test("service worker shows distinct alerts and opens only approved dashboard des
     const notification = shown.at(-1);
     handlers.notificationclick({ notification: { ...notification, close() {} }, waitUntil: p => pending = p }); await pending;
   }
-  assert.match(shown[0].title, /New assignment/); assert.match(shown[1].title, /Daily Quiz/);
+  assert.match(shown[0].title, /New assignment/); assert.equal(shown[1].title, "Quiz Time");
   assert.notEqual(shown[0].tag, shown[1].tag);
   assert.deepEqual(opened, [`${scope}#scheduling`, `${scope}#daily-quiz`, `${scope}#scheduling`, `${scope}#scheduling`]);
 

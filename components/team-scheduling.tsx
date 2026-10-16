@@ -26,7 +26,7 @@ function Person({ id }: { id: string }) {
   return <span className="schedule-person"><i style={{ background: TEAM.find(p => p.id === id)?.color }} />{personName(id)}</span>;
 }
 
-export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSync, home, pastContent, availabilityOnly = false, onAvailability, onChecklist }: { userId: string; isOwner: boolean; token: string; onSetup?: () => void; calendarSync?: DashboardPayload["calendarAssignmentSync"]; home?: EmployeeHomeOptions; pastContent?: ReactNode; availabilityOnly?: boolean; onAvailability?: () => void; onChecklist?: () => void }) {
+export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSync, home, pastContent, availabilityOnly = false, onAvailability, onChecklist, focusId, onCloseFocus }: { focusId?: string; onCloseFocus?: () => void; userId: string; isOwner: boolean; token: string; onSetup?: () => void; calendarSync?: DashboardPayload["calendarAssignmentSync"]; home?: EmployeeHomeOptions; pastContent?: ReactNode; availabilityOnly?: boolean; onAvailability?: () => void; onChecklist?: () => void }) {
   const isHome = Boolean(home);
   const [schedule, setSchedule] = useState<TeamSchedule | null>(null);
   const [loading, setLoading] = useState(true);
@@ -152,12 +152,13 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
           <Button disabled={busy || needsRefresh || (busyConflicts.length > 0 && !conflictApproved)} onClick={() => void mutate(`/assignments/${item.id}`, { status: "accepted" })}><Check size={16} />Accept</Button>
           <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "declined" }, description: `Decline ${item.title} on ${date(item.start)}? Smooth will see your response.` })}><X size={16} />Decline</Button>
         </>}
-        {isOwner && future(item.start) && busyConflicts.length > 0 && !conflictApproved && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { overrideConflicts: true }, description: `Allow ${personName(item.employeeId)} to accept ${item.title} despite the recorded conflicts for ${date(item.start)} at ${time(item.start)}? Their acceptance is still required. Changing the appointment time clears this approval.` })}>Allow time conflict</Button>}
-        {isOwner && future(item.start) && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "cancelled" }, description: `Cancel ${personName(item.employeeId)}’s portal offer for ${item.title}? This does not remove any Google Calendar invitation.` })}>Cancel offer</Button>}
+        {isOwner && ["pending", "accepted"].includes(item.status) && future(item.start) && busyConflicts.length > 0 && !conflictApproved && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { overrideConflicts: true }, description: `Allow ${personName(item.employeeId)} to accept ${item.title} despite the recorded conflicts for ${date(item.start)} at ${time(item.start)}? Their acceptance is still required. Changing the appointment time clears this approval.` })}>Allow time conflict</Button>}
+        {isOwner && ["pending", "accepted"].includes(item.status) && future(item.start) && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "cancelled" }, description: `Cancel ${personName(item.employeeId)}’s portal offer for ${item.title}? This does not remove any Google Calendar invitation.` })}>Cancel offer</Button>}
       </div>
     </article>;
   }
 
+  const focusedItem = schedule?.assignments.find(item => item.id === focusId);
   return <section className="team-scheduling">
     {!home && (!isOwner || availabilityOnly || !schedule) && <header className="schedule-intro"><div>{isOwner && <p className="schedule-eyebrow">{availabilityOnly ? "TEAM AVAILABILITY" : "TEAM SCHEDULE"}</p>}<h2>{availabilityOnly ? isOwner ? "When your team wants to work" : "My availability" : isOwner ? "Your team’s schedule" : "My schedule"}</h2><p>{availabilityOnly ? "Keep preferred work days and unavailable time together." : "Review rental offers and assignments. Manage preferred work days and time off in Availability."}</p></div>
       <Button disabled={busy || loading} variant="outline" onClick={() => void refreshManually()}><RefreshCw size={16} />Refresh</Button></header>}
@@ -235,6 +236,12 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         {error && <p className="schedule-error" role="alert">{error}</p>}
         <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={() => setAssignmentOpen(false)}>Cancel</Button><Button disabled={busy || needsRefresh || (conflicts.length > 0 && !assignment.overrideConflicts) || alreadyInvited || alreadyOffered || !period} type="submit">{busy ? "Sending…" : "Send assignment offer"}</Button></DialogFooter>
       </form></DialogContent></Dialog>
+
+    <Dialog open={Boolean(focusId)} onOpenChange={open => { if (!open && !busy) onCloseFocus?.(); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Assignment details</DialogTitle><DialogDescription>Review the current assignment and its response.</DialogDescription></DialogHeader>
+      {focusedItem ? assignmentCard(focusedItem) : <p role="status">{loading ? "Loading assignment…" : error || "This assignment is no longer available to this account."}</p>}
+      {focusedItem && error && <p role="alert" className="schedule-error">{error}</p>}
+      {message && <p role="status" className="schedule-success">{message}</p>}
+    </DialogContent></Dialog>
 
     <Dialog open={Boolean(confirm)} onOpenChange={open => { if (!open && !busy) setConfirm(null); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Confirm change</DialogTitle><DialogDescription>{confirm?.description}</DialogDescription></DialogHeader>{error && <p className="schedule-error" role="alert">{error}</p>}<DialogFooter><Button disabled={busy} variant="outline" onClick={() => setConfirm(null)}>Go back</Button><Button disabled={busy || needsRefresh} onClick={async () => { if (confirm && await mutate(confirm.path, confirm.data, confirm.method)) setConfirm(null); }}>Confirm</Button></DialogFooter></DialogContent></Dialog>
   </section>;

@@ -6,6 +6,7 @@ import { subscriptionKeys } from "./push-encryption.mjs";
 import { sendQuizReminders } from "./quiz-notifications.mjs";
 import { assignmentNotifications, blockNotifications } from "./notification-content.mjs";
 import { creativeWorkRoute } from "./creative-work.mjs";
+import { alertsRoute } from "./alerts.mjs";
 import { payrollRoute } from "./payroll.mjs";
 import { studioReferenceRoute } from "./studio-reference.mjs";
 
@@ -93,8 +94,8 @@ async function commit(db, state, makeStatements, notifications = []) {
   if (notifications.length) statements.push(db.prepare(`INSERT INTO team_notification_events (id, user_id, kind, payload, due_at)
     SELECT json_extract(value, '$.id'), json_extract(value, '$.userId'), json_extract(value, '$.kind'),
       json_extract(value, '$.payload'), ? FROM json_each(?) WHERE ${guard}`)
-    .bind(Date.now(), JSON.stringify(notifications.map(({ userId, kind, title, body }) => ({
-      id: crypto.randomUUID(), userId, kind, payload: JSON.stringify({ title, body }),
+    .bind(Date.now(), JSON.stringify(notifications.map(({ userId, kind, title, body, target, targetId }) => ({
+      id: crypto.randomUUID(), userId, kind, payload: JSON.stringify({ title, body, target, targetId }),
     }))), id));
   const result = await db.batch(statements);
   if (!result[0].meta.changes) fail(409, "The schedule changed. Refresh, review it, and try again.");
@@ -120,11 +121,12 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 1, studioReferenceVersion: 1, payrollVersion: 1 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 1, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
   else if (user === "sync") fail(403, "Sync access is restricted to synchronization endpoints.");
+  if (url.pathname === "/alerts" || url.pathname.startsWith("/alerts/")) return alertsRoute({ request, db, user, body, fail });
   if (url.pathname === "/payroll" || url.pathname.startsWith("/sync/payroll")) return payrollRoute({ request, db, user, env, body, fail });
   if (["/studio-reference", "/sync/studio-reference", "/rental-checklists"].includes(url.pathname) || url.pathname.startsWith("/rental-checklists/")) return studioReferenceRoute({ request, db, user, env, body, fail });
   if (url.pathname === "/creative-work" || url.pathname.startsWith("/creative-work/")) return creativeWorkRoute({ request, db, user, env, ctx, body, fail });

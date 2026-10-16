@@ -1753,3 +1753,50 @@ button { cursor: pointer; }
   .help-categories { gap: 7px; }
   .help-categories button { font-size: 12px; padding: 8px 12px; }
 }
+
+/* Persistent notification inbox and compact mobile navigation. */
+.alerts-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 20px; background: var(--primary); color: var(--primary-foreground); font-size: 11px; font-weight: 750; line-height: 1; white-space: nowrap; }
+.studio-nav .alerts-count { margin-left: auto; white-space: nowrap !important; }
+.topbar-alerts { position: relative; width: 44px; height: 44px; border-radius: 12px; }
+.topbar-alerts .alerts-count { position: absolute; top: -5px; right: -6px; }
+.alerts-page { width: 100%; max-width: 900px; margin: 0 auto; }
+.alerts-heading, .alerts-controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.alerts-heading { margin-bottom: 22px; }
+.alerts-heading h2 { margin: 0 0 6px; font-size: 23px; letter-spacing: -.035em; }
+.alerts-heading p, .alert-content > p, .alerts-empty p { margin: 0; color: var(--muted-foreground); line-height: 1.6; font-size: 14px; }
+.alerts-controls { flex-wrap: wrap; margin-bottom: 18px; }
+.alerts-filters { display: inline-flex; padding: 4px; gap: 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.alerts-filters > button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border-radius: 8px; font-size: 14px; font-weight: 650; color: var(--muted-foreground); }
+.alerts-filters > button[aria-pressed="true"] { color: var(--sidebar-accent-foreground); background: var(--sidebar-accent); }
+.alerts-list { display: grid; gap: 12px; list-style: none; padding: 0; margin: 0 0 20px; }
+.alert-card { display: flex; gap: 14px; padding: 22px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); }
+.alert-card.is-unread { border-left: 3px solid var(--primary); }
+.alert-icon { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; color: var(--muted-foreground); background: var(--muted); }
+.is-unread .alert-icon { color: var(--sidebar-accent-foreground); background: var(--sidebar-accent); }
+.alert-content { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.alert-title { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.alert-title h3 { margin: 0; font-size: 16px; line-height: 1.4; font-weight: 700; }
+.alert-unread-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--primary); }
+.alert-content time, .alert-expired { display: block; margin-top: 8px; color: var(--muted-foreground); font-size: 12px; }
+.alert-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.alert-actions button { min-height: 40px; }
+.alerts-empty { display: grid; justify-items: center; gap: 12px; padding: 48px 24px; text-align: center; border: 1px dashed var(--border); border-radius: 16px; color: var(--muted-foreground); }
+.alerts-empty h3 { color: var(--foreground); font-size: 18px; margin: 0; }
+.alerts-filters button:focus-visible, .mobile-toolbar button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.mobile-toolbar { display: none; }
+@media (max-width: 767px) {
+  .dashboard-main { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .mobile-toolbar { position: fixed; z-index: 20; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 6px max(6px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); border-top: 1px solid var(--border); background: var(--card); box-shadow: 0 -3px 18px #00000008; }
+  .mobile-toolbar button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 54px; border-radius: 10px; font-size: 11px; font-weight: 600; color: var(--muted-foreground); }
+  .mobile-toolbar button[aria-current="page"], .mobile-toolbar button.is-current-section { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); font-weight: 750; }
+  .toolbar-icon { position: relative; display: flex; }
+  .toolbar-icon .alerts-count { position: absolute; left: 12px; top: -6px; min-width: 17px; height: 17px; padding: 0 4px; font-size: 10px; border: 1px solid var(--card); }
+  .topbar-alerts { display: none; }
+  .alerts-heading { margin-bottom: 18px; align-items: flex-start; }
+  .alerts-heading h2 { font-size: 20px; }
+  .alert-card { padding: 16px 12px; gap: 10px; border-radius: 14px; }
+  .alert-icon { width: 32px; height: 32px; border-radius: 9px; }
+  .alert-title h3 { font-size: 15px; }
+  .alert-actions { gap: 6px; }
+  .alert-actions button { min-height: 44px; }
+}

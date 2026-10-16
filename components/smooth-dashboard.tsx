@@ -15,6 +15,7 @@ import {
 import {
   ArrowRight,
   BarChart3,
+  Bell,
   BookOpen,
   CalendarDays,
   CalendarCheck,
@@ -79,7 +80,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -105,6 +105,8 @@ import { TeamSchedulingPage } from "@/components/team-scheduling";
 import { DashboardSettings } from "@/components/dashboard-settings";
 import { StudioInfoPage } from "@/components/studio-info";
 import { CreativeWorkPage, CreativeWorkPreview } from "@/components/creative-work";
+import { AlertsPage, UnreadBadge } from "@/components/alerts";
+import { useAlerts, type DashboardAlert } from "@/lib/use-alerts";
 import { usePayroll } from "@/lib/use-payroll";
 import { applyRentalAdvances } from "@/lib/payroll-advances.mjs";
 import type { PayrollState } from "@/lib/dashboard-types";
@@ -133,7 +135,7 @@ const STUDIO_TIME_ZONE = "America/New_York";
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 
-type ViewKey = "overview" | "rentals" | "team" | "payouts" | "guide" | "checklists" | "scheduling" | "availability" | "creative" | "settings";
+type ViewKey = "alerts" | "overview" | "rentals" | "team" | "payouts" | "guide" | "checklists" | "scheduling" | "availability" | "creative" | "settings";
 type RentalState = "upcoming" | "earned" | "paid" | "awaiting";
 type CustomerPaymentState = "paid" | "deposit" | "review" | "pending";
 type AppointmentStatus = RentalState | "customer-paid" | "upcoming-paid" | "deposit" | "review";
@@ -144,6 +146,7 @@ type NavigationItem = { key: ViewKey; label: string; icon: typeof LayoutDashboar
 
 const NAV_ITEMS: NavigationItem[] = [
   { key: "overview", label: "Home", icon: House, group: "home" },
+  { key: "alerts", label: "Alerts", icon: Bell, group: "home" },
   { key: "scheduling", label: "Team Schedule", icon: CalendarDays, group: "work" },
   { key: "availability", label: "Availability", icon: CalendarCheck, group: "work" },
   { key: "creative", label: "Creative Work", icon: ClipboardList, group: "work" },
@@ -160,7 +163,7 @@ const EMPLOYEE_NAV_ITEMS: NavigationItem[] = NAV_ITEMS.filter(item => !item.owne
   group: item.key === "payouts" ? "work" : item.group,
 }));
 
-function DashboardNavigation({ isOwner, accountId, view, onNavigate }: { isOwner: boolean; accountId: string; view: ViewKey; onNavigate: (view: ViewKey) => void }) {
+function DashboardNavigation({ isOwner, accountId, view, onNavigate, unread }: { unread: number; isOwner: boolean; accountId: string; view: ViewKey; onNavigate: (view: ViewKey) => void }) {
   const { isMobile, setOpenMobile } = useSidebar();
   const closeMobileMenu = () => { if (isMobile) setOpenMobile(false); };
   const items = isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS;
@@ -182,7 +185,7 @@ function DashboardNavigation({ isOwner, accountId, view, onNavigate }: { isOwner
             <SidebarMenuItem key={item.key}>
               <SidebarMenuButton aria-current={view === item.key ? "page" : undefined} isActive={view === item.key}
                 onClick={() => { onNavigate(item.key); closeMobileMenu(); }} tooltip={item.label}>
-                <item.icon aria-hidden="true" /><span>{item.label}</span>
+                <item.icon aria-hidden="true" /><span>{item.label}</span>{item.key === "alerts" && <UnreadBadge count={unread} />}
                 {view === item.key && <ChevronRight className="sidebar-current-icon" aria-hidden="true" />}
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -202,6 +205,21 @@ function DashboardNavigation({ isOwner, accountId, view, onNavigate }: { isOwner
         </SidebarMenu></SidebarGroupContent>
       </SidebarGroup>;
     })}
+  </nav>;
+}
+
+function MobileToolbar({ view, unread, onNavigate }: { view: ViewKey; unread: number; onNavigate: (view: ViewKey) => void }) {
+  const { openMobile, setOpenMobile } = useSidebar();
+  const items: { key: ViewKey; label: string; icon: typeof House }[] = [
+    { key: "overview", label: "Home", icon: House }, { key: "scheduling", label: "Schedule", icon: CalendarDays },
+    { key: "creative", label: "Work", icon: ClipboardList }, { key: "alerts", label: "Alerts", icon: Bell },
+  ];
+  return <nav className="mobile-toolbar" aria-label="Quick navigation">
+    {items.map(item => <button key={item.key} aria-label={item.key === "creative" ? "Creative Work" : item.label} aria-current={view === item.key ? "page" : undefined}
+      onClick={() => { setOpenMobile(false); onNavigate(item.key); }}>
+      <span className="toolbar-icon"><item.icon size={21} aria-hidden="true" />{item.key === "alerts" && <UnreadBadge count={unread} />}</span><span>{item.label}</span>
+    </button>)}
+    <button aria-label="More dashboard sections" aria-expanded={openMobile} className={!items.some(item => item.key === view) ? "is-current-section" : ""} onClick={() => setOpenMobile(!openMobile)}><span className="toolbar-icon"><Menu size={21} aria-hidden="true" /></span><span>More</span></button>
   </nav>;
 }
 
@@ -1072,9 +1090,24 @@ function StripeMatchForm({
 
 function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string; schedulingToken: string }) {
   const [view, setView] = useState<ViewKey>("overview");
-  const openChecklist = () => setView("checklists");
+  const [focusedAlert, setFocusedAlert] = useState<{ target: string; id: string } | null>(null);
+  const [alertWorkLoading, setAlertWorkLoading] = useState(false);
+  const navigate = (next: ViewKey) => { setFocusedAlert(null); setView(next); };
+  const openChecklist = () => navigate("checklists");
+  const alerts = useAlerts(schedulingToken, view === "alerts");
   const payroll = usePayroll(schedulingToken, payload.payroll);
   const creative = useCreativeWork(schedulingToken);
+  const openAlert = async (alert: DashboardAlert) => {
+    setFocusedAlert(alert.targetId ? { target: alert.target, id: alert.targetId } : null);
+    if (alert.target === "quiz") {
+      setView("overview");
+      if (window.location.hash === "#daily-quiz") window.dispatchEvent(new Event("hashchange"));
+      else window.location.hash = "#daily-quiz";
+    } else if (alert.target === "creative") {
+      setView("creative"); setAlertWorkLoading(true);
+      try { await creative.refresh(); } finally { setAlertWorkLoading(false); }
+    } else setView(alert.target === "availability" ? "availability" : "scheduling");
+  };
   const creativeTotals = useMemo(() => creativeEarnings(creative.items), [creative.items]);
   const currentYear = Number(studioLocal(Date.now()).slice(0, 4));
   const [earningsYear, setEarningsYear] = useState(currentYear);
@@ -1086,6 +1119,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
   useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }, [view]);
   useEffect(() => {
     const openSchedule = () => {
+      if (window.location.hash === "#alerts") setView("alerts");
       if (window.location.hash === "#creative-work") setView("creative");
       if (window.location.hash === "#scheduling") setView("scheduling");
       if (window.location.hash === "#daily-quiz") setView("overview");
@@ -1254,22 +1288,23 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
         <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact /></SidebarHeader>
         <SidebarContent className="studio-sidebar-content">
-          <DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={setView} />
+          <DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={navigate} unread={alerts.unreadCount} />
           {!isOwner && <div className="sidebar-progress"><SmoothStarSidebar /></div>}
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
-          <SettingsNavigation active={view === "settings"} onOpen={() => setView("settings")} />
+          <SettingsNavigation active={view === "settings"} onOpen={() => navigate("settings")} />
           <div className="sidebar-user"><span className="user-avatar" style={{ background: teamAccent(payload.user.id, payload.user.accent) }}>{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" title="Log out" onClick={onLogout}><LogOut size={18} /></button></div>
         </SidebarFooter>
       </Sidebar>
 
       <SidebarInset className={`dashboard-main${isOwner ? " owner-dashboard" : ""}`}>
         <header className="dashboard-topbar">
-          <div className="topbar-title"><SidebarTrigger className="mobile-menu-trigger" aria-label="Open navigation"><Menu /></SidebarTrigger><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div>
-          {payload.source === "sample" && <div className="topbar-actions"><Badge className="sample-badge" variant="outline">Preview data</Badge></div>}
+          <div className="topbar-title"><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div>
+          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
         </header>
 
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
+          {view === "alerts" && <AlertsPage state={alerts} onOpen={alert => void openAlert(alert)} />}
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Creative work totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "overview" && !isOwner && <CreativeWorkPreview state={creative} isOwner={false} onOpen={() => setView("creative")} />}
@@ -1277,7 +1312,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
           {view === "payouts" && isOwner && Boolean(payroll.state?.reviewCount) && <p className="schedule-warning" role="status">A previously credited earning changed in Calendar. Its advance credit is preserved and needs review.</p>}
           {view === "settings" && <DashboardSettings token={schedulingToken} profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} dark={dark} onThemeChange={setDark} onSync={isOwner ? openCalendarSync : undefined} lastSynced={`${formatDate(payload.generatedAt, true)} · ${formatTime(payload.generatedAt)}`} />}
           {view === "checklists" && <StudioInfoPage token={schedulingToken} isOwner={isOwner} userId={payload.user.id} section="checklists" />}
-          {view === "creative" && <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} />}
+          {view === "creative" && <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} focusLoading={alertWorkLoading} focusId={focusedAlert?.target === "creative" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} />}
           {view === "overview" && !isOwner && <TeamSchedulingPage onChecklist={openChecklist} token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, advance, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide"), onChecklist: openChecklist }} />}
           {view === "overview" && isOwner && (
             <div className="owner-overview">
@@ -1346,10 +1381,11 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
             {!isOwner && employeeEarnings.rentals.length > 0 && <article className="panel employee-earnings-details"><div className="panel-heading"><div><h2>Earnings by appointment</h2><p>Upcoming amounts are estimates. Custom assignments are listed in Schedule.</p></div></div><RentalTable employeeId={employeeId} rentals={employeeEarnings.rentals} /></article>}
           </>}
           {view === "guide" && <StudioGuidePage isOwner={isOwner} draftPassword={sessionPassword} teamToken={schedulingToken} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
-          {(view === "scheduling" || view === "availability") && <TeamSchedulingPage onChecklist={openChecklist} availabilityOnly={view === "availability"} onAvailability={() => setView("availability")} isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
+          {(view === "scheduling" || view === "availability") && <TeamSchedulingPage onChecklist={openChecklist} focusId={focusedAlert?.target === "scheduling" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} availabilityOnly={view === "availability"} onAvailability={() => setView("availability")} isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
         </div>
         <DashboardVersionFooter viewer={isOwner ? "owner" : "employee"} />
       </SidebarInset>
+      <MobileToolbar view={view} unread={alerts.unreadCount} onNavigate={navigate} />
       {isOwner && (
         <>
           <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={setPaymentOverrideOpen} open={paymentOverrideOpen} reviewRentals={reviewRentals} />

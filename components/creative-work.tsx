@@ -30,13 +30,13 @@ export function CreativeWorkPreview({ state, isOwner, onOpen }: { state: Creativ
   return <button className="creative-home-link" onClick={onOpen}><ClipboardList size={22} /><span><strong>Creative work</strong><small>{state.error ? "Open to refresh assignments" : isOwner ? `${review} awaiting review · ${active.length} active assignments` : `${active.length} active assignment${active.length === 1 ? "" : "s"} · View your briefs and submissions`}</small></span><ArrowUpRight size={18} /></button>;
 }
 
-export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = false, year }: { state: CreativeWorkState; employees: Employee[]; isOwner: boolean; earningsOnly?: boolean; year?: number }) {
+export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = false, year, focusId, onCloseFocus, focusLoading = false }: { focusLoading?: boolean; focusId?: string; onCloseFocus?: () => void; state: CreativeWorkState; employees: Employee[]; isOwner: boolean; earningsOnly?: boolean; year?: number }) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
   const [search, setSearch] = useState(""), [filter, setFilter] = useState("active"), [person, setPerson] = useState("all");
   const [selected, setSelected] = useState<string | null>(null), [editor, setEditor] = useState<{ item?: CreativeAssignment; id: string } | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
-  const selectedItem = state.items.find(item => item.id === selected);
+  const selectedItem = state.items.find(item => item.id === (focusId ?? selected));
   const summary = creativeEarnings(state.items, year);
   const visible = (earningsOnly ? summary.items : state.items).filter(item => {
     if (earningsOnly) return item.status === "approved";
@@ -63,8 +63,9 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
       <div className="creative-card-bottom"><strong>{dollars(item.amountCents)}</strong><span>{item.status === "approved" ? creativeOwed(item) ? `${dollars(creativeOwed(item))} owed` : "Paid in full" : "Earned after approval"}<ArrowUpRight size={16} /></span></div>
     </button>)}</div>}
     {!state.loading && !state.error && !visible.length && <div className="creative-empty"><ClipboardList size={26} /><h3>{earningsOnly ? "No approved creative work yet" : state.items.length ? "No assignments match" : "No creative assignments yet"}</h3><p>{earningsOnly ? "Approved assignments will appear here automatically." : isOwner ? "Create work such as an edit, photo selection, design, or social post." : "Smooth’s creative assignments will appear here with a brief, deadline, and agreed pay."}</p></div>}
-    <Dialog open={Boolean(selectedItem)} onOpenChange={open => { if (!open && !busy) setSelected(null); }}><DialogContent className="creative-dialog"><DialogHeader><DialogTitle>{selectedItem?.title}</DialogTitle><DialogDescription>{selectedItem && `${name(selectedItem.employeeId)} · ${status(selectedItem)} · Due ${date(selectedItem.dueAt)}`}</DialogDescription></DialogHeader>
-      {selectedItem && <WorkDetails key={selectedItem.id} item={selectedItem} isOwner={isOwner} busy={busy} error={error} act={act} onEdit={() => { setEditor({ id: selectedItem.id, item: selectedItem }); setSelected(null); }} />}
+    <Dialog open={Boolean(focusId || selectedItem)} onOpenChange={open => { if (!open && !busy) { setSelected(null); onCloseFocus?.(); } }}><DialogContent className="creative-dialog"><DialogHeader><DialogTitle>{selectedItem?.title ?? "Creative assignment"}</DialogTitle><DialogDescription>{selectedItem ? `${name(selectedItem.employeeId)} · ${status(selectedItem)} · Due ${date(selectedItem.dueAt)}` : "Review the current assignment details."}</DialogDescription></DialogHeader>
+      {!selectedItem && <p role="status">{state.loading || focusLoading ? "Loading assignment…" : state.error || "This assignment is no longer available to this account."}</p>}
+      {selectedItem && <WorkDetails key={selectedItem.id} item={selectedItem} isOwner={isOwner} busy={busy} error={error} act={act} onEdit={() => { setEditor({ id: selectedItem.id, item: selectedItem }); setSelected(null); onCloseFocus?.(); }} />}
     </DialogContent></Dialog>
     {editor && <WorkEditor key={`${editor.id}-${editor.item?.version ?? 0}`} editor={editor} employees={employees} state={state} onClose={() => setEditor(null)} />}
   </section>;

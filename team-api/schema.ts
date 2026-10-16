@@ -159,3 +159,11 @@ export const payrollAdvanceAllocations = sqliteTable("payroll_advance_allocation
   advanceId: text("advance_id").notNull().references(() => payrollAdvances.id), sourceKind: text("source_kind").notNull(), sourceId: text("source_id").notNull(),
   amountCents: integer("amount_cents").notNull(), cashFloorCents: integer("cash_floor_cents").notNull().default(0), createdAt: text("created_at").notNull(),
 }, table => [primaryKey({ columns: [table.advanceId, table.sourceKind, table.sourceId] }), index("payroll_allocations_source").on(table.sourceKind, table.sourceId)]);
+
+// Inbox persists after push delivery; migration triggers archive events atomically.
+export const notificationInbox = sqliteTable("team_inbox", {
+  sequence: integer("sequence").primaryKey({ autoIncrement: true }), id: text("id").notNull().unique(),
+  userId: text("user_id").notNull(), kind: text("kind").notNull(), title: text("title").notNull(), body: text("body").notNull(),
+  target: text("target").notNull(), targetId: text("target_id"), createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at"), readAt: integer("read_at"),
+}, table => [index("team_inbox_user_sequence").on(table.userId, table.sequence), index("team_inbox_user_unread").on(table.userId, table.readAt, table.sequence)]);

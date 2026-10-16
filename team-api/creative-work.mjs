@@ -116,7 +116,7 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
   const name = TEAM.find(p => p.id === item.employeeId).name;
   const recipient = isOwner ? item.employeeId : "owner";
   const title = isOwner ? ({ assigned: "New creative assignment", updated: "Creative assignment updated", approved: "Creative work approved", cancelled: "Creative assignment cancelled", "changes requested": "Changes requested", "payment recorded": "Creative payout recorded" }[event]) : `${name} ${event} creative work`;
-  const notification = JSON.stringify({ title, body: `${notificationText(item.title, 160)}. Open Creative Work to see the details.` });
+  const notification = JSON.stringify({ title, body: `${notificationText(item.title, 160)}. Open Creative Work to see the details.`, target: "creative", targetId: item.id });
   const result = await db.batch([write,
     db.prepare(`INSERT INTO team_notification_events (id, user_id, kind, payload, due_at)
       SELECT ?, ?, 'creative', ?, ? WHERE EXISTS (SELECT 1 FROM team_creative_assignments WHERE id = ? AND mutation = ?)`)
