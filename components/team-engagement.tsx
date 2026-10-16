@@ -218,12 +218,11 @@ export function TeamEngagementReview({ token }: { token: string }) {
   const sequence = useRef(0), savingRef = useRef(false), rewardRequest = useRef({ key: "", id: "" });
   const [action, setAction] = useState("add");
   const [amount, setAmount] = useState("5");
-  const [reason, setReason] = useState("");
   const [questionId, setQuestionId] = useState("");
   const [saving, setSaving] = useState(false);
   const [rewardError, setRewardError] = useState("");
   const [rewardNotice, setRewardNotice] = useState("");
-  useEffect(() => { setAction("add"); setAmount("5"); setReason(""); setQuestionId(""); setRewardError(""); setRewardNotice(""); rewardRequest.current = { key: "", id: "" }; }, [selected]);
+  useEffect(() => { setAction("add"); setAmount("5"); setQuestionId(""); setRewardError(""); setRewardNotice(""); rewardRequest.current = { key: "", id: "" }; }, [selected]);
   const load = useCallback(async () => {
     const request = ++sequence.current; setBusy(true);
     try { const result = await teamRequest<TeamEngagement>(token, "/engagement/team"); if (result.quizVersion !== 3) throw new Error("Quiz update pending"); if (request === sequence.current) { setState(result); setError(""); } }
@@ -240,16 +239,16 @@ export function TeamEngagementReview({ token }: { token: string }) {
   const validAmount = Number.isSafeInteger(numericAmount) && numericAmount > 0 && numericAmount <= 10000;
   const pointsRemoved = Math.min(resetQuestion?.attempt?.points ?? 0, member?.summary.points ?? 0);
   const supportsControls = state?.ownerControlsVersion === 1;
-  const validReward = Boolean(member && reason.trim() && (resetting ? supportsControls && (action === "reset-mood" || resetQuestion) :
+  const validReward = Boolean(member && (resetting ? supportsControls && (action === "reset-mood" || resetQuestion) :
     action === "star" || (validAmount && (action === "remove-stars" ? supportsControls && numericAmount <= member.summary.stars : member.summary.points + signedAmount >= 0))));
   const actionLabel = action === "star" ? "Award SmoothStar" : action === "remove-stars" ? "Remove SmoothStars" : action === "remove" ? "Remove points" :
     action === "reset-mood" ? "Reset today's Temp Check" : action === "reset-question" ? "Reset question" : "Add points";
   async function saveReward() {
     if (!member || !state || !validReward || busy || savingRef.current) return;
-    const payload = resetting ? { userId: member.userId, reason: reason.trim(), day: state.day,
+    const payload = resetting ? { userId: member.userId, reason: "Reset by Smooth", day: state.day,
       ...(action === "reset-mood" ? { kind: "mood", moodRevision: member.moodRevision } : {
         kind: "question", tier: resetQuestion!.question.tier, questionId: resetQuestion!.question.id, attemptedAt: resetQuestion!.attempt?.createdAt ?? null,
-      }) } : { userId: member.userId, kind: starAction ? "star" : "points", amount: action === "star" ? 1 : signedAmount, reason: reason.trim() };
+      }) } : { userId: member.userId, kind: starAction ? "star" : "points", amount: action === "star" ? 1 : signedAmount, reason: "Adjusted by Smooth" };
     const key = JSON.stringify(payload);
     if (rewardRequest.current.key !== key) rewardRequest.current = { key, id: crypto.randomUUID() };
     savingRef.current = true; setSaving(true); setRewardError(""); setRewardNotice("");
@@ -261,7 +260,7 @@ export function TeamEngagementReview({ token }: { token: string }) {
         setState(result); setRewardNotice(action === "reset-mood" ? `Today's Temp Check is ready again for ${member.name}.` :
           action === "reset-question" ? `${member.name}'s question is ready to retry.` : action === "remove-stars" ? `Removed ${numericAmount} ${numericAmount === 1 ? "SmoothStar" : "SmoothStars"} from ${member.name}.` :
           action === "star" ? `Awarded a SmoothStar to ${member.name}.` : `Updated ${member.name}'s points.`);
-        setReason(""); setQuestionId(""); rewardRequest.current = { key: "", id: "" };
+        setQuestionId(""); rewardRequest.current = { key: "", id: "" };
       }
     } catch (e) { if (request === sequence.current) setRewardError(e instanceof Error ? e.message : "That wasn't saved. Try again."); }
     finally { savingRef.current = false; setSaving(false); }
@@ -287,7 +286,6 @@ export function TeamEngagementReview({ token }: { token: string }) {
             <div className="reward-control-fields"><label>Action<select aria-label="Action" value={action} onChange={event => { setAction(event.target.value); setAmount(event.target.value === "remove-stars" ? "1" : "5"); setRewardError(""); setRewardNotice(""); }}><option value="add">Add points</option><option value="remove">Remove points</option><option value="star">Award a SmoothStar</option><option value="remove-stars" disabled={!supportsControls}>Remove SmoothStars</option><option value="reset-mood" disabled={!supportsControls}>Reset today's Temp Check</option><option value="reset-question" disabled={!supportsControls}>Reset a question for today</option></select></label>
             {!resetting && action !== "star" && <label>{action === "remove-stars" ? "SmoothStars" : "Points"}<input type="number" min="1" max="10000" step="1" inputMode="numeric" value={amount} onChange={event => setAmount(event.target.value)} required /></label>}</div>
             {action === "reset-question" && <><label>Today's question<select aria-label="Today's question" value={resetQuestion?.question.id ?? ""} onChange={event => setQuestionId(event.target.value)} disabled={!todaysQuestions.length}><option value="" disabled>Choose a question</option>{todaysQuestions.map(item => <option key={item.question.id} value={item.question.id}>{tierLabel(item.question.tier)} · {item.attempt ? `${item.attempt.correct ? "Correct" : "Incorrect"} · ${item.attempt.points} points` : "Not answered"}</option>)}</select></label>{resetQuestion ? <p className="engagement-muted">{resetQuestion.question.prompt}</p> : <p className="engagement-muted">No question has been opened today. Have them open Daily Quiz first.</p>}</>}
-            <label>Reason<input type="text" maxLength={240} value={reason} onChange={event => setReason(event.target.value)} placeholder="e.g. Great teamwork on a rental" required /></label>
             <p className="engagement-muted">{action === "reset-mood" ? `Clears today's Temp Check entries for ${member.name} and lets them check in again now. Earlier days stay in their history.` :
               action === "reset-question" ? `Reopens this question now and removes ${pointsRemoved} points from the available balance. Other answers and collected stickers stay. Any other unanswered question waits until two hours after this retry.` :
               action === "star" ? `${member.name} will have ${member.summary.stars + 1} SmoothStars. Points stay the same.` :

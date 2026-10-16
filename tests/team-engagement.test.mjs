@@ -57,12 +57,12 @@ async function offered(f, user, correct = true) {
   const q = JSON.parse(f.DB.sqlite.prepare("SELECT data FROM team_quiz_offers WHERE user_id = ? AND day = ? AND tier = ?").get(user, state.day, tier).data);
   return { day: state.day, tier, questionId: q.id, optionId: correct ? q.correctOptionId : q.options.find(o => o.id !== q.correctOptionId).id };
 }
-const adjustment = (amount = 10, extra = {}) => ({ requestId: crypto.randomUUID(), userId: "jordyn", kind: "points", amount, reason: "Synthetic test reward", ...extra });
+const adjustment = (amount = 10, extra = {}) => ({ requestId: crypto.randomUUID(), userId: "jordyn", kind: "points", amount, ...extra });
 const reportMember = (data, id = "jordyn") => data.members.find(p => p.userId === id);
 async function resetInput(f, kind = "question", user = "jordyn", tier) {
   const report = (await f.call("owner", "/engagement/team")).data, member = reportMember(report, user);
   const question = tier ? member.todayQuiz.find(item => item.question.tier === tier) : member.todayQuiz.at(-1);
-  return { requestId: crypto.randomUUID(), userId: user, day: report.day, kind, reason: "Synthetic reset correction",
+  return { requestId: crypto.randomUUID(), userId: user, day: report.day, kind,
     ...(kind === "mood" ? { moodRevision: member.moodRevision } : { tier: question.question.tier, questionId: question.question.id, attemptedAt: question.attempt?.createdAt ?? null }) };
 }
 
@@ -340,7 +340,7 @@ test("migration preserves old snapshots and points; late old-worker answers star
   assert.equal(old.prepare("SELECT points FROM team_reward_accounts").get().points, 10);
 });
 
-test("owner can add/remove points and award a separate SmoothStar with a private reason history", async () => {
+test("owner can adjust points and award SmoothStars without typing a reason", async () => {
   const f = fixture();
   let response = await f.call("owner", "/engagement/rewards", adjustment(95));
   assert.equal(response.status, 200);
@@ -361,6 +361,7 @@ test("owner can add/remove points and award a separate SmoothStar with a private
   const mine = (await f.call("jordyn")).data;
   assert.equal(mine.summary.stars, 2); // Re-adding removed points doesn't mint extra stars.
   assert.equal(mine.rewards.length, 4);
+  assert.ok(mine.rewards.every(reward => reward.reason === "Adjusted by Smooth"));
   assert.equal((await f.call("rayne", "/engagement?userId=jordyn")).data.rewards.length, 0);
   assert.equal((await f.call("rayne")).data.summary.stars, 0);
   assert.equal(f.alerts.length, 0);
@@ -369,7 +370,7 @@ test("owner can add/remove points and award a separate SmoothStar with a private
 test("only the owner can administer valid adjustments for active employees", async () => {
   const f = fixture();
   for (const user of ["jordyn", "sync"]) assert.equal((await f.call(user, "/engagement/rewards", adjustment())).status, 403);
-  for (const extra of [{userId:"owner"}, {userId:"unknown"}, {amount:0}, {amount:1.5}, {amount:10001}, {kind:"star",amount:2}, {kind:"star",amount:-10001}, {reason:" "}, {reason:"x".repeat(241)}, {requestId:"bad"}, {kind:"bad"}]) assert.equal((await f.call("owner", "/engagement/rewards", adjustment(10, extra))).status, 400);
+  for (const extra of [{userId:"owner"}, {userId:"unknown"}, {amount:0}, {amount:1.5}, {amount:10001}, {kind:"star",amount:2}, {kind:"star",amount:-10001}, {reason:"x".repeat(241)}, {requestId:"bad"}, {kind:"bad"}]) assert.equal((await f.call("owner", "/engagement/rewards", adjustment(10, extra))).status, 400);
   f.env.TEAM_TOKEN_HASHES = JSON.stringify(Object.fromEntries(Object.entries(hashes).filter(([id]) => id !== "amia")));
   assert.equal((await f.call("owner", "/engagement/rewards", adjustment(10, { userId: "amia" }))).status, 400);
   assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_reward_changes").get().n, 0);
@@ -379,6 +380,7 @@ test("reward retries are idempotent and conflicting reuse cannot change another 
   const f = fixture(), input = adjustment(25);
   const responses = await Promise.all(Array.from({ length: 8 }, () => f.call("owner", "/engagement/rewards", input)));
   assert.ok(responses.every(r => r.status === 200));
+  assert.equal((await f.call("owner", "/engagement/rewards", { ...input, reason: " " })).status, 200);
   assert.equal((await f.call("jordyn")).data.summary.points, 25);
   assert.equal((await f.call("owner", "/engagement/rewards", { ...input, userId: "rayne" })).status, 409);
   assert.equal((await f.call("owner", "/engagement/rewards", { ...input, amount: 50 })).status, 409);
@@ -440,6 +442,8 @@ test("owner resets only today's Temp Checks and a replay cannot hide a new check
   f.DB.queries = 0;
   const result = await f.call('owner', '/engagement/reset', input);
   assert.equal(result.status, 200); assert.ok(f.DB.queries <= 50);
+  assert.equal(reportMember(result.data).resets[0].reason, 'Reset by Smooth');
+  assert.equal((await f.call('owner', '/engagement/reset', {...input, reason:' '})).status, 200);
   assert.deepEqual(reportMember(result.data).moods.map(m => m.id), ['earlier']);
   const due = (await f.call('jordyn')).data;
   assert.equal(due.moodDue, true); assert.equal(due.summary.points, 0);
@@ -542,7 +546,7 @@ test("today's imported legacy question can be reset without reimporting its old 
 test("employee resets are owner-only, current-day only, and reject stale targets and reused IDs", async () => {
   const f = fixture(), answerInput = await offered(f, 'jordyn'), input = await resetInput(f);
   for (const user of ['jordyn', 'rayne', 'sync']) assert.equal((await f.call(user, '/engagement/reset', input)).status, 403);
-  for (const extra of [{userId:'owner'}, {userId:'unknown'}, {tier:'expert'}, {reason:' '}, {requestId:'bad'}, {kind:'unknown'}]) assert.equal((await f.call('owner', '/engagement/reset', {...input,...extra})).status, 400);
+  for (const extra of [{userId:'owner'}, {userId:'unknown'}, {tier:'expert'}, {reason:'x'.repeat(241)}, {requestId:'bad'}, {kind:'unknown'}]) assert.equal((await f.call('owner', '/engagement/reset', {...input,...extra})).status, 400);
   assert.equal((await f.call('owner', '/engagement/reset', {...input,day:'2026-10-14'})).status, 409);
   await f.call('jordyn', '/engagement/answer', answerInput);
   assert.equal((await f.call('owner', '/engagement/reset', input)).status, 409);

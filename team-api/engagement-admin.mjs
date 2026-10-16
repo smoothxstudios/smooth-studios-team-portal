@@ -7,8 +7,8 @@ export async function resetEngagement({ db, input, env, day, now, fail }) {
   if (input.day !== day) fail(409, "A new studio day has started. Refresh before resetting today's check-ins.");
   if (!['mood', 'question'].includes(input.kind)) fail(400, "Choose Temp Check or a quiz question.");
   if (typeof input.requestId !== "string" || !/^[a-f0-9-]{36}$/i.test(input.requestId)) fail(400, "Refresh this reset and try again.");
-  const reason = typeof input.reason === "string" ? input.reason.trim() : "";
-  if (!reason || reason.length > 240) fail(400, "Add a short reason (up to 240 characters).");
+  const reason = (typeof input.reason === "string" ? input.reason.trim() : "") || "Reset by Smooth";
+  if (reason.length > 240) fail(400, "Keep the optional note under 241 characters.");
   if (input.kind === "mood" && (!Number.isSafeInteger(input.moodRevision) || input.moodRevision < 0)) fail(400, "Refresh this employee's Temp Check before resetting it.");
   if (input.kind === "question" && (!QUIZ_TIERS.some(t => t.id === input.tier) || typeof input.questionId !== "string" || input.questionId.length > 240 ||
     (input.attemptedAt !== null && (typeof input.attemptedAt !== "string" || !Number.isFinite(Date.parse(input.attemptedAt)))))) fail(400, "Choose one of today's questions.");

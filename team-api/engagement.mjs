@@ -153,8 +153,8 @@ export async function engagementRoute({ request, db, user, env, body, fail }) {
     if (typeof input.requestId !== "string" || !/^[a-f0-9-]{36}$/i.test(input.requestId)) fail(400, "Refresh this adjustment and try again.");
     if (!["points", "star"].includes(input.kind) || !Number.isSafeInteger(input.amount) ||
       (input.kind === "points" ? input.amount === 0 || Math.abs(input.amount) > 10000 : input.amount !== 1 && !(input.amount < 0 && input.amount >= -10000))) fail(400, "Enter a whole-number points adjustment, award one SmoothStar, or choose how many to remove.");
-    const reason = typeof input.reason === "string" ? input.reason.trim() : "";
-    if (!reason || reason.length > 240) fail(400, "Add a short reason (up to 240 characters).");
+    const reason = (typeof input.reason === "string" ? input.reason.trim() : "") || "Adjusted by Smooth";
+    if (reason.length > 240) fail(400, "Keep the optional note under 241 characters.");
     const id = `owner:${input.requestId}`;
     const previous = await db.prepare("SELECT * FROM team_reward_changes WHERE id = ?").bind(id).first();
     if (previous && (previous.user_id !== input.userId || previous.kind !== input.kind || previous.amount !== input.amount || previous.reason !== reason)) fail(409, "This request was already used for a different adjustment. Refresh before making another.");
