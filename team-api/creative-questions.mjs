@@ -120,14 +120,17 @@ export const QUESTION_BANKS = {
 };
 export const QUESTION_BANK = Object.values(QUESTION_BANKS).flat();
 
-export function dailyQuestion(day, tier = "medium") {
+const hash = value => [...value].reduce((n, c) => Math.imul(n ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+
+export function dailyQuestion(day, tier = "medium", employeeId = "", offset = 0) {
   const difficulty = QUIZ_TIERS.find(item => item.id === tier);
   if (!difficulty) throw new Error("Invalid question tier.");
   const epoch = Date.parse("2026-10-15T00:00:00Z"), date = Date.parse(`${day}T00:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(date) || new Date(date).toISOString().slice(0, 10) !== day) throw new Error("Invalid question date.");
   const ordinal = Math.round((date - epoch) / 86400_000), bank = QUESTION_BANKS[tier];
-  const item = bank[((ordinal % bank.length) + bank.length) % bank.length];
-  let seed = [...`${day}:${item.id}`].reduce((n, c) => Math.imul(n ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+  const index = ordinal + (employeeId ? hash(employeeId) : 0) + offset;
+  const item = bank[((index % bank.length) + bank.length) % bank.length];
+  let seed = hash(`${day}:${item.id}${employeeId ? `:${employeeId}` : ""}`);
   const choices = item.choices.map((text, i) => ({ id: `choice-${i}`, text }));
   for (let i = choices.length - 1; i > 0; i--) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -135,9 +138,16 @@ export function dailyQuestion(day, tier = "medium") {
   }
   // Opaque display IDs must not reveal that the first authored option is correct.
   const correctIndex = choices.findIndex(choice => choice.text === item.correct);
-  return { id: `v3:${day}:${tier}:${item.id}`, day, tier, points: difficulty.points, category: item.category, prompt: item.prompt,
+  return { id: `${employeeId ? "v4" : "v3"}:${day}:${tier}:${item.id}${employeeId ? `:${hash(employeeId).toString(36)}` : ""}`, day, tier, points: difficulty.points, category: item.category, prompt: item.prompt,
     options: choices.map((choice, i) => ({ id: `option-${i}`, text: choice.text })),
     correctOptionId: `option-${correctIndex}`, explanation: item.explanation, source: item.source };
+}
+
+// Candidates and their answer keys stay on the server. The database reserves the
+// first unused prompt atomically, so overlapping logins cannot receive a duplicate.
+export function employeeQuestionCandidates(day, tier, employeeId) {
+  if (!employeeId || !QUESTION_BANKS[tier]) throw new Error("Choose an employee and valid question tier.");
+  return QUESTION_BANKS[tier].map((_, offset) => dailyQuestion(day, tier, employeeId, offset));
 }
 
 export function publicQuestion(question) {

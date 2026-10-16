@@ -48,13 +48,13 @@ export const quizAttempts = sqliteTable("team_quiz_attempts", {
   userId: text("user_id").notNull(), day: text("day").notNull(), tier: text("tier").notNull(),
   correct: integer("correct").notNull(), points: integer("points").notNull(),
   createdAt: integer("created_at").notNull(), data: text("data").notNull(),
-}, table => [primaryKey({ columns: [table.userId, table.day, table.tier] })]);
+}, table => [primaryKey({ columns: [table.userId, table.day, table.tier] }), index("team_quiz_attempts_day").on(table.day)]);
 
 export const quizOffers = sqliteTable("team_quiz_offers", {
   userId: text("user_id").notNull(), day: text("day").notNull(), slot: integer("slot").notNull(),
   tier: text("tier").notNull(), offeredAt: integer("offered_at").notNull(),
   dismissedAt: integer("dismissed_at"), data: text("data").notNull(),
-}, table => [primaryKey({ columns: [table.userId, table.day, table.slot] }), uniqueIndex("team_quiz_offers_tier").on(table.userId, table.day, table.tier)]);
+}, table => [primaryKey({ columns: [table.userId, table.day, table.slot] }), uniqueIndex("team_quiz_offers_tier").on(table.userId, table.day, table.tier), index("team_quiz_offers_day").on(table.day)]);
 
 export const rewardAccounts = sqliteTable("team_reward_accounts", {
   userId: text("user_id").primaryKey(), points: integer("points").notNull().default(0),

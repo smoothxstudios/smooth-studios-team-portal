@@ -1,6 +1,6 @@
 import { TEAM, studioLocal, localInstant, addLocalDays } from "../lib/team-schedule.mjs";
 import { MOODS, TEMP_CHECK_INTERVAL_MS, QUIZ_INTERVAL_MS, QUIZ_TIERS, starProgress } from "../lib/team-engagement.mjs";
-import { dailyQuestion, publicQuestion } from "./creative-questions.mjs";
+import { employeeQuestionCandidates, publicQuestion } from "./creative-questions.mjs";
 
 const moodRow = row => row ? { id: row.id, mood: row.mood, createdAt: new Date(row.created_at).toISOString() } : null;
 async function preserveLegacyAttempts(db, user) {
@@ -33,22 +33,49 @@ async function pendingOffer(db, user, day) {
   return db.prepare(`SELECT o.* FROM team_quiz_offers o WHERE o.user_id = ? AND o.day = ?
     AND NOT EXISTS (SELECT 1 FROM team_quiz_attempts a WHERE a.user_id = o.user_id AND a.day = o.day AND a.tier = o.tier) LIMIT 1`).bind(user, day).first();
 }
+const unusedQuestion = `WITH candidate AS (
+  SELECT c.value AS data FROM json_each(?) c
+  WHERE NOT EXISTS (SELECT 1 FROM team_quiz_offers o WHERE o.day = ?
+    AND json_extract(o.data, '$.prompt') = json_extract(c.value, '$.prompt'))
+  AND NOT EXISTS (SELECT 1 FROM team_quiz_attempts a WHERE a.day = ?
+    AND json_extract(a.data, '$.question.prompt') = json_extract(c.value, '$.prompt'))
+  ORDER BY CAST(c.key AS INTEGER) LIMIT 1
+)`;
 async function offerQuestion(db, user, day, now) {
   const pending = await pendingOffer(db, user, day);
-  if (pending) return pending;
+  if (pending) {
+    // Only replace an unanswered pre-update offer when its prompt was also issued
+    // to someone else. Unique snapshots and all submitted answers stay untouched.
+    if (JSON.parse(pending.data).id.startsWith("v3:")) {
+      await db.prepare(`${unusedQuestion}
+        UPDATE team_quiz_offers AS o SET data = (SELECT data FROM candidate), dismissed_at = NULL
+        WHERE o.user_id = ? AND o.day = ? AND o.slot = ? AND o.data = ?
+          AND EXISTS (SELECT 1 FROM candidate)
+          AND NOT EXISTS (SELECT 1 FROM team_quiz_attempts a WHERE a.user_id = o.user_id AND a.day = o.day AND a.tier = o.tier)
+          AND (EXISTS (SELECT 1 FROM team_quiz_offers other WHERE other.day = o.day AND other.user_id != o.user_id
+            AND json_extract(other.data, '$.prompt') = json_extract(o.data, '$.prompt'))
+            OR EXISTS (SELECT 1 FROM team_quiz_attempts a WHERE a.day = o.day AND a.user_id != o.user_id
+              AND json_extract(a.data, '$.question.prompt') = json_extract(o.data, '$.prompt')))`)
+        .bind(JSON.stringify(employeeQuestionCandidates(day, pending.tier, user)), day, day,
+          user, day, pending.slot, pending.data).run();
+      return pendingOffer(db, user, day);
+    }
+    return pending;
+  }
   const attempts = await todayAttempts(db, user, day);
   if (attempts.length >= 3 || (attempts.length && Date.parse(attempts.at(-1).createdAt) + QUIZ_INTERVAL_MS > now)) return null;
   const remaining = QUIZ_TIERS.filter(tier => !attempts.some(a => a.tier === tier.id));
   const tier = remaining[crypto.getRandomValues(new Uint32Array(1))[0] % remaining.length].id;
   // Competing devices can propose different tiers, but only one slot wins.
   // Re-check eligibility in the INSERT so a stale request cannot skip the wait.
-  await db.prepare(`INSERT OR IGNORE INTO team_quiz_offers (user_id, day, slot, tier, offered_at, data)
-    SELECT ?, ?, ?, ?, ?, ? WHERE
+  await db.prepare(`${unusedQuestion}
+    INSERT OR IGNORE INTO team_quiz_offers (user_id, day, slot, tier, offered_at, data)
+    SELECT ?, ?, ?, ?, ?, candidate.data FROM candidate WHERE
       (SELECT COUNT(*) FROM team_quiz_attempts WHERE user_id = ? AND day = ?) = ?
       AND COALESCE((SELECT MAX(created_at) FROM team_quiz_attempts WHERE user_id = ? AND day = ?), 0) <= ?
       AND NOT EXISTS (SELECT 1 FROM team_quiz_offers o WHERE o.user_id = ? AND o.day = ?
         AND NOT EXISTS (SELECT 1 FROM team_quiz_attempts a WHERE a.user_id = o.user_id AND a.day = o.day AND a.tier = o.tier))`)
-    .bind(user, day, attempts.length + 1, tier, now, JSON.stringify(dailyQuestion(day, tier)),
+    .bind(JSON.stringify(employeeQuestionCandidates(day, tier, user)), day, day, user, day, attempts.length + 1, tier, now,
       user, day, attempts.length, user, day, now - QUIZ_INTERVAL_MS, user, day).run();
   return pendingOffer(db, user, day);
 }

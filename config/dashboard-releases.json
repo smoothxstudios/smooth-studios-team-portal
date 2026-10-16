@@ -1,6 +1,29 @@
 {
-  "currentVersion": "2.12.0",
+  "currentVersion": "2.12.1",
   "releases": [
+    {
+      "id": "2026-10-15-individual-quizzes-check-in-spacing",
+      "version": "2.12.1",
+      "date": "2026-10-15",
+      "category": "Team",
+      "title": "Roomier check-ins and individual Daily Quiz questions",
+      "changes": [
+        "Temp Check has more space between mood choices and between the saved check-in card and Done button.",
+        "The Next Temp Check sentence is removed. The three-hour check-in schedule stays the same.",
+        "Employees receive different Daily Quiz questions, including when they log in together or draw the same difficulty. Answer ordering also varies by employee.",
+        "Questions are reserved atomically for each employee and remain consistent across devices. Shared unanswered questions from the previous release are replaced when reopened; completed answers and points are preserved.",
+        "Daily lookup indexes keep question allocation focused on the current day. The existing two-hour quiz spacing and 5, 10, and 15-point tiers remain in place."
+      ],
+      "employee": {
+        "title": "Roomier Temp Check and your own Daily Quiz questions",
+        "changes": [
+          "More space separates the mood choices and the saved check-in from the Done button. The Next Temp Check sentence is removed.",
+          "Daily Quiz gives each employee different questions, even when you check in together. Your question stays the same when you refresh or switch devices.",
+          "Any shared unanswered question from the previous release is refreshed. Your completed answers, points, and SmoothStars are kept."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-15-paced-quizzes-smoothstar-rewards",
       "version": "2.12.0",

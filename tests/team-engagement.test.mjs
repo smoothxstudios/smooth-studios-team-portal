@@ -6,9 +6,9 @@ import worker from "../team-api/worker.mjs";
 import { TEAM } from "../lib/team-schedule.mjs";
 import { teamToken, tokenHash } from "../lib/team-auth.mjs";
 import { TEMP_CHECK_INTERVAL_MS, QUIZ_INTERVAL_MS, MOODS, QUIZ_TIERS, nextEngagementPrompt, starProgress } from "../lib/team-engagement.mjs";
-import { dailyQuestion, publicQuestion, QUESTION_BANK, QUESTION_BANKS } from "../team-api/creative-questions.mjs";
+import { dailyQuestion, employeeQuestionCandidates, publicQuestion, QUESTION_BANK, QUESTION_BANKS } from "../team-api/creative-questions.mjs";
 
-const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
+const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
 const tokens = Object.fromEntries(await Promise.all([...TEAM.map(p => p.id), "sync"].map(async id => [id, await teamToken(`synthetic-engagement-test-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(Object.entries(tokens).map(async ([id, token]) => [id, await tokenHash(token)])));
 const now = Date.parse("2026-10-15T17:00:00Z"), today = "2026-10-15";
@@ -53,7 +53,9 @@ const current = state => state.quiz.find(item => item.question.id === state.curr
 async function offered(f, user, correct = true) {
   const state = (await f.call(user)).data;
   assert.equal(state.available, true);
-  return answer(state.day, correct, current(state).question.tier);
+  const tier = current(state).question.tier;
+  const q = JSON.parse(f.DB.sqlite.prepare("SELECT data FROM team_quiz_offers WHERE user_id = ? AND day = ? AND tier = ?").get(user, state.day, tier).data);
+  return { day: state.day, tier, questionId: q.id, optionId: correct ? q.correctOptionId : q.options.find(o => o.id !== q.correctOptionId).id };
 }
 const adjustment = (amount = 10, extra = {}) => ({ requestId: crypto.randomUUID(), userId: "jordyn", kind: "points", amount, reason: "Synthetic test reward", ...extra });
 const reportMember = (data, id = "jordyn") => data.members.find(p => p.userId === id);
@@ -72,7 +74,7 @@ test("private employee state exposes only one server-issued question and no unan
   const q = current(state).question;
   assert.equal(q.options.length, 4);
   for (const key of ["correctOptionId", "explanation", "source"]) assert.ok(!(key in q));
-  assert.equal((await f.call("owner", "/health")).data.engagementVersion, 3);
+  assert.equal((await f.call("owner", "/health")).data.engagementVersion, 4);
 });
 
 test("moods remain private and independent of quiz points, assignments, and notifications", async () => {
@@ -137,6 +139,72 @@ test("random difficulty is persisted across refreshes and simultaneous devices",
   mock.timers.setTime(now + 4 * QUIZ_INTERVAL_MS);
   assert.deepEqual(current((await f.call("jordyn")).data).question, initial);
   assert.equal((await f.call("jordyn")).data.answeredToday, 0);
+});
+
+test("all employees receive different prompts even when the same tiers unlock simultaneously", async () => {
+  const f = fixture(), people = TEAM.filter(p => p.id !== "owner").map(p => p.id), prompts = new Set();
+  const random = mock.method(crypto, "getRandomValues", values => values.fill(0));
+  try {
+    for (let slot = 0; slot < 3; slot++) {
+      mock.timers.setTime(now + slot * QUIZ_INTERVAL_MS);
+      const devices = await Promise.all(people.map(async user => Promise.all([f.call(user), f.call(user)])));
+      const questions = devices.map(([first, second]) => {
+        assert.equal(first.status, 200); assert.equal(second.status, 200);
+        assert.deepEqual(current(first.data).question, current(second.data).question);
+        const q = current(first.data).question;
+        assert.equal(q.tier, QUIZ_TIERS[slot].id);
+        assert.ok(!("correctOptionId" in q));
+        assert.ok(!prompts.has(q.prompt)); prompts.add(q.prompt);
+        return q;
+      });
+      assert.equal((await f.call(people[1], "/engagement/answer", {
+        day: today, tier: questions[0].tier, questionId: questions[0].id, optionId: questions[0].options[0].id,
+      })).status, 409);
+      await Promise.all(people.map(async user => {
+        const input = await offered(f, user), result = await f.call(user, "/engagement/answer", input);
+        assert.equal(result.status, 200); assert.equal(result.data.answeredToday, slot + 1);
+        assert.equal(result.data.available, false);
+      }));
+    }
+    assert.equal(prompts.size, people.length * 3);
+    for (const user of people) assert.equal((await f.call(user)).data.summary.points, 30);
+    assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_quiz_offers").get().n, people.length * 3);
+  } finally { random.mock.restore(); }
+});
+
+test("shared unanswered legacy offers become distinct without changing submitted answers or points", async () => {
+  const f = fixture(), q = dailyQuestion(today, "easy"), people = TEAM.filter(p => p.id !== "owner").map(p => p.id);
+  for (const user of people) f.DB.sqlite.prepare("INSERT INTO team_quiz_offers (user_id, day, slot, tier, offered_at, dismissed_at, data) VALUES (?, ?, 1, ?, ?, ?, ?)")
+    .run(user, today, q.tier, now, now, JSON.stringify(q));
+  const completed = { day: today, tier: q.tier, createdAt: new Date(now).toISOString(), question: publicQuestion(q), selectedOptionId: q.correctOptionId,
+    correctOptionId: q.correctOptionId, correct: true, points: q.points, explanation: q.explanation, source: q.source };
+  const snapshot = JSON.stringify(completed);
+  f.DB.sqlite.prepare("INSERT INTO team_quiz_attempts VALUES (?, ?, ?, 1, ?, ?, ?)").run(people[0], today, q.tier, q.points, now, snapshot);
+  const results = await Promise.all(people.map(user => f.call(user)));
+  const questions = results.map(r => { assert.equal(r.status, 200); return current(r.data).question; });
+  assert.equal(new Set(questions.map(item => item.prompt)).size, people.length);
+  assert.equal(results[0].data.summary.points, q.points);
+  assert.equal(f.DB.sqlite.prepare("SELECT data FROM team_quiz_attempts").get().data, snapshot);
+  for (let i = 1; i < people.length; i++) {
+    assert.equal(results[i].data.questionDue, true);
+    assert.equal(results[i].data.summary.points, 0);
+    assert.equal((await f.call(people[i], "/engagement/answer", answer(today, true, "easy"))).status, 409);
+    assert.deepEqual(current((await f.call(people[i])).data).question, questions[i]);
+    assert.equal((await f.call(people[i], "/engagement/answer", await offered(f, people[i]))).data.summary.points, q.points);
+  }
+});
+
+test("already answered questions without offers are excluded from new reservations", async () => {
+  const f = fixture(), q = employeeQuestionCandidates(today, "easy", "jordyn")[0];
+  const snapshot = JSON.stringify({ day: today, tier: "easy", createdAt: new Date(now).toISOString(), question: publicQuestion(q), points: 5, correct: true });
+  f.DB.sqlite.prepare("INSERT INTO team_quiz_attempts VALUES ('rayne', ?, 'easy', 1, 5, ?, ?)").run(today, now, snapshot);
+  const random = mock.method(crypto, "getRandomValues", values => values.fill(0));
+  try {
+    const state = (await f.call("jordyn")).data;
+    assert.equal(current(state).question.tier, "easy");
+    assert.notEqual(current(state).question.prompt, q.prompt);
+    assert.deepEqual(current((await f.call("jordyn")).data).question, current(state).question);
+  } finally { random.mock.restore(); }
 });
 
 test("one question per two hours, one of each tier, with no banked instant backlog", async () => {
@@ -256,13 +324,13 @@ test("migration preserves old snapshots and points; late old-worker answers star
   const input = await offered(f, "jordyn"); assert.notEqual(input.tier, "medium");
   await f.call("jordyn", "/engagement/answer", input);
   const points = (await f.call("jordyn")).data.summary.points;
-  migrations.slice(-2).forEach(sql => f.DB.sqlite.exec(sql));
+  migrations.slice(5).forEach(sql => f.DB.sqlite.exec(sql));
   assert.equal((await f.call("jordyn")).data.summary.points, points);
   assert.equal(f.DB.sqlite.prepare("SELECT data FROM team_creative_attempts").get().data, json);
   // Seed a pre-migration database and run the additive account migration twice.
-  const old = new DatabaseSync(":memory:"); migrations.slice(0, -1).forEach(sql => old.exec(sql));
+  const old = new DatabaseSync(":memory:"); migrations.slice(0, 6).forEach(sql => old.exec(sql));
   old.prepare("INSERT INTO team_quiz_attempts VALUES (?, ?, ?, ?, ?, ?, ?)").run("amia", today, "medium", 1, 10, now, json);
-  old.exec(migrations.at(-1)); old.exec(migrations.at(-1));
+  migrations.slice(6).forEach(sql => old.exec(sql)); migrations.slice(6).forEach(sql => old.exec(sql));
   assert.equal(old.prepare("SELECT points FROM team_reward_accounts").get().points, 10);
 });
 
@@ -326,7 +394,9 @@ test("concurrent deductions cannot make a negative balance or leave a phantom le
 test("the question bank spans studio disciplines with unique choices and exact shutter math", () => {
   assert.ok(QUESTION_BANK.length >= 40);
   assert.equal(new Set(QUESTION_BANK.map(q => q.id)).size, QUESTION_BANK.length);
+  assert.equal(new Set(QUESTION_BANK.map(q => q.prompt)).size, QUESTION_BANK.length);
   for (const difficulty of QUIZ_TIERS) {
+    assert.ok(QUESTION_BANKS[difficulty.id].length >= TEAM.filter(p => p.id !== "owner").length);
     assert.ok(new Set(QUESTION_BANKS[difficulty.id].map(q => q.category)).size >= 5);
     for (let i = 0; i < QUESTION_BANKS[difficulty.id].length; i++) {
       const day = new Date(Date.parse(today) + i * 86400000).toISOString().slice(0,10), q = dailyQuestion(day, difficulty.id);
