@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Smooth Studios Team Portal",
-  "short_name": "Smooth Team",
+  "name": "Smooth Studios",
+  "short_name": "Smooth Studios",
   "start_url": "./#scheduling",
   "scope": "./",
   "display": "standalone",

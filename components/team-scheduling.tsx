@@ -10,6 +10,7 @@ import { enableTeamPush, disableTeamPush, teamPushIsEnabled, testTeamPush, teamR
 import type { DashboardPayload } from "@/lib/dashboard-types";
 import { EmployeeHome, type EmployeeHomeOptions } from "@/components/employee-home";
 import { TeamAvailability } from "@/components/team-availability";
+import { OwnerScheduleAgenda } from "@/components/owner-schedule-agenda";
 import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps, workPreferenceMatch } from "@/lib/team-schedule.mjs";
 
 const personName = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
@@ -184,7 +185,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
   }
 
   return <section className="team-scheduling">
-    {!home && <header className="schedule-intro"><div>{isOwner && <p className="schedule-eyebrow">{availabilityOnly ? "TEAM AVAILABILITY" : "TEAM SCHEDULE"}</p>}<h2>{availabilityOnly ? isOwner ? "When your team wants to work" : "My availability" : isOwner ? "The right person. The right time." : "My schedule"}</h2><p>{availabilityOnly ? "Keep preferred work days and unavailable time together." : "Review rental offers and assignments. Manage preferred work days and time off in Availability."}</p></div>
+    {!home && (!isOwner || availabilityOnly || !schedule) && <header className="schedule-intro"><div>{isOwner && <p className="schedule-eyebrow">{availabilityOnly ? "TEAM AVAILABILITY" : "TEAM SCHEDULE"}</p>}<h2>{availabilityOnly ? isOwner ? "When your team wants to work" : "My availability" : isOwner ? "Your team’s schedule" : "My schedule"}</h2><p>{availabilityOnly ? "Keep preferred work days and unavailable time together." : "Review rental offers and assignments. Manage preferred work days and time off in Availability."}</p></div>
       <Button disabled={busy || loading} variant="outline" onClick={() => void refreshManually()}><RefreshCw size={16} />Refresh</Button></header>}
     {error && <div role="alert" className="schedule-error"><p>{error}</p>{home && <Button disabled={busy} variant="outline" onClick={() => void refreshManually()}><RefreshCw size={16} />Refresh</Button>}</div>}
     {message && <p role="status" className="schedule-success">{message}</p>}
@@ -197,6 +198,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     {schedule && !home && !availabilityOnly && (isOwner || scheduleTab === "upcoming") && <>
       {isOwner && calendarSync?.status === "needs_access" && <div className="schedule-warning" role="status"><strong>Google Calendar needs permission to show rental assignments</strong><p>In your rental calendar’s Settings and sharing, give <b>{calendarSync.serviceAccountEmail ?? "the existing dashboard service account"}</b> “Make changes to events” access. Rental team notes will appear after the next sync. Your assignments are saved here.</p></div>}
       {isOwner && calendarSync?.status === "retrying" && <p className="schedule-warning" role="status">Some rental team notes could not update in Google Calendar. They will retry on the next sync; your assignments are saved here.</p>}
+      {isOwner ? <OwnerScheduleAgenda schedule={schedule} employeeId={filter} onEmployeeChange={setFilter} onAssign={openAssignment} onAvailability={onAvailability ?? (() => openBlockTime())} onRefresh={() => void refreshManually()} busy={busy} renderAssignment={assignmentCard} /> : <>
       <div className="schedule-toolbar"><div className="schedule-actions">
         <Button onClick={onAvailability ?? (() => openBlockTime())} variant="outline"><CalendarDays size={16} />Availability</Button>
         {isOwner && <Button onClick={() => openAssignment()} variant="outline"><Plus size={16} />Assign work</Button>}
@@ -231,6 +233,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
 
 
       <p className="schedule-small">Studio rental offers and acceptances are listed in the Google Calendar event’s description after syncing. Existing Calendar invitations remain valid. Custom tasks stay in this dashboard.</p>
+      </>}
     </>}
 
     {schedule && !availabilityOnly && (isHome || isOwner || scheduleTab === "upcoming") && (

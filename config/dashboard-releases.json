@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.14.1",
+  "currentVersion": "2.14.2",
   "releases": [
+    {
+      "id": "2026-10-16-mobile-team-schedule",
+      "version": "2.14.2",
+      "date": "2026-10-16",
+      "category": "Team",
+      "title": "A clearer team schedule on your phone",
+      "changes": [
+        "The owner schedule opens one day at a time, with a date strip, date picker, and week or 30-day views. Search by client, booking, or teammate and filter by employee or staffing status.",
+        "Each Calendar booking and its portal offers share one card. Confirmed staff stay green; pending responses and conflicts are visible, with instructions and offer controls inside Details.",
+        "Time blocks and preferred work hours are grouped under each day’s expandable availability section. Past responses and Calendar help stay out of the main list.",
+        "New Home Screen installs use Smooth Studios as the app name. The iPhone-generated notification attribution is controlled by iOS, and existing installs may retain their chosen name."
+      ],
+      "employee": {
+        "title": "Smooth Studios app name",
+        "changes": [
+          "New Home Screen installs use Smooth Studios as the app name. Existing installed icons may keep the name chosen when they were added."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-specific-notifications",
       "version": "2.14.1",
