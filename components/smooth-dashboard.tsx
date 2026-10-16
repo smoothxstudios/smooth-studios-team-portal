@@ -370,7 +370,7 @@ function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[]; onUnlo
       <div className="login-card">
         <Logo />
         <div className="login-heading">
-          <p className="eyebrow">Team portal</p>
+          <p className="eyebrow">Dashboard</p>
           <h1>Sign in</h1>
         </div>
         {!selection ? <p className="login-preparing" role="status">Preparing sign-in…</p> : quickReady && !usePassword ? <><div className="quick-login"><Button disabled={loading} onClick={quickUnlock}><Fingerprint size={20} />{loading ? "Opening…" : `Continue as ${profile?.label ?? selectedId}`}</Button><p>Face ID, fingerprint, or device PIN</p></div>
