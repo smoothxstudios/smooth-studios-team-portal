@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Plus, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Plus, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { enableTeamPush, disableTeamPush, teamPushIsEnabled, testTeamPush, teamRequest, type TeamSchedule, type TeamAssignment, type TimeBlock, type WorkPreference } from "@/lib/team-api";
+import { teamPushIsEnabled, teamRequest, type TeamSchedule, type TeamAssignment, type TimeBlock, type WorkPreference } from "@/lib/team-api";
 import type { DashboardPayload } from "@/lib/dashboard-types";
+import { NotificationSettings } from "@/components/notification-settings";
 import { EmployeeHome, type EmployeeHomeOptions } from "@/components/employee-home";
 import { TeamAvailability } from "@/components/team-availability";
 import { OwnerScheduleAgenda } from "@/components/owner-schedule-agenda";
@@ -45,9 +46,6 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
   const [confirm, setConfirm] = useState<{ path: string; method: string; data: object; description: string } | null>(null);
   const [block, setBlock] = useState({ userId, reason: "Class", ...initialPeriod(), repeatUntil: "", weekly: false });
   const [assignment, setAssignment] = useState({ employeeId: "akiva", appointmentId: "", title: "", instructions: "", overrideConflicts: false, ...initialPeriod() });
-  const [pushSupported, setPushSupported] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [pushFeedback, setPushFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
     const version = ++requestVersion.current;
@@ -60,7 +58,6 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       if (mutationInFlight.current) return;
       const version = ++requestVersion.current;
       try {
-        setPushSupported("serviceWorker" in navigator && "PushManager" in window && "Notification" in window);
         const activation = await fetch("./data/team-api.json", { cache: "no-store" });
         const ready = activation.ok && (await activation.json()).enabled === true;
         if (disposed) return;
@@ -68,11 +65,9 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         if (ready) {
           const result = await teamRequest<TeamSchedule>(token, "/schedule");
           if (!disposed && version === requestVersion.current) { setSchedule(result); setError(""); setNeedsRefresh(false); }
-          if (!availabilityOnly) try {
-            const registered = await teamPushIsEnabled(token, result.pushPublicKey);
-            if (!disposed) setPushEnabled(registered);
-          } catch {
-            if (!disposed) { setPushEnabled(false); setPushFeedback({ ok: false, text: "Couldn’t verify notifications on this device. Use Enable on this device to reconnect, then Send test." }); }
+          // Keep already-enabled employee devices current without showing controls here.
+          if (!isOwner && !availabilityOnly) {
+            try { await teamPushIsEnabled(token, result.pushPublicKey); } catch { /* Settings handles setup feedback. */ }
           }
         }
       } catch { if (!disposed && version === requestVersion.current) setError("Couldn’t refresh scheduling. Check your connection and try Refresh; the last view may be out of date."); }
@@ -83,7 +78,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     const onFocus = () => void refresh();
     window.addEventListener("focus", onFocus);
     return () => { disposed = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); };
-  }, [token, isHome, availabilityOnly]);
+  }, [token, isHome, availabilityOnly, isOwner]);
 
   async function mutate(path: string, data: object, method = "POST") {
     if (!schedule || busy || needsRefresh || mutationInFlight.current) return false;
@@ -103,27 +98,6 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       return true;
     } catch (e) { setError(e instanceof Error ? e.message : "Couldn’t save this change."); return false; }
     finally { mutationInFlight.current = false; setBusy(false); }
-  }
-  async function pushAction(action: "enable" | "disable" | "test") {
-    if (busy) return;
-    // Permission must be requested directly from the tap, before any network I/O.
-    const permission = action === "enable" && pushSupported ? Notification.requestPermission() : null;
-    setBusy(true); setPushFeedback(null);
-    try {
-      if (action === "enable") {
-        if (!schedule?.pushPublicKey || !permission) throw new Error("Open this dashboard from your Home Screen to enable iPhone notifications.");
-        await enableTeamPush(token, schedule.pushPublicKey, await permission); setPushEnabled(true);
-        setPushFeedback({ ok: true, text: "Notifications enabled on this device. Use Send test to check delivery." });
-      } else if (action === "disable") {
-        await disableTeamPush(token); setPushEnabled(false); setPushFeedback({ ok: true, text: "Notifications disabled on this device." });
-      } else {
-        const result = await testTeamPush(token, schedule?.pushPublicKey ?? null);
-        if (result.expired) setPushEnabled(false);
-        setPushFeedback({ ok: result.accepted, text: result.message });
-      }
-      try { await load(); } catch { /* Keep the actual notification result visible. */ }
-    } catch (e) { setPushFeedback({ ok: false, text: e instanceof Error ? e.message : "Notification setup failed." }); }
-    finally { setBusy(false); }
   }
 
   const appointments = useMemo(() => (schedule?.appointments ?? []).filter(a => future(a.start)).sort((a, b) => Date.parse(a.start) - Date.parse(b.start)), [schedule]);
@@ -204,7 +178,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         <Button onClick={onAvailability ?? (() => openBlockTime())} variant="outline"><CalendarDays size={16} />Availability</Button>
         {isOwner && <Button onClick={() => openAssignment()} variant="outline"><Plus size={16} />Assign work</Button>}
       </div><label className="schedule-filter">{isOwner ? "View team member" : "Your schedule"}{isOwner ? <select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">Everyone</option>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select> : <Person id={userId} />}</label></div>
-      <div className="schedule-notice"><ShieldCheck size={18} /><p>All times are Tallahassee time (Eastern). Calendar and payment syncing is scheduled every 5 minutes; portal responses update immediately. {isOwner ? "Check recorded commitments before assigning work. Preferred days express interest; blocked time and existing work take priority. Employees confirm by accepting." : "A pending offer is confirmed when you select Accept."}</p></div>
+      <div className="schedule-notice"><ShieldCheck size={18} /><p>Calendar and payment syncing is scheduled every 5 minutes; portal responses update immediately. {isOwner ? "Check recorded commitments before assigning work. Preferred days express interest; blocked time and existing work take priority. Employees confirm by accepting." : "A pending offer is confirmed when you select Accept."}</p></div>
 
       <article className="schedule-panel"><div className="schedule-row schedule-section-heading"><div><h3><CalendarDays size={20} />Week at a glance</h3><p>{date(localInstant(`${week}T12:00`))}–{date(localInstant(`${days[6]}T12:00`))} · {schedule.syncedAt ? `Calendar synced ${date(schedule.syncedAt)} at ${time(schedule.syncedAt)}` : "Waiting for Calendar"}</p></div><div className="schedule-actions">
         <Button size="icon" variant="outline" aria-label="Previous week" onClick={() => setWeek(addLocalDays(`${week}T00:00`, -7).slice(0, 10))}><ChevronLeft /></Button>
@@ -237,17 +211,13 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       </>}
     </>}
 
-    {schedule && !availabilityOnly && (isHome || isOwner || scheduleTab === "upcoming") && (
-      <details className="schedule-panel schedule-push"><summary className="notification-summary"><span><Bell size={18} />Notifications</span><small>{pushEnabled ? "On for this device" : "Set up alerts"}</small></summary><div><p>{isOwner ? "Receive schedule changes and employee responses." : "Get an alert when Smooth assigns you a rental or task, and when your next Daily Quiz question is ready."}</p>{!isOwner && <p className="schedule-small">Quiz reminders follow your daily check-in, with two hours between questions. One reminder per new question, up to three questions a day. Tap an alert to open the right section.</p>}<p className="schedule-small">On iPhone: Safari → Share → Add to Home Screen. Open that icon, unlock, then enable notifications. Closing the app or locking your phone keeps alerts on. Using Log out in the dashboard disables them on this device.</p>{!pushSupported && <p className="schedule-warning">This browser session does not support push. Use the Home Screen app on iPhone or a supported browser.</p>}</div><div className="schedule-actions">
-        {pushEnabled ? <><Button variant="outline" disabled={busy} onClick={() => void pushAction("test")}>Send test</Button><Button variant="outline" disabled={busy} onClick={() => void pushAction("disable")}>Disable this device</Button></> : <Button disabled={busy || !pushSupported || !schedule.pushPublicKey} onClick={() => void pushAction("enable")}><Bell size={16} />Enable on this device</Button>}
-      </div>{pushFeedback && <p className={pushFeedback.ok ? "schedule-success" : "schedule-warning"} role={pushFeedback.ok ? "status" : "alert"}>{pushFeedback.text}</p>}{isOwner && <p className="schedule-small">Registered devices: {TEAM.map(p => `${p.name} ${schedule.devices[p.id] ?? 0}`).join(" · ")}. Registration does not guarantee delivery; focus mode and device settings can suppress alerts.</p>}</details>
-    )}
+    {schedule && isOwner && !availabilityOnly && <NotificationSettings token={token} isOwner schedule={schedule} />}
 
-    <Dialog open={blockOpen} onOpenChange={open => { if (!busy) setBlockOpen(open); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Block time</DialogTitle><DialogDescription>Class, personal time, or another commitment. Times are Eastern. Existing assignments are not cancelled.</DialogDescription></DialogHeader>
+    <Dialog open={blockOpen} onOpenChange={open => { if (!busy) setBlockOpen(open); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Block time</DialogTitle><DialogDescription>Class, personal time, or another commitment. Existing assignments are not cancelled.</DialogDescription></DialogHeader>
       <form onSubmit={async e => { e.preventDefault(); if (await mutate("/blocks", { ...block, repeatUntil: block.weekly ? block.repeatUntil : null })) setBlockOpen(false); }}>
         {isOwner && <label>Team member<select value={block.userId} onChange={e => setBlock({ ...block, userId: e.target.value })}>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
         <label>Reason<Input required maxLength={120} value={block.reason} onChange={e => setBlock({ ...block, reason: e.target.value })} placeholder="Class, personal time, another job…" /></label>
-        <div className="schedule-form-pair"><label>Starts (Eastern)<Input required type="datetime-local" value={block.startLocal} onChange={e => setBlock({ ...block, startLocal: e.target.value })} /></label><label>Ends (Eastern)<Input required type="datetime-local" value={block.endLocal} onChange={e => setBlock({ ...block, endLocal: e.target.value })} /></label></div>
+        <div className="schedule-form-pair"><label>Starts<Input required type="datetime-local" value={block.startLocal} onChange={e => setBlock({ ...block, startLocal: e.target.value })} /></label><label>Ends<Input required type="datetime-local" value={block.endLocal} onChange={e => setBlock({ ...block, endLocal: e.target.value })} /></label></div>
         <label className="schedule-check"><input type="checkbox" checked={block.weekly} onChange={e => setBlock({ ...block, weekly: e.target.checked })} />Repeat every week on this weekday</label>
         {block.weekly && <><p className="schedule-small">For a class that already started, use its original meeting date. The series must include an upcoming meeting.</p><label>Last date of the class or series<Input required type="date" min={block.startLocal.slice(0, 10)} max={addLocalDays(block.startLocal || `${week}T00:00`, 364).slice(0, 10)} value={block.repeatUntil} onChange={e => setBlock({ ...block, repeatUntil: e.target.value })} /></label></>}
         {error && <p className="schedule-error" role="alert">{error}</p>}
@@ -257,7 +227,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     <Dialog open={assignmentOpen} onOpenChange={open => { if (!busy) setAssignmentOpen(open); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Assign work</DialogTitle><DialogDescription>Create an offer for one employee. They confirm by accepting it in their dashboard.</DialogDescription></DialogHeader>
       <form onSubmit={async e => { e.preventDefault(); if (await mutate("/assignments", assignment)) setAssignmentOpen(false); }}>
         <label>Rental or assignment<select value={assignment.appointmentId} onChange={e => setAssignment({ ...assignment, appointmentId: e.target.value, overrideConflicts: false })}><option value="">Custom assignment (no automatic commission)</option>{appointments.map(a => <option key={a.id} value={a.id}>{date(a.start)} {time(a.start)} · {a.customer} · {a.title}</option>)}</select></label>
-        {selectedAppointment ? <p className="schedule-notice">{date(selectedAppointment.start)} · {time(selectedAppointment.start)}–{time(selectedAppointment.end)} · {money(selectedAppointment.priceCents)}<br />Calendar controls this rental’s date and price.</p> : <><label>Assignment title<Input required maxLength={160} value={assignment.title} onChange={e => setAssignment({ ...assignment, title: e.target.value })} placeholder="Prepare the studio, assist on location…" /></label><div className="schedule-form-pair"><label>Starts (Eastern)<Input required type="datetime-local" value={assignment.startLocal} onChange={e => setAssignment({ ...assignment, startLocal: e.target.value, overrideConflicts: false })} /></label><label>Ends (Eastern)<Input required type="datetime-local" value={assignment.endLocal} onChange={e => setAssignment({ ...assignment, endLocal: e.target.value, overrideConflicts: false })} /></label></div></>}
+        {selectedAppointment ? <p className="schedule-notice">{date(selectedAppointment.start)} · {time(selectedAppointment.start)}–{time(selectedAppointment.end)} · {money(selectedAppointment.priceCents)}<br />Calendar controls this rental’s date and price.</p> : <><label>Assignment title<Input required maxLength={160} value={assignment.title} onChange={e => setAssignment({ ...assignment, title: e.target.value })} placeholder="Prepare the studio, assist on location…" /></label><div className="schedule-form-pair"><label>Starts<Input required type="datetime-local" value={assignment.startLocal} onChange={e => setAssignment({ ...assignment, startLocal: e.target.value, overrideConflicts: false })} /></label><label>Ends<Input required type="datetime-local" value={assignment.endLocal} onChange={e => setAssignment({ ...assignment, endLocal: e.target.value, overrideConflicts: false })} /></label></div></>}
         <label>Employee<select value={assignment.employeeId} onChange={e => setAssignment({ ...assignment, employeeId: e.target.value, overrideConflicts: false })}>{TEAM.filter(p => p.id !== "owner").map(p => <option key={p.id} value={p.id}>{p.name}{period ? ` — ${employeeAvailabilityLabel(p.id)}` : ""}</option>)}</select></label>
         {period && schedule?.availabilityVersion === 1 && !conflicts.length && <p className={selectedPreference === "full" ? "schedule-success" : "schedule-notice"}>{selectedPreference === "full" ? `${personName(assignment.employeeId)} wants to work during this entire time. They still need to accept the offer.` : selectedPreference === "partial" ? "Only part of this assignment falls within their preferred hours. Confirm the full time with them." : "No work preference covers this time. You can still offer it; the employee confirms by accepting."}</p>}
         {(conflicts.length > 0 || alreadyInvited || alreadyOffered) && <p className="schedule-warning">{alreadyInvited ? "This person already accepted the Calendar invitation." : alreadyOffered ? "This person already has an active offer for this appointment." : conflicts.join("; ")}</p>}

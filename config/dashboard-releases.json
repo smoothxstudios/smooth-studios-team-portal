@@ -1,6 +1,32 @@
 {
-  "currentVersion": "2.18.3",
+  "currentVersion": "2.19.0",
   "releases": [
+    {
+      "id": "2026-10-16-owner-week-month-finances",
+      "version": "2.19.0",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Week and month finances on Home",
+      "changes": [
+        "Home starts with This week and This month: revenue, total earned team pay, and the amount remaining after team pay.",
+        "Period totals use Eastern dates and completed, fully paid appointments, including tips. Team pay includes approved creative work and remains a cost after it has been paid. Fees and other expenses are not deducted.",
+        "Removed Paid to team from the Home summary; payment history remains in Payouts. Upcoming and total unpaid earnings use compact shortcuts.",
+        "Upcoming appears above Needs attention on mobile.",
+        "Settings tabs use a clear red selection. The access notice appears once at the top of Studio info, and repeated timezone reminders are removed.",
+        "Employee notification controls moved from Home and My Schedule to Settings → Preferences; enabled alerts keep working.",
+        "Points and star adjustment activity is visible only to Smooth. Employee responses contain totals and quiz progress without the administrative adjustment history."
+      ],
+      "commits": [],
+      "employee": {
+        "title": "Clearer settings and less clutter",
+        "changes": [
+          "Manage notifications in Settings → Preferences. Existing enabled notifications keep working.",
+          "The selected Settings tab has a clear red highlight. Repeated timezone reminders are removed.",
+          "The access notice appears once at the top of Studio info.",
+          "My SmoothStars focuses on your total, progress, and recent quiz answers."
+        ]
+      }
+    },
     {
       "id": "2026-10-16-compact-info-and-sign-in-recovery",
       "version": "2.18.3",

@@ -360,8 +360,10 @@ test("owner can adjust points and award SmoothStars without typing a reason", as
   await f.call("owner", "/engagement/rewards", adjustment(80));
   const mine = (await f.call("jordyn")).data;
   assert.equal(mine.summary.stars, 2); // Re-adding removed points doesn't mint extra stars.
-  assert.equal(mine.rewards.length, 4);
-  assert.ok(mine.rewards.every(reward => reward.reason === "Adjusted by Smooth"));
+  assert.deepEqual(mine.rewards, []); // Administrative activity stays owner-only.
+  const owner = reportMember((await f.call("owner", "/engagement/team")).data);
+  assert.equal(owner.rewards.length, 4);
+  assert.ok(owner.rewards.every(reward => reward.reason === "Adjusted by Smooth"));
   assert.equal((await f.call("rayne", "/engagement?userId=jordyn")).data.rewards.length, 0);
   assert.equal((await f.call("rayne")).data.summary.stars, 0);
   assert.equal(f.alerts.length, 0);
@@ -621,7 +623,8 @@ test("SmoothStars can be removed from earned and awarded totals without reducing
   assert.equal(summary.stars,1); assert.equal(summary.goal,1500);
   f.DB.queries=0; await f.call('owner','/engagement/rewards',adjustment(-1,{kind:'star'})); assert.ok(f.DB.queries<=50);
   assert.equal((await f.call('rayne')).data.summary.stars,0);
-  assert.ok((await f.call('jordyn')).data.rewards.some(r=>r.kind==='star'&&r.amount===-2));
+  assert.deepEqual((await f.call('jordyn')).data.rewards, []);
+  assert.ok(reportMember((await f.call('owner', '/engagement/team')).data).rewards.some(r=>r.kind==='star'&&r.amount===-2));
 });
 
 test("competing star removals cannot take the collection below zero", async () => {

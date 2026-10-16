@@ -29,6 +29,7 @@ export function StudioInfoPage({ token, isOwner, userId, section }: { token: str
     {!data && !error && <p role="status">Loading studio information…</p>}
     {section === "reference" ? <>
       <div className="creative-heading"><div><h2>Studio info</h2><p>Contacts, access, and Wi-Fi in one place.</p></div><div className="creative-toolbar-buttons"><Button variant="outline" size="sm" onClick={() => void load()} aria-label="Refresh studio information"><RefreshCw size={16} /></Button>{isOwner && data && <Button onClick={() => setEditor({ id: crypto.randomUUID(), category: "Contacts", label: "", value: "", note: "", kind: "text" })}><Plus size={17} />Add info</Button>}</div></div>
+      <p className="studio-access-notice">For authorized team use. Do not share access details.</p>
       <div className="creative-filters"><label className="creative-search"><Search size={17} /><span className="sr-only">Search important information</span><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search door, Wi-Fi, contacts…" /></label><label><span className="sr-only">Information category</span><select value={category} onChange={event => setCategory(event.target.value)}><option value="all">All categories</option>{STUDIO_INFO_CATEGORIES.map(value => <option key={value}>{value}</option>)}</select></label></div>
       <div className="studio-info-sections">{STUDIO_INFO_CATEGORIES.filter(group => entries.some(item => item.category === group)).map(group => {
         const groupEntries = entries.filter(item => item.category === group);
@@ -36,7 +37,7 @@ export function StudioInfoPage({ token, isOwner, userId, section }: { token: str
         return <section className="studio-info-group" key={group}><header><h3><Icon size={18} aria-hidden="true" />{group}</h3><span>{groupEntries.length}</span></header><div className="studio-info-grid">{groupEntries.map(item => <InfoCard key={item.id} entry={item} expandMatch={Boolean(search.trim())} onEdit={isOwner ? () => setEditor(item) : undefined} />)}</div></section>;
       })}</div>
       {data && !entries.length && <p className="creative-empty">{data.entries.length ? "No matching information. Try another word or category." : "Studio information is being prepared."}</p>}
-      {data?.updatedAt && <p className="creative-hint">Updated {date(data.updatedAt)} Eastern</p>}
+      {data?.updatedAt && <p className="creative-hint">Updated {date(data.updatedAt)}</p>}
       {editor && data && <InfoEditor key={editor.id} entry={editor} data={data} token={token} onClose={() => setEditor(null)} onSave={load} />}
     </> : data && <RentalChecklist key={userId} data={data} userId={userId} isOwner={isOwner} token={token} onSave={load} />}
   </section>;
@@ -44,8 +45,9 @@ export function StudioInfoPage({ token, isOwner, userId, section }: { token: str
 
 function InfoCard({ entry, onEdit, expandMatch }: { entry: InfoEntry; onEdit?: () => void; expandMatch: boolean }) {
   const [shown, setShown] = useState(false), [copied, setCopied] = useState(false), [error, setError] = useState("");
+  const note = entry.note.replace(/For authorized team use\.\s*Do not share access details\./gi, "").trim();
   const canCopy = ["secret", "phone", "link"].includes(entry.kind);
-  const content = <div className="studio-info-body"><div className={`studio-info-value${entry.kind === "secret" ? " is-secret" : ""}`}>{entry.kind === "secret" && !shown ? "••••••" : entry.kind === "link" ? <a href={entry.value} target="_blank" rel="noopener noreferrer">{entry.value}</a> : entry.value}</div>{entry.note && <p>{entry.note}</p>}{(canCopy || onEdit) && <div className="studio-info-actions">
+  const content = <div className="studio-info-body"><div className={`studio-info-value${entry.kind === "secret" ? " is-secret" : ""}`}>{entry.kind === "secret" && !shown ? "••••••" : entry.kind === "link" ? <a href={entry.value} target="_blank" rel="noopener noreferrer">{entry.value}</a> : entry.value}</div>{note && <p>{note}</p>}{(canCopy || onEdit) && <div className="studio-info-actions">
     {entry.kind === "secret" && <Button variant="outline" size="sm" onClick={() => setShown(value => !value)}>{shown ? <EyeOff size={15} /> : <Eye size={15} />}{shown ? "Hide" : "Show"}</Button>}
     {canCopy && <Button variant="ghost" size="sm" onClick={async () => { try { await navigator.clipboard.writeText(entry.value); setCopied(true); setError(""); } catch { setShown(true); setError("Select and copy the value above."); } }}><Copy size={15} />{copied ? "Copied" : "Copy"}</Button>}
     {entry.kind === "phone" && <a className="studio-call" href={`tel:${entry.value.replace(/[^+0-9]/g, "")}`}><Phone size={15} />Call</a>}

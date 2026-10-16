@@ -33,7 +33,7 @@ function RewardHistory({ rewards }: { rewards: RewardChange[] }) {
   return <><h3 className="creative-history-title">Points & star activity</h3><div className="reward-history">{rewards.map(reward => <div key={reward.id}><div className="engagement-row"><strong>{`${reward.amount > 0 ? "+" : ""}${reward.amount} ${reward.kind === "star" ? Math.abs(reward.amount) === 1 ? "SmoothStar" : "SmoothStars" : "points"}`}</strong><small>{clock(reward.createdAt)}</small></div><p>{reward.reason}</p></div>)}</div></>;
 }
 function NextQuizTime({ state }: { state: EmployeeEngagement }) {
-  return state.nextQuestionAt ? <p className="quiz-next-time"><Clock3 size={16} aria-hidden="true" /><span>Next question: <strong>{clock(state.nextQuestionAt)} Eastern</strong></span></p> : <p className="engagement-muted quiz-tomorrow">Come back tomorrow for a new question.</p>;
+  return state.nextQuestionAt ? <p className="quiz-next-time"><Clock3 size={16} aria-hidden="true" /><span>Next question: <strong>{clock(state.nextQuestionAt)}</strong></span></p> : <p className="engagement-muted quiz-tomorrow">Come back tomorrow for a new question.</p>;
 }
 
 function AnswerResult({ attempt, celebrate = false }: { attempt: CreativeAttempt; celebrate?: boolean }) {
@@ -177,7 +177,7 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
         <div className="engagement-popup-heading"><DialogTitle>{panel === "mood" ? "Temp Check" : "Daily Quiz"}</DialogTitle><button type="button" className="engagement-close" aria-label={panel === "mood" ? "Dismiss Temp Check" : "Dismiss Daily Quiz"} disabled={busy} onClick={dismiss}><X size={19} /></button></div>
         <DialogDescription className={panel === "mood" ? "engagement-muted" : "sr-only"}>{panel === "mood" ? state?.moodDue ? "How are you feeling?" : "You're checked in for now." : "One question at a time, with two hours between answers. Up to three different difficulties each day."}</DialogDescription>
         {state && (panel === "mood" ? <>
-          {state.moodDue ? <div className="temp-check-moods">{MOODS.map(mood => <button type="button" key={mood.id} disabled={busy} onClick={() => recordMood(mood.id)} aria-label={`I'm feeling ${mood.label.toLowerCase()}`}><span aria-hidden="true">{mood.emoji}</span><strong>{mood.label}</strong></button>)}</div> : <div className="temp-check-saved">{latestMood ? <><span aria-hidden="true">{latestMood.emoji}</span><strong>{latestMood.label}</strong><small>{clock(state.lastMood!.createdAt)} Eastern</small></> : <strong>You skipped this check-in.</strong>}</div>}
+          {state.moodDue ? <div className="temp-check-moods">{MOODS.map(mood => <button type="button" key={mood.id} disabled={busy} onClick={() => recordMood(mood.id)} aria-label={`I'm feeling ${mood.label.toLowerCase()}`}><span aria-hidden="true">{mood.emoji}</span><strong>{mood.label}</strong></button>)}</div> : <div className="temp-check-saved">{latestMood ? <><span aria-hidden="true">{latestMood.emoji}</span><strong>{latestMood.label}</strong><small>{clock(state.lastMood!.createdAt)}</small></> : <strong>You skipped this check-in.</strong>}</div>}
           <Button variant="outline" disabled={busy} onClick={dismiss}>{state.moodDue ? "Skip for now" : "Done"}</Button>
         </> : current && <>
           <div className="engagement-row quiz-current-tier"><strong>{tierLabel(current.question.tier)} · {current.question.points} points</strong><span>{state.answeredToday}/3 answered today</span></div>
@@ -196,7 +196,7 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
       </DialogContent>
     </Dialog>
     <Dialog open={enabled && progressOpen} onOpenChange={setProgressOpen}><DialogContent className="schedule-modal studio-stars-dialog"><DialogHeader><DialogTitle>My SmoothStars</DialogTitle><DialogDescription>Easy: 5 points. Medium: 10. Very Hard: 15. Earn a SmoothStar for every {STAR_POINTS} points toward your next goal. Smooth can also award stickers directly.</DialogDescription></DialogHeader>
-      {state && <><StarCollection summary={state.summary} /><div className="studio-sticker-wall" aria-label={`${state.summary.stars} SmoothStars collected`}>{Array.from({ length: Math.min(10, Math.max(1, state.summary.stars)) }, (_, i) => <span className={`studio-star-sticker${state.summary.stars ? " earned" : ""}`} key={i}><Star size={40} aria-hidden="true" /></span>)}{state.summary.stars > 10 && <strong>+{state.summary.stars - 10} more</strong>}</div><StarGoal summary={state.summary} /><p className="engagement-muted">{state.summary.correct} correct · {state.summary.incorrect} incorrect · {state.summary.answered} answered</p><h3 className="creative-history-title">Recent answers</h3><AttemptHistory attempts={state.history} /><RewardHistory rewards={state.rewards} /></>}
+      {state && <><StarCollection summary={state.summary} /><div className="studio-sticker-wall" aria-label={`${state.summary.stars} SmoothStars collected`}>{Array.from({ length: Math.min(10, Math.max(1, state.summary.stars)) }, (_, i) => <span className={`studio-star-sticker${state.summary.stars ? " earned" : ""}`} key={i}><Star size={40} aria-hidden="true" /></span>)}{state.summary.stars > 10 && <strong>+{state.summary.stars - 10} more</strong>}</div><StarGoal summary={state.summary} /><p className="engagement-muted">{state.summary.correct} correct · {state.summary.incorrect} incorrect · {state.summary.answered} answered</p><h3 className="creative-history-title">Recent answers</h3><AttemptHistory attempts={state.history} /></>}
     </DialogContent></Dialog>
   </EngagementContext.Provider>;
 }
@@ -289,12 +289,12 @@ export function TeamEngagementReview({ token }: { token: string }) {
       return <button type="button" key={person.userId} className="team-checkin-card" onClick={() => setSelected(person.userId)}>
         <span className="engagement-row"><strong className="schedule-person"><i style={{ background: person.color }} />{person.name}</strong><ChevronRight size={16} /></span>
         <span className="team-checkin-mood">{mood ? <><span aria-hidden="true">{mood.emoji}</span>{mood.label}</> : "No check-in yet"}</span>
-        <small>{person.moods[0] ? `${clock(person.moods[0].createdAt)} Eastern` : "Employees can skip a check-in."}</small>
+        <small>{person.moods[0] ? `${clock(person.moods[0].createdAt)}` : "Employees can skip a check-in."}</small>
         <span className="team-checkin-score"><Star size={16} />{person.summary.points} points · {person.summary.stars} SmoothStars</span>
         <small>Today: {person.today.length}/3 answered · +{person.today.reduce((sum, attempt) => sum + attempt.points, 0)} points</small>
       </button>;
     })}</div></>}
-    <Dialog open={Boolean(member)} onOpenChange={open => { if (!open && !saving) setSelected(""); }}><DialogContent className="schedule-modal studio-stars-dialog"><DialogHeader><DialogTitle>{member?.name} · Check-ins & SmoothStars</DialogTitle><DialogDescription>Self-reported moods and recorded daily answers. All dates are Eastern.</DialogDescription></DialogHeader>
+    <Dialog open={Boolean(member)} onOpenChange={open => { if (!open && !saving) setSelected(""); }}><DialogContent className="schedule-modal studio-stars-dialog"><DialogHeader><DialogTitle>{member?.name} · Check-ins & SmoothStars</DialogTitle><DialogDescription>Self-reported moods and recorded daily answers.</DialogDescription></DialogHeader>
       {member && <><StarCollection summary={member.summary} /><StarGoal summary={member.summary} />
         <form className="reward-controls" onSubmit={event => { event.preventDefault(); void saveReward(); }}>
           <h3>Manage check-ins, points & SmoothStars</h3>

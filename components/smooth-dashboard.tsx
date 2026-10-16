@@ -14,7 +14,6 @@ import {
 } from "recharts";
 import {
   ArrowRight,
-  Banknote,
   BarChart3,
   BookOpen,
   CalendarDays,
@@ -25,7 +24,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  CircleDollarSign,
   CreditCard,
   Clock3,
   Eye,
@@ -44,7 +42,6 @@ import {
   ReceiptText,
   Search,
   Settings,
-  ShieldCheck,
   TriangleAlert,
   Users,
   WalletCards,
@@ -103,6 +100,7 @@ import { createGuidePatch, MAX_GUIDELINE_UPDATE_BYTES } from "@/lib/studio-guide
 import { TeamAccountSetup, type NewTeamSettings } from "@/components/team-account-setup";
 import { TEAM, studioLocal } from "@/lib/team-schedule.mjs";
 import { employeeEarningsForYear } from "@/lib/employee-home.mjs";
+import { customerFullyPaid, tipAmount, recognizedRevenue, ownerPeriodFinances } from "@/lib/owner-finances.mjs";
 import { TeamSchedulingPage } from "@/components/team-scheduling";
 import { DashboardSettings } from "@/components/dashboard-settings";
 import { StudioInfoPage } from "@/components/studio-info";
@@ -248,19 +246,6 @@ function durationLabel(rental: Rental) {
   if (minutes < 60) return `${minutes} min`;
   const hours = minutes / 60;
   return Number.isInteger(hours) ? `${hours} hr` : `${hours.toFixed(1)} hrs`;
-}
-
-function customerFullyPaid(rental: Rental) {
-  if (rental.paymentOverride !== undefined) return rental.fullyPaid;
-  return rental.fullyPaid || (rental.paidOnlineCents !== null && rental.paidOnlineCents >= rental.priceCents);
-}
-
-function tipAmount(rental: Rental) {
-  return rental.tipCents ?? Math.max((rental.paidOnlineCents ?? 0) - rental.priceCents, 0);
-}
-
-function recognizedRevenue(rental: Rental) {
-  return customerFullyPaid(rental) ? rental.priceCents + tipAmount(rental) : 0;
 }
 
 function customerPaymentState(rental: Rental): CustomerPaymentState {
@@ -448,8 +433,27 @@ function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[]; onUnlo
   );
 }
 
-function KpiCard({ label, value, note, icon: Icon, tone }: { label: string; value: string; note: string; icon: typeof Banknote; tone: "red" | "green" | "blue" | "amber" }) {
-  return <article className={`kpi-card tone-${tone}`}><div className="kpi-heading"><span>{label}</span><div className="kpi-icon"><Icon size={19} /></div></div><strong>{value}</strong><p>{note}</p></article>;
+function OwnerFinancialSummary({ rentals, creative, upcomingCount, totalOwed, onSchedule, onPayouts }: {
+  rentals: Rental[]; creative: ReturnType<typeof useCreativeWork>; upcomingCount: number; totalOwed: number;
+  onSchedule: () => void; onPayouts: () => void;
+}) {
+  const now = Date.now();
+  const periods = ownerPeriodFinances(rentals, creative.items, now);
+  const ready = creative.loaded && !creative.error;
+  return <section className="owner-finances" aria-label="Weekly and monthly revenue after team pay">
+    <div className="owner-finance-grid">{periods.map(period => {
+      const payReady = ready && !period.missingRates;
+      return <article className="owner-finance-card" key={period.id}>
+        <header><h2>{period.label}</h2><span>{formatDate(period.start)}–{formatDate(new Date(now).toISOString())}</span></header>
+        <div className="owner-finance-revenue"><span>Revenue</span><strong>{dollars(period.revenue, true)}</strong></div>
+        <div className="owner-finance-deduction"><div><span>Team pay</span>{payReady && <small>{dollars(period.stillOwed, true)} still owed</small>}</div><strong>{payReady ? `−${dollars(period.teamPay, true)}` : "—"}</strong></div>
+        <div className={`owner-finance-net${payReady && period.afterTeamPay < 0 ? " is-negative" : ""}`}><span>After team pay</span><strong>{payReady ? dollars(period.afterTeamPay, true) : "—"}</strong></div>
+        {!payReady && <p className="owner-finance-status" role="status">{period.missingRates ? "Set missing employee pay rates to finish this total." : creative.error ? "Team pay is unavailable. Refresh to finish this total." : "Loading team pay…"}</p>}
+      </article>;
+    })}</div>
+    <p className="owner-finance-basis">Completed, fully paid appointments, including tips. Team pay includes approved creative work. Before fees and other expenses.</p>
+    <div className="owner-finance-shortcuts"><button onClick={onSchedule}><CalendarDays size={16} />{upcomingCount} upcoming appointments<ChevronRight size={15} /></button><button onClick={onPayouts}><WalletCards size={16} />Total still owed: {ready ? dollars(totalOwed, true) : "—"}<ChevronRight size={15} /></button></div>
+  </section>;
 }
 
 function PeriodTotals({ rentals, employeeId, creative = [] }: { rentals: Rental[]; employeeId?: string; creative?: CreativeAssignment[] }) {
@@ -635,7 +639,7 @@ function OwnerAttention({ reviewCount, unmatchedCount, stripeConnected, onReview
 function OwnerUpcoming({ rentals, onSchedule }: { rentals: Rental[]; onSchedule: () => void }) {
   return (
     <article className="panel owner-upcoming">
-      <div className="panel-heading"><div><h2>Coming up</h2><p>Next on your calendar · Eastern time</p></div><button onClick={onSchedule}>Open schedule <ChevronRight size={15} /></button></div>
+      <div className="panel-heading"><div><h2>Coming up</h2><p>Next on your calendar</p></div><button onClick={onSchedule}>Open schedule <ChevronRight size={15} /></button></div>
       {rentals.length ? <ol className="owner-upcoming-list">
         {rentals.slice(0, 4).map(rental => <li key={rental.id}>
           <time className="owner-date-block" dateTime={rental.start} aria-label={formatDate(rental.start)}>
@@ -1257,23 +1261,19 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Creative work totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
-          {view === "overview" && <CreativeWorkPreview state={creative} isOwner={isOwner} onOpen={() => setView("creative")} />}
+          {view === "overview" && !isOwner && <CreativeWorkPreview state={creative} isOwner={false} onOpen={() => setView("creative")} />}
           {view === "settings" && <DashboardSettings token={schedulingToken} profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} dark={dark} onThemeChange={setDark} onSync={isOwner ? openCalendarSync : undefined} lastSynced={`${formatDate(payload.generatedAt, true)} · ${formatTime(payload.generatedAt)}`} />}
           {view === "checklists" && <StudioInfoPage token={schedulingToken} isOwner={isOwner} userId={payload.user.id} section="checklists" />}
           {view === "creative" && <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} />}
           {view === "overview" && !isOwner && <TeamSchedulingPage onChecklist={openChecklist} token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide"), onChecklist: openChecklist }} />}
           {view === "overview" && isOwner && (
             <div className="owner-overview">
-              <section className="kpi-grid" aria-label="Studio summary">
-                <KpiCard icon={CalendarDays} label="Upcoming" note="Appointments on your calendar" tone="blue" value={String(upcoming.length)} />
-                <KpiCard icon={CircleDollarSign} label="Appointment revenue" note="Fully paid appointments" tone="red" value={dollars(metrics.revenue)} />
-                <KpiCard icon={Banknote} label="Payroll owed" note="Earned, not yet paid" tone="amber" value={dollars(metrics.owed)} />
-                <KpiCard icon={ShieldCheck} label="Paid to team" note="Recorded employee payouts" tone="green" value={dollars(metrics.paid)} />
-              </section>
+              <OwnerFinancialSummary rentals={visibleRentals} creative={creative} upcomingCount={upcoming.length} totalOwed={metrics.owed} onSchedule={() => setView("scheduling")} onPayouts={() => setView("payouts")} />
               <section className="owner-workspace" aria-label="Upcoming work and payment reviews">
                 <OwnerUpcoming rentals={upcoming} onSchedule={() => setView("scheduling")} />
                 <OwnerAttention reviewCount={reviewRentals.length} unmatchedCount={payload.stripeSummary?.unmatchedPaymentCount ?? payload.unmatchedStripePayments?.length ?? 0} stripeConnected={stripeConnected} onReview={reviewPayments} onMatch={() => openStripeMatch()} onPayouts={() => setView("payouts")} />
               </section>
+              <CreativeWorkPreview state={creative} isOwner onOpen={() => setView("creative")} />
               <details className="owner-reports">
                 <summary>
                   <span className="owner-reports-icon"><BarChart3 size={21} /></span>

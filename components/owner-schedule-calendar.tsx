@@ -18,7 +18,7 @@ function responseLabel(item: ScheduleEntry) {
   if (item.kind !== "work") return item.kind === "block" ? "Blocked" : "Prefers to work";
   return item.confirmations.length ? item.confirmations.map(person => `${personName(person.employeeId)}: ${person.appStatus === "accepted" ? "accepted in app" : person.appStatus === "pending" ? "awaiting app response" : "Calendar accepted"}`).join("; ") : "Unassigned";
 }
-const eventLabel = (item: ScheduleEntry) => `${title(item)}. ${time(item.start)}–${time(item.end)} Eastern. ${responseLabel(item)}. Open details.`;
+const eventLabel = (item: ScheduleEntry) => `${title(item)}. ${time(item.start)}–${time(item.end)}. ${responseLabel(item)}. Open details.`;
 function EventStatus({ item }: { item: ScheduleEntry }) {
   if (item.kind !== "work") return null;
   return item.status === "confirmed" ? <span className="calendar-event-check" aria-hidden="true">✅</span> : item.status === "pending" ? <Clock3 className="calendar-event-pending" size={14} aria-hidden="true" /> : null;

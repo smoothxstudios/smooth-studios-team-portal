@@ -59,11 +59,11 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
     </>}
     {state.loading ? <p role="status">Loading creative work…</p> : <div className="creative-grid">{visible.map(item => <button className="creative-card" key={item.id} onClick={() => { setSelected(item.id); setError(""); }}>
       <div className="creative-card-top"><span className={`creative-status is-${item.status}`}>{status(item)}</span>{isOwner && <span className="creative-person"><i style={{ background: teamAccent(item.employeeId) }} />{name(item.employeeId)}</span>}</div>
-      <h3>{item.title}</h3><p className={!earningsOnly && openStatuses.includes(item.status) && Date.parse(item.dueAt) < now ? "creative-overdue" : ""}>{earningsOnly ? `Approved ${date(item.approvedAt!)}` : `Due ${date(item.dueAt)} Eastern`}</p>
+      <h3>{item.title}</h3><p className={!earningsOnly && openStatuses.includes(item.status) && Date.parse(item.dueAt) < now ? "creative-overdue" : ""}>{earningsOnly ? `Approved ${date(item.approvedAt!)}` : `Due ${date(item.dueAt)}`}</p>
       <div className="creative-card-bottom"><strong>{dollars(item.amountCents)}</strong><span>{item.status === "approved" ? creativeOwed(item) ? `${dollars(creativeOwed(item))} owed` : "Paid in full" : "Earned after approval"}<ArrowUpRight size={16} /></span></div>
     </button>)}</div>}
     {!state.loading && !state.error && !visible.length && <div className="creative-empty"><ClipboardList size={26} /><h3>{earningsOnly ? "No approved creative work yet" : state.items.length ? "No assignments match" : "No creative assignments yet"}</h3><p>{earningsOnly ? "Approved assignments will appear here automatically." : isOwner ? "Create work such as an edit, photo selection, design, or social post." : "Smooth’s creative assignments will appear here with a brief, deadline, and agreed pay."}</p></div>}
-    <Dialog open={Boolean(selectedItem)} onOpenChange={open => { if (!open && !busy) setSelected(null); }}><DialogContent className="creative-dialog"><DialogHeader><DialogTitle>{selectedItem?.title}</DialogTitle><DialogDescription>{selectedItem && `${name(selectedItem.employeeId)} · ${status(selectedItem)} · Due ${date(selectedItem.dueAt)} Eastern`}</DialogDescription></DialogHeader>
+    <Dialog open={Boolean(selectedItem)} onOpenChange={open => { if (!open && !busy) setSelected(null); }}><DialogContent className="creative-dialog"><DialogHeader><DialogTitle>{selectedItem?.title}</DialogTitle><DialogDescription>{selectedItem && `${name(selectedItem.employeeId)} · ${status(selectedItem)} · Due ${date(selectedItem.dueAt)}`}</DialogDescription></DialogHeader>
       {selectedItem && <WorkDetails key={selectedItem.id} item={selectedItem} isOwner={isOwner} busy={busy} error={error} act={act} onEdit={() => { setEditor({ id: selectedItem.id, item: selectedItem }); setSelected(null); }} />}
     </DialogContent></Dialog>
     {editor && <WorkEditor key={`${editor.id}-${editor.item?.version ?? 0}`} editor={editor} employees={employees} state={state} onClose={() => setEditor(null)} />}
@@ -108,7 +108,7 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit }: { item: Creati
       <div className="creative-actions"><Button disabled={busy} type="submit">{busy ? "Saving…" : ({ submit: "Send for review", approve: "Approve & add earnings", revise: "Send back for changes", pay: "Save payment record", cancel: "Cancel assignment", decline: "Decline offer" }[action])}</Button><Button disabled={busy} type="button" variant="outline" onClick={() => setAction("")}>Back</Button></div>
     </form>}
     {error && <p className="login-error" role="alert">{error}</p>}
-    <details className="creative-history"><summary>Activity history</summary>{[...item.history].reverse().map(entry => <p key={entry.id}>{name(entry.by)} · {entry.event}<small>{date(entry.at)} Eastern</small></p>)}</details>
+    <details className="creative-history"><summary>Activity history</summary>{[...item.history].reverse().map(entry => <p key={entry.id}>{name(entry.by)} · {entry.event}<small>{date(entry.at)}</small></p>)}</details>
   </div>;
 }
 
@@ -133,7 +133,7 @@ function WorkEditor({ editor, employees, state, onClose }: { editor: { id: strin
       <label>Assign to<select required disabled={Boolean(item)} value={employeeId} onChange={event => setEmployeeId(event.target.value)}>{activeEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>
       <label>Assignment title<Input required maxLength={160} value={title} onChange={event => setTitle(event.target.value)} placeholder="Edit a recap video, retouch a photo set…" /></label>
       <label>Brief & deliverables<Textarea required maxLength={8000} rows={5} value={instructions} onChange={event => setInstructions(event.target.value)} placeholder="What should they make? Include format, length, style, and what a finished submission needs." /></label>
-      <div className="creative-form-row"><label>Deadline · Eastern<Input required type="datetime-local" value={due} onChange={event => setDue(event.target.value)} /></label><label>Agreed pay (USD)<Input required inputMode="decimal" value={pay} onChange={event => setPay(event.target.value)} placeholder="0.00" /></label></div>
+      <div className="creative-form-row"><label>Deadline<Input required type="datetime-local" value={due} onChange={event => setDue(event.target.value)} /></label><label>Agreed pay (USD)<Input required inputMode="decimal" value={pay} onChange={event => setPay(event.target.value)} placeholder="0.00" /></label></div>
       <label>Reference links · optional, one per line<Textarea maxLength={20500} value={references} onChange={event => setReferences(event.target.value)} placeholder="https://…" /></label>
       <p className="creative-hint">The employee accepts, submits their work, and earns the agreed amount when you approve it.</p>
       {error && <p className="login-error" role="alert">{error}</p>}

@@ -42,7 +42,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
 
   return <>
     <div className="schedule-toolbar">
-      <p className="schedule-small">Visible to you and Smooth. All times are Eastern.</p>
+      <p className="schedule-small">Visible to you and Smooth.</p>
       {isOwner && <label className="schedule-filter">Team member<select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">Everyone</option>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
     </div>
     <div className="availability-columns">
@@ -57,7 +57,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
     <label className="availability-past-toggle"><input type="checkbox" checked={showPast} onChange={e => setShowPast(e.target.checked)} />Include past entries</label>
     <p className="schedule-small">No preference means no preference recorded. Existing assignments stay in place when availability changes; contact Smooth if you need an assignment changed.</p>
 
-    <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>{form.id ? "Edit work preference" : "When do you want to work?"}</DialogTitle><DialogDescription>Choose a day or specific hours. Times are Eastern. Smooth uses this when assigning work.</DialogDescription></DialogHeader>
+    <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>{form.id ? "Edit work preference" : "When do you want to work?"}</DialogTitle><DialogDescription>Choose a day or specific hours. Smooth uses this when assigning work.</DialogDescription></DialogHeader>
       <form onSubmit={async e => {
         e.preventDefault(); setFormError("");
         try {

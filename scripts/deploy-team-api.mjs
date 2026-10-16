@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { teamToken, tokenHash } from "../lib/team-auth.mjs";
@@ -69,3 +69,12 @@ for (let attempt = 0; attempt < 10; attempt++) {
 }
 if (!ready) throw new Error("The Worker was deployed but has not passed its readiness check. Run this deployment again before enabling scheduling.");
 process.stdout.write("Team scheduling API and push keys are ready. Existing push keys were preserved.\n");
+
+// Publish only the already-public RSA encryption key. Private imports can be
+// prepared without exposing their plaintext or the Worker decryption secret.
+const keyResponse = await fetch(`${TEAM_API_URL}/studio-reference/key`, { cache: "no-store", redirect: "error", signal: AbortSignal.timeout(10_000) });
+if (!keyResponse.ok) throw new Error("Could not read the secure import public key.");
+const { publicKey } = await keyResponse.json();
+if (publicKey?.kty !== "RSA" || typeof publicKey.n !== "string" || typeof publicKey.e !== "string") throw new Error("Invalid secure import public key.");
+await mkdir(path.join(root, "public/data"), { recursive: true });
+await writeFile(path.join(root, "public/data/secure-import-key.json"), JSON.stringify({ publicKey: { kty: "RSA", n: publicKey.n, e: publicKey.e, alg: "RSA-OAEP-256", key_ops: ["encrypt"], ext: true } }) + "\n");

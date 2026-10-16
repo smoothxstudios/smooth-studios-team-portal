@@ -42,7 +42,7 @@ export function EmployeeHome({ userId, schedule, loading, options, onBlockTime, 
     </section>}
 
     {(loading || upcoming.length > 0 || offers.length === 0) && <section className="panel employee-home-next" aria-labelledby="employee-next-heading">
-      <div className="employee-section-heading"><div><h2 id="employee-next-heading">Next assignments</h2><p>All times Eastern</p></div><Button variant="ghost" onClick={options.onSchedule}>View schedule <ArrowRight size={16} /></Button></div>
+      <div className="employee-section-heading"><div><h2 id="employee-next-heading">Next assignments</h2></div><Button variant="ghost" onClick={options.onSchedule}>View schedule <ArrowRight size={16} /></Button></div>
       {loading ? <p className="employee-empty" role="status">Checking your assignments…</p> : upcoming.length ? <div className="employee-work-list">{upcoming.slice(0, 3).map(item => {
         const category = item.appointmentId ? categorizeAppointment(item.title).label : "Assignment";
         return <details className="employee-work" key={item.id}>

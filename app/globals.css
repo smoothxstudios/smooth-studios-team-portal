@@ -1365,6 +1365,27 @@ button { cursor: pointer; }
 .owner-dashboard .dashboard-content { max-width: 1400px; }
 .owner-sync-status { color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
 .owner-overview { display: grid; gap: 24px; }
+.owner-finances { min-width: 0; }
+.owner-finance-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.owner-finance-card { padding: 22px 24px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); min-width: 0; }
+.owner-finance-card header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 14px; }
+.owner-finance-card h2 { font-size: 15px; font-weight: 650; }
+.owner-finance-card header > span { color: var(--muted-foreground); font-size: 12px; }
+.owner-finance-revenue { display: grid; gap: 5px; margin: 20px 0; }
+.owner-finance-revenue > span { font-size: 12px; color: var(--muted-foreground); }
+.owner-finance-revenue > strong { font-size: clamp(28px, 3vw, 38px); line-height: 1.2; letter-spacing: -.035em; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.owner-finance-deduction, .owner-finance-net { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 14px; }
+.owner-finance-deduction { padding-bottom: 16px; color: var(--muted-foreground); }
+.owner-finance-deduction small { display: block; font-size: 11px; margin-top: 3px; }
+.owner-finance-deduction strong, .owner-finance-net strong { font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.owner-finance-net { padding-top: 16px; border-top: 1px solid var(--border); }
+.owner-finance-net strong { color: #168653; font-size: 22px; letter-spacing: -.025em; }
+.dark .owner-finance-net strong { color: #57dca0; }
+.owner-finance-net.is-negative strong { color: #d33030; }
+.owner-finance-basis, .owner-finance-status { margin: 10px 0 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.6; }
+.owner-finance-shortcuts { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 8px; }
+.owner-finance-shortcuts button { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 0; font-size: 13px; text-align: left; }
+.owner-finance-shortcuts button:hover { color: var(--primary); }
 .owner-dashboard .panel { box-shadow: none; }
 .owner-dashboard .panel-heading { align-items: center; padding: 22px 24px 16px; }
 .owner-dashboard .panel-heading h2 { font-size: 18px; font-weight: 650; }
@@ -1475,6 +1496,8 @@ button { cursor: pointer; }
 @media (max-width: 767px) {
   .owner-overview { gap: 18px; }
   .owner-dashboard .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .owner-finance-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .owner-finance-card { padding: 18px; }
   .owner-dashboard .kpi-card { min-height: 137px; padding: 16px; }
   .owner-dashboard .kpi-heading { align-items: flex-start; font-size: 12px; }
   .owner-dashboard .kpi-icon { width: 24px; height: 24px; }
@@ -1482,7 +1505,6 @@ button { cursor: pointer; }
   .owner-dashboard .kpi-card strong { font-size: clamp(24px, 6vw, 30px); }
   .owner-dashboard .kpi-card p { font-size: 11px; }
   .owner-workspace { gap: 18px; }
-  .owner-workspace .owner-attention { grid-row: 1; }
   .owner-dashboard .panel-heading { padding: 18px 18px 12px; gap: 8px; }
   .owner-dashboard .panel-heading h2 { font-size: 17px; }
   .owner-dashboard .panel-heading > button { min-height: 44px; }
@@ -1518,7 +1540,7 @@ button { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) { .owner-reports-toggle svg { transition: none; } }
 
-/* Compact notification controls shared by Home and Schedule. */
+/* Notification controls in employee Settings and the owner schedule. */
 .notification-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
 .notification-summary > span { display: inline-flex; align-items: center; gap: 9px; font-weight: 650; }
 .notification-summary > small { color: var(--muted-foreground); text-align: right; }
@@ -1537,8 +1559,11 @@ button { cursor: pointer; }
 .login-account-switch:disabled { opacity: .5; }
 .login-preparing { text-align: center; color: var(--muted-foreground); padding: 24px 0; }
 .dashboard-settings { display: grid; gap: 24px; max-width: 1050px; min-width: 0; }
-.settings-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); height: auto; width: 100%; padding: 5px; gap: 5px; border-radius: 14px; }
+.settings-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; width: 100%; padding: 5px; gap: 5px; border-radius: 14px; }
 .settings-tabs [role=tab] { min-height: 48px; height: auto; gap: 8px; padding: 10px 12px; border-radius: 10px; white-space: normal; text-align: center; }
+.settings-tabs [role=tab][data-state=active] { background: #c90000; color: #fff; font-weight: 700; box-shadow: 0 2px 5px rgb(0 0 0 / 12%); }
+.settings-tabs [role=tab]:focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
+.studio-access-notice { color: var(--muted-foreground); font-size: 13px; line-height: 1.5; margin-top: -10px; }
 .settings-tabs [role=tab] svg { flex: 0 0 auto; }
 .settings-preferences { display: grid; gap: 20px; }
 .dashboard-settings [role=tabpanel][hidden] { display: none; }

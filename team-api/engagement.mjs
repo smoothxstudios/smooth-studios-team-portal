@@ -90,11 +90,11 @@ export async function offerQuestion(db, user, day, now) {
 async function employeeState(db, user, now) {
   const day = studioLocal(now).slice(0, 10);
   await offerQuestion(db, user, day, now);
-  const [state, attempts, offer, latest, stats, recent, rewards] = await Promise.all([
+  const [state, attempts, offer, latest, stats, recent] = await Promise.all([
     db.prepare("SELECT * FROM team_engagement_state WHERE user_id = ?").bind(user).first(),
     todayAttempts(db, user, day), pendingOffer(db, user, day),
     db.prepare("SELECT id, mood, created_at FROM team_mood_checkins WHERE user_id = ? AND reset_at IS NULL ORDER BY created_at DESC LIMIT 1").bind(user).first(),
-    summary(db, user), history(db, user), rewardHistory(db, user),
+    summary(db, user), history(db, user),
   ]);
   const available = Boolean(offer && !attempts.some(a => a.tier === offer.tier)), question = available ? publicQuestion(JSON.parse(offer.data)) : null;
   const quiz = attempts.map(attempt => ({ question: attempt.question, attempt }));
@@ -105,7 +105,7 @@ async function employeeState(db, user, now) {
     currentQuestionId: question?.id ?? attempts.at(-1)?.question.id ?? null,
     answeredToday: attempts.length,
     nextQuestionAt: !available && attempts.length > 0 && attempts.length < 3 ? Math.min(Date.parse(attempts.at(-1).createdAt) + QUIZ_INTERVAL_MS, Date.parse(localInstant(addLocalDays(`${day}T00:00`, 1)))) : null,
-    quiz, summary: stats, history: recent, rewards };
+    quiz, summary: stats, history: recent, rewards: [] };
 }
 async function teamState(db, env, now) {
   const day = studioLocal(now).slice(0, 10), active = JSON.parse(env.TEAM_TOKEN_HASHES);
