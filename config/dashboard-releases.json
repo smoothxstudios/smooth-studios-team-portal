@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.16.0",
+  "currentVersion": "2.16.1",
   "releases": [
+    {
+      "id": "2026-10-16-deployment-retries",
+      "version": "2.16.1",
+      "date": "2026-10-16",
+      "category": "Maintenance",
+      "title": "Reliable deployment retries",
+      "changes": [
+        "Backend deployment retries use a distinct Pages artifact for each attempt, preventing an earlier artifact from blocking the final publishing step.",
+        "The private studio reference import was verified with 28 information cards and 22 rental checklist items. Repeated imports preserve owner edits."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-16-studio-work-tools",
       "version": "2.16.0",

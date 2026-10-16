@@ -81,6 +81,7 @@ jobs:
           GITHUB_PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
       - uses: actions/upload-pages-artifact@v3
         with:
+          name: team-pages-${{ github.run_attempt }}
           path: out
 
   deploy-pages:
@@ -92,3 +93,5 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: team-pages-${{ github.run_attempt }}
