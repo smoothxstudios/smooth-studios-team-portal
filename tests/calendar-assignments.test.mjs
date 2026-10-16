@@ -19,7 +19,7 @@ test("team notes preserve booking text exactly and distinguish an offer from acc
   assert.equal((offer.match(/Jordyn/g) ?? []).length, 1);
   assert.match(offer, /Awaiting app response/);
   const accepted = rentalTeamDescription(offer, [{ ...pending, status: "accepted" }]);
-  assert.match(accepted, /✓ Jordyn — Accepted in app/);
+  assert.match(accepted, /✅ Jordyn — Accepted in app/);
   assert.doesNotMatch(accepted, /Awaiting app response/);
   assert.equal(rentalTeamDescription(accepted, [{ ...pending, status: "cancelled" }]), original);
   assert.equal(rentalTeamDescription(offer, [{ ...pending, status: "declined" }]), original);
@@ -30,7 +30,7 @@ test("previous appended notes move to the top without changing booking whitespac
   const legacy = `${booking}\n\n[Smooth Studios rental team]\nJordyn — Accepted\n[/Smooth Studios rental team]`;
   const accepted = [{ ...pending, status: "accepted" }];
   const updated = rentalTeamDescription(legacy, accepted);
-  assert.ok(updated.startsWith("[Smooth Studios rental team]\n✓ Jordyn — Accepted in app"));
+  assert.ok(updated.startsWith("[Smooth Studios rental team]\n✅ Jordyn — Accepted in app"));
   assert.ok(updated.endsWith(booking));
   assert.equal((updated.match(/\[Smooth Studios rental team\]/g) ?? []).length, 1);
   assert.equal(rentalTeamDescription(updated, accepted), updated, "repeated sync does not add whitespace");

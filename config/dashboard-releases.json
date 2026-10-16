@@ -1,6 +1,21 @@
 {
-  "currentVersion": "2.14.3",
+  "currentVersion": "2.15.0",
   "releases": [
+    {
+      "id": "2026-10-16-full-team-calendar",
+      "version": "2.15.0",
+      "date": "2026-10-16",
+      "category": "Team",
+      "title": "A full calendar for the team schedule",
+      "changes": [
+        "The owner schedule opens to a full month with weekdays in fixed columns. Tap a date for its hourly schedule, or switch to Week to see bookings positioned by time.",
+        "Overlapping bookings appear side by side. Tap an event to see employee confirmations, instructions, and assignment controls. List remains available for a 30-day overview.",
+        "Availability can be shown on the calendar alongside bookings. Employee and staffing filters work across the calendar and list views.",
+        "Google Calendar rental descriptions begin with the team verification. Accepted app responses use a green check emoji; pending offers remain clearly pending.",
+        "Publishing changes to the Calendar verification format triggers a sync so existing rental descriptions receive the update."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-16-calendar-confirmation-checks",
       "version": "2.14.3",

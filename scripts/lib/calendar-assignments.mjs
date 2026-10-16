@@ -18,7 +18,7 @@ export function rentalTeamDescription(description, assignments) {
     const matches = assignments.filter(a => a.employeeId === person.id && ["pending", "accepted"].includes(a.status));
     if (!matches.length) return [];
     return [matches.some(a => a.status === "accepted")
-      ? `✓ ${person.name} — Accepted in app`
+      ? `✅ ${person.name} — Accepted in app`
       : `○ ${person.name} — Awaiting app response`];
   });
   if (!people.length) return otherNotes;

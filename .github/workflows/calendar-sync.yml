@@ -1,6 +1,11 @@
 name: Sync Smooth Studios Calendar
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/lib/calendar-assignments.mjs"
+      - ".github/workflows/calendar-sync.yml"
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
