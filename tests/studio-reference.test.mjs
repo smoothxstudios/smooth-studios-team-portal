@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fixture } from "./helpers/notification-fixture.mjs";
 import worker from "../team-api/worker.mjs";
+import { readFileSync } from "node:fs";
+import { studioInfoEntries } from "../lib/studio-reference.mjs";
 
 const content = () => ({ entries: [
   { id: "door", category: "Access", label: "Door", value: "synthetic-code-only", note: "Team only", kind: "secret" },
@@ -94,5 +96,31 @@ test("accepted app assignments grant checklist access only for the current appoi
   offer.status = "pending";
   f.DB.sqlite.prepare("UPDATE team_assignments SET data = ? WHERE id = ?").run(JSON.stringify(offer), offer.id);
   assert.equal((await f.call("amia", "/rental-checklists")).data.rentals.length, 0);
+  f.close();
+});
+
+test("reference cleanup preserves contacts, access, Wi-Fi and every generic checklist step", async () => {
+  const f = await setup();
+  const legacy = content();
+  legacy.entries[0].category = "Access & Wi-Fi";
+  legacy.entries.push({ ...legacy.entries[0], id: "wifi", label: "Studio Wi-Fi password" });
+  legacy.entries.push({ id: "price", category: "Pricing", label: "Rental price", value: "synthetic-price", kind: "text", note: "" });
+  legacy.entries.push({ id: "equipment", category: "Equipment", label: "Equipment", value: "synthetic-detail", kind: "text", note: "" });
+  f.DB.sqlite.prepare("UPDATE studio_reference SET data = ?, revision = 4, imported_id = 'prior-import' WHERE id = 1").run(JSON.stringify(legacy));
+  const sql = readFileSync(new URL("../team-api/migrations/0013_studio_info_categories.sql", import.meta.url), "utf8");
+  f.DB.sqlite.exec(sql);
+  const row = f.DB.sqlite.prepare("SELECT * FROM studio_reference WHERE id = 1").get();
+  const retained = JSON.parse(row.data);
+  assert.deepEqual(retained.entries, studioInfoEntries(legacy.entries));
+  assert.deepEqual(retained.entries.map(item => item.category), ["Access", "Contacts", "Wi-Fi"]);
+  assert.deepEqual(retained.entries.map(item => item.value), legacy.entries.slice(0, 3).map(item => item.value));
+  assert.deepEqual(retained.checklist, legacy.checklist);
+  assert.equal(row.revision, 5); assert.equal(row.imported_id, "prior-import");
+  // A stale editor cannot restore the retired sections or overwrite the migrated data.
+  assert.equal((await f.call("owner", "/studio-reference", { ...legacy, revision: 4 }, "PATCH")).status, 409);
+  assert.equal((await f.call("owner", "/studio-reference", { ...legacy, revision: 5 }, "PATCH")).status, 200);
+  const teamView = (await f.call("amia", "/studio-reference")).data;
+  assert.deepEqual(teamView.entries, retained.entries);
+  assert.deepEqual(teamView.checklist, legacy.checklist);
   f.close();
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -37,12 +37,11 @@ import {
   LockKeyhole,
   LogOut,
   Menu,
-  Moon,
   ReceiptText,
   RefreshCw,
   Search,
+  Settings,
   ShieldCheck,
-  Sun,
   TriangleAlert,
   Users,
   WalletCards,
@@ -82,7 +81,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -102,11 +100,10 @@ import { TeamAccountSetup, type NewTeamSettings } from "@/components/team-accoun
 import { TEAM, studioLocal } from "@/lib/team-schedule.mjs";
 import { employeeEarningsForYear } from "@/lib/employee-home.mjs";
 import { TeamSchedulingPage } from "@/components/team-scheduling";
-import { StudioInfoPage } from "@/components/studio-info";
+import { DashboardSettings, type SettingsTab } from "@/components/dashboard-settings";
 import { CreativeWorkPage, CreativeWorkPreview } from "@/components/creative-work";
 import { useCreativeWork, type CreativeAssignment } from "@/lib/use-creative-work";
 import { creativeEarnings, creativeEarningDate } from "@/lib/creative-work.mjs";
-import { QuickSignInSettings } from "@/components/quick-sign-in-settings";
 import { rememberProfile, rememberedProfile, quickSignInRecord, quickSignInPassword, quickSignInError } from "@/lib/quick-sign-in.mjs";
 import { EmployeeEngagementBar, EmployeeEngagementProvider, SmoothStarSidebar, TeamEngagementReview } from "@/components/team-engagement";
 import { DashboardVersionFooter } from "@/components/dashboard-version-footer";
@@ -130,14 +127,14 @@ const STUDIO_TIME_ZONE = "America/New_York";
 const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 
-type ViewKey = "overview" | "rentals" | "team" | "payouts" | "guide" | "scheduling" | "availability" | "creative" | "studio";
+type ViewKey = "overview" | "rentals" | "team" | "payouts" | "guide" | "scheduling" | "availability" | "creative" | "settings";
 type RentalState = "upcoming" | "earned" | "paid" | "awaiting";
 type CustomerPaymentState = "paid" | "deposit" | "review" | "pending";
 type AppointmentStatus = RentalState | "customer-paid" | "upcoming-paid" | "deposit" | "review";
 type PaymentFilter = "all" | CustomerPaymentState;
 
 const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ownerOnly?: boolean }[] = [
-  { key: "overview", label: "Overview", icon: LayoutDashboard },
+  { key: "overview", label: "Home", icon: LayoutDashboard },
   { key: "scheduling", label: "Team Schedule", icon: CalendarDays },
   { key: "availability", label: "Availability", icon: CalendarCheck },
   { key: "creative", label: "Creative Work", icon: ClipboardList },
@@ -145,7 +142,7 @@ const NAV_ITEMS: { key: ViewKey; label: string; icon: typeof LayoutDashboard; ow
   { key: "team", label: "Team", icon: Users, ownerOnly: true },
   { key: "payouts", label: "Payouts", icon: WalletCards },
   { key: "guide", label: "Studio Guidelines", icon: BookOpen },
-  { key: "studio", label: "Studio Info", icon: ClipboardList },
+  { key: "settings", label: "Settings", icon: Settings },
 ];
 const EMPLOYEE_NAV_ITEMS = NAV_ITEMS.filter(item => !item.ownerOnly && item.key !== "rentals").map(item => ({
   ...item, label: item.key === "overview" ? "Home" : item.key === "scheduling" ? "Schedule" : item.key === "payouts" ? "Earnings" : item.label,
@@ -312,25 +309,25 @@ function Logo({ compact = false }: { compact?: boolean }) {
 }
 
 function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[]; onUnlock: (profile: AccessProfile, password: string) => Promise<void> }) {
-  const [selectedId, setSelectedId] = useState(profiles[0]?.id ?? "owner");
+  const [selection, setSelection] = useState<{ id: string; quickReady: boolean } | null>(null);
+  const [usePassword, setUsePassword] = useState(false);
+  const selectedId = selection?.id ?? profiles[0]?.id ?? "owner";
+  const quickReady = selection?.quickReady ?? false;
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [quickReady, setQuickReady] = useState(false);
-  const selectedByUser = useRef(false);
   const profile = profiles.find(item => item.id === selectedId);
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const saved = rememberedProfile();
-      if (!selectedByUser.current && saved && profiles.some(item => item.id === saved)) setSelectedId(saved);
+      setSelection(current => {
+        const saved = current?.id ?? rememberedProfile();
+        const id = saved && profiles.some(item => item.id === saved) ? saved : profiles[0]?.id ?? "owner";
+        return { id, quickReady: Boolean(quickSignInRecord(id)) };
+      });
     }, 0);
     return () => window.clearTimeout(timer);
   }, [profiles]);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setQuickReady(Boolean(quickSignInRecord(selectedId))), 0);
-    return () => window.clearTimeout(timer);
-  }, [selectedId]);
   const quickUnlock = async () => {
     if (!profile) return;
     setLoading(true); setError("");
@@ -366,15 +363,18 @@ function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[]; onUnlo
           <p className="eyebrow">Team portal</p>
           <h1>Sign in</h1>
         </div>
-        {quickReady && <div className="quick-login"><Button disabled={loading} onClick={quickUnlock}><Fingerprint size={20} />{loading ? "Opening…" : `Continue as ${profile?.label ?? selectedId}`}</Button><p>Face ID, fingerprint, or device PIN</p></div>}
-        <form onSubmit={submit}>
+        {!selection ? <p className="login-preparing" role="status">Preparing sign-in…</p> : quickReady && !usePassword ? <><div className="quick-login"><Button disabled={loading} onClick={quickUnlock}><Fingerprint size={20} />{loading ? "Opening…" : `Continue as ${profile?.label ?? selectedId}`}</Button><p>Face ID, fingerprint, or device PIN</p></div>
+          {error && <p className="login-error" role="alert">{error}</p>}
+          <button className="login-account-switch" disabled={loading} onClick={() => { setUsePassword(true); setPassword(""); setShowPassword(false); setError(""); }}>Sign in to another account</button>
+        </> : <form onSubmit={submit}>
           <input type="hidden" name="username" autoComplete="username" value={selectedId === "owner" ? "smooth" : selectedId} />
-          <label className="select-label" htmlFor="dashboard-profile">Dashboard</label>
+          <label className="select-label" htmlFor="dashboard-profile">Account</label>
           <div className="select-field">
             <Users aria-hidden="true" size={17} />
             <select
               id="dashboard-profile"
-              onChange={(event) => { selectedByUser.current = true; setSelectedId(event.target.value); setPassword(""); setError(""); }}
+              disabled={loading}
+              onChange={(event) => { const id = event.target.value; setSelection({ id, quickReady: Boolean(quickSignInRecord(id)) }); setPassword(""); setShowPassword(false); setError(""); }}
               value={selectedId}
             >
               {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.label}</option>)}
@@ -401,15 +401,12 @@ function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[]; onUnlo
             <Button className="unlock-button" disabled={!password || loading} size="lg" type="submit">
               {loading ? "Signing in…" : "Sign in"}<ArrowRight size={17} />
             </Button>
-        </form>
+          {quickReady && <button type="button" className="login-account-switch" disabled={loading} onClick={() => { setUsePassword(false); setPassword(""); setError(""); }}>Use quick sign-in</button>}
+        </form>}
         <DashboardVersionFooter compact />
       </div>
     </main>
   );
-}
-
-function ThemeControl({ dark, onChange }: { dark: boolean; onChange: (dark: boolean) => void }) {
-  return <div className="theme-control"><Sun size={15} /><Switch aria-label="Use dark theme" checked={dark} onCheckedChange={onChange} /><Moon size={15} /></div>;
 }
 
 function KpiCard({ label, value, note, icon: Icon, tone }: { label: string; value: string; note: string; icon: typeof Banknote; tone: "red" | "green" | "blue" | "amber" }) {
@@ -1023,9 +1020,8 @@ function StripeMatchForm({
 
 function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; sessionPassword: string; schedulingToken: string }) {
   const [view, setView] = useState<ViewKey>("overview");
-  const [studioTab, setStudioTab] = useState<"reference" | "checklists">("reference");
-  const [checklistRentalId, setChecklistRentalId] = useState("");
-  const openChecklist = (id?: string) => { setChecklistRentalId(id ?? ""); setStudioTab("checklists"); setView("studio"); };
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("preferences");
+  const openChecklist = () => { setSettingsTab("checklists"); setView("settings"); };
   const creative = useCreativeWork(schedulingToken);
   const creativeTotals = useMemo(() => creativeEarnings(creative.items), [creative.items]);
   const currentYear = Number(studioLocal(Date.now()).slice(0, 4));
@@ -1205,12 +1201,10 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
         <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact />{isOwner && <span className={`calendar-dot ${payload.source === "sample" ? "preview" : ""}`}><span /> {payload.source === "sample" ? "Preview data loaded" : stripeConnected ? "Calendar + Stripe connected" : "Calendar connected"}</span>}</SidebarHeader>
         <SidebarContent>
-          <SidebarGroup><SidebarGroupContent><DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={next => { if (next === "studio") { setStudioTab("reference"); setChecklistRentalId(""); } setView(next); }} /></SidebarGroupContent></SidebarGroup>
+          <SidebarGroup><SidebarGroupContent><DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={next => { if (next === "settings") setSettingsTab("preferences"); setView(next); }} /></SidebarGroupContent></SidebarGroup>
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
           {!isOwner && <SmoothStarSidebar />}
-          <QuickSignInSettings profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} />
-          <ThemeControl dark={dark} onChange={setDark} />
           <div className="sidebar-user"><span className="user-avatar" style={{ background: teamAccent(payload.user.id, payload.user.accent) }}>{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" onClick={onLogout}><LogOut size={16} /></button></div>
         </SidebarFooter>
       </Sidebar>
@@ -1225,7 +1219,7 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Creative work totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "overview" && <CreativeWorkPreview state={creative} isOwner={isOwner} onOpen={() => setView("creative")} />}
-          {view === "studio" && <StudioInfoPage key={`${studioTab}-${checklistRentalId}`} token={schedulingToken} isOwner={isOwner} initialTab={studioTab} initialRentalId={checklistRentalId} />}
+          {view === "settings" && <DashboardSettings key={settingsTab} token={schedulingToken} profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} dark={dark} onThemeChange={setDark} initialTab={settingsTab} />}
           {view === "creative" && <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} />}
           {view === "overview" && !isOwner && <TeamSchedulingPage onChecklist={openChecklist} token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide"), onChecklist: openChecklist }} />}
           {view === "overview" && isOwner && (
@@ -1371,6 +1365,8 @@ export function SmoothDashboard() {
     setSchedulingToken(await teamToken(password, profile.id));
     setSessionPassword(password);
     rememberProfile(profile.id);
+    // A fresh sign-in always starts at Home; notification links still navigate an open session.
+    window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
     setPayload(unlocked);
   };
 

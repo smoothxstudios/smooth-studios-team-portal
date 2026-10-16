@@ -39,7 +39,7 @@ function Confirmation({ person }: { person: WorkEntry["confirmations"][number] }
 export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, onAssign, onAvailability, onRefresh, busy, renderAssignment, onChecklist }: {
   schedule: TeamSchedule; employeeId: string; onEmployeeChange: (id: string) => void;
   onAssign: (appointmentId?: string) => void; onAvailability: () => void; onRefresh: () => void;
-  onChecklist?: (id?: string) => void; busy: boolean; renderAssignment: (item: TeamAssignment) => ReactNode;
+  onChecklist?: () => void; busy: boolean; renderAssignment: (item: TeamAssignment) => ReactNode;
 }) {
   const [now, setNow] = useState(Date.now);
   const [selectedDay, setSelectedDay] = useState(() => studioLocal(now).slice(0, 10));
@@ -98,7 +98,7 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
         {conflicts.length > 0 && <div className="agenda-conflict"><AlertTriangle size={15} aria-hidden="true" />Time conflict · {conflicts.map(offer => name(offer.employeeId)).join(", ")}</div>}
       </div>
       <div className="agenda-work-actions">
-        {onChecklist && item.appointment && /studio.*rental|rental.*studio/i.test(item.title) && <Button variant="outline" onClick={() => { setFocused(null); onChecklist(item.appointment!.id); }}>Rental checklist</Button>}
+        {onChecklist && item.appointment && /studio.*rental|rental.*studio/i.test(item.title) && <Button variant="outline" onClick={() => { setFocused(null); onChecklist(); }}>Rental checklist</Button>}
         {item.appointment && Date.parse(item.start) > now && <Button disabled={busy} variant={item.status === "unassigned" ? "default" : "outline"} onClick={() => assign(item.appointment!.id)}><Plus size={15} />{item.status === "unassigned" ? "Assign person" : "Add person"}</Button>}
         <details className="agenda-details" open={expanded || undefined}>
           <summary>Details{live.length > 0 ? ` & offers (${live.length})` : ""}<ChevronDown size={16} aria-hidden="true" /></summary>

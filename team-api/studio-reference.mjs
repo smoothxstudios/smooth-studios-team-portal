@@ -1,4 +1,5 @@
 import { tokenHash, unbase64url } from "../lib/team-auth.mjs";
+import { studioInfoEntries } from "../lib/studio-reference.mjs";
 
 const isRental = appointment => /studio.*rental|rental.*studio/i.test(appointment.title);
 export async function studioReferenceRoute({ request, db, user, env, body, fail }) {
@@ -24,9 +25,9 @@ export async function studioReferenceRoute({ request, db, user, env, body, fail 
       return { id: text(item.id, 80), phase: text(item.phase, 80), label: text(item.label, 500) };
     });
     if (new Set(entries.map(item => item.id)).size !== entries.length || new Set(checklist.map(item => item.id)).size !== checklist.length) fail(400, "Each item needs a unique ID.");
-    return { entries, checklist };
+    return { entries: studioInfoEntries(entries), checklist };
   };
-  if (url.pathname === "/studio-reference" && request.method === "GET") return { ...reference, revision: row.revision, updatedAt: row.updated_at };
+  if (url.pathname === "/studio-reference" && request.method === "GET") return { ...reference, entries: studioInfoEntries(reference.entries), revision: row.revision, updatedAt: row.updated_at };
   if (url.pathname === "/sync/studio-reference" && request.method === "POST") {
     if (user !== "sync") fail(403, "This import is reserved for the deployment workflow.");
     const input = await body(request);

@@ -1,6 +1,31 @@
 {
-  "currentVersion": "2.16.1",
+  "currentVersion": "2.17.0",
   "releases": [
+    {
+      "id": "2026-10-16-settings-and-simple-sign-in",
+      "version": "2.17.0",
+      "date": "2026-10-16",
+      "category": "Interface",
+      "title": "Settings and a simpler sign-in",
+      "changes": [
+        "Face ID and quick sign-in show one focused sign-in screen. “Sign in to another account” opens the account and password form when needed.",
+        "Every successful sign-in opens Home. Notification links still navigate an already-open session.",
+        "Settings brings together Quick sign-in, appearance, Studio Info, and the rental checklist, simplifying the sidebar.",
+        "Studio Info contains only Contacts, Access, and Wi-Fi, with existing codes and numbers preserved.",
+        "The studio rental checklist is a reusable list for any rental, with a reset button for the next one. Checks stay in the current tab; choosing a booking is no longer required."
+      ],
+      "employee": {
+        "title": "A cleaner sign-in and Settings",
+        "changes": [
+          "Face ID and quick sign-in show one focused sign-in screen. “Sign in to another account” opens the account and password form when needed.",
+          "Every successful sign-in opens Home. Notification links still navigate an already-open session.",
+          "Settings brings together Quick sign-in, appearance, Studio Info, and the rental checklist, simplifying the sidebar.",
+          "Studio Info contains only Contacts, Access, and Wi-Fi, with existing codes and numbers preserved.",
+          "The studio rental checklist is a reusable list for any rental, with a reset button for the next one. Checks stay in the current tab; choosing a booking is no longer required."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-deployment-retries",
       "version": "2.16.1",
