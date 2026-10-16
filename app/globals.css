@@ -1080,3 +1080,160 @@ button { cursor: pointer; }
 .team-account-fields input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--card); color: var(--foreground); font-size: 16px; }
 .team-setup-action { margin: 12px 20px 20px; min-height: 44px; max-width: calc(100% - 40px); white-space: normal; }
 .team-account-password { margin: 12px 20px; overflow-wrap: anywhere; font-family: monospace; }
+
+/* Owner workspace: a short overview, with detailed reports available on demand. */
+.owner-dashboard .dashboard-content { max-width: 1400px; }
+.owner-sync-status { color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
+.owner-overview { display: grid; gap: 24px; }
+.owner-dashboard .panel { box-shadow: none; }
+.owner-dashboard .panel-heading { align-items: center; padding: 22px 24px 16px; }
+.owner-dashboard .panel-heading h2 { font-size: 18px; font-weight: 650; }
+.owner-dashboard .panel-heading p:not(.eyebrow) { margin: 5px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.owner-dashboard .panel-heading > button { min-height: 40px; gap: 5px; font-size: 12px; }
+.owner-dashboard .kpi-card { min-height: 145px; padding: 20px; border-top: 1px solid var(--border); border-radius: 16px; box-shadow: none; }
+.owner-dashboard .kpi-card::after { display: none; }
+.owner-dashboard .kpi-heading { font-size: 13px; font-weight: 500; }
+.owner-dashboard .kpi-card strong { margin-top: 12px; font-size: clamp(26px, 2.6vw, 34px); font-weight: 650; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
+.owner-dashboard .kpi-card p { font-size: 12px; line-height: 1.5; }
+.owner-dashboard .kpi-icon { width: 30px; height: 30px; border-radius: 9px; }
+.owner-workspace { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); align-items: start; gap: 24px; }
+.owner-workspace > * { min-width: 0; }
+.owner-upcoming-list { margin: 0; padding: 0 24px 8px; list-style: none; }
+.owner-upcoming-list > li { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 16px 0; border-top: 1px solid var(--border); }
+.owner-date-block { display: grid; justify-items: center; align-content: center; width: 48px; min-height: 56px; border: 1px solid var(--border); border-radius: 12px; background: var(--muted); }
+.owner-date-block span { color: var(--muted-foreground); font-size: 10px; line-height: 1.4; text-transform: uppercase; letter-spacing: .06em; }
+.owner-date-block strong { font-size: 22px; line-height: 1.25; font-weight: 650; }
+.owner-appointment-copy { min-width: 0; }
+.owner-appointment-copy strong, .owner-appointment-time strong { display: block; font-size: 14px; line-height: 1.45; font-weight: 650; }
+.owner-appointment-copy span, .owner-appointment-time span { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.owner-appointment-copy strong, .owner-appointment-copy span { overflow-wrap: anywhere; }
+.owner-appointment-time { text-align: right; white-space: nowrap; }
+.owner-appointment-time strong { font-size: 12px; font-weight: 500; }
+.owner-attention-list { padding: 0 24px 8px; }
+.owner-attention-item { display: grid; grid-template-columns: 38px minmax(0, 1fr) 17px; align-items: center; gap: 12px; width: 100%; min-height: 90px; padding: 18px 0; border-top: 1px solid var(--border); text-align: left; cursor: pointer; }
+.owner-attention-item:hover strong, .owner-panel-link:hover { color: var(--primary); }
+.owner-attention-item > svg { color: var(--muted-foreground); }
+.owner-action-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; color: #b97812; background: rgba(239,170,32,.12); }
+.owner-attention-item strong { display: block; font-size: 14px; line-height: 1.45; font-weight: 600; }
+.owner-attention-item small { display: block; margin-top: 5px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.owner-attention-empty { display: grid; justify-items: start; gap: 10px; padding: 12px 0 24px; }
+.owner-attention-empty > span { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; color: #1f9d63; background: rgba(31,157,99,.1); }
+.owner-attention-empty strong { font-size: 14px; font-weight: 600; }
+.owner-attention-empty p { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
+.owner-panel-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 54px; padding: 16px 24px; border-top: 1px solid var(--border); color: var(--foreground); text-align: left; font-size: 13px; font-weight: 500; cursor: pointer; }
+.owner-reports { min-width: 0; }
+.owner-reports > summary { display: flex; align-items: center; gap: 16px; padding: 22px 24px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); list-style: none; cursor: pointer; }
+.owner-reports > summary::-webkit-details-marker { display: none; }
+.owner-reports-icon { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; background: var(--muted); color: var(--muted-foreground); }
+.owner-reports-copy { flex: 1; min-width: 0; }
+.owner-reports-copy strong { display: block; font-size: 15px; font-weight: 600; }
+.owner-reports-copy small { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.owner-reports-toggle { display: flex; align-items: center; gap: 10px; color: var(--muted-foreground); font-size: 12px; }
+.owner-reports-toggle svg { flex-shrink: 0; transition: transform .18s ease; }
+.owner-reports .reports-hide, .owner-reports[open] .reports-show { display: none; }
+.owner-reports[open] .reports-hide { display: inline; }
+.owner-reports[open] .owner-reports-toggle svg { transform: rotate(180deg); }
+.owner-reports-content { display: grid; gap: 20px; padding-top: 20px; }
+.owner-reports-content > * { min-width: 0; margin-top: 0; }
+.owner-reports .period-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); box-shadow: none; }
+.owner-reports .period-strip-title { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--border); }
+.owner-reports .period-strip-title strong { font-size: 14px; }
+.owner-reports .period-strip-title span, .owner-reports .period-total > span, .owner-reports .period-total small, .owner-reports .period-total em { font-size: 12px; line-height: 1.5; }
+.owner-reports .period-total { padding: 20px 24px; }
+.owner-reports .period-total > span { font-weight: 500; text-transform: none; letter-spacing: 0; }
+.owner-reports .period-total strong { margin-top: 8px; font-size: 26px; }
+.owner-reports .chart-legend { display: flex; flex-wrap: wrap; font-size: 12px; }
+.owner-reports .legend-dark { background: var(--muted-foreground); }
+.owner-reports .category-revenue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; padding: 0 24px 12px; }
+.owner-reports .category-revenue-card { padding: 16px 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; }
+.owner-reports .category-revenue-card strong { font-size: 13px; white-space: normal; }
+.owner-reports .category-revenue-card small, .owner-reports .category-revenue-note, .owner-reports .stripe-connected { font-size: 12px; }
+.owner-reports .stripe-flow-grid article { display: block; padding: 20px; }
+.owner-reports .stripe-flow-item-icon { display: none; }
+.owner-reports .stripe-flow-grid article > div > span { font-size: 12px; font-weight: 500; }
+.owner-reports .stripe-flow-grid article strong { font-size: 21px; margin-top: 8px; overflow-wrap: anywhere; }
+.owner-reports .stripe-flow-grid article small { font-size: 11px; line-height: 1.5; }
+.owner-reports .stripe-unmatched-heading strong, .owner-reports .stripe-unmatched-list strong, .owner-reports .stripe-unmatched-list b { font-size: 13px; }
+.owner-reports .stripe-unmatched-heading small, .owner-reports .stripe-unmatched-list small { font-size: 12px; line-height: 1.5; }
+.owner-reports .stripe-unmatched-heading [data-slot="button"] { min-height: 40px; font-size: 12px; }
+.owner-reports .stripe-unmatched-list { grid-template-columns: 1fr; }
+.owner-team-tabs { gap: 22px; }
+.owner-team-tabs > [data-slot="tabs-list"] { min-height: 46px; padding: 4px; border: 1px solid var(--border); background: var(--card); }
+.owner-team-tabs [data-slot="tabs-trigger"] { min-height: 36px; padding: 7px 18px; font-size: 13px; }
+.owner-team-tabs [data-slot="tabs-trigger"][data-state="active"] { color: var(--foreground); background: var(--muted); box-shadow: none; }
+.owner-team-tabs .team-engagement-review { margin-top: 0; }
+.owner-dashboard .team-page-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px; }
+.owner-dashboard .employee-card { padding: 22px; }
+.owner-dashboard .employee-card-head { grid-template-columns: 42px minmax(0,1fr); }
+.owner-dashboard .employee-card-head .status { grid-column: 2; justify-self: start; }
+.owner-dashboard .employee-avatar.large { width: 42px; height: 42px; border-radius: 12px; box-shadow: none; }
+.owner-dashboard .employee-card-head p { font-size: 12px; overflow-wrap: anywhere; }
+.owner-dashboard .employee-stats { background: transparent; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); border-radius: 0; }
+.owner-dashboard .employee-stats div { padding: 16px 8px; background: transparent; }
+.owner-dashboard .employee-stats span { font-size: 11px; line-height: 1.5; text-transform: none; }
+.owner-dashboard .employee-next { font-size: 12px; grid-template-columns: 18px minmax(0,1fr); }
+.owner-dashboard .employee-next strong { grid-column: 2; }
+.owner-dashboard .team-setup-action { min-height: 40px; font-size: 12px; }
+.owner-dashboard .page-heading > [data-slot="button"] { padding: 9px 13px; border: 1px solid var(--border); border-radius: 10px; color: var(--foreground); background: var(--card); }
+.owner-appointment-filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 0 24px 20px; }
+.owner-appointment-filters .category-select { width: 220px; min-height: 42px; border-radius: 10px; font-size: 13px; }
+.owner-appointment-filters > button { min-height: 42px; }
+.owner-dashboard .rental-table th { height: 44px; font-size: 10px; }
+.owner-dashboard .rental-name strong, .owner-dashboard .rental-date strong, .owner-dashboard .money-cell, .owner-dashboard .payment-amount strong { font-size: 13px; }
+.owner-dashboard .rental-name span, .owner-dashboard .rental-date span, .owner-dashboard .payment-detail, .owner-dashboard .category-badge, .owner-dashboard .status { font-size: 11px; }
+.owner-dashboard .mark-paid-card { padding: 24px; }
+.owner-dashboard .mark-paid-card h2 { margin: 0 0 10px; font-size: 19px; }
+.owner-dashboard .mark-paid-card > p:not(.eyebrow), .owner-dashboard .workflow-scope { font-size: 13px; }
+.owner-dashboard .mark-paid-card label { margin-bottom: 8px; font-size: 13px; }
+.owner-dashboard .payout-control input, .owner-dashboard .payout-employee-select { font-size: 14px; }
+.owner-attention-item:focus-visible, .owner-panel-link:focus-visible, .owner-reports > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: 10px; }
+@media (max-width: 1180px) {
+  .owner-workspace { grid-template-columns: minmax(0, 1fr); }
+  .owner-dashboard .owner-sync-status { display: none; }
+  .owner-reports .stripe-flow-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .owner-overview { gap: 18px; }
+  .owner-dashboard .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .owner-dashboard .kpi-card { min-height: 137px; padding: 16px; }
+  .owner-dashboard .kpi-heading { align-items: flex-start; font-size: 12px; }
+  .owner-dashboard .kpi-icon { width: 24px; height: 24px; }
+  .owner-dashboard .kpi-icon svg { width: 15px; height: 15px; }
+  .owner-dashboard .kpi-card strong { font-size: clamp(24px, 6vw, 30px); }
+  .owner-dashboard .kpi-card p { font-size: 11px; }
+  .owner-workspace { gap: 18px; }
+  .owner-workspace .owner-attention { grid-row: 1; }
+  .owner-dashboard .panel-heading { padding: 18px 18px 12px; gap: 8px; }
+  .owner-dashboard .panel-heading h2 { font-size: 17px; }
+  .owner-dashboard .panel-heading > button { min-height: 44px; }
+  .owner-upcoming-list { padding: 0 18px 4px; }
+  .owner-upcoming-list > li { grid-template-columns: 42px minmax(0, 1fr); gap: 4px 12px; padding: 16px 0; }
+  .owner-date-block { grid-row: span 2; align-self: start; width: 42px; min-height: 52px; }
+  .owner-appointment-time { grid-column: 2; display: flex; gap: 9px; text-align: left; }
+  .owner-appointment-time strong { font-size: 12px; }
+  .owner-appointment-time span { margin: 0; }
+  .owner-attention-list { padding: 0 18px 6px; }
+  .owner-attention-item { gap: 10px; grid-template-columns: 34px minmax(0, 1fr) 16px; }
+  .owner-action-icon { width: 34px; height: 34px; }
+  .owner-attention-item strong { font-size: 13px; }
+  .owner-panel-link { padding: 16px 18px; }
+  .owner-reports > summary { padding: 18px; gap: 12px; }
+  .owner-reports-icon { width: 36px; height: 36px; }
+  .owner-reports-toggle > span { display: none !important; }
+  .owner-reports .period-strip { grid-template-columns: 1fr; }
+  .owner-reports .period-total { padding: 18px; }
+  .owner-reports .category-revenue-grid { grid-template-columns: 1fr; padding: 0 18px 8px; }
+  .owner-reports .stripe-flow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .owner-reports .stripe-flow-grid article { padding: 16px; }
+  .owner-reports .stripe-unmatched { padding: 18px; }
+  .owner-team-tabs > [data-slot="tabs-list"] { width: 100%; height: auto; }
+  .owner-team-tabs [data-slot="tabs-trigger"] { min-height: 42px; padding: 8px 10px; white-space: normal; }
+  .owner-dashboard .employee-card { padding: 18px; }
+  .owner-dashboard .page-heading { align-items: flex-start; }
+  .owner-dashboard .page-heading > [data-slot="button"] { width: auto; }
+  .owner-appointment-filters { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0 18px 18px; gap: 10px; }
+  .owner-appointment-filters .category-select { width: 100%; min-height: 44px; }
+  .owner-dashboard .mark-paid-card { padding: 20px; }
+  .owner-dashboard .empty-state p { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .owner-reports-toggle svg { transition: none; } }

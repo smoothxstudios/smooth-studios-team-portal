@@ -1,6 +1,20 @@
 {
-  "currentVersion": "2.13.1",
+  "currentVersion": "2.13.2",
   "releases": [
+    {
+      "id": "2026-10-15-cleaner-owner-dashboard",
+      "version": "2.13.2",
+      "date": "2026-10-15",
+      "category": "Design",
+      "title": "A cleaner owner dashboard",
+      "changes": [
+        "The overview brings key totals, upcoming appointments, and payment review actions to the top. Detailed financial reports open together when needed.",
+        "Removed duplicate team earnings and appointment history sections from the overview. Full records remain in Team, Appointments, and Payouts.",
+        "Team now separates People from Check-ins & rewards. Appointment filters and payout controls have clearer layouts.",
+        "Calmer cards, readable text, and roomier mobile spacing make the owner dashboard easier to scan."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-15-direct-owner-actions",
       "version": "2.13.1",

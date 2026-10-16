@@ -15,6 +15,7 @@ import {
 import {
   ArrowRight,
   Banknote,
+  BarChart3,
   BookOpen,
   CalendarDays,
   CalendarCheck,
@@ -80,6 +81,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -527,27 +529,51 @@ function StripeMoneyFlow({
   );
 }
 
-function PaymentReview({ rentals, onOpen, onOverride, stripeConnected }: { rentals: Rental[]; onOpen: () => void; onOverride: () => void; stripeConnected: boolean }) {
-  const appointments = rentals.filter((rental) => customerPaymentState(rental) === "review");
-  if (!appointments.length) return null;
-  const unrecorded = appointments.reduce((sum, rental) => sum + Math.max(rental.priceCents - (rental.paidOnlineCents ?? 0), 0), 0);
-
+function OwnerAttention({ reviewCount, unmatchedCount, stripeConnected, onReview, onMatch, onPayouts }: {
+  reviewCount: number; unmatchedCount: number; stripeConnected: boolean;
+  onReview: () => void; onMatch: () => void; onPayouts: () => void;
+}) {
   return (
-    <section className="panel payment-review-panel">
-      <div className="payment-review-copy">
-        <span className="payment-review-icon"><ReceiptText size={21} /></span>
-        <div>
-          <p className="eyebrow">Payment check</p>
-          <h2>{appointments.length} completed appointment{appointments.length === 1 ? "" : "s"} need review</h2>
-          <p>{stripeConnected ? "The Calendar and Stripe records do not confirm the full balance." : "The Calendar event shows a deposit or no checkout payment."} Confirm whether the balance is still unpaid or was received by invoice, cash, Apple Pay, or another method.</p>
-        </div>
+    <article className="panel owner-attention">
+      <div className="panel-heading"><h2>Needs attention</h2></div>
+      <div className="owner-attention-list">
+        {reviewCount > 0 && <button className="owner-attention-item" onClick={onReview}>
+          <span className="owner-action-icon"><ReceiptText size={19} /></span>
+          <span><strong>Review appointment payments</strong><small>{reviewCount} appointment{reviewCount === 1 ? "" : "s"} with an unconfirmed balance</small></span>
+          <ChevronRight size={17} />
+        </button>}
+        {unmatchedCount > 0 && <button className="owner-attention-item" onClick={onMatch}>
+          <span className="owner-action-icon"><Link2 size={19} /></span>
+          <span><strong>Match Stripe payments</strong><small>{unmatchedCount} received payment{unmatchedCount === 1 ? "" : "s"} to link</small></span>
+          <ChevronRight size={17} />
+        </button>}
+        {!reviewCount && !unmatchedCount && <div className="owner-attention-empty">
+          <span><Check size={21} /></span><strong>No payment reviews waiting</strong>
+          <p>{stripeConnected ? "Appointment balances and Stripe matches are up to date." : "No appointment balances need review."}</p>
+        </div>}
       </div>
-      <div className="payment-review-total"><span>Not recorded on event</span><strong>{dollars(unrecorded)}</strong><small>This may include invoice or other payments.</small></div>
-      <div className="payment-review-actions"><Button onClick={onOpen} size="sm" variant="outline">Review appointments</Button><Button onClick={onOverride} size="sm">Record payment received</Button></div>
-    </section>
+      <button className="owner-panel-link" onClick={onPayouts}>Manage team payouts <ArrowRight size={16} /></button>
+    </article>
   );
 }
 
+function OwnerUpcoming({ rentals, onSchedule }: { rentals: Rental[]; onSchedule: () => void }) {
+  return (
+    <article className="panel owner-upcoming">
+      <div className="panel-heading"><div><h2>Coming up</h2><p>Next on your calendar · Eastern time</p></div><button onClick={onSchedule}>Open schedule <ChevronRight size={15} /></button></div>
+      {rentals.length ? <ol className="owner-upcoming-list">
+        {rentals.slice(0, 4).map(rental => <li key={rental.id}>
+          <time className="owner-date-block" dateTime={rental.start} aria-label={formatDate(rental.start)}>
+            <span>{new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_TIME_ZONE, month: "short" }).format(new Date(rental.start))}</span>
+            <strong>{new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_TIME_ZONE, day: "numeric" }).format(new Date(rental.start))}</strong>
+          </time>
+          <div className="owner-appointment-copy"><strong>{rental.customer}</strong><span>{rental.title}</span></div>
+          <div className="owner-appointment-time"><strong>{formatTime(rental.start)}</strong><span>{durationLabel(rental)}</span></div>
+        </li>)}
+      </ol> : <EmptyState title="Nothing coming up yet" copy="New Calendar appointments will appear here after syncing." />}
+    </article>
+  );
+}
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return <div className="chart-tooltip"><p>{label}</p>{payload.map((item) => <div key={item.name}><span style={{ background: item.color }} />{item.name}<strong>{dollars(item.value)}</strong></div>)}</div>;
@@ -608,22 +634,6 @@ function RentalTable({ rentals, employeeId }: { rentals: Rental[]; employeeId?: 
 
 function EmptyState({ title, copy }: { title: string; copy: string }) {
   return <div className="empty-state"><CalendarDays size={28} /><strong>{title}</strong><p>{copy}</p></div>;
-}
-
-function TeamSnapshot({ employees, rentals }: { employees: Employee[]; rentals: Rental[] }) {
-  return (
-    <section className="team-strip">
-      <div className="team-strip-heading"><div><p className="eyebrow">Team pulse</p><h2>Earnings by employee</h2></div><Users size={20} /></div>
-      <div className="team-strip-grid">
-        {employees.map((employee) => {
-          const assigned = rentals.filter((rental) => rental.assignedEmployeeIds.includes(employee.id));
-          const owed = assigned.reduce((sum, rental) => sum + (rentalState(rental, employee.id) === "earned" ? unpaidEarnings(rental.employeePayouts[employee.id]) : 0), 0);
-          const upcoming = assigned.filter((rental) => rentalState(rental, employee.id) === "upcoming").length;
-          return <div className="employee-pulse" key={employee.id}><span className="employee-avatar" style={{ background: teamAccent(employee.id, employee.accent) }}>{employee.name.slice(0, 1)}</span><div><strong>{employee.name}</strong><span>{upcoming} upcoming</span></div><div><strong>{dollars(owed)}</strong><span>owed</span></div></div>;
-        })}
-      </div>
-    </section>
-  );
 }
 
 function TeamPage({ employees, rentals, teamAccess, onSetup }: { employees: Employee[]; rentals: Rental[]; teamAccess?: DashboardPayload["teamAccess"]; onSetup: () => void }) {
@@ -698,9 +708,7 @@ function PayoutPage({
       </article>
       {isOwner && (
         <article className="panel mark-paid-card">
-          <div className="workflow-icon"><GitBranch size={24} /></div>
-          <p className="eyebrow">Smooth action</p>
-          <h2>Mark employee earnings paid</h2>
+          <h2>Record a team payout</h2>
           <p>Choose who you paid and the last appointment date covered. The dashboard will update only that payout selection.</p>
           <div className="payout-control">
             <label id="payout-employee-label">Employee selection</label>
@@ -718,7 +726,6 @@ function PayoutPage({
           </div>
           <div className="workflow-scope"><ReceiptText size={16} /><span>{payoutScopeLabel} · {eligibleAppointments} eligible appointment{eligibleAppointments === 1 ? "" : "s"}</span></div>
           <Button className="github-button" onClick={onContinue}>Review and mark paid <ArrowRight size={16} /></Button>
-          <small>You will stay inside the dashboard while the workflow runs.</small>
         </article>
       )}
     </section>
@@ -1051,7 +1058,6 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
     return months;
   }, [employeeId, visibleRentals]);
 
-  const recent = visibleRentals.slice(0, 6);
   const displayName = payload.user.name;
 
   const prepareTeamSetup = async (settings: NewTeamSettings) => {
@@ -1156,45 +1162,52 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="dashboard-main">
+      <SidebarInset className={`dashboard-main${isOwner ? " owner-dashboard" : ""}`}>
         <header className="dashboard-topbar">
           <div className="topbar-title"><SidebarTrigger className="mobile-menu-trigger" aria-label="Open navigation"><Menu /></SidebarTrigger><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div>
-          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}{isOwner && <><Button className="sync-now-button" aria-label="Sync now" onClick={openCalendarSync} size="sm" variant="outline"><RefreshCw size={15} /><span>Sync now</span></Button><div className="date-chip"><CalendarDays size={15} /><span>Jan–Dec 2026</span></div></>}</div>
+          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}{isOwner && <><Button className="sync-now-button" aria-label="Sync now" onClick={openCalendarSync} size="sm" variant="outline"><RefreshCw size={15} /><span>Sync now</span></Button><span className="owner-sync-status">Updated {formatDate(payload.generatedAt, true)} · {formatTime(payload.generatedAt)}</span></>}</div>
         </header>
 
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {view === "overview" && !isOwner && <TeamSchedulingPage token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide") }} />}
           {view === "overview" && isOwner && (
-            <>
-              <section className="kpi-grid">
-                {isOwner ? <><KpiCard icon={CircleDollarSign} label="Appointment revenue" note="Fully paid Calendar appointments" tone="red" value={dollars(metrics.revenue)} /><KpiCard icon={Banknote} label="Payroll owed" note="Earned, not yet paid" tone="amber" value={dollars(metrics.owed)} /><KpiCard icon={ShieldCheck} label="Paid to team" note="Recorded employee payouts" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={`${upcoming.length} accepted assignments`} tone="blue" value={String(upcoming.length)} /></> : <><KpiCard icon={Banknote} label="Earned, not paid" note="Completed + customer paid" tone="red" value={dollars(metrics.owed)} /><KpiCard icon={Clock3} label="Projected earnings" note="From upcoming appointments" tone="amber" value={dollars(metrics.projected)} /><KpiCard icon={ShieldCheck} label="Paid this year" note="Payouts marked complete" tone="green" value={dollars(metrics.paid)} /><KpiCard icon={CalendarDays} label="Upcoming appointments" note={upcoming[0] ? `Next: ${formatDate(upcoming[0].start, true)}` : "Nothing scheduled"} tone="blue" value={String(upcoming.length)} /></>}
+            <div className="owner-overview">
+              <section className="kpi-grid" aria-label="Studio summary">
+                <KpiCard icon={CalendarDays} label="Upcoming" note="Appointments on your calendar" tone="blue" value={String(upcoming.length)} />
+                <KpiCard icon={CircleDollarSign} label="Appointment revenue" note="Fully paid appointments" tone="red" value={dollars(metrics.revenue)} />
+                <KpiCard icon={Banknote} label="Payroll owed" note="Earned, not yet paid" tone="amber" value={dollars(metrics.owed)} />
+                <KpiCard icon={ShieldCheck} label="Paid to team" note="Recorded employee payouts" tone="green" value={dollars(metrics.paid)} />
               </section>
-              {isOwner && <StripeMoneyFlow onMatch={openStripeMatch} summary={payload.stripeSummary} unmatchedPayments={payload.unmatchedStripePayments ?? []} />}
-              <PeriodTotals employeeId={employeeId} rentals={visibleRentals} />
-              {isOwner && <CategoryRevenue rentals={visibleRentals} />}
-              {isOwner && <PaymentReview onOpen={reviewPayments} onOverride={openPaymentOverride} rentals={visibleRentals} stripeConnected={stripeConnected} />}
-
-              <section className="overview-grid">
-                <article className="panel trend-panel">
-                  <div className="panel-heading"><div><p className="eyebrow">2026 performance</p><h2>{isOwner ? "Revenue & payroll" : "My earnings"}</h2></div><div className="chart-legend"><span className="legend-red" />{isOwner ? "Revenue" : "Paid"}<span className="legend-dark" />{isOwner ? "Payroll" : "Owed"}</div></div>
-                  <div className="chart-wrap"><ResponsiveContainer height="100%" width="100%"><AreaChart data={monthly} margin={{ left: -18, right: 6, top: 12, bottom: 0 }}><defs><linearGradient id="redFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#e10000" stopOpacity={0.24} /><stop offset="100%" stopColor="#e10000" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 6" vertical={false} /><XAxis axisLine={false} dataKey="month" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} /><YAxis axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickFormatter={(value) => `$${value / 100}`} tickLine={false} /><Tooltip content={<ChartTooltip />} /><Area dataKey={isOwner ? "payroll" : "owed"} fill="transparent" name={isOwner ? "Payroll" : "Owed"} stroke="#27272a" strokeDasharray="5 5" strokeWidth={2} type="monotone" /><Area dataKey={isOwner ? "revenue" : "paid"} fill="url(#redFill)" name={isOwner ? "Revenue" : "Paid"} stroke="#e10000" strokeWidth={3} type="monotone" /></AreaChart></ResponsiveContainer></div>
-                </article>
-                <article className="panel upcoming-panel">
-                  <div className="panel-heading"><div><p className="eyebrow">On the calendar</p><h2>Coming up</h2></div><button onClick={() => setView("rentals")}>View all <ChevronRight size={15} /></button></div>
-                  <div className="upcoming-list">{upcoming.length ? upcoming.slice(0, 4).map((rental) => <div className="upcoming-item" key={rental.id}><div className="date-block"><strong>{new Date(rental.start).getDate()}</strong><span>{formatDate(rental.start, true).slice(0, 3)}</span></div><div className="upcoming-copy"><strong>{rental.customer}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div><div className="upcoming-value"><strong>{dollars(employeeId ? rental.employeePayouts[employeeId]?.amountCents ?? 0 : rental.priceCents)}</strong><span>{employeeId ? "your earnings" : "appointment"}</span></div></div>) : <EmptyState copy="Accepted Calendar assignments will appear here." title="No upcoming appointments" />}</div>
-                </article>
+              <section className="owner-workspace" aria-label="Upcoming work and payment reviews">
+                <OwnerUpcoming rentals={upcoming} onSchedule={() => setView("scheduling")} />
+                <OwnerAttention reviewCount={reviewRentals.length} unmatchedCount={payload.stripeSummary?.unmatchedPaymentCount ?? payload.unmatchedStripePayments?.length ?? 0} stripeConnected={stripeConnected} onReview={reviewPayments} onMatch={() => openStripeMatch()} onPayouts={() => setView("payouts")} />
               </section>
-
-              {isOwner && <TeamSnapshot employees={payload.employees} rentals={rentals} />}
-              <article className="panel rentals-panel"><div className="panel-heading"><div><p className="eyebrow">Latest activity</p><h2>Appointment history</h2></div><button onClick={() => setView("rentals")}>View all <ChevronRight size={15} /></button></div>{recent.length ? <RentalTable employeeId={employeeId} rentals={recent} /> : <EmptyState copy="Calendar appointments will appear after the first sync." title="No appointment history yet" />}</article>
-            </>
+              <details className="owner-reports">
+                <summary>
+                  <span className="owner-reports-icon"><BarChart3 size={21} /></span>
+                  <span className="owner-reports-copy"><strong>Financial reports</strong><small>Revenue, Stripe, and category breakdowns</small></span>
+                  <span className="owner-reports-toggle"><span className="reports-show">Show reports</span><span className="reports-hide">Hide reports</span><ChevronDown size={18} /></span>
+                </summary>
+                <div className="owner-reports-content">
+                  <PeriodTotals rentals={visibleRentals} />
+                  <article className="panel trend-panel">
+                    <div className="panel-heading"><h2>Revenue &amp; payroll</h2><div className="chart-legend"><span className="legend-red" />Revenue<span className="legend-dark" />Payroll</div></div>
+                    <div className="chart-wrap"><ResponsiveContainer height="100%" width="100%"><AreaChart data={monthly} margin={{ left: -18, right: 6, top: 12, bottom: 0 }}><defs><linearGradient id="redFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#e10000" stopOpacity={0.24} /><stop offset="100%" stopColor="#e10000" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 6" vertical={false} /><XAxis axisLine={false} dataKey="month" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} /><YAxis axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickFormatter={(value) => `$${value / 100}`} tickLine={false} /><Tooltip content={<ChartTooltip />} /><Area dataKey="payroll" fill="transparent" name="Payroll" stroke="var(--muted-foreground)" strokeDasharray="5 5" strokeWidth={2} type="monotone" /><Area dataKey="revenue" fill="url(#redFill)" name="Revenue" stroke="#e10000" strokeWidth={3} type="monotone" /></AreaChart></ResponsiveContainer></div>
+                  </article>
+                  <StripeMoneyFlow onMatch={openStripeMatch} summary={payload.stripeSummary} unmatchedPayments={payload.unmatchedStripePayments ?? []} />
+                  <CategoryRevenue rentals={visibleRentals} />
+                </div>
+              </details>
+            </div>
           )}
 
           {view === "rentals" && isOwner && <article className="panel page-panel">
             <div className="panel-heading page-heading">
-              <div><p className="eyebrow">Beginning January 1, 2026</p><h2>{isOwner ? "All appointments" : "My accepted appointments"}</h2><p>{isOwner ? "Revenue includes every fully paid appointment—even when no employee is assigned." : "Only appointments accepted from one of your Google emails appear here."}</p></div>
-              <div className="page-actions">
+              <div><h2>All appointments</h2><p>{filteredRentals.length} appointment{filteredRentals.length === 1 ? "" : "s"}{categoryFilter !== "all" || paymentFilter !== "all" ? " match your filters" : " in your records"}</p></div>
+              {reviewRentals.length > 0 && <Button onClick={openPaymentOverride} size="sm" variant="outline"><ReceiptText size={15} /> Record payment received</Button>}
+            </div>
+            <div className="owner-appointment-filters">
                 <Select onValueChange={setCategoryFilter} value={categoryFilter}>
                   <SelectTrigger aria-label="Filter appointments by category" className="category-select"><SelectValue placeholder="All categories" /></SelectTrigger>
                   <SelectContent position="popper">
@@ -1212,13 +1225,15 @@ function DashboardView({ payload, dark, setDark, onLogout, sessionPassword, sche
                     <SelectItem value="pending">Payment pending</SelectItem>
                   </SelectContent>
                 </Select>
-                <Badge className="count-badge" variant="secondary">{filteredRentals.length} appointment{filteredRentals.length === 1 ? "" : "s"}</Badge>
-                {isOwner && reviewRentals.length > 0 && <Button onClick={openPaymentOverride} size="sm" variant="outline"><GitBranch size={14} /> Record payment received</Button>}
-              </div>
+                {(categoryFilter !== "all" || paymentFilter !== "all") && <Button variant="ghost" onClick={() => { setCategoryFilter("all"); setPaymentFilter("all"); }}>Clear filters</Button>}
             </div>
             {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the next Calendar sync, scheduled every 5 minutes." : "No appointments match the selected filters."} title="No appointments found" />}
           </article>}
-          {view === "team" && isOwner && <><TeamPage employees={payload.employees} rentals={rentals} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} /><TeamEngagementReview token={schedulingToken} /></>}
+          {view === "team" && isOwner && <Tabs defaultValue="people" className="owner-team-tabs">
+            <TabsList aria-label="Team sections"><TabsTrigger value="people">People</TabsTrigger><TabsTrigger value="engagement">Check-ins &amp; rewards</TabsTrigger></TabsList>
+            <TabsContent value="people"><TeamPage employees={payload.employees} rentals={rentals} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} /></TabsContent>
+            <TabsContent value="engagement"><TeamEngagementReview token={schedulingToken} /></TabsContent>
+          </Tabs>}
           {view === "payouts" && <>
             {!isOwner && <div className="employee-earnings-heading"><div><h2>My earnings</h2><p>Paid, owed, and estimated earnings by appointment year.</p></div><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
             <PayoutPage employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
