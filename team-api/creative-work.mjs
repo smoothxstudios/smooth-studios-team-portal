@@ -39,8 +39,8 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
   const terms = () => {
     let dueAt;
     try { dueAt = localInstant(text(input.dueLocal, 16)); } catch { fail(400, "Choose a valid deadline in Eastern time."); }
-    if (Date.parse(dueAt) <= Date.now() || Date.parse(dueAt) > Date.now() + 2 * 366 * 86400_000) fail(400, "Choose a future deadline within the next two years.");
-    return { title: text(input.title, 160), instructions: text(input.instructions, 8000), dueAt, amountCents: amount(input.amountCents), references: links(input.references ?? []) };
+    if (Date.parse(dueAt) > Date.now() + 2 * 366 * 86400_000) fail(400, "Choose a past date or a deadline no more than two years ahead.");
+    return { title: text(input.title, 160), instructions: text(input.instructions ?? "", 8000, false), dueAt, amountCents: amount(input.amountCents), references: links(input.references ?? []) };
   };
   if (!id) {
     requireOwner();

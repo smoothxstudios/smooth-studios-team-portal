@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.22.0",
+  "currentVersion": "2.22.1",
   "releases": [
+    {
+      "id": "2026-10-16-past-creative-work",
+      "version": "2.22.1",
+      "date": "2026-10-16",
+      "category": "Creative work",
+      "title": "Past creative deadlines and optional briefs",
+      "changes": [
+        "Add creative work with a past deadline, or move an unaccepted offer to a past date.",
+        "Brief & deliverables is optional when creating or editing an offer. Empty briefs are hidden in assignment details.",
+        "Help explains how to add older work and follow its acceptance, submission, approval, and payout steps."
+      ],
+      "employee": {
+        "title": "Cleaner creative assignment details",
+        "changes": [
+          "Creative assignments show a brief only when one has been included. Reference links still appear when provided."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-16-swipe-sidebar-navigation",
       "version": "2.22.0",

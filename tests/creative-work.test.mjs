@@ -13,6 +13,75 @@ async function submitted(f) {
   item = (await act(f, "jordyn", item, "accept")).data.assignment;
   return (await act(f, "jordyn", item, "submit", { links: ["https://example.invalid/delivery"], note: "First cut" })).data.assignment;
 }
+test("past creative deadlines accept an omitted or blank brief", async t => {
+  const f = await setup(); t.after(() => f.close());
+  assert.equal((await f.call("owner", "/health")).data.creativeWorkVersion, 2);
+  for (const instructions of [undefined, "", " \n "]) {
+    const input = { ...offer(), dueLocal: "2025-10-05T18:00", instructions };
+    if (instructions === undefined) delete input.instructions;
+    const result = await f.call("owner", "/creative-work", input);
+    assert.equal(result.status, 200);
+    const item = result.data.assignment;
+    assert.equal(item.dueAt, "2025-10-05T22:00:00.000Z");
+    assert.equal(item.instructions, "");
+    assert.equal(item.status, "offered");
+    assert.equal(item.approvedAt, null);
+    assert.deepEqual(item.payments, []);
+    assert.deepEqual(creativeEarnings([item]).metrics, { paid: 0, owed: 0, projected: input.amountCents });
+  }
+  assert.equal((await f.call("jordyn", "/creative-work")).data.assignments.length, 3);
+});
+test("an offer can move to a past deadline and clear its brief while invalid terms remain rejected", async t => {
+  const f = await setup(); t.after(() => f.close());
+  const original = await create(f);
+  const result = await act(f, "owner", original, "edit", { ...offer(), instructions: "", dueLocal: "2025-01-05T18:00" });
+  assert.equal(result.status, 200);
+  const item = result.data.assignment;
+  assert.equal(item.id, original.id);
+  assert.equal(item.instructions, "");
+  assert.equal(item.dueAt, "2025-01-05T23:00:00.000Z");
+  assert.equal(item.version, original.version + 1);
+  assert.equal((await act(f, "owner", original, "edit", offer())).status, 409);
+  const invalidTerms = [
+    { dueLocal: "2025-02-30T18:00" },
+    { dueLocal: "" },
+    { dueLocal: studioLocal(Date.now() + 3 * 366 * 86400_000) },
+    { instructions: {} },
+    { instructions: "a".repeat(8001) },
+    { title: " " },
+  ];
+  for (const invalid of invalidTerms) {
+    assert.equal((await f.call("owner", "/creative-work", { ...offer(), ...invalid })).status, 400);
+    assert.equal((await act(f, "owner", item, "edit", { ...offer(), ...invalid })).status, 400);
+  }
+  const saved = (await f.call("owner", "/creative-work")).data.assignments;
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].dueAt, item.dueAt);
+  assert.equal(saved[0].version, item.version);
+});
+test("older work still requires acceptance, submission, and approval before earning or paying", async t => {
+  const f = await setup(); t.after(() => f.close());
+  const result = await f.call("owner", "/creative-work", { ...offer(), dueLocal: "2025-10-05T18:00", instructions: "" });
+  assert.equal(result.status, 200);
+  let item = result.data.assignment;
+  const dueAt = item.dueAt;
+  assert.equal((await act(f, "owner", item, "approve")).status, 409);
+  assert.equal((await act(f, "owner", item, "pay", { amountCents: item.amountCents })).status, 409);
+  item = (await act(f, "jordyn", item, "accept")).data.assignment;
+  assert.equal(item.status, "accepted");
+  item = (await act(f, "jordyn", item, "submit", { links: ["https://example.invalid/older-delivery"] })).data.assignment;
+  assert.equal(item.status, "submitted");
+  assert.equal(creativeOwed(item), 0);
+  const approvalStarted = Date.now();
+  item = (await act(f, "owner", item, "approve")).data.assignment;
+  assert.equal(item.status, "approved");
+  assert.ok(Date.parse(item.approvedAt) >= approvalStarted);
+  assert.equal(item.dueAt, dueAt);
+  assert.equal(creativeOwed(item), item.amountCents);
+  item = (await act(f, "owner", item, "pay", { amountCents: item.amountCents })).data.assignment;
+  assert.equal(creativePaid(item), item.amountCents);
+  assert.equal(creativeOwed(item), 0);
+});
 test("creative work is private, owner-assigned, and unrelated to Calendar payroll", async () => {
   const f = await setup();
   assert.equal((await f.call("jordyn", "/creative-work", offer())).status, 403);
