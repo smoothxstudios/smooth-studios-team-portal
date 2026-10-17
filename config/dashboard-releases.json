@@ -1,6 +1,27 @@
 {
-  "currentVersion": "2.29.0",
+  "currentVersion": "2.30.0",
   "releases": [
+    {
+      "id": "2026-10-17-owner-reminders-and-immediate-tabs",
+      "version": "2.30.0",
+      "date": "2026-10-17",
+      "category": "Notifications",
+      "title": "Team reminders and immediate page changes",
+      "changes": [
+        "Smooth can send a notification to selected team members from Team → People, choose the page it opens, and review recent sent messages.",
+        "Pending upcoming assignments include a Remind button. Reminders are checked against the current assignment response and are limited to one per assignment every five minutes.",
+        "Sent reminders appear in the recipient’s Alerts and queue a push for enabled devices. Safe retries do not send duplicates.",
+        "Choosing another toolbar tab opens its page immediately and quietly updates its information. Tapping the active tab keeps the smooth return to the top and refresh."
+      ],
+      "employee": {
+        "title": "Studio reminders and faster tabs",
+        "changes": [
+          "Smooth can send reminders through Alerts and enabled phone notifications. A reminder opens its related page and does not accept an assignment for you.",
+          "Changing toolbar tabs opens the new page immediately. Tap the active tab for a smooth return to the top and refresh."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-google-calendar-assignment-connections",
       "version": "2.29.0",

@@ -24,7 +24,7 @@ self.addEventListener("push", event => {
     icon: new URL("smooth-studios-logo.png", self.registration.scope).href,
     tag: id ? `smooth-${type}-${id}` : `smooth-${type}`,
     renotify: true,
-    data: { type },
+    data: { type, ...(["alerts", "settings", "scheduling", "creative"].includes(payload?.target) ? { target: payload.target } : {}) },
   }));
 });
 self.addEventListener("notificationclick", event => {
@@ -32,7 +32,9 @@ self.addEventListener("notificationclick", event => {
   const type = event.notification.data?.type;
   const notice = Object.hasOwn(notices, type) ? notices[type] : notices.schedule;
   // Never navigate to a URL supplied by a payload or notification data.
-  const destination = new URL(`./${notice.hash}`, self.registration.scope).href;
+  const targets = { alerts: "#alerts", settings: "#settings", scheduling: "#scheduling", creative: "#creative-work" };
+  const target = event.notification.data?.target;
+  const destination = new URL(`./${Object.hasOwn(targets, target) ? targets[target] : notice.hash}`, self.registration.scope).href;
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     const existing = windows.find(client => client.url.startsWith(self.registration.scope));

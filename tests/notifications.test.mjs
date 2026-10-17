@@ -5,7 +5,7 @@ import test, { mock } from "node:test";
 import { base64url, unbase64url } from "../lib/team-auth.mjs";
 import { QUIZ_INTERVAL_MS } from "../lib/team-engagement.mjs";
 import { encryptPush, subscriptionKeys } from "../team-api/push-encryption.mjs";
-import { flushAlerts } from "../team-api/push.mjs";
+import { deliverPush, flushAlerts } from "../team-api/push.mjs";
 import { sendQuizReminders } from "../team-api/quiz-notifications.mjs";
 import { notificationTime, notificationDetails, assignmentNotifications } from "../team-api/notification-content.mjs";
 import worker from "../team-api/worker.mjs";
@@ -156,6 +156,23 @@ test("service worker shows distinct alerts and opens only approved dashboard des
   assert.equal((await show({ type: "unknown", title: "Untrusted", body: "Untrusted" })).title, "Schedule update");
   assert.equal((await show({ type: "schedule", title: {}, body: "broken" })).title, "Schedule update");
   assert.equal((await show(null)).title, "Schedule update");
+  const settings = await show({ type: "schedule", title: "Connect Google Calendar", body: "Connect your account in Settings.", target: "settings" });
+  handlers.notificationclick({ notification: { ...settings, close() {} }, waitUntil: p => pending = p }); await pending;
+  assert.equal(opened.at(-1), `${scope}#settings`);
+  const invalidTarget = await show({ type: "schedule", title: "Studio reminder", body: "Check your app.", target: "https://untrusted.invalid" });
+  handlers.notificationclick({ notification: { ...invalidTarget, close() {} }, waitUntil: p => pending = p }); await pending;
+  assert.equal(opened.at(-1), `${scope}#scheduling`);
+});
+
+test("owner notices keep their text compatible with installed service workers and allow only fixed destinations", async () => {
+  const d = device("notice-compatibility"), pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const key = await crypto.subtle.exportKey("jwk", pair.privateKey), sent = [];
+  const provider = async (_url, options) => { sent.push(d.decrypt(options.body)); return new Response(null, { status: 201 }); };
+  for (const target of ["settings", "https://untrusted.invalid"]) await deliverPush(d.endpoint, key, provider, {
+    kind: "notice", keys: d.keys, notificationId: "synthetic-owner-notice", details: { title: "Connect your Google Calendar", body: "Open Settings to connect.", target },
+  });
+  assert.deepEqual(sent[0], { type: "schedule", title: "Connect your Google Calendar", body: "Open Settings to connect.", target: "settings", id: "synthetic-owner-notice" });
+  assert.equal(sent[1].type, "schedule"); assert.equal(sent[1].target, undefined);
 });
 
 test("two booking responses queue separately and send specific encrypted alerts only to Smooth", async () => {

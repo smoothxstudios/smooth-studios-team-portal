@@ -2,9 +2,10 @@
 import { useEffect, useRef, useState } from "react";
 import { attachScrollTapGuard } from "@/lib/scroll-tap-guard.mjs";
 import { alertBody, groupAlerts } from "@/lib/alert-presentation.mjs";
-import { Bell, CalendarDays, Check, CheckCheck, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2 } from "lucide-react";
+import { Bell, CalendarDays, Check, CheckCheck, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { AlertsState, DashboardAlert } from "@/lib/use-alerts";
 
 const stamp = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
@@ -32,9 +33,14 @@ function AlertOptions({ alert, state, onOpen }: { alert: DashboardAlert; state: 
 
 export function AlertsPage({ state, onOpen, isOwner = false }: { isOwner?: boolean; state: AlertsState; onOpen: (alert: DashboardAlert) => void }) {
   const page = useRef<HTMLElement>(null);
+  const [notice, setNotice] = useState<DashboardAlert | null>(null);
   useEffect(() => { if (page.current) return attachScrollTapGuard(page.current); }, []);
   const groups = isOwner ? groupAlerts(state.alerts) : [{ id: "all", person: null, alerts: state.alerts }];
-  const open = async (alert: DashboardAlert) => { if (await state.markRead(alert)) onOpen(alert); };
+  const open = async (alert: DashboardAlert) => {
+    if (!await state.markRead(alert)) return;
+    if (alert.kind === "notice") setNotice(alert);
+    else onOpen(alert);
+  };
   return <section ref={page} className="alerts-page" aria-label="Your alerts">
     <div className="alerts-heading"><h2>Alerts</h2></div>
     <div className="alerts-controls">
@@ -52,10 +58,10 @@ export function AlertsPage({ state, onOpen, isOwner = false }: { isOwner?: boole
       {isOwner && <header className="person-section-heading"><span className="employee-avatar" style={{ background: group.person?.color ?? "#64748b" }}>{group.person?.name.slice(0, 1) ?? "•"}</span><h3>{group.person?.name ?? "Other updates"}</h3><small>{group.alerts.length} alert{group.alerts.length === 1 ? "" : "s"}</small></header>}
       <ul className="alerts-list">
       {group.alerts.map((alert: DashboardAlert) => {
-        const Icon = alert.target === "quiz" ? Sparkles : alert.target === "creative" ? ClipboardList : CalendarDays;
+        const Icon = alert.kind === "notice" ? Bell : alert.target === "quiz" ? Sparkles : alert.target === "creative" ? ClipboardList : CalendarDays;
         const expired = alert.expiresAt !== null && alert.expiresAt <= Date.now();
         return <li key={alert.id} className={`alert-card${alert.readAt ? "" : " is-unread"}`}>
-          <button type="button" className="alert-open" disabled={state.busy} onClick={() => void open(alert)} aria-label={`${alert.title}. ${alert.target === "quiz" ? "Open Daily Quiz" : alert.target === "availability" ? "View availability" : "View details"}`}>
+          <button type="button" className="alert-open" disabled={state.busy} onClick={() => void open(alert)} aria-label={`${alert.title}. ${alert.target === "settings" ? "Open Settings" : alert.target === "alerts" ? "Read notification" : alert.target === "quiz" ? "Open Daily Quiz" : alert.target === "availability" ? "View availability" : "View details"}`}>
             <span className="alert-content"><span className="alert-title"><Icon className="alert-kind-icon" size={15} aria-hidden="true" /><strong>{alert.title}</strong><ArrowUpRight className="alert-open-arrow" size={14} aria-hidden="true" /></span>
               <span className="alert-preview">{alertBody(alert.body) || "Open this alert for details."}</span>
               <span className="alert-meta"><time dateTime={new Date(alert.createdAt).toISOString()}>{stamp.format(alert.createdAt)}</time><span className="alert-status" data-unread={!alert.readAt}>{alert.readAt ? "Read" : "Unread"}{expired ? " · Earlier reminder" : ""}</span></span>
@@ -68,5 +74,16 @@ export function AlertsPage({ state, onOpen, isOwner = false }: { isOwner?: boole
       })}
     </ul></section>)}
     {state.nextCursor && <Button variant="outline" disabled={state.busy} onClick={() => void state.loadMore()}>{state.busy ? "Loading…" : "Load more"}</Button>}
+    <Dialog open={Boolean(notice)} onOpenChange={value => { if (!value) setNotice(null); }}>
+      <DialogContent className="schedule-modal" showCloseButton={false}>
+        <DialogHeader><div className="schedule-row"><DialogTitle>{notice?.title}</DialogTitle><Button type="button" variant="ghost" size="icon" aria-label="Close notification" onClick={() => setNotice(null)}><X size={20} /></Button></div><DialogDescription>From Smooth{notice ? ` · ${stamp.format(notice.createdAt)}` : ""}</DialogDescription></DialogHeader>
+        <p className="notification-full-message">{notice?.body}</p>
+        <DialogFooter>
+          <Button type="button" variant="outline" disabled={state.busy} onClick={async () => { if (notice && await state.deleteAlert(notice)) setNotice(null); }}><Trash2 size={16} />Delete</Button>
+          {notice && notice.target !== "alerts" && <Button type="button" onClick={() => { onOpen(notice); setNotice(null); }}>{notice.target === "settings" ? "Open Settings" : notice.target === "creative" ? "Open Creative work" : notice.targetId ? "Open assignment" : "Open Schedule"}<ArrowUpRight size={16} /></Button>}
+          <Button type="button" variant="ghost" onClick={() => setNotice(null)}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </section>;
 }

@@ -1,0 +1,46 @@
+name: Send Google Calendar connection reminders
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/calendar-connect-reminder.yml"
+      - "scripts/send-calendar-connect-reminder.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: calendar-connect-reminder-20261017
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Wait for reminder support on the existing backend
+        run: |
+          node --input-type=module <<'JS'
+          import { TEAM_API_URL } from './lib/team-schedule.mjs';
+          let ready = false;
+          for (let attempt = 0; attempt < 24; attempt++) {
+            try {
+              const response = await fetch(`${TEAM_API_URL}/health`, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+              ready = response.ok && (await response.json()).manualNoticesVersion === 1;
+            } catch { /* Allow the deployment to finish before sending. */ }
+            if (ready) break;
+            await new Promise(resolve => setTimeout(resolve, 10000));
+          }
+          if (!ready) throw new Error('Reminder support did not become ready. No notification was sent by this job.');
+          JS
+      - name: Queue the three requested reminders and verify their inbox records
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}
+        run: node scripts/send-calendar-connect-reminder.mjs

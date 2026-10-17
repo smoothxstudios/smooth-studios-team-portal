@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scrollToolbarToTop } from '../lib/toolbar-navigation.mjs';
+import { activateToolbarTab, scrollToolbarToTop } from '../lib/toolbar-navigation.mjs';
 
 function fixture(y = 1000, reduced = false) {
   const win = new EventTarget(), frames = new Map(), listeners = new Set(), positions = [];
@@ -30,7 +30,7 @@ test('toolbar scrolling eases through intermediate positions before reporting ar
   f.step(100); f.step(205);
   const quarter = f.win.scrollY;
   assert.ok(quarter > 0 && quarter < 1000);
-  assert.equal(arrived, false, 'navigation must wait for arrival');
+  assert.equal(arrived, false, 'the active-tab refresh waits for arrival');
   f.step(310);
   assert.ok(f.win.scrollY > 0 && f.win.scrollY < quarter);
   assert.ok(1000 - quarter > quarter - f.win.scrollY, 'the slide slows as it approaches the top');
@@ -104,4 +104,43 @@ test('a replacement toolbar request resumes from the current position and only t
   assert.equal(f.win.scrollY, 0);
   assert.equal(f.frames.size, 0);
   assert.equal(f.listeners.size, 0);
+});
+
+test('changing toolbar tabs opens immediately without scrolling the previous page or starting a visible refresh', async () => {
+  const f = fixture(), movement = { current: null }, opened = [];
+  let quietRefreshes = 0, visibleRefreshes = 0, scrolls = 0;
+  const selection = activateToolbarTab({ active: 'overview', next: 'alerts', movement,
+    scroll: () => { scrolls++; return scrollToolbarToTop(f.win); },
+    navigate: page => opened.push(page), refreshDestination: () => quietRefreshes++, refreshCurrent: () => visibleRefreshes++ });
+  assert.deepEqual(opened, ['alerts'], 'navigation happens in the click handler, before any frame or promise settles');
+  assert.equal(quietRefreshes, 1);
+  assert.equal(visibleRefreshes, 0);
+  assert.equal(scrolls, 0);
+  assert.equal(f.win.scrollY, 1000);
+  assert.equal(f.frames.size, 0);
+  await selection;
+  assert.deepEqual(opened, ['alerts']);
+});
+
+test('active-tab retaps keep smooth refresh, and a different tab cancels that glide without a delayed navigation', async () => {
+  const f = fixture(), movement = { current: null }, opened = [], arrivals = [];
+  let quietRefreshes = 0;
+  const select = (active, next) => activateToolbarTab({ active, next, movement,
+    scroll: () => scrollToolbarToTop(f.win), navigate: page => opened.push(page),
+    refreshDestination: () => quietRefreshes++, refreshCurrent: arrival => arrivals.push(arrival) });
+  const retap = select('overview', 'overview');
+  assert.equal(arrivals.length, 1); assert.deepEqual(opened, []);
+  f.step(0); f.step(100);
+  assert.ok(f.win.scrollY > 0 && f.win.scrollY < 1000);
+  const stoppedAt = f.win.scrollY;
+  const firstChange = select('overview', 'team'), latestChange = select('team', 'scheduling');
+  assert.deepEqual(opened, ['team', 'scheduling']);
+  assert.equal(quietRefreshes, 2); assert.equal(arrivals.length, 1);
+  assert.equal(await arrivals[0], false, 'the canceled active-tab refresh cannot start its network read');
+  f.step(1000);
+  await Promise.all([retap, firstChange, latestChange]);
+  assert.deepEqual(opened, ['team', 'scheduling'], 'no old promise can select a stale tab later');
+  assert.equal(f.win.scrollY, stoppedAt);
+  assert.equal(movement.current, null);
+  assert.equal(f.frames.size, 0); assert.equal(f.listeners.size, 0);
 });

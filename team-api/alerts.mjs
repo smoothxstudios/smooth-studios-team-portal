@@ -2,7 +2,7 @@ import { TEAM } from '../lib/team-schedule.mjs';
 import { alertBody } from '../lib/alert-presentation.mjs';
 import { notificationText } from './notification-content.mjs';
 
-const targets = new Set(['scheduling', 'availability', 'creative', 'quiz']);
+const targets = new Set(['scheduling', 'availability', 'creative', 'quiz', 'settings', 'alerts']);
 const validSequence = value => Number.isSafeInteger(value) && value >= 0;
 const validAlertIds = ids => Array.isArray(ids) && ids.length > 0 && ids.length <= 50 &&
   ids.every(id => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(id));

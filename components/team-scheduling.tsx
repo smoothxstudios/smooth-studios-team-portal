@@ -2,7 +2,7 @@
 import { RentalDescription } from "@/components/rental-description";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Plus, ShieldCheck, X } from "lucide-react";
+import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Plus, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +43,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
   const [scheduleTab, setScheduleTab] = useState<"upcoming" | "past">("upcoming");
   const requestVersion = useRef(0);
   const mutationInFlight = useRef(false);
+  const reminderIds = useRef(new Map<string, string>());
   const [filter, setFilter] = useState(isOwner ? "all" : userId);
   const [week, setWeek] = useState(() => studioLocal(Date.now()).slice(0, 10));
   const [blockOpen, setBlockOpen] = useState(false);
@@ -109,6 +110,21 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     finally { mutationInFlight.current = false; setBusy(false); }
   }
 
+  async function remindAssignment(item: TeamAssignment) {
+    if (!isOwner || busy || mutationInFlight.current) return;
+    mutationInFlight.current = true; setBusy(true); setError(""); setMessage("");
+    const id = reminderIds.current.get(item.id) ?? crypto.randomUUID();
+    reminderIds.current.set(item.id, id);
+    try {
+      const result = await teamRequest<{ notification: string }>(token, `/assignments/${item.id}/remind`, { id });
+      reminderIds.current.delete(item.id);
+      setMessage(result.notification);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "The reminder could not be confirmed. Try again.");
+      try { await load(); } catch { /* Keep the last schedule while preserving the retry ID. */ }
+    } finally { mutationInFlight.current = false; setBusy(false); }
+  }
+
   const appointments = useMemo(() => (schedule?.appointments ?? []).filter(a => future(a.start)).sort((a, b) => Date.parse(a.start) - Date.parse(b.start)), [schedule]);
   const selectedAppointment = appointments.find(a => a.id === assignment.appointmentId);
   let period: { start: string; end: string; appointmentId?: string } | null = null;
@@ -161,6 +177,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       {busyConflicts.length > 0 && <p className="schedule-warning">Conflict: {busyConflicts.join("; ")}. {conflictApproved ? "Smooth approved this time conflict. You can still accept the offer." : isOwner ? "You can approve this time conflict below." : "Ask Smooth to approve the conflict or adjust the assignment."}</p>}
       {conflictApproved && <p className="schedule-small">Time conflict override approved by Smooth for this appointment time.</p>}
       <div className="schedule-actions">
+        {isOwner && item.status === "pending" && future(item.start) && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => void remindAssignment(item)}><Bell size={16} />Remind</Button>}
         {onChecklist && item.appointmentId && item.status === "accepted" && /studio.*rental|rental.*studio/i.test(item.title) && <Button variant="outline" onClick={() => onChecklist()}>Rental checklist</Button>}
         {!isOwner && item.status === "pending" && future(item.start) && <>
           <Button disabled={busy || needsRefresh || (busyConflicts.length > 0 && !conflictApproved)} onClick={() => void mutate(`/assignments/${item.id}`, { status: "accepted" })}><Check size={16} />Accept</Button>

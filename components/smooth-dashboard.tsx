@@ -4,7 +4,7 @@ import { OwnerWeeklyHours } from "@/components/dashboard/owner-weekly-hours";
 import { AlertsPage,UnreadBadge } from "@/components/alerts";
 import { CreativeWorkPage,CreativeWorkPreview } from "@/components/creative-work";
 import { DashboardRefreshProvider,PullToRefresh,useRefreshSource } from "@/components/dashboard-refresh";
-import { scrollToolbarToTop } from "@/lib/toolbar-navigation.mjs";
+import { activateToolbarTab,scrollToolbarToTop } from "@/lib/toolbar-navigation.mjs";
 import { DashboardSettings } from "@/components/dashboard-settings";
 import { DashboardVersionFooter } from "@/components/dashboard-version-footer";
 import { CategoryRevenue,OwnerFinancialSummary,PeriodTotals } from "@/components/dashboard/financial-summary";
@@ -92,23 +92,12 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   const [focusedAlert, setFocusedAlert] = useState<{ target: string; id: string } | null>(null);
   const [alertWorkLoading, setAlertWorkLoading] = useState(false);
   const navigate = (next: ViewKey) => { toolbarScroll.current?.cancel(); toolbarScroll.current = null; setFocusedAlert(null); setView(next); };
-  const navigateToolbar = async (next: ViewKey) => {
-    toolbarScroll.current?.cancel();
-    const movement = scrollToolbarToTop(window);
-    toolbarScroll.current = movement;
-    if (next === view) {
-      setToolbarRefresh(previous => ({ id: (previous?.id ?? 0) + 1, arrival: movement.finished }));
-      await movement.finished;
-      if (toolbarScroll.current === movement) toolbarScroll.current = null;
-      return;
-    }
-    if (!await movement.finished || toolbarScroll.current !== movement) return;
-    toolbarScroll.current = null;
-    // Keep the current page mounted until it reaches the top: opening a shorter
-    // destination first would clamp the scroll position and create another jump.
-    navigate(next);
-    setQuietRefresh(value => value + 1);
-  };
+  const navigateToolbar = (next: ViewKey) => activateToolbarTab({
+    active: view, next, movement: toolbarScroll,
+    scroll: () => scrollToolbarToTop(window), navigate,
+    refreshDestination: () => { setToolbarRefresh(null); setQuietRefresh(value => value + 1); },
+    refreshCurrent: arrival => setToolbarRefresh(previous => ({ id: (previous?.id ?? 0) + 1, arrival })),
+  });
   useEffect(() => () => { toolbarScroll.current?.cancel(); }, []);
   const openChecklist = () => navigate("checklists");
   const alerts = useAlerts(schedulingToken, view === "alerts");
@@ -123,7 +112,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
     } else if (alert.target === "creative") {
       setView("creative"); setAlertWorkLoading(true);
       try { await creative.refresh(); } finally { setAlertWorkLoading(false); }
-    } else setView(alert.target === "availability" ? "availability" : "scheduling");
+    } else setView(alert.target === "settings" ? "settings" : alert.target === "alerts" ? "alerts" : alert.target === "availability" ? "availability" : "scheduling");
   };
   const creativeTotals = useMemo(() => creativeEarnings(creative.items), [creative.items]);
   const currentYear = Number(studioLocal(Date.now()).slice(0, 4));
@@ -143,6 +132,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
     const openSchedule = () => {
       if (["connected", "error"].includes(new URLSearchParams(window.location.search).get("calendar") ?? "")) setView("settings");
       if (window.location.hash === "#alerts") setView("alerts");
+      if (window.location.hash === "#settings") setView("settings");
       if (window.location.hash === "#creative-work") setView("creative");
       if (window.location.hash === "#scheduling") setView("scheduling");
       if (window.location.hash === "#daily-quiz") setView("overview");
@@ -395,7 +385,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           </article>}
           {view === "team" && isOwner && <Tabs defaultValue="people" className="owner-team-tabs">
             <TabsList aria-label="Team sections"><TabsTrigger value="people">People</TabsTrigger><TabsTrigger value="engagement">Check-ins &amp; rewards</TabsTrigger></TabsList>
-            <TabsContent value="people"><TeamPage payroll={payroll.state} employees={payload.employees} rentals={rentals} creative={creative.items} onSetup={() => setTeamSetupOpen(true)} /></TabsContent>
+            <TabsContent value="people"><TeamPage token={schedulingToken} payroll={payroll.state} employees={payload.employees} rentals={rentals} creative={creative.items} onSetup={() => setTeamSetupOpen(true)} /></TabsContent>
             <TabsContent value="engagement"><TeamEngagementReview token={schedulingToken} /></TabsContent>
           </Tabs>}
           {view === "payouts" && <>

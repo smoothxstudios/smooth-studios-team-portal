@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { TeamNotifications } from "@/components/team-notifications";
 import { creativeEarnings } from "@/lib/creative-work.mjs";
 import { dollars,formatDate,paidEarnings,rentalState,teamAccent,unpaidEarnings } from "@/lib/dashboard-presentation";
 import type {
@@ -11,8 +12,10 @@ import {
 CalendarDays
 } from "lucide-react";
 
-export function TeamPage({ employees, rentals, creative, payroll, onSetup }: { employees: Employee[]; rentals: Rental[]; creative: CreativeAssignment[]; payroll?: PayrollState; onSetup: () => void }) {
+export function TeamPage({ employees, rentals, creative, payroll, onSetup, token }: { employees: Employee[]; rentals: Rental[]; creative: CreativeAssignment[]; payroll?: PayrollState; onSetup: () => void; token?: string }) {
   return (
+    <>
+    {token && <TeamNotifications token={token} employees={employees} />}
     <div className="team-page-grid">
       {employees.map((employee) => {
         const advance = payroll?.balances.find(item => item.employeeId === employee.id);
@@ -31,5 +34,6 @@ export function TeamPage({ employees, rentals, creative, payroll, onSetup }: { e
         );
       })}
     </div>
+    </>
   );
 }
