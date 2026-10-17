@@ -2,6 +2,7 @@ import { TEAM } from "../lib/team-schedule.mjs";
 import { unbase64url } from "../lib/team-auth.mjs";
 import { payrollRecord, payrollKey, recordManifest, verifyDelta, recordBatches } from '../lib/sync-records.mjs';
 import { trackImport, cleanImports } from './sync-storage.mjs';
+import { advanceReviewQuery, advanceReviewDetails } from './payroll-reviews.mjs';
 
 const earningRecord = row => payrollRecord({ employeeId: row.employee_id, rentalId: row.rental_id,
   amountCents: row.amount_cents, paidCents: row.paid_cents, earnedAt: row.earned_at, eligible: row.eligible === 1 });
@@ -66,21 +67,24 @@ async function payrollState(db, user) {
       WHERE (? IS NULL OR a.employee_id = ?) GROUP BY a.employee_id, p.source_kind, p.source_id`).bind(employee, employee).all(),
     // Preserve the ledger if source data later changes. Do not silently create
     // new available credit or settle a different earning with the same money.
-    db.prepare(`SELECT a.employee_id, p.source_kind, p.source_id, SUM(p.amount_cents) AS applied
-      FROM payroll_advance_allocations p JOIN payroll_advances a ON a.id = p.advance_id
-      LEFT JOIN payroll_sources s ON s.employee_id = a.employee_id AND s.kind = p.source_kind AND s.id = p.source_id
-      WHERE (? IS NULL OR a.employee_id = ?) GROUP BY a.employee_id, p.source_kind, p.source_id
-      HAVING s.id IS NULL OR SUM(p.amount_cents) > s.amount_cents OR (p.source_kind = 'rental' AND SUM(p.amount_cents) + MAX(p.cash_floor_cents) > s.amount_cents)`).bind(employee, employee).all(),
+    db.prepare(advanceReviewQuery).bind(employee, employee).all(),
   ]);
   return { version: 1, syncedAt: state?.synced_at ?? null,
     balances: balances.results.map(row => ({ employeeId: row.employee_id, totalCents: Number(row.total), appliedCents: Number(row.applied), remainingCents: Math.max(0, Number(row.total) - Number(row.applied)) })),
     allocations: allocations.results.map(row => ({ employeeId: row.employee_id, kind: row.source_kind, sourceId: row.source_id, amountCents: Number(row.amount), cashFloorCents: Number(row.floor) })),
-    reviewCount: reviews.results.length };
+    reviewCount: reviews.results.length,
+    ...(employee === null ? { reviewPeople: [...new Set(reviews.results.map(row => row.employee_id))].map(employeeId => ({ employeeId, count: reviews.results.filter(row => row.employee_id === employeeId).length })) } : {}),
+  };
 }
 
 export async function payrollRoute({ request, db, user, env, body, fail }) {
   const path = new URL(request.url).pathname;
   const isSync = user === 'sync';
+  if (path === '/payroll/reviews') {
+    if (user !== 'owner') fail(403, 'Only Smooth can review advance discrepancies.');
+    if (request.method !== 'GET') fail(405, 'Advance reviews are read-only.');
+    return advanceReviewDetails(db);
+  }
   if (isSync && request.method === 'GET' && path === '/sync/payroll/manifest') {
     await cleanImports(db, 'payroll');
     const state = await db.prepare('SELECT generation, synced_at FROM payroll_state WHERE id = 1').first();

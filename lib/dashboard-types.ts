@@ -102,6 +102,15 @@ export type PayrollState = {
   version: 1; syncedAt: string | null; balances: AdvanceBalance[];
   allocations: { employeeId: string; kind: "rental" | "creative"; sourceId: string; amountCents: number; cashFloorCents: number }[];
   reviewCount: number;
+  reviewPeople?: { employeeId: string; count: number }[];
+};
+
+export type PayrollReview = {
+  employeeId: string; kind: "rental" | "creative"; sourceId: string;
+  title: string; customer: string | null; start: string | null; end: string | null;
+  sourceAvailable: boolean; appliedCents: number; cashFloorCents: number;
+  currentAmountCents: number | null; creditedAt: string;
+  code: string; reason: string; nextStep: string;
 };
 
 export type DashboardPayload = {

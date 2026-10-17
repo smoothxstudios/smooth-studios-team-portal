@@ -1,5 +1,6 @@
 "use client";
 import { OwnerWeeklyHours } from "@/components/dashboard/owner-weekly-hours";
+import { AdvanceReview } from "@/components/dashboard/advance-review";
 import { OwnerHomeLayout } from "@/components/dashboard/owner-home-layout";
 
 import { AlertsPage,UnreadBadge } from "@/components/alerts";
@@ -45,6 +46,7 @@ SidebarProvider
 } from "@/components/ui/sidebar";
 import { Tabs,TabsContent,TabsList,TabsTrigger } from "@/components/ui/tabs";
 import { APPOINTMENT_CATEGORIES } from "@/lib/appointment-categories.mjs";
+import { rentalAlertTargetId } from "@/lib/alert-target.mjs";
 import { creativeEarningDate,creativeEarnings } from "@/lib/creative-work.mjs";
 import { decryptDashboard,encryptWorkflowPayload } from "@/lib/dashboard-crypto";
 import type { PaymentFilter,ViewKey } from "@/lib/dashboard-presentation";
@@ -326,7 +328,12 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Creative work totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "overview" && !isOwner && <CreativeWorkPreview state={creative} isOwner={false} onOpen={() => setView("creative")} />}
           {view === "payouts" && payroll.error && <p className="schedule-warning" role="status">{payroll.error}</p>}
-          {view === "payouts" && isOwner && Boolean(payroll.state?.reviewCount) && <p className="schedule-warning" role="status">A previously credited earning changed in Calendar. Its advance credit is preserved and needs review.</p>}
+          {view === "payouts" && isOwner && <AdvanceReview token={schedulingToken} payroll={payroll.state} employees={payload.employees} onReviewed={payroll.updateReviewSummary} onOpenSource={(kind, id) => {
+            const target = kind === "rental" ? "scheduling" : "creative";
+            const focusId = kind === "rental" ? rentalAlertTargetId(id) : id;
+            setFocusedAlert(focusId ? { target, id: focusId } : null); setView(focusId ? target : "rentals");
+            if (kind === "creative") void creative.refresh();
+          }} />}
           {view === "settings" && <DashboardSettings token={schedulingToken} profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} dark={dark} onThemeChange={setDark} onSync={isOwner ? openCalendarSync : undefined} lastSynced={`${formatDate(payload.generatedAt, true)} · ${formatTime(payload.generatedAt)}`} />}
           {view === "checklists" && <StudioInfoPage token={schedulingToken} isOwner={isOwner} userId={payload.user.id} section="checklists" />}
           {view === "creative" && <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} focusLoading={alertWorkLoading} focusId={focusedAlert?.target === "creative" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} />}

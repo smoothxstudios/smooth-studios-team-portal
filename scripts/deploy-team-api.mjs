@@ -66,7 +66,7 @@ for (let attempt = 0; attempt < 10; attempt++) {
   try {
     const health = await fetch(`${TEAM_API_URL}/health`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
     const status = health.ok && await health.json();
-    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 3 && status.creativeWorkVersion === 2 && status.studioReferenceVersion === 1 && status.payrollVersion === 1 && status.alertsVersion === 3 && status.calendarInvitationsVersion === 1 && status.calendarDeliveryVersion === 1 && status.manualNoticesVersion === 1 && status.reminderTemplatesVersion === 1 && status.dashboardLayoutVersion === 1 && status.rentalStaffVersion === 1 && status.rentalTimeVersion === 1 && status.incrementalSyncVersion === 1);
+    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 3 && status.creativeWorkVersion === 2 && status.studioReferenceVersion === 1 && status.payrollVersion === 1 && status.alertsVersion === 3 && status.calendarInvitationsVersion === 1 && status.calendarDeliveryVersion === 1 && status.manualNoticesVersion === 1 && status.reminderTemplatesVersion === 1 && status.dashboardLayoutVersion === 1 && status.rentalStaffVersion === 1 && status.rentalTimeVersion === 1 && status.incrementalSyncVersion === 1 && status.payrollReviewVersion === 1);
   } catch { /* A transient deployment response is retried within this bound. */ }
   if (ready) break;
   if (attempt < 9) await new Promise(resolve => setTimeout(resolve, 2000));

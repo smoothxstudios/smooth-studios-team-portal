@@ -1928,6 +1928,30 @@ button { cursor: pointer; }
 .alerts-person-group { margin-top: 20px; border-top: 1px solid var(--border); }
 .alerts-person-group .alerts-list { margin-top: 0; }
 .team-payout-breakdown { grid-column: 1 / -1; }
+.advance-review-strip { display: flex; align-items: center; gap: 8px; min-width: 0; margin-bottom: 12px; padding: 4px 8px 4px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); font-size: 12px; }
+.advance-review-strip > svg { flex-shrink: 0; color: #a66d22; }
+.advance-review-strip > strong { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.advance-review-strip > button { min-height: 44px; flex-shrink: 0; gap: 6px; padding: 8px; font-size: 12px; }
+.advance-review-strip button span { color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.advance-review-dialog { display: flex; flex-direction: column; gap: 0; width: calc(100vw - 24px); max-width: 580px; max-height: calc(100dvh - 32px); padding: 0; overflow: hidden; border-radius: 18px; }
+.advance-review-dialog > [data-slot="dialog-header"] { padding: 20px 68px 16px 20px; flex-shrink: 0; text-align: left; }
+.advance-review-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 20px; font-size: 13px; line-height: 1.55; }
+.advance-review-person > h3 { display: flex; align-items: center; gap: 9px; padding: 12px 0; font-size: 15px; font-weight: 700; }
+.advance-review-person .employee-avatar { width: 28px; height: 28px; font-size: 12px; }
+.advance-review-item { padding: 14px 0 18px; border-top: 1px solid var(--border); min-width: 0; }
+.advance-review-record { display: grid; gap: 2px; overflow-wrap: anywhere; }
+.advance-review-record > strong { font-size: 14px; }
+.advance-review-record > span, .advance-review-next { color: var(--muted-foreground); }
+.advance-review-reason { margin: 10px 0; font-weight: 600; }
+.advance-review-item dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 10px 0; }
+.advance-review-item dt { font-size: 11px; color: var(--muted-foreground); }
+.advance-review-item dd { margin: 2px 0 0; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.advance-review-actions { display: flex; align-items: start; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.advance-review-actions details { min-width: 0; max-width: 100%; font-size: 11px; color: var(--muted-foreground); }
+.advance-review-actions summary { cursor: pointer; padding: 12px 0; }
+.advance-review-actions code, .advance-review-actions details span { display: block; overflow-wrap: anywhere; }
+.advance-review-dialog > footer { display: flex; justify-content: space-between; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.advance-review-actions > button, .advance-review-dialog > footer > button { min-height: 44px; }
 .team-payout-people { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0 24px 6px; }
 .team-payout-person { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 3fr); gap: 20px; align-items: start; padding: 18px 0; min-width: 0; }
 .team-payout-person + .team-payout-person { border-top: 1px solid var(--border); }

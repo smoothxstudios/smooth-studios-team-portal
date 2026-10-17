@@ -135,7 +135,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -169,7 +169,7 @@ async function route(request, env, ctx) {
   }
   if (url.pathname === "/alerts" || url.pathname.startsWith("/alerts/")) return alertsRoute({ request, db, user, body, fail });
   if (url.pathname === "/dashboard-layout") return dashboardLayoutRoute({ request, db, user, body, fail });
-  if (url.pathname === "/payroll" || url.pathname.startsWith("/sync/payroll")) return payrollRoute({ request, db, user, env, body, fail });
+  if (url.pathname === "/payroll" || url.pathname.startsWith("/payroll/") || url.pathname.startsWith("/sync/payroll")) return payrollRoute({ request, db, user, env, body, fail });
   if (["/studio-reference", "/sync/studio-reference", "/rental-checklists"].includes(url.pathname) || url.pathname.startsWith("/rental-checklists/")) return studioReferenceRoute({ request, db, user, env, body, fail });
   if (url.pathname === "/creative-work" || url.pathname.startsWith("/creative-work/")) return creativeWorkRoute({ request, db, user, env, ctx, body, fail });
   if (url.pathname === "/engagement" || url.pathname.startsWith("/engagement/")) return engagementRoute({ request, db, user, env, body, fail });
