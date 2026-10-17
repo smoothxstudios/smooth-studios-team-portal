@@ -141,6 +141,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   }, [view]);
   useEffect(() => {
     const openSchedule = () => {
+      if (["connected", "error"].includes(new URLSearchParams(window.location.search).get("calendar") ?? "")) setView("settings");
       if (window.location.hash === "#alerts") setView("alerts");
       if (window.location.hash === "#creative-work") setView("creative");
       if (window.location.hash === "#scheduling") setView("scheduling");

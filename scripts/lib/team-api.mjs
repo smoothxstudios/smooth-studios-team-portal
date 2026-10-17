@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { teamToken } from "../../lib/team-auth.mjs";
 import { TEAM_API_URL } from "../../lib/team-schedule.mjs";
 
-export async function syncTeamSchedule(rentals, ownerPassword) {
+export async function syncTeamSchedule(rentals, ownerPassword, calendarConfiguration, calendarReadAt) {
   const token = await teamToken(ownerPassword, "sync");
   async function request(path, data) {
     const response = await fetch(`${TEAM_API_URL}${path}`, {
@@ -13,6 +13,7 @@ export async function syncTeamSchedule(rentals, ownerPassword) {
     if (!response.ok) throw new Error(`Team schedule sync failed (${response.status}). Existing encrypted dashboards were not overwritten.`);
     return response.json();
   }
+  if (calendarConfiguration) await request("/sync/calendar/configuration", calendarConfiguration);
   const generation = randomUUID();
   // Deliberate allowlist: filtered rental descriptions include client contact,
   // quoted price, paid-online amount and setup answers for the assigned team.
@@ -23,7 +24,7 @@ export async function syncTeamSchedule(rentals, ownerPassword) {
   for (let offset = 0; offset < appointments.length; offset += 50) {
     await request("/sync/import", { generation, appointments: appointments.slice(offset, offset + 50) });
   }
-  await request("/sync/commit", { generation, count: appointments.length });
+  await request("/sync/commit", { generation, count: appointments.length, ...(calendarReadAt ? { calendarReadAt } : {}) });
   const result = await request("/sync/accepted");
   if (!Array.isArray(result.assignments) || !Array.isArray(result.calendarAssignments)) throw new Error("Deploy the updated team API before syncing Calendar assignment notes. Dashboards were not overwritten.");
   const push = result.pushDiagnostics;

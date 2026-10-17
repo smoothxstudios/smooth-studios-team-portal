@@ -43,6 +43,10 @@ if (!existing.some(secret => secret.name === "VAPID_JWK")) {
   const jwk = await crypto.subtle.exportKey("jwk", keys.privateKey);
   await secretRequest("PUT", { name: "VAPID_JWK", text: JSON.stringify(jwk), type: "secret_text" });
 }
+if (!existing.some(secret => secret.name === "CALENDAR_CONNECTION_KEY")) {
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  await secretRequest("PUT", { name: "CALENDAR_CONNECTION_KEY", text: Buffer.from(raw).toString("base64url"), type: "secret_text" });
+}
 await secretRequest("PUT", { name: "TEAM_TOKEN_HASHES", text: JSON.stringify(hashes), type: "secret_text" });
 
 function wrangler(args) {
@@ -62,7 +66,7 @@ for (let attempt = 0; attempt < 10; attempt++) {
   try {
     const health = await fetch(`${TEAM_API_URL}/health`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
     const status = health.ok && await health.json();
-    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 3 && status.creativeWorkVersion === 2 && status.studioReferenceVersion === 1 && status.payrollVersion === 1 && status.alertsVersion === 2 && status.calendarInvitationsVersion === 1);
+    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 3 && status.creativeWorkVersion === 2 && status.studioReferenceVersion === 1 && status.payrollVersion === 1 && status.alertsVersion === 2 && status.calendarInvitationsVersion === 1 && status.calendarDeliveryVersion === 1);
   } catch { /* A transient deployment response is retried within this bound. */ }
   if (ready) break;
   if (attempt < 9) await new Promise(resolve => setTimeout(resolve, 2000));

@@ -16,6 +16,7 @@ import { useRefreshSource } from "@/components/dashboard-refresh";
 import { saveScheduleMutation, scheduleMutationMessage, scheduleMutationError } from "@/lib/team-schedule-mutations.mjs";
 import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps, workPreferenceMatch } from "@/lib/team-schedule.mjs";
 import { calendarInvitationStatus, calendarInvitationLabel, pendingCalendarInvitations } from "@/lib/calendar-invitations.mjs";
+import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
 
 const personName = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
 const time = (value: string) => new Date(value).toLocaleTimeString("en-US", { timeZone: STUDIO_ZONE, hour: "numeric", minute: "2-digit" });
@@ -156,6 +157,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       {appointment && /studio.*rental|rental.*studio/i.test(appointment.title) && <RentalDescription details={appointment.rentalDetails} />}
       {item.instructions && <p className="schedule-instructions">{item.instructions}</p>}
       {item.note && <p className="schedule-notice">{item.note}</p>}
+      <CalendarAssignmentStatus delivery={item.calendarSync} />
       {busyConflicts.length > 0 && <p className="schedule-warning">Conflict: {busyConflicts.join("; ")}. {conflictApproved ? "Smooth approved this time conflict. You can still accept the offer." : isOwner ? "You can approve this time conflict below." : "Ask Smooth to approve the conflict or adjust the assignment."}</p>}
       {conflictApproved && <p className="schedule-small">Time conflict override approved by Smooth for this appointment time.</p>}
       <div className="schedule-actions">
@@ -165,7 +167,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
           <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "declined" }, description: `Decline ${item.title} on ${date(item.start)}? Smooth will see your response.` })}><X size={16} />Decline</Button>
         </>}
         {isOwner && ["pending", "accepted"].includes(item.status) && future(item.start) && busyConflicts.length > 0 && !conflictApproved && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { overrideConflicts: true }, description: `Allow ${personName(item.employeeId)} to accept ${item.title} despite the recorded conflicts for ${date(item.start)} at ${time(item.start)}? Their acceptance is still required. Changing the appointment time clears this approval.` })}>Allow time conflict</Button>}
-        {isOwner && ["pending", "accepted"].includes(item.status) && future(item.start) && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "cancelled" }, description: `Cancel ${personName(item.employeeId)}’s portal offer for ${item.title}? This does not remove any Google Calendar invitation.` })}>Cancel offer</Button>}
+        {isOwner && ["pending", "accepted"].includes(item.status) && future(item.start) && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "cancelled" }, description: `Cancel ${personName(item.employeeId)}’s app offer for ${item.title}? The app will also remove an invitation it created. Invitations added separately in Google Calendar stay available.` })}>Cancel offer</Button>}
       </div>
     </article>;
   }

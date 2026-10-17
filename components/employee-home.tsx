@@ -8,6 +8,7 @@ import { employeeHomeWork } from "@/lib/employee-home.mjs";
 import { categorizeAppointment } from "@/lib/appointment-categories.mjs";
 import { STUDIO_ZONE } from "@/lib/team-schedule.mjs";
 import { calendarInvitationLabel } from "@/lib/calendar-invitations.mjs";
+import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
 import type { Rental, AdvanceBalance } from "@/lib/dashboard-types";
 import type { TeamAssignment, TeamSchedule } from "@/lib/team-api";
 
@@ -61,7 +62,7 @@ export function EmployeeHome({ userId, schedule, loading, options, onBlockTime, 
             <div className="employee-work-title"><span>{category}</span><h3>{item.title}</h3>{item.customer && <p>{item.customer}</p>}</div>
             <span className={`schedule-status ${schedule ? "accepted" : ""}`}><Check size={13} />{Date.parse(item.start) <= Date.now() ? "In progress" : item.status}</span><ChevronDown className="employee-work-chevron" size={18} />
           </summary>
-          <div className="employee-work-details">{item.appointmentId && /studio.*rental|rental.*studio/i.test(item.title) && <RentalDescription details={item.rentalDetails} />}<h4>Preparation & instructions</h4><p>{item.instructions || "No additional instructions have been added for this assignment."}</p>{item.note && <p className="schedule-notice">{item.note}</p>}{options.onChecklist && item.appointmentId && /studio.*rental|rental.*studio/i.test(item.title) && <Button variant="outline" onClick={() => options.onChecklist?.()}>Rental checklist</Button>}<Button variant="outline" onClick={options.onGuide}><BookOpen size={16} />Studio guidelines</Button></div>
+          <div className="employee-work-details"><CalendarAssignmentStatus delivery={item.calendarSync} />{item.appointmentId && /studio.*rental|rental.*studio/i.test(item.title) && <RentalDescription details={item.rentalDetails} />}<h4>Preparation & instructions</h4><p>{item.instructions || "No additional instructions have been added for this assignment."}</p>{item.note && <p className="schedule-notice">{item.note}</p>}{options.onChecklist && item.appointmentId && /studio.*rental|rental.*studio/i.test(item.title) && <Button variant="outline" onClick={() => options.onChecklist?.()}>Rental checklist</Button>}<Button variant="outline" onClick={options.onGuide}><BookOpen size={16} />Studio guidelines</Button></div>
         </details>;
       })}</div> : <div className="employee-empty"><CalendarDays size={28} /><h3>{schedule ? "You’re all caught up" : "No upcoming work in the last sync"}</h3><p>{schedule ? "Your next assignment will appear here. Keep your availability up to date so Smooth can schedule you." : "Check Schedule for new offers and your latest availability."}</p></div>}
     </section>}

@@ -94,6 +94,7 @@ try {
   if (error?.code !== "ENOENT") throw error;
 }
 const accessToken = await googleAccessToken(serviceAccount, teamEnabled);
+const calendarReadAt = new Date().toISOString();
 const calendarEvents = await fetchCalendarEvents(calendarId, accessToken);
 const stripeSecretKey = process.env.STRIPE_RESTRICTED_KEY?.trim();
 const stripeSnapshot = stripeSecretKey
@@ -115,7 +116,8 @@ const payloadOptions = {
 };
 let payloads = buildDashboardPayloads(payloadOptions);
 if (teamEnabled) {
-  const portal = await syncTeamSchedule(payloads.owner.rentals, passwords.owner);
+  const portal = await syncTeamSchedule(payloads.owner.rentals, passwords.owner, { calendarId,
+    employees: config.employees.filter(employee => employee.accessReady).map(({ id, email, invitationEmails }) => ({ id, email, invitationEmails })) }, calendarReadAt);
   const calendarAssignmentSync = await syncCalendarAssignmentNotes({ calendarId, accessToken, calendarEvents,
     rentals: payloads.owner.rentals, assignments: portal.calendarAssignments, employees: config.employees });
   payloads = buildDashboardPayloads({ ...payloadOptions, portalAssignments: portal.assignments });

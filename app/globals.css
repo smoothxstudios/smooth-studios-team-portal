@@ -2009,3 +2009,39 @@ button { cursor: pointer; }
   .alert-open:hover, .alerts-undo > button:hover, .availability-person-trigger:hover { background: var(--muted); }
   .alert-row-action:hover { color: var(--foreground); background: var(--muted); }
 }
+
+/* Calendar credentials stay in the upload flow; Settings shows connection state. */
+.calendar-settings { gap: 14px; min-width: 0; }
+.calendar-settings > p { margin: 0; }
+.calendar-connection-state { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; width: 100%; }
+.calendar-connection-state > svg { flex-shrink: 0; color: #169966; }
+.calendar-connection-state > div { min-width: 0; flex: 1; }
+.calendar-connection-state strong { font-size: 14px; font-weight: 650; }
+.calendar-connection-state p { margin: 2px 0 0; overflow-wrap: anywhere; font-size: 12px; }
+.calendar-settings .calendar-settings-note { font-size: 12px; line-height: 1.5; }
+.calendar-settings-message { font-size: 13px; color: #118653; }
+.calendar-settings-error { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; width: 100%; }
+.calendar-settings-error p { min-width: 0; flex: 1; font-size: 13px; overflow-wrap: anywhere; }
+.calendar-setup, .calendar-team { min-width: 0; width: 100%; border-top: 1px solid var(--border); }
+.calendar-setup > summary, .calendar-team > summary { min-height: 44px; padding: 12px 0; font-size: 13px; font-weight: 650; cursor: pointer; }
+.calendar-setup > ol { margin: 0 0 12px; padding-left: 20px; list-style: decimal; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
+.calendar-setup li + li { margin-top: 8px; }
+.calendar-setup a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+.calendar-redirect { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; margin-bottom: 12px; }
+.calendar-redirect code { min-width: 0; flex: 1 1 240px; padding: 10px; border-radius: 8px; background: var(--muted); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; user-select: text; }
+.calendar-setup-guide { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 0; margin-left: 14px; font-size: 12px; }
+.calendar-team > ul { margin: 0; padding: 0; list-style: none; }
+.calendar-team li { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 12px; }
+.calendar-team li > strong { font-weight: 600; }
+.calendar-team li > span { min-width: 0; color: var(--muted-foreground); overflow-wrap: anywhere; }
+.calendar-setup > summary:focus-visible, .calendar-team > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
+.dark .calendar-settings-message { color: #71d1a5; }
+
+.calendar-assignment-status { display: flex; align-items: center; gap: .35rem; }
+.calendar-assignment-status svg { flex: 0 0 auto; }
+.calendar-privacy-link { display: block; margin-top: .7rem; text-align: center; color: var(--muted-foreground); font-size: .68rem; }
+.calendar-privacy { max-width: 46rem; margin: 0 auto; padding: 3rem 1.4rem; color: var(--foreground); line-height: 1.7; }
+.calendar-privacy h1 { margin: 1.5rem 0 .5rem; font-size: clamp(1.7rem, 5vw, 2.5rem); font-weight: 700; line-height: 1.2; }
+.calendar-privacy h2 { margin: 1.5rem 0 .4rem; font-size: 1.1rem; font-weight: 650; }
+.calendar-privacy p { margin: .7rem 0; }
+.calendar-privacy a { text-decoration: underline; text-underline-offset: .2em; }

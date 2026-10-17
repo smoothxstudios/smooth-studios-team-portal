@@ -3,6 +3,7 @@
 import { DashboardVersionFooter } from "@/components/dashboard-version-footer";
 import { Logo } from "@/components/dashboard/shared";
 import { Button } from "@/components/ui/button";
+import { dashboardBasePath } from "@/lib/site-path.mjs";
 import type {
 AccessProfile
 } from "@/lib/dashboard-types";
@@ -114,6 +115,7 @@ export function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[];
           {quickReady && <button type="button" className="login-account-switch" disabled={loading} onClick={() => { setUsePassword(false); setPassword(""); setError(""); }}>Use quick sign-in</button>}
         </form>}
         <DashboardVersionFooter compact />
+        <a className="calendar-privacy-link" href={`${dashboardBasePath()}/privacy/`}>Calendar connection privacy</a>
       </div>
     </main>
   );

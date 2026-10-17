@@ -10,6 +10,8 @@ import { alertsRoute } from "./alerts.mjs";
 import { payrollRoute } from "./payroll.mjs";
 import { studioReferenceRoute } from "./studio-reference.mjs";
 import { CALENDAR_INVITATION_STATUSES } from "../lib/calendar-invitations.mjs";
+import { calendarAuthRoute } from "./calendar-auth.mjs";
+import { calendarQueueStatement, flushCalendarAssignments } from "./calendar-delivery.mjs";
 
 const users = TEAM.map(p => p.id);
 const origins = new Set(["https://smoothxstudios.github.io", "https://dashboard.smoothstudios.co", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
@@ -115,6 +117,11 @@ function approveConflict(period) {
 
 async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
+  if (request.method === "GET" && ["/calendar/oauth/start", "/calendar/oauth/callback"].includes(url.pathname)) {
+    const result = await calendarAuthRoute({ request, env, user: null, body, fail });
+    if (url.pathname.endsWith("/callback")) ctx.waitUntil(flushCalendarAssignments(env, { limit: 3 }));
+    return result;
+  }
   if (request.method === "GET" && url.pathname === "/studio-reference/key") {
     if (!env.STUDIO_REFERENCE_KEY) fail(503, "Secure import is not ready.");
     const { kty, n, e } = JSON.parse(env.STUDIO_REFERENCE_KEY);
@@ -122,11 +129,37 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 2, calendarInvitationsVersion: 1 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 2, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
   else if (user === "sync") fail(403, "Sync access is restricted to synchronization endpoints.");
+  if (url.pathname.startsWith("/calendar/")) return calendarAuthRoute({ request, env, user, body, fail });
+  if (request.method === "POST" && url.pathname === "/sync/calendar/configuration") {
+    const input = await body(request);
+    const calendarId = text(input.calendarId, 500);
+    if (calendarId.includes("/") || /\s/.test(calendarId) || !Array.isArray(input.employees) || input.employees.length > users.length - 1) fail(400, "Invalid Calendar delivery configuration.");
+    const ids = new Set(), emails = new Set();
+    const employees = input.employees.map(entry => {
+      if (!entry || typeof entry !== "object") fail(400, "Invalid Calendar team member.");
+      const id = person(entry.id, true);
+      if (ids.has(id)) fail(400, "Duplicate Calendar team member.");
+      ids.add(id);
+      if (!Array.isArray(entry.invitationEmails) || !entry.invitationEmails.length || entry.invitationEmails.length > 10) fail(400, "Check the Calendar invitation addresses.");
+      const invitationEmails = [...new Set(entry.invitationEmails.map(value => {
+        const email = text(value, 254).toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || emails.has(email)) fail(400, "Calendar invitation addresses must belong to one person.");
+        return email;
+      }))];
+      invitationEmails.forEach(email => emails.add(email));
+      const email = text(entry.email, 254).toLowerCase();
+      if (!invitationEmails.includes(email)) fail(400, "The primary invitation address must be a configured alias.");
+      return { id, email, invitationEmails };
+    });
+    await db.prepare("INSERT INTO calendar_sync_config (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data")
+      .bind(JSON.stringify({ calendarId, employees })).run();
+    return { saved: true };
+  }
   if (url.pathname === "/alerts" || url.pathname.startsWith("/alerts/")) return alertsRoute({ request, db, user, body, fail });
   if (url.pathname === "/payroll" || url.pathname.startsWith("/sync/payroll")) return payrollRoute({ request, db, user, env, body, fail });
   if (["/studio-reference", "/sync/studio-reference", "/rental-checklists"].includes(url.pathname) || url.pathname.startsWith("/rental-checklists/")) return studioReferenceRoute({ request, db, user, env, body, fail });
@@ -182,7 +215,23 @@ async function route(request, env, ctx) {
 
   if (request.method === "GET" && url.pathname === "/schedule") {
     const s = await snapshot(db), isOwner = user === "owner";
-    const assignments = s.assignments.filter(a => isOwner || a.employeeId === user);
+    const calendarRows = (await db.prepare(`SELECT q.assignment_id, q.status, q.result, q.updated_at FROM calendar_assignment_outbox q
+      JOIN team_assignments a ON a.id = q.assignment_id WHERE ? = 'owner' OR a.employee_id = ?`).bind(user, user).all()).results;
+    const assignments = s.assignments.filter(a => isOwner || a.employeeId === user).map(assignment => {
+      const row = calendarRows.find(item => item.assignment_id === assignment.id);
+      if (!row) return assignment;
+      let result = {}; try { result = JSON.parse(row.result ?? "{}"); } catch { /* Keep a safe pending status. */ }
+      let deliveryStatus = row.status;
+      // A later Calendar import wins over an older outbound confirmation.
+      if (row.status === "synced" && Date.parse(s.state.synced_at) > row.updated_at && !["invitation_removed", "no_calendar_invitation"].includes(result.code)) {
+        const invitation = s.appointments.find(appointment => appointment.id === assignment.appointmentId)?.calendarInvitations?.find(item => item.employeeId === assignment.employeeId);
+        result.googleStatus = invitation?.status;
+        if (!invitation && assignment.status !== "cancelled") { deliveryStatus = "needs_review"; result.code = "invitation_missing"; }
+      }
+      return { ...assignment, calendarSync: { status: deliveryStatus, checkedAt: row.updated_at,
+        ...(typeof result.code === "string" ? { code: result.code } : {}),
+        ...(["accepted", "declined", "needsAction", "tentative", "removed"].includes(result.googleStatus) ? { googleStatus: result.googleStatus } : {}) } };
+    });
     const ids = new Set(assignments.filter(active).map(a => a.appointmentId));
     const devices = (await db.prepare("SELECT user_id, COUNT(*) AS count FROM team_devices GROUP BY user_id").all()).results;
     const workPreferences = user === "owner"
@@ -239,9 +288,12 @@ async function route(request, env, ctx) {
   }
   if (request.method === "POST" && url.pathname === "/sync/commit") {
     const input = await body(request), generation = text(input.generation, 80), s = await snapshot(db);
+    const calendarReadAt = input.calendarReadAt === undefined ? new Date().toISOString() : text(input.calendarReadAt, 40);
+    if (!Number.isFinite(Date.parse(calendarReadAt)) || Date.parse(calendarReadAt) > Date.now() + 60_000 || Date.parse(calendarReadAt) < Date.now() - 86400_000) fail(400, "Invalid Calendar read time.");
     const next = await jsonRows(db, "SELECT data FROM team_appointments WHERE generation = ?", generation);
     if (!Number.isInteger(input.count) || next.length !== input.count) fail(409, "The calendar import is incomplete.");
     const changes = [], notifications = [];
+    const queuedIds = new Set((await db.prepare("SELECT assignment_id FROM calendar_assignment_outbox").all()).results.map(row => row.assignment_id));
     const appointmentsById = new Map(next.map(a => [a.id, a]));
     for (const a of s.assignments.filter(a => a.appointmentId && active(a))) {
       const appointment = appointmentsById.get(a.appointmentId);
@@ -256,14 +308,16 @@ async function route(request, env, ctx) {
       }
     }
     await commit(db, s.state, mutation => [
-      db.prepare(`UPDATE team_state SET generation = ?, synced_at = ? WHERE id = 1 AND ${guard}`).bind(generation, new Date().toISOString(), mutation),
+      db.prepare(`UPDATE team_state SET generation = ?, synced_at = ? WHERE id = 1 AND ${guard}`).bind(generation, calendarReadAt, mutation),
       db.prepare(`UPDATE team_assignments SET data = (SELECT value FROM json_each(?) WHERE json_extract(value, '$.id') = team_assignments.id)
         WHERE id IN (SELECT json_extract(value, '$.id') FROM json_each(?)) AND ${guard}`)
         .bind(JSON.stringify(changes), JSON.stringify(changes), mutation),
+      ...changes.filter(assignment => queuedIds.has(assignment.id)).map(assignment => calendarQueueStatement(db, assignment, mutation)),
     ], notifications);
     // The old snapshot remains available until the atomic generation switch.
     await db.prepare("DELETE FROM team_appointments WHERE generation != ?").bind(generation).run();
     if (notifications.length) ctx.waitUntil(flushAlerts(env));
+    if (changes.some(assignment => queuedIds.has(assignment.id))) ctx.waitUntil(flushCalendarAssignments(env, { limit: 3 }));
     return { synced: next.length };
   }
   if (["POST", "PATCH", "DELETE"].includes(request.method) &&
@@ -370,8 +424,10 @@ async function route(request, env, ctx) {
       status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       ...(input.overrideConflicts ? { conflictOverride: approveConflict({ start, end }) } : {}) };
     const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices WHERE user_id = ?").bind(employeeId).first();
-    await commit(db, s.state, mutation => [saveAssignment(db, item, mutation)], assignmentNotifications(item, "offered", [employeeId]));
+    await commit(db, s.state, mutation => [saveAssignment(db, item, mutation),
+      ...(item.appointmentId ? [calendarQueueStatement(db, item, mutation)] : [])], assignmentNotifications(item, "offered", [employeeId]));
     ctx.waitUntil(flushAlerts(env));
+    if (item.appointmentId) ctx.waitUntil(flushCalendarAssignments(env, { assignmentId: item.id, limit: 1 }));
     return { saved: true, notification: devices.count
       ? "Offer saved. A notification was queued for their enabled devices."
       : "Offer saved. This employee has no devices enabled for notifications yet; they can see and accept it in their dashboard." };
@@ -402,9 +458,12 @@ async function route(request, env, ctx) {
         if (!hasConflictOverride(item)) checkConflicts(user, item, s, item.id);
       }
     }
-    await commit(db, s.state, mutation => [saveAssignment(db, { ...item, status: input.status, updatedAt: new Date().toISOString() }, mutation)],
+    const updated = { ...item, status: input.status, updatedAt: new Date().toISOString() };
+    await commit(db, s.state, mutation => [saveAssignment(db, updated, mutation),
+      ...(updated.appointmentId ? [calendarQueueStatement(db, updated, mutation)] : [])],
       assignmentNotifications(item, input.status, user === "owner" ? [item.employeeId] : ["owner"]));
     ctx.waitUntil(flushAlerts(env));
+    if (updated.appointmentId) ctx.waitUntil(flushCalendarAssignments(env, { assignmentId: updated.id, limit: 1 }));
     return { saved: true };
   }
   if (request.method === "POST" && url.pathname === "/push/device/status") {
@@ -473,14 +532,22 @@ const worker = {
     if (origin) headers["access-control-allow-origin"] = origin;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...headers,
       "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type", "access-control-max-age": "600" } });
-    try { return new Response(JSON.stringify(await route(request, env, ctx)), { headers }); }
+    try {
+      const result = await route(request, env, ctx);
+      if (result instanceof Response) {
+        const responseHeaders = new Headers(headers);
+        result.headers.forEach((value, name) => responseHeaders.set(name, value));
+        return new Response(result.body, { status: result.status, headers: responseHeaders });
+      }
+      return new Response(JSON.stringify(result), { headers });
+    }
     catch (error) {
       const status = error instanceof ApiError ? error.status : 500;
       return new Response(JSON.stringify({ error: status === 500 ? "Scheduling is temporarily unavailable. Your change was not confirmed; refresh before retrying." : error.message }), { status, headers });
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(Promise.all([flushAlerts(env), sendQuizReminders(env)]));
+    ctx.waitUntil(Promise.all([flushAlerts(env), sendQuizReminders(env), flushCalendarAssignments(env, { limit: 3 })]));
   },
 };
 export default worker;
