@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.34.3",
+  "currentVersion": "2.35.0",
   "releases": [
+    {
+      "id": "2026-10-17-quiet-automatic-updates",
+      "version": "2.35.0",
+      "date": "2026-10-17",
+      "category": "Dashboard",
+      "title": "Fresh data without interrupting your page",
+      "changes": [
+        "The signed-in dashboard checks for fresh published data every minute while visible, when you return, and after reconnecting. Updates stay quiet and keep your current page, scroll position, filters, and form entries. Open editors and pickers defer snapshot changes until a later check.",
+        "Manual refresh and automatic snapshot checks share in-flight reads. Unchanged encrypted data skips decryption, older snapshots cannot replace newer data, and offline failures keep the last usable information. Server imports remain on their existing five-minute schedule.",
+        "Payment review and Stripe matching keep your selections and search text when updated records arrive."
+      ],
+      "employee": {
+        "title": "Your dashboard updates quietly",
+        "changes": [
+          "Fresh information loads automatically while you use the dashboard and when you return, without jumping to the top or showing a refresh animation. Your open page and entries stay in place; pull down whenever you want to check immediately."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-incremental-database-sync",
       "version": "2.34.3",

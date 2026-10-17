@@ -49,7 +49,7 @@ import { creativeEarningDate,creativeEarnings } from "@/lib/creative-work.mjs";
 import { decryptDashboard,encryptWorkflowPayload } from "@/lib/dashboard-crypto";
 import type { PaymentFilter,ViewKey } from "@/lib/dashboard-presentation";
 import { FALLBACK_PROFILES,appointmentCategory,customerPaymentState,dollars,eligibleForPayout,formatDate,formatTime,paidEarnings,rentalState,teamAccent,unpaidEarnings } from "@/lib/dashboard-presentation";
-import { refreshDashboardSnapshot } from "@/lib/dashboard-refresh.mjs";
+import { attachQuietSnapshotRefresh,createDashboardSnapshotReader,dashboardHasOpenEditor } from "@/lib/dashboard-refresh.mjs";
 import type {
 AccessProfile,
 DashboardPayload,
@@ -422,14 +422,12 @@ export function SmoothDashboard() {
   const [sessionPassword, setSessionPassword] = useState("");
   const [schedulingToken, setSchedulingToken] = useState("");
   const sessionEpoch = useRef(0);
-  const refreshSnapshot = useCallback(async () => {
-    if (!payload || !sessionPassword) return false;
-    const epoch = sessionEpoch.current;
-    return refreshDashboardSnapshot({
-      profile: { id: payload.user.id, role: payload.role }, password: sessionPassword,
-      decrypt: decryptDashboard, isCurrent: () => epoch === sessionEpoch.current, onSnapshot: setPayload,
-    });
-  }, [payload, sessionPassword]);
+  const snapshotReader = useRef<(() => Promise<boolean>) | null>(null);
+  const refreshSnapshot = useCallback(() => snapshotReader.current?.() ?? Promise.resolve(false), []);
+  const signedIn = Boolean(payload);
+  useEffect(() => {
+    if (signedIn) return attachQuietSnapshotRefresh(refreshSnapshot);
+  }, [signedIn, refreshSnapshot]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("smooth-theme");
@@ -473,13 +471,18 @@ export function SmoothDashboard() {
 
   const unlock = async (profile: AccessProfile, password: string) => {
     const epoch = ++sessionEpoch.current;
-    const response = await fetch(`./data/${profile.id}.json`, { cache: "no-store" });
+    const response = await fetch(`./data/${encodeURIComponent(profile.id)}.json?v=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error("Dashboard data is unavailable");
     const envelope = await response.json() as EncryptedEnvelope;
     const unlocked = await decryptDashboard(envelope, password);
     if (unlocked.user.id !== profile.id || unlocked.role !== profile.role) throw new Error("Invalid dashboard payload");
     const token = await teamToken(password, profile.id);
     if (epoch !== sessionEpoch.current) return;
+    snapshotReader.current = createDashboardSnapshotReader({
+      profile: { id: profile.id, role: profile.role }, password,
+      decrypt: decryptDashboard, isCurrent: () => epoch === sessionEpoch.current, onSnapshot: setPayload,
+      canApply: () => !dashboardHasOpenEditor(),
+    }, unlocked, envelope);
     setSchedulingToken(token);
     setSessionPassword(password);
     rememberProfile(profile.id);
@@ -489,5 +492,5 @@ export function SmoothDashboard() {
   };
 
   if (!payload) return <LoginScreen onUnlock={unlock} profiles={profiles} />;
-  return <DashboardRefreshProvider><DashboardView dark={dark} onRefresh={refreshSnapshot} onLogout={() => { sessionEpoch.current++; void disableTeamPush(schedulingToken).catch(() => {}); setPayload(null); setSessionPassword(""); setSchedulingToken(""); }} payload={payload} sessionPassword={sessionPassword} schedulingToken={schedulingToken} setDark={setDark} /></DashboardRefreshProvider>;
+  return <DashboardRefreshProvider><DashboardView dark={dark} onRefresh={refreshSnapshot} onLogout={() => { sessionEpoch.current++; snapshotReader.current = null; void disableTeamPush(schedulingToken).catch(() => {}); setPayload(null); setSessionPassword(""); setSchedulingToken(""); }} payload={payload} sessionPassword={sessionPassword} schedulingToken={schedulingToken} setDark={setDark} /></DashboardRefreshProvider>;
 }

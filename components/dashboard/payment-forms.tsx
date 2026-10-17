@@ -22,7 +22,7 @@ import {
 Check,
 Search
 } from "lucide-react";
-import { useEffect,useMemo,useState } from "react";
+import { useEffect,useMemo,useRef,useState } from "react";
 
 export function PaymentOverrideForm({
   open,
@@ -37,10 +37,13 @@ export function PaymentOverrideForm({
 }) {
   const [eventId, setEventId] = useState("");
   const [paidStatus, setPaidStatus] = useState<"true" | "false" | "clear">("true");
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { initialized.current = false; return; }
+    if (initialized.current) return;
     const resetTimer = window.setTimeout(() => {
+      initialized.current = true;
       setEventId(reviewRentals[0]?.id ?? "");
       setPaidStatus("true");
     }, 0);
@@ -140,10 +143,13 @@ export function StripeMatchForm({
   const [eventId, setEventId] = useState("");
   const [query, setQuery] = useState("");
   const matchablePayments = useMemo(() => payments.filter((payment) => Boolean(payment.matchKey)), [payments]);
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { initialized.current = false; return; }
+    if (initialized.current) return;
     const resetTimer = window.setTimeout(() => {
+      initialized.current = true;
       setPaymentId(initialPaymentId || matchablePayments[0]?.matchKey || "");
       setEventId("");
       setQuery("");
