@@ -86,7 +86,8 @@ YAxis
 function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; onRefresh: () => Promise<boolean>; sessionPassword: string; schedulingToken: string }) {
   useRefreshSource(onRefresh);
   const [view, setView] = useState<ViewKey>("overview");
-  const [toolbarRefresh, setToolbarRefresh] = useState(0);
+  const [toolbarRefresh, setToolbarRefresh] = useState<{ id: number; arrival: Promise<boolean> } | null>(null);
+  const [quietRefresh, setQuietRefresh] = useState(0);
   const toolbarScroll = useRef<ReturnType<typeof scrollToolbarToTop> | null>(null);
   const [focusedAlert, setFocusedAlert] = useState<{ target: string; id: string } | null>(null);
   const [alertWorkLoading, setAlertWorkLoading] = useState(false);
@@ -95,12 +96,18 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
     toolbarScroll.current?.cancel();
     const movement = scrollToolbarToTop(window);
     toolbarScroll.current = movement;
+    if (next === view) {
+      setToolbarRefresh(previous => ({ id: (previous?.id ?? 0) + 1, arrival: movement.finished }));
+      await movement.finished;
+      if (toolbarScroll.current === movement) toolbarScroll.current = null;
+      return;
+    }
     if (!await movement.finished || toolbarScroll.current !== movement) return;
     toolbarScroll.current = null;
     // Keep the current page mounted until it reaches the top: opening a shorter
     // destination first would clamp the scroll position and create another jump.
     navigate(next);
-    setToolbarRefresh(value => value + 1);
+    setQuietRefresh(value => value + 1);
   };
   useEffect(() => () => { toolbarScroll.current?.cancel(); }, []);
   const openChecklist = () => navigate("checklists");
@@ -126,7 +133,12 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   useEffect(() => {
     if (payload.role === "owner" && window.location.hash.startsWith("#setup-team")) { setView("team"); setTeamSetupOpen(true); }
   }, [payload.role]);
-  useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }, [view]);
+  useEffect(() => {
+    // Links and notification routes can change the view during a toolbar glide.
+    // Stop its old target before positioning the newly opened page.
+    toolbarScroll.current?.cancel(); toolbarScroll.current = null;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [view]);
   useEffect(() => {
     const openSchedule = () => {
       if (window.location.hash === "#alerts") setView("alerts");
@@ -312,7 +324,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           <div className="topbar-heading"><MobileMenuButton /><div className="topbar-title"><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div></div>
           <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
         </header>
-        <PullToRefresh page={view} requestId={toolbarRefresh} />
+        <PullToRefresh page={view} request={toolbarRefresh} quietRequestId={quietRefresh} />
         <div className="dashboard-refresh-body">
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
           {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} />}

@@ -1859,6 +1859,7 @@ button { cursor: pointer; }
   .pull-refresh-slot[data-phase="success"] .pull-refresh-indicator { color: #15834f; }
   .dark .pull-refresh-slot[data-phase="success"] .pull-refresh-indicator { color: #71d1a5; }
   .pull-refresh-slot[data-phase="error"] .pull-refresh-indicator { color: var(--foreground); }
+  .dashboard-main[data-refresh-mode="toolbar"] .pull-refresh-indicator { top: 6px; transform: translate(-50%, 0); transition: opacity 160ms ease; }
 }
 @keyframes refresh-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
@@ -1880,14 +1881,19 @@ button { cursor: pointer; }
 .alerts-person-group { margin-top: 20px; border-top: 1px solid var(--border); }
 .alerts-person-group .alerts-list { margin-top: 0; }
 .team-payout-breakdown { grid-column: 1 / -1; }
-.team-payout-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.team-payout-person { border: 1px solid var(--border); border-radius: 14px; padding: 0 14px 14px; min-width: 0; }
-.team-payout-person dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.team-payout-person dt { font-size: 11px; color: var(--muted-foreground); }
+.team-payout-people { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0 24px 6px; }
+.team-payout-person { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 3fr); gap: 20px; align-items: start; padding: 18px 0; min-width: 0; }
+.team-payout-person + .team-payout-person { border-top: 1px solid var(--border); }
+.team-payout-person .person-section-heading { min-width: 0; padding: 3px 0 0; }
+.team-payout-person .person-section-heading h3 { overflow-wrap: anywhere; }
+.team-payout-person dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); min-width: 0; gap: 10px 16px; }
+.team-payout-person dl > div { min-width: 0; }
+.team-payout-person dt { font-size: 11px; line-height: 1.5; color: var(--muted-foreground); }
 .team-payout-person dd { margin: 4px 0 0; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .team-payout-person dl > div:first-child dd { color: var(--primary); }
-.team-payout-person dl > div:nth-child(4) { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
-.team-payout-person dl > div:nth-child(4) dd { margin: 0; font-size: 14px; }
+.team-payout-person .team-payout-advance { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; }
+.team-payout-person .team-payout-advance dd { margin: 0; font-size: 12px; font-weight: 600; }
+.team-payout-person > .schedule-warning { grid-column: 1 / -1; margin: 0; }
 .owner-weekly-hours { min-width: 0; max-width: 100%; }
 .owner-weekly-hours .panel-heading { flex-wrap: wrap; gap: 12px; }
 .owner-weekly-hours .panel-heading > div { min-width: 0; overflow-wrap: anywhere; }
@@ -1914,7 +1920,11 @@ button { cursor: pointer; }
 .rental-details-toggle { margin-top: 6px; font-size: 12px; white-space: normal; }
 .rental-details-toggle summary { cursor: pointer; }
 @media (max-width: 767px) {
-  .team-payout-people, .team-hours-grid { grid-template-columns: minmax(0, 1fr); }
+  .team-payout-people { padding: 0 18px 4px; }
+  .team-payout-person { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .team-payout-person .person-section-heading { padding: 0; }
+  .team-payout-person dl { gap: 10px; }
+  .team-hours-grid { grid-template-columns: minmax(0, 1fr); }
   .team-hours-body { padding: 0 18px 18px; }
   .team-payout-person dd { font-size: 15px; }
   .dashboard-main button, .dashboard-main a { touch-action: pan-y pinch-zoom; }

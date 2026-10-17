@@ -1,6 +1,27 @@
 {
-  "currentVersion": "2.26.0",
+  "currentVersion": "2.26.1",
   "releases": [
+    {
+      "id": "2026-10-17-quiet-tab-updates-and-payout-rows",
+      "version": "2.26.1",
+      "date": "2026-10-17",
+      "category": "Interface",
+      "title": "Quieter tab changes and simpler payouts",
+      "changes": [
+        "Changing mobile toolbar tabs loads current information quietly. The visible refresh is reserved for tapping the active tab or pulling the page.",
+        "Active-tab refresh glides to the top with an overlaid indicator, removing the extra downward shift.",
+        "Payouts uses Amount owed for remaining earned pay. Person summaries are simple divider rows inside one panel, with no nested cards.",
+        "Team hours identifies its source as scheduled Calendar appointments and dashboard tasks, rather than clock-in records."
+      ],
+      "employee": {
+        "title": "Quieter tab changes",
+        "changes": [
+          "Changing mobile toolbar tabs loads current information quietly. The visible refresh is reserved for tapping the active tab or pulling the page.",
+          "Active-tab refresh glides to the top with an overlaid indicator, removing the extra downward shift."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-weekly-history-and-smooth-return",
       "version": "2.26.0",

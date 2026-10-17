@@ -21,12 +21,12 @@ export function useRefreshSource(read: () => Promise<unknown>, enabled = true) {
 }
 
 type Phase = "idle" | "pulling" | "ready" | "refreshing" | "success" | "error";
-export function PullToRefresh({ page, requestId = 0 }: { page: string; requestId?: number }) {
+export function PullToRefresh({ page, request, quietRequestId = 0 }: { page: string; request?: { id: number; arrival: Promise<boolean> } | null; quietRequestId?: number }) {
   const coordinator = useContext(RefreshContext);
   const slot = useRef<HTMLDivElement>(null);
   const { openMobile } = useSidebar();
   const blocked = useRef(openMobile);
-  const startRefresh = useRef<() => void>(() => {});
+  const startRefresh = useRef<(arrival?: Promise<boolean>) => void>(() => {});
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
   useEffect(() => { blocked.current = openMobile; }, [openMobile]);
@@ -43,16 +43,23 @@ export function PullToRefresh({ page, requestId = 0 }: { page: string; requestId
         root.style.setProperty("--refresh-turn", `${distance * 4}deg`);
       });
     };
-    const hide = () => { paint(0, false); setPhase("idle"); };
-    const refresh = () => {
+    const hide = () => { paint(0, false); setPhase("idle"); delete root.dataset.refreshMode; };
+    const refresh = (arrival?: Promise<boolean>) => {
       if (disposed || busy) return;
       window.clearTimeout(dismiss);
-      busy = true; paint(52, false); setPhase("refreshing"); setError("");
-      void coordinator.run().then(() => {
-        if (!disposed) { setPhase("success"); dismiss = window.setTimeout(hide, 350); }
-      }).catch((cause: unknown) => {
-        if (!disposed) { paint(80, false); setError(cause instanceof Error ? cause.message : "Couldn’t refresh. Pull again to retry."); setPhase("error"); dismiss = window.setTimeout(hide, 3000); }
-      }).finally(() => { busy = false; });
+      if (arrival) root.dataset.refreshMode = "toolbar";
+      else delete root.dataset.refreshMode;
+      busy = true; paint(arrival ? 0 : 52, false); setPhase("refreshing"); setError("");
+      void (async () => {
+        try {
+          if (arrival && !await arrival) { if (!disposed) hide(); return; }
+          if (disposed) return;
+          await coordinator.run();
+          if (!disposed) { setPhase("success"); dismiss = window.setTimeout(hide, 350); }
+        } catch (cause: unknown) {
+          if (!disposed) { paint(arrival ? 0 : 80, false); setError(cause instanceof Error ? cause.message : "Couldn’t refresh. Pull again to retry."); setPhase("error"); dismiss = window.setTimeout(hide, 3000); }
+        } finally { busy = false; }
+      })();
     };
     startRefresh.current = refresh;
     setPhase("idle");
@@ -61,6 +68,7 @@ export function PullToRefresh({ page, requestId = 0 }: { page: string; requestId
       isBlocked: () => blocked.current,
       onPull: distance => {
         if (disposed) return;
+        delete root.dataset.refreshMode;
         window.clearTimeout(dismiss);
         paint(distance, distance > 0);
         setPhase(distance <= 0 ? "idle" : distance >= PULL_REFRESH_THRESHOLD ? "ready" : "pulling");
@@ -70,18 +78,21 @@ export function PullToRefresh({ page, requestId = 0 }: { page: string; requestId
     return () => {
       disposed = true; detach(); cancelAnimationFrame(frame); window.clearTimeout(dismiss);
       root.style.removeProperty("--refresh-distance"); root.style.removeProperty("--refresh-turn");
-      delete root.dataset.pulling; document.documentElement.classList.remove("has-pull-refresh");
+      delete root.dataset.pulling; delete root.dataset.refreshMode; document.documentElement.classList.remove("has-pull-refresh");
     };
   }, [coordinator, page]);
   useEffect(() => {
-    if (!requestId) return;
-    // Toolbar navigation has finished scrolling. Wait for the destination's
-    // effects to register its data sources before starting the refresh.
+    if (request) startRefresh.current(request.arrival);
+  }, [request]);
+  useEffect(() => {
+    if (!quietRequestId || !coordinator) return;
+    // A different tab loads its mounted sources quietly. Reserve the visible
+    // refresh treatment for tapping the active tab or pulling the page.
     const frame = requestAnimationFrame(() => {
-      startRefresh.current();
+      void coordinator.run().catch(() => {});
     });
     return () => cancelAnimationFrame(frame);
-  }, [requestId]);
+  }, [coordinator, quietRequestId]);
   const Icon = phase === "success" ? Check : phase === "error" ? WifiOff : phase === "refreshing" ? RefreshCw : ArrowDown;
   const text = phase === "ready" ? "Release to refresh" : phase === "refreshing" ? "Refreshing…" : phase === "success" ? "Refreshed" : phase === "error" ? error : phase === "pulling" ? "Pull to refresh" : "";
   return <div ref={slot} className="pull-refresh-slot" data-phase={phase}>

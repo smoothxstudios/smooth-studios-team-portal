@@ -53,7 +53,11 @@ export function MobileToolbar({ isOwner, view, unread, onNavigate }: { isOwner: 
       active.current = index;
       paint(index, false);
       setPendingView(items[index].key);
-      startTransition(async () => { setOpenMobile(false); await navigate.current(items[index].key); });
+      setOpenMobile(false);
+      // Start motion immediately; the pending highlight follows its destination
+      // while the current page remains mounted through the upward glide.
+      const navigation = navigate.current(items[index].key);
+      startTransition(async () => { await navigation; });
     };
     select.current = choose;
     const detachSlide = attachToolbarSlide(bar, {

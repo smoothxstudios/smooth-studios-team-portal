@@ -34,6 +34,6 @@ export function OwnerWeeklyHours({ employees, rentals, token }: { employees: Emp
     </div></div>
     <div className="team-hours-body">{loading && <p className="schedule-small" role="status">Updating hours…</p>}{error && <p className="schedule-warning" role="status">{error}</p>}
     <div className="team-hours-grid">{week.people.map(person => <div key={person.id} className="team-hours-person"><span className="employee-avatar" style={{ background: teamAccent(person.id, person.accent) }}>{person.name.slice(0, 1)}</span><strong>{person.name}</strong><span>{person.hours.toLocaleString("en-US", { maximumFractionDigits: 2 })} <small>hrs</small></span></div>)}</div>
-    <p className="schedule-small">Monday–Sunday · Based on completed, accepted work in the available schedule history. Overlapping time counts once.</p></div>
+    <p className="schedule-small">Scheduled time · Completed, accepted Calendar appointments and dashboard tasks. Overlapping time counts once.</p></div>
   </section>;
 }
