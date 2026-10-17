@@ -1,6 +1,23 @@
 {
-  "currentVersion": "2.34.0",
+  "currentVersion": "2.34.1",
   "releases": [
+    {
+      "id": "2026-10-17-sidebar-swipe-close",
+      "version": "2.34.1",
+      "date": "2026-10-17",
+      "category": "Dashboard",
+      "title": "Swipe left to close the sidebar",
+      "changes": [
+        "Swipe left across the open mobile sidebar to close it with the same smooth slide as the menu controls. Swiping over a navigation row closes the menu without opening that page; vertical scrolling and normal taps still work."
+      ],
+      "employee": {
+        "title": "Swipe left to close the sidebar",
+        "changes": [
+          "Swipe right from the page’s left edge to open the menu, then swipe left across it to close. You can still scroll the menu vertically and tap pages as usual."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-rental-controls-and-feedback",
       "version": "2.34.0",

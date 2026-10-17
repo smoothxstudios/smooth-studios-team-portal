@@ -167,9 +167,9 @@ function Sidebar({
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
   React.useEffect(() => {
-    if (!isMobile || openMobile || side !== "left" || collapsible === "none") return
-    return attachSidebarSwipe(document, () => setOpenMobile(true))
-  }, [isMobile, openMobile, side, collapsible, setOpenMobile])
+    if (!isMobile || side !== "left" || collapsible === "none") return
+    return attachSidebarSwipe(document, () => setOpenMobile(true), () => setOpenMobile(false))
+  }, [isMobile, side, collapsible, setOpenMobile])
 
   if (collapsible === "none") {
     return (
