@@ -15,6 +15,7 @@ import { OwnerScheduleAgenda } from "@/components/owner-schedule-agenda";
 import { useRefreshSource } from "@/components/dashboard-refresh";
 import { saveScheduleMutation, scheduleMutationMessage, scheduleMutationError } from "@/lib/team-schedule-mutations.mjs";
 import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps, workPreferenceMatch } from "@/lib/team-schedule.mjs";
+import { calendarInvitationStatus, calendarInvitationLabel, pendingCalendarInvitations } from "@/lib/calendar-invitations.mjs";
 
 const personName = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
 const time = (value: string) => new Date(value).toLocaleTimeString("en-US", { timeZone: STUDIO_ZONE, hour: "numeric", minute: "2-digit" });
@@ -202,12 +203,12 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         const preferred = preferences.flatMap(p => blockOccurrences(p, from, to)) as (WorkPreference & { start: string; end: string })[];
         const offers = visibleAssignments.filter(a => ["pending", "accepted"].includes(a.status) && overlaps(a, { start: from, end: to }));
         const calendar = schedule.appointments.filter(a => overlaps(a, { start: from, end: to }) &&
-          (filter === "all" || a.acceptedEmployeeIds.includes(filter)));
+          (filter === "all" || a.acceptedEmployeeIds.includes(filter) || ["needsAction", "tentative"].includes(calendarInvitationStatus(a, filter))));
         return <div className="schedule-day" key={day}><h4>{new Date(from).toLocaleDateString("en-US", { timeZone: STUDIO_ZONE, weekday: "short", day: "numeric", month: "short" })}</h4>
           {!occurrences.length && !preferred.length && !offers.length && !calendar.length && <p className="schedule-empty-day">No recorded commitments</p>}
           {preferred.map(p => <div className="schedule-entry preferred" key={`${p.id}-${p.start}`}><Person id={p.userId} /><strong>Wants to work</strong><span>{p.allDay ? "Full day" : `${time(p.start)}–${time(p.end)}`}</span>{p.note && <small>{p.note}</small>}</div>)}
           {occurrences.map(b => <div className="schedule-entry blocked" key={`${b.id}-${b.start}`}><Person id={b.userId} /><strong>{b.reason}</strong><span>{time(b.start)}–{time(b.end)} · Blocked</span></div>)}
-          {calendar.map(a => <div className="schedule-entry" key={a.id}><strong>{a.customer ? `${a.customer} · ` : ""}{a.title}</strong><span>{time(a.start)}–{time(a.end)}</span><small className={a.acceptedEmployeeIds.length ? "schedule-calendar-accepted" : undefined}>{a.acceptedEmployeeIds.length ? <><Check size={14} aria-hidden="true" />Calendar accepted: {a.acceptedEmployeeIds.map(personName).join(", ")}</> : offers.some(o => o.appointmentId === a.id) ? "Portal offer below" : "No accepted team member"}</small>{/studio.*rental|rental.*studio/i.test(a.title) && <details className="rental-details-toggle"><summary>Rental details</summary><RentalDescription details={a.rentalDetails} /></details>}{isOwner && future(a.start) && <button onClick={() => openAssignment(a.id)}>Assign person →</button>}</div>)}
+          {calendar.map(a => <div className="schedule-entry" key={a.id}><strong>{a.customer ? `${a.customer} · ` : ""}{a.title}</strong><span>{time(a.start)}–{time(a.end)}</span><small className={a.acceptedEmployeeIds.length ? "schedule-calendar-accepted" : undefined}>{a.acceptedEmployeeIds.length ? <><Check size={14} aria-hidden="true" />Calendar accepted: {a.acceptedEmployeeIds.map(personName).join(", ")}</> : pendingCalendarInvitations(a).length ? "Respond in Google Calendar" : offers.some(o => o.appointmentId === a.id) ? "Portal offer below" : "No accepted team member"}</small>{pendingCalendarInvitations(a).map(invitation => <small key={invitation.employeeId}>{personName(invitation.employeeId)} · {calendarInvitationLabel(invitation.status)}</small>)}{/studio.*rental|rental.*studio/i.test(a.title) && <details className="rental-details-toggle"><summary>Rental details</summary><RentalDescription details={a.rentalDetails} /></details>}{isOwner && future(a.start) && <button onClick={() => openAssignment(a.id)}>Assign person →</button>}</div>)}
           {offers.map(a => <div className={`schedule-entry ${a.status}`} key={a.id}><Person id={a.employeeId} /><strong>{a.title}</strong><span>{time(a.start)}–{time(a.end)} · {a.status}</span></div>)}
         </div>;
       })}</div></article>

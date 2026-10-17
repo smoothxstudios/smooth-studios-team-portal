@@ -1782,18 +1782,15 @@ button { cursor: pointer; }
 .alerts-controls { flex-wrap: wrap; margin-bottom: 18px; }
 .alerts-undo { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-bottom: 12px; padding: 0 6px 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--muted-foreground); font-size: 12px; }
 .alerts-undo > button { min-width: 44px; min-height: 44px; padding: 8px; color: var(--foreground); font-weight: 650; border-radius: 8px; }
-.alerts-undo > button:hover { background: var(--muted); }
 .alerts-filters { display: inline-flex; padding: 4px; gap: 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
 .alerts-filters > button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border-radius: 8px; font-size: 14px; font-weight: 650; color: var(--muted-foreground); }
 .alerts-filters > button[aria-pressed="true"] { color: var(--sidebar-accent-foreground); background: var(--sidebar-accent); }
 .alerts-list { display: grid; gap: 6px; list-style: none; padding: 0; margin: 0 0 20px; }
 .alert-card { display: flex; align-items: center; gap: 0; padding: 0; min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
 .alert-open { display: flex; align-items: center; flex: 1; min-width: 0; min-height: 76px; padding: 10px 12px; text-align: left; border-radius: 12px; }
-.alert-open:hover { background: var(--muted); }
 .alert-open:focus-visible, .alert-row-action:focus-visible, .alerts-undo > button:focus-visible { outline: 2px solid var(--ring); outline-offset: -3px; }
 .alert-row-actions { display: flex; flex: 0 0 44px; margin-right: 4px; }
 .alert-row-action { display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; border-radius: 10px; color: var(--muted-foreground); }
-.alert-row-action:hover { color: var(--foreground); background: var(--muted); }
 .alert-actions-menu { min-width: 172px; border-radius: 12px; }
 .alert-actions-menu [data-slot="dropdown-menu-item"] { min-height: 44px; padding-inline: 10px; font-size: 13px; border-radius: 8px; }
 .alert-row-action:disabled, .alerts-undo > button:disabled { opacity: .45; }
@@ -1881,11 +1878,53 @@ button { cursor: pointer; }
 .person-section-heading h3 { margin: 0; font-size: 15px; font-weight: 700; }
 .person-section-heading small { margin-left: auto; color: var(--muted-foreground); font-size: 12px; text-align: right; }
 .person-section-heading .employee-avatar, .team-hours-person .employee-avatar { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 50%; color: white; font-weight: 700; font-size: 13px; }
-.availability-people { display: grid; gap: 22px; }
-.availability-person { min-width: 0; border-top: 1px solid var(--border); }
+.availability-panel { min-width: 0; }
+.availability-panel.is-self { display: grid; gap: 16px; }
+.availability-toolbar { margin-bottom: 14px; }
+.availability-toolbar .schedule-filter { min-width: 0; max-width: 100%; }
+.availability-toolbar select { min-width: 180px; }
+.availability-people { display: grid; gap: 0; min-width: 0; }
+.availability-person { min-width: 0; }
+.availability-panel.is-owner .availability-person { border-top: 1px solid var(--border); }
+.availability-person-trigger { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto 18px; align-items: center; gap: 10px; width: 100%; min-height: 64px; padding: 10px 0; text-align: left; border-radius: 8px; }
+.availability-person-trigger:focus-visible, .availability-show-more:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.availability-person-trigger .employee-avatar { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--muted); color: #fff; font-size: 12px; font-weight: 650; box-shadow: none; }
+.availability-person-name { min-width: 0; font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+.availability-person-counts { display: grid; gap: 2px; color: var(--muted-foreground); font-size: 11px; line-height: 1.4; text-align: right; }
+.availability-person-trigger > svg { flex-shrink: 0; color: var(--muted-foreground); transition: transform 160ms ease; }
+.availability-person-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.availability-person-details { min-width: 0; }
+.availability-panel.is-owner .availability-person-details { padding: 2px 0 18px; }
 .availability-person .availability-columns { margin-top: 0; }
-.availability-person.is-owner .schedule-section-heading > p { display: none; }
+.availability-panel.is-owner .availability-section { min-width: 0; padding: 0; background: transparent; border: 0; border-radius: 0; }
+.availability-panel.is-owner .availability-section + .availability-section { border-left: 1px solid var(--border); padding-left: 20px; }
+.availability-panel.is-owner .schedule-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.availability-panel.is-owner .schedule-section-heading h3 { margin: 0; font-size: 14px; gap: 7px; }
+.availability-panel.is-owner .schedule-section-heading h3 > svg { flex-shrink: 0; }
+.availability-panel.is-owner .schedule-section-heading button { margin-top: 0; min-height: 44px; max-width: 100%; padding: 8px 10px; font-size: 12px; white-space: normal; }
+.availability-panel.is-owner .schedule-count { padding: 3px 7px; font-size: 11px; }
+.availability-panel.is-owner .schedule-blocks { gap: 0; }
 .availability-person .schedule-block { min-width: 0; }
+.availability-panel.is-owner .schedule-block { align-items: flex-start; gap: 8px; padding: 10px 0; }
+.availability-panel.is-owner .schedule-block:first-child { border-top: 0; }
+.availability-panel.is-owner .schedule-block > div { min-width: 0; overflow-wrap: anywhere; }
+.availability-panel.is-owner .schedule-block strong { margin: 0 0 4px; font-size: 13px; }
+.availability-panel.is-owner .schedule-block p { font-size: 12px; line-height: 1.5; }
+.availability-panel.is-owner .schedule-block small { font-size: 11px; line-height: 1.5; }
+.availability-panel.is-owner .availability-entry-actions { flex: 0 0 auto; flex-wrap: nowrap; gap: 4px; }
+.availability-panel.is-owner .schedule-block button { min-width: 44px; min-height: 44px; }
+.availability-panel.is-owner .schedule-empty { padding: 8px 0; font-size: 12px; }
+.availability-show-more { min-height: 44px; padding: 8px 2px; color: var(--primary); font-size: 13px; font-weight: 600; text-align: left; border-radius: 8px; }
+.availability-panel.is-owner > .availability-past-toggle { min-height: 54px; margin: 0; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; }
+.availability-panel.is-owner > .schedule-small { margin: 0; font-size: 12px; line-height: 1.5; }
+@media (max-width: 900px) {
+  .availability-panel.is-owner .availability-section + .availability-section { border-left: 0; border-top: 1px solid var(--border); padding-left: 0; padding-top: 16px; }
+}
+@media (max-width: 767px) {
+  .availability-toolbar select { min-width: 0; }
+  .availability-person-trigger { gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .availability-person-trigger > svg { transition: none; } }
 .alerts-person-group { margin-top: 20px; border-top: 1px solid var(--border); }
 .alerts-person-group .alerts-list { margin-top: 0; }
 .team-payout-breakdown { grid-column: 1 / -1; }
@@ -1964,3 +2003,9 @@ button { cursor: pointer; }
 .engagement-history-sections > details > summary small { color: var(--muted-foreground); margin-left: 8px; font-weight: 400; }
 .engagement-history-sections > details > :not(summary) { margin-bottom: 14px; }
 .engagement-history-sections .creative-history-title { display: none; }
+
+/* Touch scrolling must not leave a mouse hover highlight under the finger. */
+@media (hover: hover) and (pointer: fine) {
+  .alert-open:hover, .alerts-undo > button:hover, .availability-person-trigger:hover { background: var(--muted); }
+  .alert-row-action:hover { color: var(--foreground); background: var(--muted); }
+}

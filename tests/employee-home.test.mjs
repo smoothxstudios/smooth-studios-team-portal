@@ -38,6 +38,21 @@ test("home includes custom work, ongoing appointments, and pending review, but e
   assert.equal(employeeHomeWork("rayne", null, [snapshot], now).upcoming.length, 0);
 });
 
+test("home shows Calendar invites separately from confirmed work and dashboard offers", () => {
+  const invited = { ...appointment, acceptedEmployeeIds: [], calendarInvitations: [{ employeeId: "jordyn", status: "needsAction" }] };
+  const data = { ...schedule, appointments: [invited], assignments: [] };
+  const result = employeeHomeWork("jordyn", data, [], now);
+  assert.equal(result.calendarInvitations.length, 1);
+  assert.equal(result.calendarInvitations[0].calendarStatus, "needsAction");
+  assert.equal(result.upcoming.length, 0);
+  assert.equal(result.offers.length, 0);
+  assert.equal(employeeHomeWork("rayne", data, [], now).calendarInvitations.length, 0);
+  assert.equal(employeeHomeWork("jordyn", { ...data, assignments: [{ ...assignment, status: "pending" }] }, [], now).calendarInvitations.length, 0);
+  assert.equal(employeeHomeWork("jordyn", { ...data, assignments: [assignment] }, [], now).calendarInvitations.length, 0);
+  assert.equal(employeeHomeWork("jordyn", { ...data, appointments: [{ ...invited, calendarInvitations: [] }] }, [], now).calendarInvitations.length, 0);
+  assert.equal(employeeHomeWork("jordyn", { ...data, appointments: [{ ...invited, acceptedEmployeeIds: ["jordyn"] }] }, [], now).upcoming.length, 1);
+});
+
 test("earnings retain partial payouts, deposits, tips, manual decisions, and projected amounts", () => {
   const past = { ...snapshot, start: "2026-10-10T17:00:00Z", end: "2026-10-10T18:00:00Z" };
   const rentals = [

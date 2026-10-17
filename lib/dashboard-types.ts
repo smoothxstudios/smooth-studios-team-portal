@@ -75,6 +75,7 @@ export type StudioRulebook = {
 };
 
 export type Rental = {
+  calendarInvitations?: { employeeId: string; status: "accepted" | "tentative" | "needsAction" | "declined" }[];
   rentalDetails?: string;
   id: string;
   stripeMatchKey?: string;

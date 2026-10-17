@@ -8,6 +8,7 @@ import { summarizeStripeSnapshot } from "./stripe-data.mjs";
 import { calculateEmployeePayout, initializePayAdjustments } from "./employee-pay.mjs";
 import { MAX_GUIDELINES } from "../../lib/studio-guidelines.mjs";
 import { organizeGuideline } from "../../lib/guideline-content.mjs";
+import { CALENDAR_INVITATION_STATUSES } from "../../lib/calendar-invitations.mjs";
 
 const KDF_ITERATIONS = 310_000;
 const RULEBOOK_LIMITS = {
@@ -291,15 +292,16 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
         ? "calendar"
         : "none";
 
-  const acceptedEmails = new Set(
-    (event.attendees ?? [])
-      .filter((attendee) => attendee.responseStatus === "accepted")
-      .map((attendee) => attendee.email?.trim().toLowerCase())
-      .filter(Boolean),
-  );
-  const assignedEmployees = config.employees.filter((employee) =>
-    employeeInvitationEmails(employee).some((email) => acceptedEmails.has(email)),
-  );
+  const calendarInvitations = config.employees.flatMap(employee => {
+    const emails = new Set(employeeInvitationEmails(employee));
+    const responses = (event.attendees ?? []).filter(guest => emails.has(guest.email?.trim().toLowerCase()))
+      .map(guest => guest.responseStatus ?? "needsAction");
+    // Aliases belong to one person. An accepted invitation takes precedence.
+    const status = CALENDAR_INVITATION_STATUSES.find(value => responses.includes(value));
+    return status ? [{ employeeId: employee.id, status }] : [];
+  });
+  const acceptedIds = new Set(calendarInvitations.filter(invitation => invitation.status === "accepted").map(invitation => invitation.employeeId));
+  const assignedEmployees = config.employees.filter(employee => acceptedIds.has(employee.id));
   const title = summaryRentalType(event.summary);
   const category = categorizeAppointment(title);
   const employeePayouts = Object.fromEntries(
@@ -328,6 +330,7 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
     ...(stripePayment ? { stripePayment } : {}),
     ...(typeof override === "boolean" ? { paymentOverride: override } : {}),
     assignedEmployeeIds: assignedEmployees.map((employee) => employee.id),
+    calendarInvitations,
     employeePayouts,
   };
 }
@@ -402,6 +405,7 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
           return {
             ...employeeRental,
             assignedEmployeeIds: [employee.id],
+            calendarInvitations: rental.calendarInvitations.filter(invitation => invitation.employeeId === employee.id),
             employeePayouts: { [employee.id]: rental.employeePayouts[employee.id] },
           };
         });

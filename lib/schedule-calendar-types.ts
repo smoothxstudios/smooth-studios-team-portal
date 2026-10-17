@@ -4,7 +4,7 @@ export type WorkEntry = {
   id: string; kind: "work"; start: string; end: string; title: string; customer: string;
   appointment: TeamAppointment | null; assignments: TeamAssignment[];
   calendarIds: string[]; confirmedIds: string[]; pendingIds: string[]; employeeIds: string[];
-  confirmations: { employeeId: string; appStatus: "accepted" | "pending" | null; calendarAccepted: boolean }[];
+  confirmations: { employeeId: string; appStatus: "accepted" | "pending" | null; calendarAccepted: boolean; calendarStatus?: "tentative" | "needsAction" }[];
   status: "unassigned" | "pending" | "confirmed";
 };
 export type AvailabilityEntry = {

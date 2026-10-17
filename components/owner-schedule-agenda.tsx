@@ -12,6 +12,7 @@ import type { WorkEntry, AvailabilityEntry, ScheduleEntry as Entry, ScheduleView
 import { TEAM, STUDIO_ZONE, addLocalDays, assignmentConflicts, hasConflictOverride, localInstant, overlaps, studioLocal } from "@/lib/team-schedule.mjs";
 import { agendaMatchesStatus, agendaOnDay, buildScheduleAgenda } from "@/lib/schedule-agenda.mjs";
 import { calendarDays, calendarMonth, moveCalendarMonth } from "@/lib/schedule-calendar.mjs";
+import { assignmentResponseLabel, calendarInvitationLabel } from "@/lib/calendar-invitations.mjs";
 
 type Status = "all" | "unassigned" | "pending" | "confirmed";
 const statusOptions: { id: Status; label: string }[] = [{ id: "all", label: "All work" }, { id: "unassigned", label: "Unassigned" }, { id: "pending", label: "Pending" }, { id: "confirmed", label: "Confirmed" }];
@@ -31,8 +32,9 @@ function Confirmation({ person }: { person: WorkEntry["confirmations"][number] }
     <span className="agenda-guest-avatar" style={{ background: TEAM.find(member => member.id === person.employeeId)?.color }} aria-hidden="true">
       {name(person.employeeId).slice(0, 1)}<span className="agenda-guest-check">{accepted ? <Check size={12} strokeWidth={3} /> : <Clock3 size={12} strokeWidth={2.5} />}</span>
     </span>
-    <span className="agenda-guest-copy"><strong>{name(person.employeeId)}</strong><span className="agenda-guest-response">{person.appStatus === "accepted" ? "Accepted in app" : person.appStatus === "pending" ? "Awaiting app response" : "Calendar accepted"}</span>
+    <span className="agenda-guest-copy"><strong>{name(person.employeeId)}</strong><span className="agenda-guest-response">{assignmentResponseLabel(person)}</span>
       {person.appStatus && person.calendarAccepted && <span className="agenda-guest-calendar"><Check size={12} aria-hidden="true" />Calendar accepted</span>}
+      {person.appStatus && person.calendarStatus && <span className="agenda-guest-response">{calendarInvitationLabel(person.calendarStatus)}</span>}
     </span>
   </li>;
 }
@@ -107,7 +109,7 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
             <p className="schedule-small">{dayLabel(studioLocal(item.start).slice(0, 10))} · {timeRange(item)}</p>
             {item.appointment && <p className="schedule-small">Appointment price: {(item.appointment.priceCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}</p>}
             {item.appointment && /studio.*rental|rental.*studio/i.test(item.title) && <RentalDescription details={item.appointment.rentalDetails} />}
-            {live.length ? <div className="agenda-offer-details">{live.map(renderAssignment)}</div> : <p className="schedule-small">{item.calendarIds.length ? "Staff confirmed through Google Calendar." : "No active offers. Choose Assign person to send one."}</p>}
+            {live.length ? <div className="agenda-offer-details">{live.map(renderAssignment)}</div> : <p className="schedule-small">{item.calendarIds.length ? "Staff confirmed through Google Calendar." : item.pendingIds.length ? "Calendar invitations are awaiting a response in Google Calendar." : "No active offers. Choose Assign person to send one."}</p>}
             {previous.length > 0 && <div className="agenda-previous"><strong>Previous offers</strong>{previous.map(offer => <p key={offer.id}>{name(offer.employeeId)} · {offer.status}</p>)}</div>}
           </div>
         </details>
@@ -149,6 +151,6 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
       {focusedItem?.kind === "work" ? workCard(focusedItem, focused!.day, true) : focusedItem && <div className="calendar-availability-detail"><Person id={focusedItem.userId} /><h3>{focusedItem.title}</h3><p>{focusedItem.allDay ? "Full day" : timeRange(focusedItem)}</p>{focusedItem.note && <p>{focusedItem.note}</p>}<Button variant="outline" onClick={() => { setFocused(null); onAvailability(); }}>Manage availability</Button></div>}
     </DialogContent></Dialog>
     {history.length > 0 && <details className="schedule-panel agenda-history"><summary><span>Past offers & responses <small>{history.length}</small></span><ChevronDown size={17} aria-hidden="true" /></summary><div>{history.slice(0, 50).map(item => <div key={item.id}><Person id={item.employeeId} /><strong>{item.title}</strong><span>{shortDate(item.start)} · {time(item.start)}</span><span className={`schedule-status ${item.status}`}>{item.status === "pending" ? "No response" : item.status}</span></div>)}{history.length > 50 && <p className="schedule-small">Showing the latest 50 responses.</p>}</div></details>}
-    <details className="agenda-help"><summary>Calendar & assignment details</summary><p>Assign work here. A green check with “Accepted in app” means the employee accepted that offer. An amber clock means their app response is still pending. “Calendar accepted” shows a separate Google Calendar RSVP; receiving a notification does not confirm an assignment.</p><p>For studio rentals, open the Google Calendar event to see the same app response at the top of its description after the next sync. Syncing is scheduled every 5 minutes and can be delayed. This is a backup copy of the app response; Google’s guest RSVP check stays separate. Custom tasks stay here.</p><p>To reassign a booking, open Details, cancel the existing offer, then add the new person.</p></details>
+    <details className="agenda-help"><summary>Calendar & assignment details</summary><p>Assign work here or add the employee as a guest in Google Calendar. Calendar invitations sync here as invited, tentative, or accepted. Respond to Calendar invitations in Google Calendar. A green check with “Accepted in app” means the employee accepted a dashboard offer; those responses remain separate.</p><p>For studio rentals, open the Google Calendar event to see the same app response at the top of its description after the next sync. Syncing is scheduled every 5 minutes and can be delayed. This is a backup copy of the app response; Google’s guest RSVP check stays separate. Custom tasks stay here.</p><p>To reassign a booking, open Details, cancel the existing offer, then add the new person.</p></details>
   </div>;
 }

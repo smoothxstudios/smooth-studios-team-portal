@@ -1,4 +1,6 @@
 "use client";
+import { useEffect, useRef, useState } from "react";
+import { attachScrollTapGuard } from "@/lib/scroll-tap-guard.mjs";
 import { alertBody, groupAlerts } from "@/lib/alert-presentation.mjs";
 import { Bell, CalendarDays, Check, CheckCheck, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,10 +13,29 @@ export function UnreadBadge({ count }: { count: number }) {
   return count > 0 ? <span className="alerts-count" aria-label={`${count} unread`}>{count > 99 ? "99+" : count}</span> : null;
 }
 
+function AlertOptions({ alert, state, onOpen }: { alert: DashboardAlert; state: AlertsState; onOpen: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const menu = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (open && menu.current) return attachScrollTapGuard(menu.current); }, [open]);
+  return <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenuTrigger asChild onPointerDown={event => event.preventDefault()}>
+      <button type="button" className="alert-row-action" disabled={state.busy} onClick={() => setOpen(value => !value)} aria-label={`More options: ${alert.title}`} title="Alert options"><MoreHorizontal size={19} aria-hidden="true" /></button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent ref={menu} className="alert-actions-menu" align="end" collisionPadding={8}>
+      <DropdownMenuItem disabled={state.busy} onSelect={() => void onOpen()}><ArrowUpRight size={16} aria-hidden="true" />Open details</DropdownMenuItem>
+      {!alert.readAt && <DropdownMenuItem disabled={state.busy} onSelect={() => void state.markRead(alert)}><Check size={16} aria-hidden="true" />Mark read</DropdownMenuItem>}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem variant="destructive" disabled={state.busy} onSelect={() => void state.deleteAlert(alert)}><Trash2 size={16} aria-hidden="true" />Delete alert</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>;
+}
+
 export function AlertsPage({ state, onOpen, isOwner = false }: { isOwner?: boolean; state: AlertsState; onOpen: (alert: DashboardAlert) => void }) {
+  const page = useRef<HTMLElement>(null);
+  useEffect(() => { if (page.current) return attachScrollTapGuard(page.current); }, []);
   const groups = isOwner ? groupAlerts(state.alerts) : [{ id: "all", person: null, alerts: state.alerts }];
   const open = async (alert: DashboardAlert) => { if (await state.markRead(alert)) onOpen(alert); };
-  return <section className="alerts-page" aria-label="Your alerts">
+  return <section ref={page} className="alerts-page" aria-label="Your alerts">
     <div className="alerts-heading"><h2>Alerts</h2></div>
     <div className="alerts-controls">
       <div className="alerts-filters" role="group" aria-label="Filter alerts">
@@ -41,14 +62,7 @@ export function AlertsPage({ state, onOpen, isOwner = false }: { isOwner?: boole
             </span>
           </button>
           <div className="alert-row-actions">
-            <DropdownMenu><DropdownMenuTrigger asChild><button type="button" className="alert-row-action" disabled={state.busy} aria-label={`More options: ${alert.title}`} title="Alert options"><MoreHorizontal size={19} aria-hidden="true" /></button></DropdownMenuTrigger>
-              <DropdownMenuContent className="alert-actions-menu" align="end" collisionPadding={8}>
-                <DropdownMenuItem disabled={state.busy} onSelect={() => void open(alert)}><ArrowUpRight size={16} aria-hidden="true" />Open details</DropdownMenuItem>
-                {!alert.readAt && <DropdownMenuItem disabled={state.busy} onSelect={() => void state.markRead(alert)}><Check size={16} aria-hidden="true" />Mark read</DropdownMenuItem>}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" disabled={state.busy} onSelect={() => void state.deleteAlert(alert)}><Trash2 size={16} aria-hidden="true" />Delete alert</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <AlertOptions alert={alert} state={state} onOpen={() => open(alert)} />
           </div>
         </li>;
       })}

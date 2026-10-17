@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { agendaMatchesStatus, agendaOnDay, agendaWeek, buildScheduleAgenda } from "../lib/schedule-agenda.mjs";
 import { localInstant } from "../lib/team-schedule.mjs";
+import { assignmentResponseLabel } from "../lib/calendar-invitations.mjs";
 
 const period = { start: localInstant("2026-10-16T14:00"), end: localInstant("2026-10-16T16:00") };
 const booking = { id: "rental-1", title: "Studio A Rental", customer: "Example Client", priceCents: 10000, ...period, acceptedEmployeeIds: [] };
@@ -93,4 +94,30 @@ test("calendar time is authoritative when a linked offer has a stale time", () =
   assert.equal(result.length, 1);
   assert.equal(result[0].start, booking.start);
   assert.deepEqual(result[0].pendingIds, ["jordyn"]);
+});
+
+test("Calendar invitations appear as pending with their Google response source and no invented app acceptance", () => {
+  const invited = { ...booking, calendarInvitations: [{ employeeId: "jordyn", status: "needsAction" },
+    { employeeId: "akiva", status: "tentative" }, { employeeId: "rayne", status: "declined" }] };
+  const [item] = buildScheduleAgenda(schedule([offer("old", "jordyn", "declined")], [invited]), options);
+  assert.deepEqual(item.confirmedIds, []);
+  assert.deepEqual(item.pendingIds, ["jordyn", "akiva"]);
+  assert.deepEqual(item.confirmations, [
+    { employeeId: "jordyn", appStatus: null, calendarAccepted: false, calendarStatus: "needsAction" },
+    { employeeId: "akiva", appStatus: null, calendarAccepted: false, calendarStatus: "tentative" },
+  ]);
+  assert.equal(item.status, "pending");
+  assert.deepEqual(item.confirmations.map(assignmentResponseLabel), ["Invited in Google Calendar", "Tentative in Google Calendar"]);
+  assert.equal(item.assignments[0].status, "declined");
+  assert.equal(buildScheduleAgenda(schedule([], [invited]), { ...options, employeeId: "akiva" }).length, 1);
+  assert.equal(buildScheduleAgenda(schedule([], [invited]), { ...options, employeeId: "rayne" }).length, 0);
+  assert.deepEqual(buildScheduleAgenda(schedule([], [{ ...invited, calendarInvitations: [] }]), options)[0].employeeIds, []);
+  for (const status of ["pending", "accepted"]) {
+    const [withApp] = buildScheduleAgenda(schedule([offer("app", "jordyn", status)], [invited]), options);
+    assert.equal(withApp.assignments.length, 1);
+    assert.equal(withApp.confirmations.filter(person => person.employeeId === "jordyn").length, 1);
+    assert.equal(withApp.confirmations[0].appStatus, status);
+    assert.equal(withApp.confirmations[0].calendarAccepted, false, "app acceptance never fabricates a Google RSVP");
+    assert.equal(withApp.confirmations[0].calendarStatus, "needsAction");
+  }
 });

@@ -307,6 +307,45 @@ test("Calendar snapshots strip payments, descriptions and contact information", 
   assert.equal(view.appointments[0].description, undefined);
   assert.equal(view.appointments[0].paidOnlineCents, undefined);
 });
+
+test("Calendar invitations sync privately, remain separate from app offers, and update without duplicates", async () => {
+  const f = fixture();
+  const invited = { ...rental, calendarInvitations: [
+    { employeeId: "jordyn", status: "needsAction", email: "private@example.invalid" },
+    { employeeId: "akiva", status: "tentative" }, { employeeId: "rayne", status: "declined" },
+  ] };
+  assert.equal((await f.importCalendar([invited])).status, 200);
+  assert.deepEqual((await f.snapshot("jordyn")).appointments[0].calendarInvitations, [{ employeeId: "jordyn", status: "needsAction" }]);
+  assert.deepEqual((await f.snapshot("akiva")).appointments[0].calendarInvitations, [{ employeeId: "akiva", status: "tentative" }]);
+  assert.equal((await f.snapshot("rayne")).appointments.length, 0);
+  assert.equal((await f.snapshot("amia")).appointments.length, 0);
+  assert.deepEqual((await f.call("sync", "/sync/accepted")).data.assignments, []);
+  const item = await offer(f);
+  assert.equal((await f.call("jordyn", `/assignments/${item.id}`, { revision: (await f.snapshot()).revision, status: "declined" })).status, 200);
+  await f.importCalendar([invited]);
+  await f.importCalendar([invited]);
+  assert.equal((await f.snapshot()).assignments.length, 1);
+  assert.equal((await f.snapshot()).assignments[0].status, "declined", "Calendar sync must not reset a dashboard response");
+  assert.deepEqual((await f.call("sync", "/sync/accepted")).data.assignments, []);
+  const accepted = { ...rental, acceptedEmployeeIds: ["jordyn"], calendarInvitations: [{ employeeId: "jordyn", status: "accepted" }] };
+  await f.importCalendar([accepted]);
+  assert.deepEqual((await f.snapshot("jordyn")).appointments[0].acceptedEmployeeIds, ["jordyn"]);
+  assert.equal((await f.snapshot()).assignments[0].status, "declined");
+  await f.importCalendar([rental]);
+  assert.equal((await f.snapshot("jordyn")).appointments.length, 0, "removing the guest removes Calendar-only access");
+  assert.equal((await f.snapshot()).assignments[0].status, "declined");
+  assert.equal((await f.call(null, "/health")).data.calendarInvitationsVersion, 1);
+});
+
+test("Calendar invitation import validates employees, statuses and duplicate guests", async () => {
+  const f = fixture();
+  for (const calendarInvitations of [null, {}, [{ employeeId: "owner", status: "needsAction" }],
+    [{ employeeId: "unknown", status: "accepted" }], [{ employeeId: "jordyn", status: "confirmed" }],
+    [{ employeeId: "jordyn", status: "needsAction" }, { employeeId: "jordyn", status: "accepted" }]]) {
+    assert.equal((await f.call("sync", "/sync/import", { generation: crypto.randomUUID(), appointments: [{ ...rental, calendarInvitations }] })).status, 400);
+  }
+  assert.equal((await f.snapshot()).appointments.length, 0);
+});
 test("push endpoints reject SSRF, redirects and unsupported providers", () => {
   for (const value of ["http://fcm.googleapis.com/x", "https://localhost/x", "https://fcm.googleapis.com.attacker.invalid/x", "https://a:f@fcm.googleapis.com/x", "https://fcm.googleapis.com:999/x", "https://127.0.0.1/x"]) assert.throws(() => pushEndpoint(value));
   assert.equal(pushEndpoint("https://web.push.apple.com/fixture"), "https://web.push.apple.com/fixture");

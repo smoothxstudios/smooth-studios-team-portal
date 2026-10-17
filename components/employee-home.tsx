@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { employeeHomeWork } from "@/lib/employee-home.mjs";
 import { categorizeAppointment } from "@/lib/appointment-categories.mjs";
 import { STUDIO_ZONE } from "@/lib/team-schedule.mjs";
+import { calendarInvitationLabel } from "@/lib/calendar-invitations.mjs";
 import type { Rental, AdvanceBalance } from "@/lib/dashboard-types";
 import type { TeamAssignment, TeamSchedule } from "@/lib/team-api";
 
@@ -32,18 +33,26 @@ export function EmployeeHome({ userId, schedule, loading, options, onBlockTime, 
   onBlockTime: () => void;
   renderOffer: (assignment: TeamAssignment) => ReactNode;
 }) {
-  const { offers, updates, upcoming } = employeeHomeWork(userId, schedule, options.rentals);
+  const { offers, updates, calendarInvitations, upcoming } = employeeHomeWork(userId, schedule, options.rentals);
   return <div className="employee-home">
     {offers.length > 0 && <section className="panel employee-attention" aria-labelledby="employee-offers-heading">
       <div className="employee-section-heading"><div><p className="eyebrow">Needs your response</p><h2 id="employee-offers-heading">{offers.length === 1 ? "You have an assignment offer" : `${offers.length} assignment offers`}</h2></div></div>
       <div className="schedule-offers">{offers.map(renderOffer)}</div>
     </section>}
 
+    {calendarInvitations.length > 0 && <section className="panel employee-home-next" aria-labelledby="employee-calendar-invitations-heading">
+      <div className="employee-section-heading"><div><h2 id="employee-calendar-invitations-heading">Calendar invitations</h2><p>Respond in Google Calendar.</p></div><Button variant="ghost" onClick={options.onSchedule}>View schedule <ArrowRight size={16} /></Button></div>
+      <div className="employee-work-list">{calendarInvitations.slice(0, 3).map(item => <details className="employee-work" key={item.id}>
+        <summary><div className="employee-work-date"><strong>{date(item.start)}</strong><span>{time(item.start)}–{time(item.end)}</span></div><div className="employee-work-title"><h3>{item.title}</h3>{item.customer && <p>{item.customer}</p>}</div><span className="schedule-status pending">{calendarInvitationLabel(item.calendarStatus)}</span><ChevronDown className="employee-work-chevron" size={18} /></summary>
+        <div className="employee-work-details"><p>Open this invitation in Google Calendar to accept or decline.</p>{/studio.*rental|rental.*studio/i.test(item.title) && <RentalDescription details={item.rentalDetails} />}</div>
+      </details>)}</div>
+    </section>}
+
     {updates.length > 0 && <section className="employee-updates" aria-label="Schedule updates">
       {updates.map(item => <div className="schedule-notice" key={item.id}><CalendarDays size={18} /><div><strong>Offer cancelled · {item.title}</strong><p>{date(item.start)} · {time(item.start)}. {item.note || "Smooth cancelled this dashboard offer."}{item.appointmentId && schedule?.appointments.some(a => a.id === item.appointmentId && a.acceptedEmployeeIds.includes(userId)) ? " You still have an accepted Calendar invitation; check with Smooth." : ""}</p></div></div>)}
     </section>}
 
-    {(loading || upcoming.length > 0 || offers.length === 0) && <section className="panel employee-home-next" aria-labelledby="employee-next-heading">
+    {(loading || upcoming.length > 0 || (offers.length === 0 && calendarInvitations.length === 0)) && <section className="panel employee-home-next" aria-labelledby="employee-next-heading">
       <div className="employee-section-heading"><div><h2 id="employee-next-heading">Next assignments</h2></div><Button variant="ghost" onClick={options.onSchedule}>View schedule <ArrowRight size={16} /></Button></div>
       {loading ? <p className="employee-empty" role="status">Checking your assignments…</p> : upcoming.length ? <div className="employee-work-list">{upcoming.slice(0, 3).map(item => {
         const category = item.appointmentId ? categorizeAppointment(item.title).label : "Assignment";

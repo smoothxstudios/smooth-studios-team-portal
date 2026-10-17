@@ -5,6 +5,11 @@ import { applyRentalAdvances } from '../lib/payroll-advances.mjs';
 const now = Date.parse('2026-10-17T12:00:00Z');
 const employees = [{ id: 'akiva', name: 'Akiva' }, { id: 'rayne', name: 'Rayne' }];
 const base = { id: 'rental', start: '2026-10-16T13:00Z', end: '2026-10-16T15:00Z', fullyPaid: true, priceCents: 10000, paidOnlineCents: 10000, assignedEmployeeIds: ['akiva'], employeePayouts: { akiva: { amountCents: 3000, paidAmountCents: 1500, outstandingCents: 1500, paid: false } } };
+test('pending and tentative Google Calendar guests do not accrue hours', () => {
+  const appointment = { ...base, acceptedEmployeeIds: [], calendarInvitations: [{ employeeId: 'akiva', status: 'needsAction' }, { employeeId: 'rayne', status: 'tentative' }] };
+  const week = weeklyTeamHours(employees, [], { appointments: [appointment], assignments: [] }, now);
+  assert.deepEqual(week.people.map(person => person.hours), [0, 0]);
+});
 test('per-person pay includes only earned work, preserves advance credits and exact cents, and never borrows another person’s pay', () => {
   const creative = [{ employeeId: 'akiva', status: 'approved', amountCents: 10001, payments: [{ amountCents: 2000 }], advanceAppliedCents: 3000 }, { employeeId: 'akiva', status: 'submitted', amountCents: 5000 }];
   const rows = teamEarnings(employees, [base, { ...base, fullyPaid: false, paymentOverride: false }, { ...base, end: '2026-10-20T15:00Z' }], creative, now);

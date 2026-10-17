@@ -167,6 +167,32 @@ test("assigns an employee through any accepted invitation email", () => {
   assert.equal(normalized.employeePayouts.akiva.amountCents, 1500);
 });
 
+test("Calendar guest statuses use configured aliases and pending invitations never earn payroll", () => {
+  const invitations = { ...event, attendees: [
+    { email: " AKIVA.ALIAS@EXAMPLE.INVALID ", responseStatus: "needsAction" },
+    { email: "jordyn@example.invalid", responseStatus: "tentative" },
+    { email: "rayne@example.invalid", responseStatus: "declined" },
+    { email: "customer@example.invalid", responseStatus: "accepted" },
+  ] };
+  const normalized = normalizeCalendarEvent(invitations, config, ledger, {});
+  assert.deepEqual(normalized.calendarInvitations, [
+    { employeeId: "akiva", status: "needsAction" }, { employeeId: "jordyn", status: "tentative" },
+    { employeeId: "rayne", status: "declined" },
+  ]);
+  assert.deepEqual(normalized.assignedEmployeeIds, []);
+  assert.deepEqual(normalized.employeePayouts, {});
+  const accepted = normalizeCalendarEvent({ ...invitations, attendees: [
+    ...invitations.attendees, { email: "akiva@example.invalid", responseStatus: "accepted" },
+  ] }, config, ledger, {});
+  assert.deepEqual(accepted.calendarInvitations.filter(i => i.employeeId === "akiva"), [{ employeeId: "akiva", status: "accepted" }]);
+  const payloads = buildDashboardPayloads({ calendarEvents: [{ ...invitations, attendees: [
+    { email: "akiva@example.invalid", responseStatus: "accepted" }, ...invitations.attendees,
+  ] }], config, ledger, overrides: {}, source: "google-calendar" });
+  assert.deepEqual(payloads.akiva.rentals[0].calendarInvitations, [{ employeeId: "akiva", status: "accepted" }]);
+  assert.equal(payloads.jordyn.rentals.length, 0, "pending invitations are live schedule information, not earned rentals");
+  assert.deepEqual(normalizeCalendarEvent({ ...event, attendees: [] }, config, ledger, {}).calendarInvitations, []);
+});
+
 test("treats deposits as partial and payments above price as paid with a tip", () => {
   const partial = { ...event, description: event.description.replace("Paid Online: $50.00", "Paid Online: $49.99") };
   const partialRental = normalizeCalendarEvent(partial, config, ledger, {});

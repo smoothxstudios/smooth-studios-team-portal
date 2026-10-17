@@ -1,6 +1,28 @@
 {
-  "currentVersion": "2.27.0",
+  "currentVersion": "2.28.0",
   "releases": [
+    {
+      "id": "2026-10-17-availability-calendar-invites-and-touch-scroll",
+      "version": "2.28.0",
+      "date": "2026-10-17",
+      "category": "Interface",
+      "title": "Compact availability and Calendar invitations",
+      "changes": [
+        "Availability keeps the team in one panel with collapsed name rows and an employee picker. Open one person at a time to see their preferred and unavailable times.",
+        "Availability sections show three entries initially, with Show N more and Show less controls for longer lists. Existing entry actions and the past-entry filter remain available.",
+        "Alerts no longer show mouse hover shading during touch scrolling. Swipe gestures do not activate an alert or menu action, and menus open after an intentional tap.",
+        "Mapped Google Calendar rental guests appear in the live schedule, including pending and tentative invitations. Calendar RSVP status stays distinct from app responses; pending guests do not add confirmed hours or earnings."
+      ],
+      "employee": {
+        "title": "Clearer touch scrolling",
+        "changes": [
+          "Alerts no longer show mouse hover shading while you scroll. Swipe gestures do not open alerts or menu actions.",
+          "Long availability lists show three entries initially; use Show N more or Show less to control the list.",
+          "Your Google Calendar rental invitations appear in the app with their Calendar response status, including pending and tentative invitations."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-compact-alert-actions",
       "version": "2.27.0",

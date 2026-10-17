@@ -6,6 +6,7 @@ import type { ScheduleEntry, ScheduleView } from "@/lib/schedule-calendar-types"
 import { calendarDayLayout, calendarMonth, moveCalendarMonth } from "@/lib/schedule-calendar.mjs";
 import { agendaOnDay } from "@/lib/schedule-agenda.mjs";
 import { STUDIO_ZONE, TEAM, studioLocal } from "@/lib/team-schedule.mjs";
+import { assignmentResponseLabel } from "@/lib/calendar-invitations.mjs";
 
 const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const label = (day: string) => new Date(`${day}T12:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -16,7 +17,7 @@ const title = (item: ScheduleEntry) => item.kind === "work" ? item.customer || i
 const color = (item: ScheduleEntry) => item.kind === "block" ? "#71717a" : item.kind === "preference" ? "#168653" : item.employeeIds.length === 1 ? TEAM.find(person => person.id === item.employeeIds[0])?.color ?? "#2563eb" : "#2563eb";
 function responseLabel(item: ScheduleEntry) {
   if (item.kind !== "work") return item.kind === "block" ? "Blocked" : "Prefers to work";
-  return item.confirmations.length ? item.confirmations.map(person => `${personName(person.employeeId)}: ${person.appStatus === "accepted" ? "accepted in app" : person.appStatus === "pending" ? "awaiting app response" : "Calendar accepted"}`).join("; ") : "Unassigned";
+  return item.confirmations.length ? item.confirmations.map(person => `${personName(person.employeeId)}: ${assignmentResponseLabel(person)}`).join("; ") : "Unassigned";
 }
 const eventLabel = (item: ScheduleEntry) => `${title(item)}. ${time(item.start)}–${time(item.end)}. ${responseLabel(item)}. Open details.`;
 function EventStatus({ item }: { item: ScheduleEntry }) {

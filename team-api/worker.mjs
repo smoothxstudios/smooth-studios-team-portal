@@ -9,6 +9,7 @@ import { creativeWorkRoute } from "./creative-work.mjs";
 import { alertsRoute } from "./alerts.mjs";
 import { payrollRoute } from "./payroll.mjs";
 import { studioReferenceRoute } from "./studio-reference.mjs";
+import { CALENDAR_INVITATION_STATUSES } from "../lib/calendar-invitations.mjs";
 
 const users = TEAM.map(p => p.id);
 const origins = new Set(["https://smoothxstudios.github.io", "https://dashboard.smoothstudios.co", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
@@ -121,7 +122,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 2 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 2, calendarInvitationsVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -188,8 +189,10 @@ async function route(request, env, ctx) {
       ? await jsonRows(db, "SELECT data FROM team_work_preferences")
       : await jsonRows(db, "SELECT data FROM team_work_preferences WHERE user_id = ?", user);
     return { revision: s.state.revision, syncedAt: s.state.synced_at, availabilityVersion: 1, workPreferences,
-      appointments: s.appointments.filter(a => isOwner || ids.has(a.id) || a.acceptedEmployeeIds.includes(user))
-        .map(a => isOwner ? a : { ...a, acceptedEmployeeIds: a.acceptedEmployeeIds.filter(id => id === user) }),
+      appointments: s.appointments.filter(a => isOwner || ids.has(a.id) || a.acceptedEmployeeIds.includes(user) ||
+          a.calendarInvitations?.some(invitation => invitation.employeeId === user && invitation.status !== "declined"))
+        .map(a => isOwner ? a : { ...a, acceptedEmployeeIds: a.acceptedEmployeeIds.filter(id => id === user),
+          calendarInvitations: (a.calendarInvitations ?? []).filter(invitation => invitation.employeeId === user) }),
       blocks: s.blocks.filter(b => isOwner || b.userId === user), assignments,
       devices: Object.fromEntries(devices.filter(d => isOwner || d.user_id === user).map(d => [d.user_id, d.count])),
       pushPublicKey: env.VAPID_JWK ? publicPushKey(JSON.parse(env.VAPID_JWK)) : null,
@@ -214,10 +217,17 @@ async function route(request, env, ctx) {
     const appointments = input.appointments.map(a => {
       if (!Number.isFinite(Date.parse(a.start)) || !Number.isFinite(Date.parse(a.end)) || Date.parse(a.end) <= Date.parse(a.start) ||
           !Number.isInteger(a.priceCents) || a.priceCents < 0 || !Array.isArray(a.acceptedEmployeeIds)) fail(400, "Invalid appointment snapshot.");
+      if (a.calendarInvitations !== undefined && (!Array.isArray(a.calendarInvitations) || a.calendarInvitations.length > users.length)) fail(400, "Invalid Calendar invitation snapshot.");
+      const calendarInvitations = (a.calendarInvitations ?? []).map(invitation => {
+        if (!invitation || !CALENDAR_INVITATION_STATUSES.includes(invitation.status)) fail(400, "Invalid Calendar invitation response.");
+        return { employeeId: person(invitation.employeeId, true), status: invitation.status };
+      });
+      if (new Set(calendarInvitations.map(invitation => invitation.employeeId)).size !== calendarInvitations.length) fail(400, "Repeated Calendar invitation.");
       return { id: text(a.id, 300), title: text(a.title, 300), customer: text(a.customer, 200, false),
         start: new Date(a.start).toISOString(), end: new Date(a.end).toISOString(), priceCents: a.priceCents,
         rentalDetails: text(a.rentalDetails ?? "", 8000, false),
         acceptedEmployeeIds: [...new Set(a.acceptedEmployeeIds.map(p => person(p, true)))],
+        calendarInvitations,
       };
     });
     const state = await db.prepare("SELECT generation FROM team_state WHERE id = 1").first();
