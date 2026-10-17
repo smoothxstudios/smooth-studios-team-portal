@@ -136,3 +136,116 @@ test('person attribution survives queue cleanup and stays scoped to the alert re
   assert.equal(result.find(a => a.id === 'wrong-person').personId, null);
   assert.deepEqual((await f.call('jordyn', '/alerts')).data.alerts, []);
 });
+
+test('delete and undo are account-scoped, idempotent, and retain each alert’s original read status', async t => {
+  const f = await fixture(); t.after(() => f.close());
+  enqueue(f.DB.sqlite, 'read-alert'); enqueue(f.DB.sqlite, 'unread-alert'); enqueue(f.DB.sqlite, 'other-alert', 'rayne');
+  await f.call('jordyn', '/alerts/read', { ids: ['read-alert'] }, 'PATCH');
+  const original = (await f.call('jordyn', '/alerts')).data;
+  await f.call('owner', '/alerts', { ids: ['read-alert', 'unread-alert'] }, 'DELETE');
+  assert.equal((await f.call('jordyn', '/alerts')).data.alerts.length, 2);
+  const deleted = await f.call('jordyn', '/alerts', { ids: ['read-alert', 'unread-alert', 'other-alert'] }, 'DELETE');
+  assert.equal(deleted.status, 200); assert.deepEqual(deleted.data, { unreadCount: 0, deletedAt: now });
+  assert.deepEqual((await f.call('jordyn', '/alerts?summary=1')).data, { throughSequence: 0, unreadCount: 0 });
+  assert.deepEqual((await f.call('jordyn', '/alerts')).data.alerts, []);
+  assert.equal((await f.call('rayne', '/alerts')).data.unreadCount, 1);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) n FROM team_notification_events').get().n, 3);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) n FROM team_inbox').get().n, 3);
+  mock.timers.setTime(now + 1000);
+  await f.call('jordyn', '/alerts', { ids: ['unread-alert'] }, 'DELETE');
+  assert.equal(f.DB.sqlite.prepare('SELECT deleted_at FROM team_inbox WHERE id = ?').get('unread-alert').deleted_at, now);
+  await f.call('rayne', '/alerts/restore', { ids: ['unread-alert'] }, 'PATCH');
+  await f.call('owner', '/alerts/restore', { ids: ['unread-alert'] }, 'PATCH');
+  assert.deepEqual((await f.call('jordyn', '/alerts')).data.alerts, []);
+  // Read commands on another device cannot silently read a dismissed alert.
+  await f.call('jordyn', '/alerts/read', { ids: ['unread-alert'] }, 'PATCH');
+  await f.call('jordyn', '/alerts/read-all', { throughSequence: original.throughSequence }, 'PATCH');
+  const readRestore = await f.call('jordyn', '/alerts/restore', { ids: ['read-alert', 'other-alert'] }, 'PATCH');
+  assert.equal(readRestore.status, 200); assert.equal(readRestore.data.unreadCount, 0);
+  assert.equal((await f.call('jordyn', '/alerts')).data.alerts[0].readAt, now);
+  const unreadRestore = await f.call('jordyn', '/alerts/restore', { ids: ['unread-alert'] }, 'PATCH');
+  assert.equal(unreadRestore.status, 200); assert.equal(unreadRestore.data.unreadCount, 1);
+  assert.deepEqual((await f.call('jordyn', '/alerts?filter=unread')).data.alerts.map(a => [a.id, a.readAt]), [['unread-alert', null]]);
+  await f.call('jordyn', '/alerts/restore', { ids: ['unread-alert'] }, 'PATCH');
+  assert.equal((await f.call('jordyn', '/alerts')).data.alerts.length, 2);
+  for (const ids of [[], ['bad/id'], Array(51).fill('id'), [4], null, undefined]) {
+    assert.equal((await f.call('jordyn', '/alerts', { ids }, 'DELETE')).status, 400);
+    assert.equal((await f.call('jordyn', '/alerts/restore', { ids }, 'PATCH')).status, 400);
+  }
+  assert.equal((await f.call('sync', '/alerts', { ids: ['unread-alert'] }, 'DELETE')).status, 403);
+});
+
+test('deleted alerts are absent from counts and stable paginated results while newer arrivals stay unread', async t => {
+  const f = await fixture(); t.after(() => f.close());
+  for (let i = 0; i < 65; i++) enqueue(f.DB.sqlite, `page-${i}`);
+  const ids = ['page-64', 'page-35', 'page-2', 'page-0'];
+  await f.call('jordyn', '/alerts', { ids }, 'DELETE');
+  const first = (await f.call('jordyn', '/alerts')).data;
+  assert.equal(first.alerts.length, 50); assert.equal(first.unreadCount, 61);
+  assert.equal(first.throughSequence, 64);
+  enqueue(f.DB.sqlite, 'later-alert');
+  const second = (await f.call('jordyn', `/alerts?before=${first.nextCursor}`)).data;
+  assert.equal(second.alerts.length, 11); assert.equal(second.nextCursor, null);
+  const visible = [...first.alerts, ...second.alerts].map(alert => alert.id);
+  assert.equal(new Set(visible).size, 61); assert.ok(ids.every(id => !visible.includes(id)));
+  await f.call('jordyn', '/alerts/read-all', { throughSequence: first.throughSequence }, 'PATCH');
+  assert.deepEqual((await f.call('jordyn', '/alerts?filter=unread')).data.alerts.map(a => a.id), ['later-alert']);
+  const restored = await f.call('jordyn', '/alerts/restore', { ids }, 'PATCH');
+  assert.equal(restored.data.unreadCount, 5);
+  assert.equal((await f.call('jordyn', '/alerts')).data.unreadCount, 5);
+});
+
+test('notification retries cannot resurrect a deleted inbox alert or change its read status', async t => {
+  const f = await fixture(); t.after(() => f.close());
+  const d = device('deleted-retry'); await f.call('jordyn', '/push/device', d);
+  enqueue(f.DB.sqlite, 'retry-alert');
+  await f.call('jordyn', '/alerts/read', { ids: ['retry-alert'] }, 'PATCH');
+  await f.call('jordyn', '/alerts', { ids: ['retry-alert'] }, 'DELETE');
+  let deliveries = 0;
+  await flushAlerts(f.env, async () => { deliveries++; return new Response(null, { status: 201 }); });
+  assert.equal(deliveries, 1);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) n FROM team_notification_events').get().n, 0);
+  enqueue(f.DB.sqlite, 'retry-alert', 'jordyn', { title: 'Retried event' });
+  assert.deepEqual((await f.call('jordyn', '/alerts')).data.alerts, []);
+  const tombstone = f.DB.sqlite.prepare('SELECT title, read_at, deleted_at FROM team_inbox WHERE id = ?').get('retry-alert');
+  assert.equal(tombstone.title, 'Synthetic assignment'); assert.equal(tombstone.read_at, now); assert.equal(tombstone.deleted_at, now);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) n FROM team_inbox WHERE id = ?').get('retry-alert').n, 1);
+  await f.call('jordyn', '/alerts/restore', { ids: ['retry-alert'] }, 'PATCH');
+  const restored = (await f.call('jordyn', '/alerts')).data;
+  assert.equal(restored.unreadCount, 0); assert.equal(restored.alerts[0].readAt, now);
+});
+
+test('dismissing an assignment alert leaves its assignment and engagement records untouched', async t => {
+  const f = await fixture(); delete f.env.VAPID_JWK; t.after(async () => { await Promise.all(f.pending); f.close(); });
+  f.DB.sqlite.prepare('UPDATE team_state SET synced_at = ? WHERE id = 1').run(new Date(now).toISOString());
+  const input = { revision: 0, employeeId: 'jordyn', startLocal: '2026-10-17T13:00', endLocal: '2026-10-17T14:00', title: 'Synthetic assignment', instructions: 'Synthetic brief' };
+  assert.equal((await f.call('owner', '/assignments', input)).status, 200);
+  const assignment = (await f.call('jordyn', '/schedule')).data.assignments[0];
+  await answerCurrent(f);
+  const engagement = (await f.call('jordyn')).data;
+  const ids = (await f.call('jordyn', '/alerts')).data.alerts.map(alert => alert.id);
+  await f.call('jordyn', '/alerts', { ids }, 'DELETE');
+  assert.deepEqual((await f.call('jordyn', '/schedule')).data.assignments[0], assignment);
+  assert.deepEqual((await f.call('jordyn')).data, engagement);
+  assert.deepEqual((await f.call('jordyn', '/alerts')).data.alerts, []);
+});
+
+test('deletion migration preserves existing inbox history and quiz retry triggers retain tombstones', t => {
+  const db = new DatabaseSync(':memory:'); t.after(() => db.close());
+  const folder = new URL('../team-api/migrations/', import.meta.url);
+  for (const file of readdirSync(folder).filter(name => name.endsWith('.sql') && name < '0020').sort()) db.exec(readFileSync(new URL(file, folder), 'utf8'));
+  enqueue(db, 'existing-unread'); enqueue(db, 'existing-read');
+  db.prepare('UPDATE team_inbox SET read_at = ? WHERE id = ?').run(now, 'existing-read');
+  const before = db.prepare('SELECT * FROM team_inbox ORDER BY sequence').all();
+  db.exec(readFileSync(new URL('0020_alert_deletion.sql', folder), 'utf8'));
+  const after = db.prepare('SELECT * FROM team_inbox ORDER BY sequence').all();
+  assert.deepEqual(after.map(({ deleted_at, ...alert }) => alert), before.map(alert => ({ ...alert })));
+  assert.ok(after.every(alert => alert.deleted_at === null));
+  const reminder = ['quiz-retry', 'jordyn', '2026-10-16', 'synthetic-question', now, now + 86400000];
+  db.prepare('INSERT INTO team_quiz_reminders(id,user_id,day,question_id,created_at,expires_at) VALUES (?,?,?,?,?,?)').run(...reminder);
+  db.prepare('UPDATE team_inbox SET deleted_at = ? WHERE id = ?').run(now, 'quiz-retry');
+  db.prepare('DELETE FROM team_quiz_reminders WHERE id = ?').run('quiz-retry');
+  db.prepare('INSERT INTO team_quiz_reminders(id,user_id,day,question_id,created_at,expires_at) VALUES (?,?,?,?,?,?)').run(...reminder);
+  assert.equal(db.prepare('SELECT deleted_at FROM team_inbox WHERE id = ?').get('quiz-retry').deleted_at, now);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM team_inbox WHERE id = ?').get('quiz-retry').n, 1);
+});

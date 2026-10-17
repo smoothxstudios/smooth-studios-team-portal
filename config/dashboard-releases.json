@@ -1,6 +1,27 @@
 {
-  "currentVersion": "2.26.1",
+  "currentVersion": "2.27.0",
   "releases": [
+    {
+      "id": "2026-10-17-compact-alert-actions",
+      "version": "2.27.0",
+      "date": "2026-10-17",
+      "category": "Notifications",
+      "title": "Compact alert rows with Delete and Undo",
+      "changes": [
+        "Alerts organize title, message, and time/status into compact rows while preserving named person groups.",
+        "Each alert\u2019s More menu includes opening its details, marking it read, and deleting it. Undo restores the most recently deleted alert while its notice is available.",
+        "Deletions stay in your account across devices and do not remove the related booking, task, or quiz."
+      ],
+      "employee": {
+        "title": "Manage your alerts",
+        "changes": [
+          "Alerts organize title, message, and time/status into compact rows while preserving named person groups.",
+          "Each alert\u2019s More menu includes opening its details, marking it read, and deleting it. Undo restores the most recently deleted alert while its notice is available.",
+          "Deletions stay in your account across devices and do not remove the related booking, task, or quiz."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-quiet-tab-updates-and-payout-rows",
       "version": "2.26.1",

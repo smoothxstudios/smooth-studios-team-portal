@@ -16,6 +16,7 @@ const empty: InboxPage = { alerts: [], unreadCount: 0, throughSequence: 0, nextC
 export function useAlerts(token: string, active: boolean) {
   const [page, setPage] = useState<InboxPage>(empty);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [deletion, setDeletion] = useState<{ alert: DashboardAlert } | null>(null);
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const requestId = useRef(0), operation = useRef(false), pages = useRef(1);
   const refresh = useCallback(async () => {
@@ -78,6 +79,37 @@ export function useAlerts(token: string, active: boolean) {
     } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "Couldn’t mark this alert as read."); return false; }
     finally { operation.current = false; setBusy(false); setLoading(false); }
   };
-  return { ...page, loading, busy, error, filter, chooseFilter, refresh, loadMore, markRead };
+  const deleteAlert = async (alert: DashboardAlert) => {
+    if (operation.current) return false;
+    operation.current = true; const current = ++requestId.current; setBusy(true);
+    try {
+      const result = await teamRequest<{ unreadCount: number; deletedAt: number }>(token, "/alerts", { ids: [alert.id] }, "DELETE");
+      if (current === requestId.current) {
+        setPage(previous => ({ ...previous, unreadCount: result.unreadCount, alerts: previous.alerts.filter(item => item.id !== alert.id) }));
+        setDeletion({ alert }); setError("");
+      }
+      return current === requestId.current;
+    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "This alert couldn’t be deleted. Try again."); return false; }
+    finally { operation.current = false; setBusy(false); setLoading(false); }
+  };
+  const undoDelete = async () => {
+    if (!deletion || operation.current) return false;
+    operation.current = true; const current = ++requestId.current; setBusy(true);
+    let restored = false;
+    try {
+      const result = await teamRequest<Summary>(token, "/alerts/restore", { ids: [deletion.alert.id] }, "PATCH");
+      if (current === requestId.current) {
+        setPage(previous => ({ ...previous, unreadCount: result.unreadCount }));
+        setDeletion(null); setError(""); restored = true;
+      }
+    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "This alert couldn’t be restored. Try again."); }
+    finally { operation.current = false; }
+    // Re-read the current filter and loaded pages so another device's read state
+    // and any arrivals during deletion stay authoritative after Undo.
+    if (restored) await refresh();
+    setBusy(false); setLoading(false);
+    return restored;
+  };
+  return { ...page, loading, busy, error, filter, deletion, chooseFilter, refresh, loadMore, markRead, deleteAlert, undoDelete };
 }
 export type AlertsState = ReturnType<typeof useAlerts>;

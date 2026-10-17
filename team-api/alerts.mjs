@@ -4,6 +4,13 @@ import { notificationText } from './notification-content.mjs';
 
 const targets = new Set(['scheduling', 'availability', 'creative', 'quiz']);
 const validSequence = value => Number.isSafeInteger(value) && value >= 0;
+const validAlertIds = ids => Array.isArray(ids) && ids.length > 0 && ids.length <= 50 &&
+  ids.every(id => typeof id === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(id));
+
+async function unreadCount(db, user) {
+  const row = await db.prepare('SELECT COUNT(*) AS unreadCount FROM team_inbox WHERE user_id = ? AND deleted_at IS NULL AND read_at IS NULL').bind(user).first();
+  return row.unreadCount;
+}
 
 export async function alertsRoute({ request, db, user, body, fail }) {
   const url = new URL(request.url);
@@ -13,9 +20,9 @@ export async function alertsRoute({ request, db, user, body, fail }) {
     const before = rawBefore === null ? null : Number(rawBefore);
     if (!['all', 'unread'].includes(filter) || (rawBefore !== null && (!/^\d+$/.test(rawBefore) || !validSequence(before) || before === 0))) fail(400, 'Choose All or Unread and a valid alerts page.');
     const summary = await db.prepare(`SELECT COALESCE(MAX(sequence), 0) AS throughSequence,
-      COUNT(CASE WHEN read_at IS NULL THEN 1 END) AS unreadCount FROM team_inbox WHERE user_id = ?`).bind(user).first();
+      COUNT(CASE WHEN read_at IS NULL THEN 1 END) AS unreadCount FROM team_inbox WHERE user_id = ? AND deleted_at IS NULL`).bind(user).first();
     if (url.searchParams.get('summary') === '1') return summary;
-    const rows = (await db.prepare(`SELECT * FROM team_inbox WHERE user_id = ? AND sequence <= ?
+    const rows = (await db.prepare(`SELECT * FROM team_inbox WHERE user_id = ? AND deleted_at IS NULL AND sequence <= ?
       ${before === null ? '' : 'AND sequence < ?'} ${filter === 'unread' ? 'AND read_at IS NULL' : ''}
       ORDER BY sequence DESC LIMIT 51`).bind(user, summary.throughSequence, ...(before === null ? [] : [before])).all()).results;
     return { ...summary, nextCursor: rows.length > 50 ? rows[49].sequence : null,
@@ -33,15 +40,31 @@ export async function alertsRoute({ request, db, user, body, fail }) {
     if (url.pathname === '/alerts/read-all') {
       if (!validSequence(input.throughSequence)) fail(400, 'Refresh Alerts before marking all as read.');
       // A new alert arriving after the displayed snapshot stays unread.
-      await db.prepare('UPDATE team_inbox SET read_at = ? WHERE user_id = ? AND sequence <= ? AND read_at IS NULL')
+      await db.prepare('UPDATE team_inbox SET read_at = ? WHERE user_id = ? AND deleted_at IS NULL AND sequence <= ? AND read_at IS NULL')
         .bind(now, user, input.throughSequence).run();
     } else {
-      if (!Array.isArray(input.ids) || !input.ids.length || input.ids.length > 50 || input.ids.some(id => typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(id))) fail(400, 'Choose valid alerts to mark as read.');
-      await db.prepare('UPDATE team_inbox SET read_at = ? WHERE user_id = ? AND id IN (SELECT value FROM json_each(?)) AND read_at IS NULL')
+      if (!validAlertIds(input?.ids)) fail(400, 'Choose valid alerts to mark as read.');
+      await db.prepare('UPDATE team_inbox SET read_at = ? WHERE user_id = ? AND deleted_at IS NULL AND id IN (SELECT value FROM json_each(?)) AND read_at IS NULL')
         .bind(now, user, JSON.stringify(input.ids)).run();
     }
-    const row = await db.prepare('SELECT COUNT(*) AS unreadCount FROM team_inbox WHERE user_id = ? AND read_at IS NULL').bind(user).first();
-    return { saved: true, readAt: now, unreadCount: row.unreadCount };
+    return { saved: true, readAt: now, unreadCount: await unreadCount(db, user) };
+  }
+  if (request.method === 'DELETE' && url.pathname === '/alerts') {
+    const input = await body(request), now = Date.now();
+    if (!validAlertIds(input?.ids)) fail(400, 'Choose valid alerts to delete.');
+    // Keep each unique inbox record as a tombstone. Notification delivery and
+    // retries can still complete without recreating a dismissed inbox alert.
+    await db.prepare('UPDATE team_inbox SET deleted_at = ? WHERE user_id = ? AND deleted_at IS NULL AND id IN (SELECT value FROM json_each(?))')
+      .bind(now, user, JSON.stringify(input.ids)).run();
+    return { unreadCount: await unreadCount(db, user), deletedAt: now };
+  }
+  if (request.method === 'PATCH' && url.pathname === '/alerts/restore') {
+    const input = await body(request);
+    if (!validAlertIds(input?.ids)) fail(400, 'Choose valid alerts to restore.');
+    // Undo changes visibility only; the original read status is retained.
+    await db.prepare('UPDATE team_inbox SET deleted_at = NULL WHERE user_id = ? AND deleted_at IS NOT NULL AND id IN (SELECT value FROM json_each(?))')
+      .bind(user, JSON.stringify(input.ids)).run();
+    return { unreadCount: await unreadCount(db, user) };
   }
   fail(404, 'Alerts action not found.');
 }
