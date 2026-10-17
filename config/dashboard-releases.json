@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.34.2",
+  "currentVersion": "2.34.3",
   "releases": [
+    {
+      "id": "2026-10-17-incremental-database-sync",
+      "version": "2.34.3",
+      "date": "2026-10-17",
+      "category": "Dashboard",
+      "title": "Less database writing during automatic sync",
+      "changes": [
+        "Five-minute Calendar and payroll checks save only new, changed, or removed records. Unchanged rentals and earnings stay in place, including previous weeks of history.",
+        "Imports verify the complete result before applying changes together. Incomplete or stale imports preserve the saved schedule and payroll, and rental acceptance and advance accounting keep their existing safeguards."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-17-rental-duration-preservation",
       "version": "2.34.2",

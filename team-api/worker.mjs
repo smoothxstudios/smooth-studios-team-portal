@@ -16,6 +16,8 @@ import { calendarQueueStatement, calendarDurationImportStatement, flushCalendarA
 import { calendarTimeChange, recoverDurationCancellation, LEGACY_PAST_NOTE } from "./calendar-time-changes.mjs";
 import { manualNoticesRoute } from "./manual-notices.mjs";
 import { withoutRemovedRentalStaff } from "../lib/rental-staff.mjs";
+import { calendarRecord, calendarKey, recordManifest, verifyDelta, recordBatches } from "../lib/sync-records.mjs";
+import { trackImport, cleanImports } from "./sync-storage.mjs";
 
 const users = TEAM.map(p => p.id);
 const origins = new Set(["https://smoothxstudios.github.io", "https://dashboard.smoothstudios.co", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
@@ -133,7 +135,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -161,7 +163,7 @@ async function route(request, env, ctx) {
       if (!invitationEmails.includes(email)) fail(400, "The primary invitation address must be a configured alias.");
       return { id, email, invitationEmails };
     });
-    await db.prepare("INSERT INTO calendar_sync_config (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data")
+    await db.prepare("INSERT INTO calendar_sync_config (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data WHERE calendar_sync_config.data != excluded.data")
       .bind(JSON.stringify({ calendarId, employees })).run();
     return { saved: true };
   }
@@ -285,6 +287,12 @@ async function route(request, env, ctx) {
     ctx.waitUntil(flushCalendarAssignments(env, { assignmentId: removed.id, limit: 1 }));
     return { saved: true, removedAssignment: removed, notification: "Person removed from this rental in the app. Check the Google Calendar removal status below." };
   }
+  if (request.method === "GET" && url.pathname === "/sync/manifest") {
+    await cleanImports(db, 'calendar');
+    const state = await db.prepare("SELECT generation, synced_at FROM team_state WHERE id = 1").first();
+    const rows = await jsonRows(db, "SELECT data FROM team_appointments WHERE generation = ?", state.generation);
+    return { ...await recordManifest(rows.map(calendarRecord), calendarKey), generation: state.generation, syncedAt: state.synced_at };
+  }
   if (request.method === "GET" && url.pathname === "/sync/accepted") {
     const assignments = await jsonRows(db, "SELECT data FROM team_assignments");
     const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices").first();
@@ -312,25 +320,33 @@ async function route(request, env, ctx) {
         return { employeeId: person(invitation.employeeId, true), status: invitation.status };
       });
       if (new Set(calendarInvitations.map(invitation => invitation.employeeId)).size !== calendarInvitations.length) fail(400, "Repeated Calendar invitation.");
-      return { id: text(a.id, 300), title: text(a.title, 300), customer: text(a.customer, 200, false),
+      return calendarRecord({ id: text(a.id, 300), title: text(a.title, 300), customer: text(a.customer, 200, false),
         start: new Date(a.start).toISOString(), end: new Date(a.end).toISOString(), priceCents: a.priceCents,
         rentalDetails: text(a.rentalDetails ?? "", 8000, false),
         acceptedEmployeeIds: [...new Set(a.acceptedEmployeeIds.map(p => person(p, true)))],
         calendarInvitations,
-      };
+      });
     });
     const state = await db.prepare("SELECT generation FROM team_state WHERE id = 1").first();
     if (state.generation === generation) fail(409, "Create a new import generation.");
+    if (input.incremental === true) await trackImport(db, 'calendar', generation);
     await db.prepare(`INSERT INTO team_appointments (generation, id, data)
       SELECT ?, json_extract(value, '$.id'), value FROM json_each(?) WHERE true
-      ON CONFLICT(generation, id) DO UPDATE SET data = excluded.data`).bind(generation, JSON.stringify(appointments)).run();
+      ON CONFLICT(generation, id) DO UPDATE SET data = excluded.data WHERE team_appointments.data != excluded.data`).bind(generation, JSON.stringify(appointments)).run();
     return { imported: appointments.length };
   }
   if (request.method === "POST" && url.pathname === "/sync/commit") {
     const input = await body(request), generation = text(input.generation, 80), s = await snapshot(db);
-    const calendarReadAt = input.calendarReadAt === undefined ? new Date().toISOString() : text(input.calendarReadAt, 40);
+    const calendarReadAt = input.calendarReadAt === undefined ? new Date(Date.now()).toISOString() : text(input.calendarReadAt, 40);
     if (!Number.isFinite(Date.parse(calendarReadAt)) || Date.parse(calendarReadAt) > Date.now() + 60_000 || Date.parse(calendarReadAt) < Date.now() - 86400_000) fail(400, "Invalid Calendar read time.");
-    const next = await jsonRows(db, "SELECT data FROM team_appointments WHERE generation = ?", generation);
+    const staged = await jsonRows(db, "SELECT data FROM team_appointments WHERE generation = ?", generation);
+    let next = staged, syncStats;
+    if (input.incremental === true) {
+      if (generation === s.state.generation || input.baseGeneration !== s.state.generation || input.baseSyncedAt !== s.state.synced_at ||
+          (s.state.synced_at && Date.parse(calendarReadAt) <= Date.parse(s.state.synced_at))) fail(409, "A newer Calendar sync is already saved. Retry with a fresh Calendar read.");
+      const verified = await verifyDelta(s.appointments.map(calendarRecord), staged.map(calendarRecord), input, calendarKey, fail);
+      next = verified.records; syncStats = verified.stats;
+    }
     if (!Number.isInteger(input.count) || next.length !== input.count) fail(409, "The calendar import is incomplete.");
     const changes = [], notifications = [], corrections = [], now = Date.now();
     const queuedIds = new Set((await db.prepare("SELECT assignment_id FROM calendar_assignment_outbox").all()).results.map(row => row.assignment_id));
@@ -356,7 +372,18 @@ async function route(request, env, ctx) {
     }
     const importedDuration = assignment => ["duration", "duration_recovered"].includes(assignment.calendarChange?.kind) && Date.parse(assignment.start) <= now;
     await commit(db, s.state, mutation => [
-      db.prepare(`UPDATE team_state SET generation = ?, synced_at = ? WHERE id = 1 AND ${guard}`).bind(generation, calendarReadAt, mutation),
+      db.prepare(`UPDATE team_state SET generation = ?, synced_at = ? WHERE id = 1 AND ${guard}`)
+        .bind(input.incremental === true ? s.state.generation : generation, calendarReadAt, mutation),
+      ...(input.incremental === true ? [
+        ...recordBatches(staged).map(rows => db.prepare(`INSERT INTO team_appointments(generation, id, data)
+          SELECT ?, json_extract(value, '$.id'), value FROM json_each(?) WHERE ${guard}
+          ON CONFLICT(generation, id) DO UPDATE SET data = excluded.data WHERE team_appointments.data != excluded.data`)
+          .bind(s.state.generation, JSON.stringify(rows), mutation)),
+        db.prepare(`DELETE FROM team_appointments WHERE generation = ? AND id IN (SELECT value FROM json_each(?)) AND ${guard}`)
+          .bind(s.state.generation, JSON.stringify(input.removed), mutation),
+        db.prepare(`DELETE FROM team_appointments WHERE generation = ? AND ${guard}`).bind(generation, mutation),
+        db.prepare(`DELETE FROM sync_imports WHERE kind = 'calendar' AND generation = ? AND ${guard}`).bind(generation, mutation),
+      ] : []),
       db.prepare(`UPDATE team_assignments SET data = (SELECT value FROM json_each(?) WHERE json_extract(value, '$.id') = team_assignments.id)
         WHERE id IN (SELECT json_extract(value, '$.id') FROM json_each(?)) AND ${guard}`)
         .bind(JSON.stringify(changes), JSON.stringify(changes), mutation),
@@ -369,10 +396,10 @@ async function route(request, env, ctx) {
         .bind(JSON.stringify(corrections.map(alert => alert.id)), mutation),
     ], notifications);
     // The old snapshot remains available until the atomic generation switch.
-    await db.prepare("DELETE FROM team_appointments WHERE generation != ?").bind(generation).run();
+    if (input.incremental !== true) await db.prepare("DELETE FROM team_appointments WHERE generation != ?").bind(generation).run();
     if (notifications.length) ctx.waitUntil(flushAlerts(env));
     if (changes.some(assignment => queuedIds.has(assignment.id) && !importedDuration(assignment))) ctx.waitUntil(flushCalendarAssignments(env, { limit: 3 }));
-    return { synced: next.length };
+    return { synced: next.length, ...(syncStats ? { syncStats } : {}) };
   }
   if (["POST", "PATCH", "DELETE"].includes(request.method) &&
       (url.pathname === "/work-preferences" || /^\/work-preferences\/[^/]+$/.test(url.pathname))) {

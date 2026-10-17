@@ -7,6 +7,8 @@ on:
       - "scripts/lib/calendar-assignments.mjs"
       - "scripts/lib/dashboard-data.mjs"
       - "scripts/lib/team-api.mjs"
+      - "scripts/lib/incremental-sync.mjs"
+      - "lib/sync-records.mjs"
       - "lib/rental-details.mjs"
       - ".github/workflows/calendar-sync.yml"
   schedule:

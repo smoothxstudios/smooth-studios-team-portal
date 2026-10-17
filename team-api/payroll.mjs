@@ -1,5 +1,10 @@
 import { TEAM } from "../lib/team-schedule.mjs";
 import { unbase64url } from "../lib/team-auth.mjs";
+import { payrollRecord, payrollKey, recordManifest, verifyDelta, recordBatches } from '../lib/sync-records.mjs';
+import { trackImport, cleanImports } from './sync-storage.mjs';
+
+const earningRecord = row => payrollRecord({ employeeId: row.employee_id, rentalId: row.rental_id,
+  amountCents: row.amount_cents, paidCents: row.paid_cents, earnedAt: row.earned_at, eligible: row.eligible === 1 });
 
 // Every allocation is one SQLite statement: the available advance and unpaid
 // earnings are read in the same write transaction. Concurrent reads, approvals,
@@ -76,6 +81,12 @@ async function payrollState(db, user) {
 export async function payrollRoute({ request, db, user, env, body, fail }) {
   const path = new URL(request.url).pathname;
   const isSync = user === 'sync';
+  if (isSync && request.method === 'GET' && path === '/sync/payroll/manifest') {
+    await cleanImports(db, 'payroll');
+    const state = await db.prepare('SELECT generation, synced_at FROM payroll_state WHERE id = 1').first();
+    const rows = (await db.prepare('SELECT * FROM payroll_rental_earnings WHERE generation = ?').bind(state.generation).all()).results;
+    return { ...await recordManifest(rows.map(earningRecord), payrollKey), generation: state.generation, syncedAt: state.synced_at };
+  }
   if (request.method === 'GET' && ['/payroll', '/sync/payroll'].includes(path)) {
     await reconcileAdvances(db); return payrollState(db, user);
   }
@@ -92,14 +103,49 @@ export async function payrollRoute({ request, db, user, env, body, fail }) {
       if (!employee(item.employeeId) || typeof item.rentalId !== 'string' || !item.rentalId || item.rentalId.length > 1024 || !cents(item.amountCents) || !cents(item.paidCents) || item.paidCents > item.amountCents || !iso(item.earnedAt) || typeof item.eligible !== 'boolean' || (item.eligible && Date.parse(item.earnedAt) > Date.parse(input.asOf))) fail(400, 'Invalid rental earnings.');
       return db.prepare(`INSERT INTO payroll_rental_earnings(generation, employee_id, rental_id, amount_cents, paid_cents, earned_at, eligible, as_of)
         SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS(SELECT 1 FROM payroll_state WHERE generation = ?)
-        ON CONFLICT(generation,employee_id,rental_id) DO UPDATE SET amount_cents=excluded.amount_cents, paid_cents=excluded.paid_cents, earned_at=excluded.earned_at, eligible=excluded.eligible, as_of=excluded.as_of`)
+        ON CONFLICT(generation,employee_id,rental_id) DO UPDATE SET amount_cents=excluded.amount_cents, paid_cents=excluded.paid_cents, earned_at=excluded.earned_at, eligible=excluded.eligible, as_of=excluded.as_of
+        WHERE amount_cents != excluded.amount_cents OR paid_cents != excluded.paid_cents OR earned_at != excluded.earned_at OR eligible != excluded.eligible OR as_of != excluded.as_of`)
         .bind(input.generation, item.employeeId, item.rentalId, item.amountCents, item.paidCents, item.earnedAt, Number(item.eligible), input.asOf, input.generation);
     });
+    if (input.incremental === true) await trackImport(db, 'payroll', input.generation);
     if (rows.length) await db.batch(rows);
     return { imported: rows.length };
   }
   if (isSync && request.method === 'POST' && path === '/sync/payroll/commit') {
     if (!uuid(input.generation) || !iso(input.asOf) || Date.parse(input.asOf) > Date.now() + 60_000 || !Number.isSafeInteger(input.count) || input.count < 0 || input.count > 100_000) fail(400, 'Invalid payroll snapshot.');
+    if (input.incremental === true) {
+      const state = await db.prepare('SELECT * FROM payroll_state WHERE id = 1').first();
+      if (Date.parse(input.asOf) < Date.now() - 86400_000 || input.generation === state.generation ||
+          input.baseGeneration !== state.generation || input.baseSyncedAt !== state.synced_at ||
+          (state.synced_at && input.asOf <= state.synced_at)) fail(409, 'A newer payroll sync is already saved. Retry with current data.');
+      const current = (await db.prepare('SELECT * FROM payroll_rental_earnings WHERE generation = ?').bind(state.generation).all()).results;
+      const staged = (await db.prepare('SELECT * FROM payroll_rental_earnings WHERE generation = ?').bind(input.generation).all()).results;
+      if (staged.some(row => row.as_of !== input.asOf)) fail(409, 'The payroll import contains a different snapshot.');
+      const { stats } = await verifyDelta(current.map(earningRecord), staged.map(earningRecord), input, payrollKey, fail);
+      const mutation = crypto.randomUUID(), guard = 'EXISTS(SELECT 1 FROM payroll_state WHERE id = 1 AND mutation = ?)';
+      const result = await db.batch([
+        db.prepare('UPDATE payroll_state SET synced_at = ?, mutation = ? WHERE id = 1 AND generation = ? AND synced_at IS ?')
+          .bind(input.asOf, mutation, state.generation, state.synced_at),
+        ...recordBatches(staged.map(earningRecord)).map(rows => db.prepare(`INSERT INTO payroll_rental_earnings
+          (generation, employee_id, rental_id, amount_cents, paid_cents, earned_at, eligible, as_of)
+          SELECT ?, json_extract(value,'$.employeeId'), json_extract(value,'$.rentalId'), json_extract(value,'$.amountCents'),
+            json_extract(value,'$.paidCents'), json_extract(value,'$.earnedAt'), json_extract(value,'$.eligible'), ?
+          FROM json_each(?) WHERE ${guard}
+          ON CONFLICT(generation,employee_id,rental_id) DO UPDATE SET amount_cents=excluded.amount_cents,
+            paid_cents=excluded.paid_cents, earned_at=excluded.earned_at, eligible=excluded.eligible, as_of=excluded.as_of
+          WHERE payroll_rental_earnings.amount_cents != excluded.amount_cents OR payroll_rental_earnings.paid_cents != excluded.paid_cents
+            OR payroll_rental_earnings.earned_at != excluded.earned_at OR payroll_rental_earnings.eligible != excluded.eligible`)
+          .bind(state.generation, input.asOf, JSON.stringify(rows), mutation)),
+        db.prepare(`DELETE FROM payroll_rental_earnings WHERE generation = ?
+          AND json_array(employee_id, rental_id) IN (SELECT value FROM json_each(?)) AND ${guard}`)
+          .bind(state.generation, JSON.stringify(input.removed), mutation),
+        db.prepare(`DELETE FROM payroll_rental_earnings WHERE generation = ? AND ${guard}`).bind(input.generation, mutation),
+        db.prepare(`DELETE FROM sync_imports WHERE kind = 'payroll' AND generation = ? AND ${guard}`).bind(input.generation, mutation),
+      ]);
+      if (!result[0].meta.changes) fail(409, 'Payroll changed during the sync. Existing records were preserved.');
+      await reconcileAdvances(db);
+      return { ...await payrollState(db, user), syncStats: stats };
+    }
     const result = await db.prepare(`UPDATE payroll_state SET generation = ?, synced_at = ? WHERE id = 1 AND (synced_at IS NULL OR synced_at < ?)
       AND (SELECT COUNT(*) FROM payroll_rental_earnings WHERE generation = ? AND as_of = ?) = ?
       AND NOT EXISTS(SELECT 1 FROM payroll_rental_earnings WHERE generation = ? AND as_of != ?)`)

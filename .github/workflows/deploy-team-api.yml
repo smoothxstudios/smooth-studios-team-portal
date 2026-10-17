@@ -6,6 +6,8 @@ on:
     paths:
       - "team-api/**"
       - "lib/team-*.mjs"
+      - "lib/sync-records.mjs"
+      - "scripts/lib/incremental-sync.mjs"
       - "scripts/deploy-team-api.mjs"
       - "scripts/import-studio-reference.mjs"
       - "data/studio-reference-import.json"
