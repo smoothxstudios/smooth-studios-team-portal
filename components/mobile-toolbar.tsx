@@ -9,7 +9,7 @@ import { attachToolbarSlide, attachToolbarScroll, mobileToolbarItems } from "@/l
 type ToolbarView = "overview" | "team" | "creative" | "scheduling" | "alerts" | "payouts";
 const icons = { home: House, team: Users, work: ClipboardList, schedule: CalendarDays, alerts: Bell, payouts: WalletCards };
 
-export function MobileToolbar({ isOwner, view, unread, onNavigate }: { isOwner: boolean; view: string; unread: number; onNavigate: (view: ToolbarView) => void }) {
+export function MobileToolbar({ isOwner, view, unread, onNavigate }: { isOwner: boolean; view: string; unread: number; onNavigate: (view: ToolbarView) => void | Promise<void> }) {
   const { setOpenMobile } = useSidebar();
   const nav = useRef<HTMLElement>(null);
   const items = useMemo(() => mobileToolbarItems(isOwner), [isOwner]);
@@ -53,7 +53,7 @@ export function MobileToolbar({ isOwner, view, unread, onNavigate }: { isOwner: 
       active.current = index;
       paint(index, false);
       setPendingView(items[index].key);
-      startTransition(() => { setOpenMobile(false); navigate.current(items[index].key); });
+      startTransition(async () => { setOpenMobile(false); await navigate.current(items[index].key); });
     };
     select.current = choose;
     const detachSlide = attachToolbarSlide(bar, {

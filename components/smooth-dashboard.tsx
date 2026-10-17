@@ -4,6 +4,7 @@ import { OwnerWeeklyHours } from "@/components/dashboard/owner-weekly-hours";
 import { AlertsPage,UnreadBadge } from "@/components/alerts";
 import { CreativeWorkPage,CreativeWorkPreview } from "@/components/creative-work";
 import { DashboardRefreshProvider,PullToRefresh,useRefreshSource } from "@/components/dashboard-refresh";
+import { scrollToolbarToTop } from "@/lib/toolbar-navigation.mjs";
 import { DashboardSettings } from "@/components/dashboard-settings";
 import { DashboardVersionFooter } from "@/components/dashboard-version-footer";
 import { CategoryRevenue,OwnerFinancialSummary,PeriodTotals } from "@/components/dashboard/financial-summary";
@@ -86,9 +87,22 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   useRefreshSource(onRefresh);
   const [view, setView] = useState<ViewKey>("overview");
   const [toolbarRefresh, setToolbarRefresh] = useState(0);
+  const toolbarScroll = useRef<ReturnType<typeof scrollToolbarToTop> | null>(null);
   const [focusedAlert, setFocusedAlert] = useState<{ target: string; id: string } | null>(null);
   const [alertWorkLoading, setAlertWorkLoading] = useState(false);
-  const navigate = (next: ViewKey) => { setFocusedAlert(null); setView(next); };
+  const navigate = (next: ViewKey) => { toolbarScroll.current?.cancel(); toolbarScroll.current = null; setFocusedAlert(null); setView(next); };
+  const navigateToolbar = async (next: ViewKey) => {
+    toolbarScroll.current?.cancel();
+    const movement = scrollToolbarToTop(window);
+    toolbarScroll.current = movement;
+    if (!await movement.finished || toolbarScroll.current !== movement) return;
+    toolbarScroll.current = null;
+    // Keep the current page mounted until it reaches the top: opening a shorter
+    // destination first would clamp the scroll position and create another jump.
+    navigate(next);
+    setToolbarRefresh(value => value + 1);
+  };
+  useEffect(() => () => { toolbarScroll.current?.cancel(); }, []);
   const openChecklist = () => navigate("checklists");
   const alerts = useAlerts(schedulingToken, view === "alerts");
   const payroll = usePayroll(schedulingToken, payload.payroll);
@@ -384,7 +398,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
         <DashboardVersionFooter viewer={isOwner ? "owner" : "employee"} />
         </div>
       </SidebarInset>
-      <MobileToolbar isOwner={isOwner} view={view} unread={alerts.unreadCount} onNavigate={next => { navigate(next); setToolbarRefresh(value => value + 1); }} />
+      <MobileToolbar isOwner={isOwner} view={view} unread={alerts.unreadCount} onNavigate={navigateToolbar} />
       {isOwner && (
         <>
           <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={setPaymentOverrideOpen} open={paymentOverrideOpen} reviewRentals={reviewRentals} />

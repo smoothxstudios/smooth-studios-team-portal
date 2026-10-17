@@ -1886,8 +1886,16 @@ button { cursor: pointer; }
 .team-payout-person dt { font-size: 11px; color: var(--muted-foreground); }
 .team-payout-person dd { margin: 4px 0 0; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .team-payout-person dl > div:first-child dd { color: var(--primary); }
+.team-payout-person dl > div:nth-child(4) { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.team-payout-person dl > div:nth-child(4) dd { margin: 0; font-size: 14px; }
 .owner-weekly-hours { min-width: 0; max-width: 100%; }
+.owner-weekly-hours .panel-heading { flex-wrap: wrap; gap: 12px; }
 .owner-weekly-hours .panel-heading > div { min-width: 0; overflow-wrap: anywhere; }
+.team-hours-week-nav { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.owner-weekly-hours .team-hours-week-button { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; color: var(--foreground); background: var(--card); font-size: 12px; font-weight: 600; }
+.owner-weekly-hours .team-hours-week-button:hover:not(:disabled) { background: var(--muted); }
+.owner-weekly-hours .team-hours-week-button:disabled { opacity: .4; cursor: default; }
+.owner-weekly-hours .team-hours-week-button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .team-hours-body { min-width: 0; padding: 0 24px 20px; }
 .team-hours-body > p { white-space: normal; overflow-wrap: anywhere; }
 .team-hours-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin-bottom: 12px; min-width: 0; }

@@ -75,10 +75,9 @@ export function PullToRefresh({ page, requestId = 0 }: { page: string; requestId
   }, [coordinator, page]);
   useEffect(() => {
     if (!requestId) return;
-    // Run after the destination's effects register its data sources, including
-    // when the active toolbar button is tapped again without changing pages.
+    // Toolbar navigation has finished scrolling. Wait for the destination's
+    // effects to register its data sources before starting the refresh.
     const frame = requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
       startRefresh.current();
     });
     return () => cancelAnimationFrame(frame);
