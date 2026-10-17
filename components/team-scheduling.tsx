@@ -17,6 +17,7 @@ import { saveScheduleMutation, scheduleMutationMessage, scheduleMutationError } 
 import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps, workPreferenceMatch } from "@/lib/team-schedule.mjs";
 import { calendarInvitationStatus, calendarInvitationLabel, pendingCalendarInvitations } from "@/lib/calendar-invitations.mjs";
 import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
+import { rentalAppointmentId } from "@/lib/alert-target.mjs";
 
 const personName = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
 const time = (value: string) => new Date(value).toLocaleTimeString("en-US", { timeZone: STUDIO_ZONE, hour: "numeric", minute: "2-digit" });
@@ -189,7 +190,11 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     </article>;
   }
 
-  const focusedItem = schedule?.assignments.find(item => item.id === focusId);
+  const focusedRentalId = rentalAppointmentId(focusId);
+  const focusedRental = schedule?.appointments.find(item => item.id === focusedRentalId);
+  const focusedRentalOffers = focusedRental ? (schedule?.assignments ?? []).filter(item => item.appointmentId === focusedRental.id &&
+    Date.parse(item.start) === Date.parse(focusedRental.start) && Date.parse(item.end) === Date.parse(focusedRental.end)) : [];
+  const focusedItem = focusedRentalId ? undefined : schedule?.assignments.find(item => item.id === focusId);
   return <section className="team-scheduling">
     {!home && (!isOwner || availabilityOnly || !schedule) && <header className="schedule-intro"><div>{isOwner && <p className="schedule-eyebrow">{availabilityOnly ? "TEAM AVAILABILITY" : "TEAM SCHEDULE"}</p>}<h2>{availabilityOnly ? isOwner ? "Availability" : "My availability" : isOwner ? "Schedule" : "My schedule"}</h2>{!isOwner && <p>{availabilityOnly ? "Add preferred work days or unavailable time." : "Review rental offers and assignments."}</p>}</div>
 </header>}
@@ -268,9 +273,20 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={() => setAssignmentOpen(false)}>Cancel</Button><Button disabled={busy || needsRefresh || (conflicts.length > 0 && !assignment.overrideConflicts) || alreadyInvited || alreadyOffered || !period} type="submit">{busy ? "Sending…" : "Send assignment offer"}</Button></DialogFooter>
       </form></DialogContent></Dialog>
 
-    <Dialog open={Boolean(focusId)} onOpenChange={open => { if (!open && !busy) onCloseFocus?.(); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Assignment details</DialogTitle><DialogDescription>Review the current assignment and its response.</DialogDescription></DialogHeader>
-      {focusedItem ? assignmentCard(focusedItem) : <p role="status">{loading ? "Loading assignment…" : error || "This assignment is no longer available to this account."}</p>}
-      {focusedItem && error && <p role="alert" className="schedule-error">{error}</p>}
+    <Dialog open={Boolean(focusId)} onOpenChange={open => { if (!open && !busy) onCloseFocus?.(); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>{focusedRentalId ? "Rental details" : "Assignment details"}</DialogTitle><DialogDescription>{focusedRentalId ? "Review the current rental and its team responses." : "Review the current assignment and its response."}</DialogDescription></DialogHeader>
+      {focusedRental ? <>
+        <article className="schedule-offer">
+          <h3>{focusedRental.title}</h3>
+          {focusedRental.customer && <p>{focusedRental.customer}</p>}
+          <p><CalendarDays size={15} /> {date(focusedRental.start)} · {time(focusedRental.start)}–{time(focusedRental.end)}</p>
+          <RentalDescription details={focusedRental.rentalDetails} />
+          {focusedRental.acceptedEmployeeIds.length > 0 && <p className="schedule-calendar-accepted"><Check size={14} aria-hidden="true" />Calendar accepted: {focusedRental.acceptedEmployeeIds.map(personName).join(", ")}</p>}
+          {pendingCalendarInvitations(focusedRental).map(invitation => <p className="schedule-small" key={invitation.employeeId}>{personName(invitation.employeeId)} · {calendarInvitationLabel(invitation.status)}</p>)}
+          {onChecklist && <Button variant="outline" onClick={() => { onCloseFocus?.(); onChecklist(); }}>Rental checklist</Button>}
+        </article>
+        {focusedRentalOffers.map(assignmentCard)}
+      </> : focusedItem ? assignmentCard(focusedItem) : <p role="status">{loading ? focusedRentalId ? "Loading rental…" : "Loading assignment…" : error || (focusedRentalId ? "This rental is no longer available to this account." : "This assignment is no longer available to this account.")}</p>}
+      {(focusedItem || focusedRental) && error && <p role="alert" className="schedule-error">{error}</p>}
       {message && <p role="status" className="schedule-success">{message}</p>}
     </DialogContent></Dialog>
 

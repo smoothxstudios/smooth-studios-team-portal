@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { attachScrollTapGuard } from "@/lib/scroll-tap-guard.mjs";
 import { alertBody, groupAlerts } from "@/lib/alert-presentation.mjs";
-import { Bell, CalendarDays, Check, CheckCheck, Mail, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
+import { Bell, CalendarDays, Check, CheckCheck, Mail, ChevronDown, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -33,12 +33,15 @@ function AlertOptions({ alert, state, onOpen }: { alert: DashboardAlert; state: 
 
 export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner?: boolean; state: AlertsState; onOpen: (alert: DashboardAlert) => void; action?: ReactNode }) {
   const page = useRef<HTMLElement>(null);
+  const bulkMenu = useRef<HTMLDivElement>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [notice, setNotice] = useState<DashboardAlert | null>(null);
   useEffect(() => { if (page.current) return attachScrollTapGuard(page.current); }, []);
+  useEffect(() => { if (bulkOpen && bulkMenu.current) return attachScrollTapGuard(bulkMenu.current); }, [bulkOpen]);
   const groups = isOwner ? groupAlerts(state.alerts) : [{ id: "all", person: null, alerts: state.alerts }];
   const open = async (alert: DashboardAlert) => {
     if (!await state.markRead(alert)) return;
-    if (alert.kind === "notice") setNotice(alert);
+    if (alert.kind === "notice" && alert.target === "alerts") setNotice(alert);
     else onOpen(alert);
   };
   return <section ref={page} className="alerts-page" aria-label="Your alerts">
@@ -48,10 +51,13 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
         <button aria-pressed={state.filter === "all"} disabled={state.busy} onClick={() => state.chooseFilter("all")}>All</button>
         <button aria-pressed={state.filter === "unread"} disabled={state.busy} onClick={() => state.chooseFilter("unread")}>Unread <UnreadBadge count={state.unreadCount} /></button>
       </div>
-      <div className="alerts-bulk-actions">
-        <Button variant="ghost" disabled={state.busy || state.loading || !state.unreadCount} onClick={() => void state.markRead()}><CheckCheck size={16} aria-hidden="true" />Mark all read</Button>
-        <Button variant="ghost" disabled={state.busy || state.loading || !state.throughSequence} onClick={() => void state.markAllUnread()}><Mail size={16} aria-hidden="true" />Mark all unread</Button>
-      </div>
+      <DropdownMenu open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DropdownMenuTrigger asChild onPointerDown={event => event.preventDefault()}><Button variant="ghost" disabled={state.busy || state.loading || !state.throughSequence} onClick={() => setBulkOpen(value => !value)}>Mark all <ChevronDown size={15} aria-hidden="true" /></Button></DropdownMenuTrigger>
+        <DropdownMenuContent ref={bulkMenu} className="alert-actions-menu" align="end" collisionPadding={8}>
+          <DropdownMenuItem disabled={state.busy || !state.unreadCount} onSelect={() => void state.markRead()}><CheckCheck size={16} aria-hidden="true" />Read</DropdownMenuItem>
+          <DropdownMenuItem disabled={state.busy || !state.throughSequence} onSelect={() => void state.markAllUnread()}><Mail size={16} aria-hidden="true" />Unread</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
     {state.error && <p className="schedule-warning" role="alert">{state.error} <button onClick={() => void state.refresh()}>Try again</button></p>}
     {state.deletion && <div className="alerts-undo" role="status"><span>Alert deleted</span><button type="button" disabled={state.busy} onClick={() => void state.undoDelete()} aria-label={`Undo deletion: ${state.deletion.alert.title}`}>Undo</button></div>}

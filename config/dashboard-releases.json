@@ -1,6 +1,27 @@
 {
-  "currentVersion": "2.32.0",
+  "currentVersion": "2.33.0",
   "releases": [
+    {
+      "id": "2026-10-17-home-layout-and-direct-alerts",
+      "version": "2.33.0",
+      "date": "2026-10-17",
+      "category": "Dashboard",
+      "title": "Arrange Home and open alerts directly",
+      "changes": [
+        "Coming up starts at the top of Smooth’s Home. Edit layout lets Smooth reorder all six Home sections and save the order to the account across devices.",
+        "Drag handles and move buttons make the layout editor usable with touch, a mouse, or a keyboard. Cancel preserves the saved order, and Reset to default restores the starting arrangement.",
+        "The Alerts read and unread bulk actions share one compact Mark all menu.",
+        "Opening an alert takes you directly to its relevant rental, assignment, or page. Inbox-only custom messages still open their full text."
+      ],
+      "employee": {
+        "title": "Simpler alert controls and direct links",
+        "changes": [
+          "Read and Unread bulk actions are under the compact Mark all menu.",
+          "Tap a reminder to go directly to its rental, assignment, or related page. Inbox-only messages still show their full text."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-mark-alerts-unread-and-stable-reminders",
       "version": "2.32.0",

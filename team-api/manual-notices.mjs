@@ -2,6 +2,7 @@ import { TEAM } from "../lib/team-schedule.mjs";
 import { tokenHash } from "../lib/team-auth.mjs";
 import { notificationText, notificationTime } from "./notification-content.mjs";
 import { flushAlerts } from "./push.mjs";
+import { rentalAlertTargetId } from "../lib/alert-target.mjs";
 
 const employees = new Set(TEAM.filter(person => person.id !== "owner").map(person => person.id));
 const targets = new Set(["alerts", "settings", "scheduling", "creative", "availability"]);
@@ -95,8 +96,9 @@ export async function manualNoticesRoute({ request, env, user, body, fail, ctx }
     target = "scheduling";
   }
   const now = Date.now(), token = crypto.randomUUID(), recipientIds = JSON.stringify(recipients);
+  const targetId = assignmentId ?? (context ? rentalAlertTargetId(context.appointmentId) : null);
   const item = { id, request_hash: hash, recipient_ids: recipientIds, title, body: message, target,
-    target_id: assignmentId, assignment_id: assignmentId, operation_token: token, created_at: now };
+    target_id: targetId, assignment_id: assignmentId, operation_token: token, created_at: now };
   let guard = assignmentId
     ? `EXISTS (SELECT 1 FROM team_assignments WHERE id = ? AND data = ? AND json_extract(data, '$.status') = 'pending'
         AND julianday(json_extract(data, '$.start')) > julianday(?))
@@ -106,12 +108,12 @@ export async function manualNoticesRoute({ request, env, user, body, fail, ctx }
         AND EXISTS (SELECT 1 FROM json_each(m.recipient_ids) p WHERE p.value = r.value)) >= 5)`;
   if (context) guard += " AND EXISTS (SELECT 1 FROM team_state WHERE id = 1 AND revision = ? AND generation = ?)";
   const events = recipients.map(userId => ({ id: `notice_${id}_${userId}`, userId,
-    payload: JSON.stringify({ title, body: message, target, ...(assignmentId ? { targetId: assignmentId } : {}), personId: "owner" }) }));
+    payload: JSON.stringify({ title, body: message, target, ...(targetId ? { targetId } : {}), personId: "owner" }) }));
   const results = await db.batch([
     db.prepare(`INSERT OR IGNORE INTO manual_notices
       (id, request_hash, recipient_ids, title, body, target, target_id, assignment_id, operation_token, created_at)
       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${guard}`)
-      .bind(id, hash, recipientIds, title, message, target, assignmentId, assignmentId, token, now,
+      .bind(id, hash, recipientIds, title, message, target, targetId, assignmentId, token, now,
         ...(assignmentId ? [assignmentId, rawAssignment, new Date(now).toISOString(), assignmentId, now - interval] : [recipientIds, now - interval]),
         ...(context ? [rentalState.revision, rentalState.generation] : [])),
     db.prepare(`INSERT OR IGNORE INTO team_notification_events(id, user_id, kind, payload, due_at)

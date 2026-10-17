@@ -1,5 +1,6 @@
 "use client";
 import { OwnerWeeklyHours } from "@/components/dashboard/owner-weekly-hours";
+import { OwnerHomeLayout } from "@/components/dashboard/owner-home-layout";
 
 import { AlertsPage,UnreadBadge } from "@/components/alerts";
 import { CreativeWorkPage,CreativeWorkPreview } from "@/components/creative-work";
@@ -331,15 +332,13 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           {view === "creative" && <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} focusLoading={alertWorkLoading} focusId={focusedAlert?.target === "creative" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} />}
           {view === "overview" && !isOwner && <TeamSchedulingPage onChecklist={openChecklist} token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, advance, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide"), onChecklist: openChecklist }} />}
           {view === "overview" && isOwner && (
-            <div className="owner-overview">
-              <OwnerFinancialSummary rentals={visibleRentals} creative={creative} upcomingCount={upcoming.length} totalOwed={metrics.owed} onSchedule={() => setView("scheduling")} onPayouts={() => setView("payouts")} />
-              <section className="owner-workspace" aria-label="Upcoming work and payment reviews">
-                <OwnerUpcoming rentals={upcoming} onSchedule={() => setView("scheduling")} />
-                <OwnerAttention reviewCount={reviewRentals.length} unmatchedCount={payload.stripeSummary?.unmatchedPaymentCount ?? payload.unmatchedStripePayments?.length ?? 0} stripeConnected={stripeConnected} onReview={reviewPayments} onMatch={() => openStripeMatch()} onPayouts={() => setView("payouts")} />
-              </section>
-              <OwnerWeeklyHours employees={payload.employees} rentals={rentals} token={schedulingToken} />
-              <CreativeWorkPreview state={creative} isOwner onOpen={() => setView("creative")} />
-              <details className="owner-reports">
+            <OwnerHomeLayout token={schedulingToken} sections={{
+              upcoming: <OwnerUpcoming rentals={upcoming} onSchedule={() => setView("scheduling")} />,
+              attention: <OwnerAttention reviewCount={reviewRentals.length} unmatchedCount={payload.stripeSummary?.unmatchedPaymentCount ?? payload.unmatchedStripePayments?.length ?? 0} stripeConnected={stripeConnected} onReview={reviewPayments} onMatch={() => openStripeMatch()} onPayouts={() => setView("payouts")} />,
+              finances: <OwnerFinancialSummary rentals={visibleRentals} creative={creative} upcomingCount={upcoming.length} totalOwed={metrics.owed} onSchedule={() => setView("scheduling")} onPayouts={() => setView("payouts")} />,
+              hours: <OwnerWeeklyHours employees={payload.employees} rentals={rentals} token={schedulingToken} />,
+              creative: <CreativeWorkPreview state={creative} isOwner onOpen={() => setView("creative")} />,
+              reports: <details className="owner-reports">
                 <summary>
                   <span className="owner-reports-icon"><BarChart3 size={21} /></span>
                   <span className="owner-reports-copy"><strong>Financial reports</strong><small>Revenue, Stripe, and category breakdowns</small></span>
@@ -354,8 +353,8 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
                   <StripeMoneyFlow onMatch={openStripeMatch} summary={payload.stripeSummary} unmatchedPayments={payload.unmatchedStripePayments ?? []} />
                   <CategoryRevenue rentals={visibleRentals} />
                 </div>
-              </details>
-            </div>
+              </details>,
+            }} />
           )}
 
           {view === "rentals" && isOwner && <article className="panel page-panel">

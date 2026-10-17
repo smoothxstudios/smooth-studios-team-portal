@@ -1,4 +1,5 @@
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const state = sqliteTable("team_state", {
   id: integer("id").primaryKey(),
@@ -7,6 +8,12 @@ export const state = sqliteTable("team_state", {
   generation: text("generation").notNull().default(""),
   syncedAt: text("synced_at"),
 });
+
+export const ownerDashboardLayout = sqliteTable("owner_dashboard_layout", {
+  id: integer("id").primaryKey(), revision: integer("revision").notNull().default(0),
+  orderJson: text("order_json").notNull(), updatedAt: integer("updated_at").notNull(),
+}, table => [check("owner_dashboard_layout_single_owner", sql`${table.id} = 1`),
+  check("owner_dashboard_layout_revision", sql`${table.revision} >= 0`)]);
 
 export const appointments = sqliteTable("team_appointments", {
   generation: text("generation").notNull(),

@@ -1,6 +1,7 @@
 import { TEAM } from '../lib/team-schedule.mjs';
 import { alertBody } from '../lib/alert-presentation.mjs';
 import { notificationText } from './notification-content.mjs';
+import { safeAlertTargetId } from '../lib/alert-target.mjs';
 
 const targets = new Set(['scheduling', 'availability', 'creative', 'quiz', 'settings', 'alerts']);
 const validSequence = value => Number.isSafeInteger(value) && value >= 0;
@@ -31,7 +32,7 @@ export async function alertsRoute({ request, db, user, body, fail }) {
         title: notificationText(row.title, 80), body: alertBody(notificationText(row.body, 360)),
         personId: TEAM.some(person => person.id === row.person_id) ? row.person_id : null,
         target: targets.has(row.target) ? row.target : 'scheduling',
-        targetId: typeof row.target_id === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(row.target_id) ? row.target_id : null,
+        targetId: safeAlertTargetId(row.kind, row.target, row.target_id),
         createdAt: row.created_at, expiresAt: row.expires_at, readAt: row.read_at,
       })) };
   }

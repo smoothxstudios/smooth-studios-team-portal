@@ -4,6 +4,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { manualNoticesRoute } from "../team-api/manual-notices.mjs";
 import { tokenHash } from "../lib/team-auth.mjs";
+import { rentalAlertTargetId } from "../lib/alert-target.mjs";
+import { alertsRoute } from "../team-api/alerts.mjs";
 
 const now = Date.parse("2026-10-17T12:00:00Z");
 mock.timers.enable({ apis: ["Date"], now });
@@ -195,6 +197,35 @@ test("upcoming rental reminders use confirmed Calendar and matching accepted app
   assert.equal(f.count("team_inbox"), 2);
   assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS count FROM team_inbox WHERE user_id='jordyn'").get().count, 1,
     "a cancelled old app offer does not cancel an independent accepted Calendar invitation");
+  const targetId = rentalAlertTargetId(rental.id);
+  assert.equal(f.DB.sqlite.prepare("SELECT target_id FROM manual_notices WHERE id=?").get(input.id).target_id, targetId);
+  assert.ok(f.DB.sqlite.prepare("SELECT target_id FROM team_inbox").all().every(item => item.target_id === targetId));
+  const inbox = await alertsRoute({ request: new Request("https://api.example.invalid/alerts"), db: f.DB, user: "jordyn",
+    fail: (status, message) => { throw Object.assign(new Error(message), { status }); } });
+  assert.equal(inbox.alerts[0].targetId, targetId, "the serialized destination survives the inbox API");
+  assert.equal(inbox.alerts[0].target, "scheduling");
+});
+
+test("rental reminder destinations support long Calendar IDs while prior receipts remain unchanged", async t => {
+  const f = fixture(t), id = `${"calendar-".repeat(20)}event@google.com`;
+  addRental(f, { id });
+  const input = notice({ context: rentalContext({ appointmentId: id }) });
+  assert.equal((await f.call("owner", "/notifications", input)).status, 200);
+  const targetId = rentalAlertTargetId(id);
+  assert.ok(targetId.length > 80);
+  const inbox = await alertsRoute({ request: new Request("https://api.example.invalid/alerts"), db: f.DB, user: "jordyn",
+    fail: (status, message) => { throw Object.assign(new Error(message), { status }); } });
+  assert.equal(inbox.alerts[0].targetId, targetId);
+  const expectedHash = await tokenHash(JSON.stringify({ kind: "notice", recipientIds: input.recipientIds,
+    title: input.title, body: input.body, target: input.target,
+    context: { ...input.context, start: new Date(input.context.start).toISOString(), end: new Date(input.context.end).toISOString() } }));
+  assert.equal(f.DB.sqlite.prepare("SELECT request_hash FROM manual_notices WHERE id=?").get(input.id).request_hash, expectedHash);
+  // Simulate a receipt from before exact rental destinations were persisted.
+  f.DB.sqlite.exec("UPDATE manual_notices SET target_id=NULL; UPDATE team_inbox SET target_id=NULL; DELETE FROM team_notification_events; DELETE FROM team_appointments;");
+  assert.equal((await f.call("owner", "/notifications", input)).status, 200);
+  assert.equal(f.DB.sqlite.prepare("SELECT target_id FROM manual_notices WHERE id=?").get(input.id).target_id, null);
+  assert.equal(f.DB.sqlite.prepare("SELECT target_id FROM team_inbox").get().target_id, null);
+  assert.equal(f.count("team_notification_events"), 0);
 });
 
 test("rental context rejects stale times, missing or non-rental bookings and pending, tentative or stale-time staff", async t => {
