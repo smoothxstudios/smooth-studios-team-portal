@@ -16,6 +16,7 @@ permissions:
 concurrency:
   group: smooth-studios-data-writes
   cancel-in-progress: false
+  queue: max
 
 jobs:
   update-build-deploy:
