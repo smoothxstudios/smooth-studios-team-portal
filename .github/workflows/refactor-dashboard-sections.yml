@@ -1,0 +1,53 @@
+name: Verify dashboard module extraction
+on:
+  push:
+    branches: [refactor/dashboard-sections-2026-10-17]
+    paths:
+      - '.github/refactor-dashboard-sections.mjs'
+      - '.github/workflows/refactor-dashboard-sections.yml'
+      - 'tests/dashboard-sections.test.mjs'
+      - 'tests/helpers/load-dashboard-module.mjs'
+permissions:
+  contents: write
+concurrency:
+  group: verify-dashboard-sections-refactor
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/refactor/dashboard-sections-2026-10-17'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/dashboard-sections-2026-10-17
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Extract inspected components without rewriting their bodies
+        run: node .github/refactor-dashboard-sections.mjs
+      - name: Run full tests including pre-refactor rendering comparisons
+        run: npm test
+        env:
+          DASHBOARD_COMPARE_BEFORE: '1'
+      - name: Remove temporary baseline and verify standalone tests
+        run: |
+          rm .github/dashboard-before.tsx
+          npm test
+      - name: Type check and build for the existing custom domain
+        run: |
+          npx tsc --noEmit
+          npm run build:github-pages
+        env:
+          GITHUB_PAGES_BASE_PATH: ''
+      - name: Commit only verified refactor files to this branch
+        run: |
+          git diff --check
+          git config user.name 'smooth-studios-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add components/smooth-dashboard.tsx components/dashboard lib/dashboard-presentation.ts config/dashboard-releases.json package.json package-lock.json
+          git rm .github/refactor-dashboard-sections.mjs .github/workflows/refactor-dashboard-sections.yml
+          git commit -m 'refactor: extract verified dashboard sections [skip ci]'
+          git push origin HEAD:refactor/dashboard-sections-2026-10-17
