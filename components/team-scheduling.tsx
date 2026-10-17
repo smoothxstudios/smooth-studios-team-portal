@@ -12,6 +12,7 @@ import { EmployeeHome, type EmployeeHomeOptions } from "@/components/employee-ho
 import { TeamAvailability } from "@/components/team-availability";
 import { OwnerScheduleAgenda } from "@/components/owner-schedule-agenda";
 import { useRefreshSource } from "@/components/dashboard-refresh";
+import { saveScheduleMutation, scheduleMutationMessage, scheduleMutationError } from "@/lib/team-schedule-mutations.mjs";
 import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps, workPreferenceMatch } from "@/lib/team-schedule.mjs";
 
 const personName = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
@@ -86,34 +87,22 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     ++requestVersion.current;
     setBusy(true); setError(""); setMessage("");
     try {
-      let result: { notification?: string };
-      try {
-        result = await teamRequest<{ notification?: string }>(token, path, { ...data, revision: schedule.revision }, method);
-      } catch (caught) {
-        // A rejected stale revision did not write a block. Only a new block is safe to retry automatically.
-        if (path !== "/blocks" || method !== "POST" || !(caught instanceof Error) ||
-            caught.message !== "The schedule changed. Refresh, review it, and try again.") throw caught;
-        const fresh = await teamRequest<TeamSchedule>(token, "/schedule");
-        setSchedule(fresh);
-        setNeedsRefresh(false);
-        const requested = data as { userId: string; reason: string; startLocal: string; endLocal: string; repeatUntil?: string | null };
-        if (fresh.blocks.some(existing =>
-          existing.userId === (isOwner ? requested.userId : userId) &&
-          existing.startLocal === requested.startLocal && existing.endLocal === requested.endLocal &&
-          existing.repeatUntil === (requested.repeatUntil ?? null) && existing.reason === requested.reason.trim()
-        )) throw new Error("This time block is already saved. Check it under Unavailable.");
-        result = await teamRequest<{ notification?: string }>(token, path, { ...data, revision: fresh.revision }, method);
-      }
+      const result = await saveScheduleMutation({
+        path, method, data, revision: schedule.revision, userId, isOwner,
+        write: (revision: number) => teamRequest<{ notification?: string }>(token, path, { ...data, revision }, method),
+        refresh: () => teamRequest<TeamSchedule>(token, "/schedule"),
+        onRefresh: (fresh: TeamSchedule) => { setSchedule(fresh); setNeedsRefresh(false); },
+      });
       setNeedsRefresh(true);
       // Reflect a confirmed response immediately, even if the follow-up read fails.
       if (path.startsWith("/assignments/") && "status" in data && ["accepted", "declined", "cancelled"].includes(String(data.status))) {
         setSchedule(current => current ? { ...current, assignments: current.assignments.map(a => a.id === path.slice(13) ? { ...a, status: data.status as TeamAssignment["status"] } : a) } : current);
       }
       // Once saved, a refresh failure must not invite a duplicate submission.
-      setMessage(result.notification ?? ("status" in data && data.status === "accepted" ? "Assignment accepted." : "status" in data && data.status === "declined" ? "Assignment declined." : (path.startsWith("/blocks") || path.startsWith("/work-preferences")) ? (method === "DELETE" ? "Availability entry removed." : "Availability saved.") : "Saved. Calendar notes and rental earnings update on the next sync, scheduled every 5 minutes."));
+      setMessage(scheduleMutationMessage(path, data, method, result));
       try { await load(); } catch { setError("Your change was saved, but the updated view could not load. Press Refresh before making another change."); }
       return true;
-    } catch (e) { setError(e instanceof Error && e.message === "The schedule changed. Refresh, review it, and try again." && path === "/blocks" ? "The schedule updated again while saving. Your entry is still here; tap Save time block to try again." : e instanceof Error ? e.message : "Couldn’t save this change."); return false; }
+    } catch (e) { setError(scheduleMutationError(path, e)); return false; }
     finally { mutationInFlight.current = false; setBusy(false); }
   }
 

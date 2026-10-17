@@ -1,6 +1,19 @@
 {
-  "currentVersion": "2.24.2",
+  "currentVersion": "2.24.3",
   "releases": [
+    {
+      "id": "2026-10-17-schedule-mutation-refactor",
+      "version": "2.24.3",
+      "date": "2026-10-17",
+      "category": "Maintenance",
+      "title": "Cleaner scheduling code and automated regression checks",
+      "changes": [
+        "Separated schedule-write recovery, duplicate time-block detection, and response messages from the scheduling screen into a reusable module without changing the interface.",
+        "Added regression tests for stale schedule saves, repeat blocks, owner/employee identity handling, and non-retryable changes.",
+        "Dashboard publication now runs the test suite before deploying, so test failures stop the release."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-16-time-block-revision-recovery",
       "version": "2.24.2",
