@@ -12,7 +12,8 @@ import { payrollRoute } from "./payroll.mjs";
 import { studioReferenceRoute } from "./studio-reference.mjs";
 import { CALENDAR_INVITATION_STATUSES } from "../lib/calendar-invitations.mjs";
 import { calendarAuthRoute } from "./calendar-auth.mjs";
-import { calendarQueueStatement, flushCalendarAssignments } from "./calendar-delivery.mjs";
+import { calendarQueueStatement, calendarDurationImportStatement, flushCalendarAssignments } from "./calendar-delivery.mjs";
+import { calendarTimeChange, recoverDurationCancellation, LEGACY_PAST_NOTE } from "./calendar-time-changes.mjs";
 import { manualNoticesRoute } from "./manual-notices.mjs";
 import { withoutRemovedRentalStaff } from "../lib/rental-staff.mjs";
 
@@ -132,7 +133,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -294,6 +295,8 @@ async function route(request, env, ctx) {
       .map(({ appointmentId, employeeId, start, end }) => ({ appointmentId, employeeId, start, end })),
       calendarAssignments: assignments.filter(a => a.appointmentId)
         .map(({ appointmentId, employeeId, start, end, status }) => ({ appointmentId, employeeId, start, end, status })),
+      durationRecovery: { restored: assignments.filter(a => a.calendarChange?.kind === "duration_recovered").length,
+        needsReview: assignments.filter(a => a.status === "cancelled" && a.note === LEGACY_PAST_NOTE && !a.calendarChange).length },
       pushDiagnostics: { registeredDevices: devices.count, queuedAlerts: alerts.count, retryingAlerts: alerts.retrying },
     };
   }
@@ -329,32 +332,46 @@ async function route(request, env, ctx) {
     if (!Number.isFinite(Date.parse(calendarReadAt)) || Date.parse(calendarReadAt) > Date.now() + 60_000 || Date.parse(calendarReadAt) < Date.now() - 86400_000) fail(400, "Invalid Calendar read time.");
     const next = await jsonRows(db, "SELECT data FROM team_appointments WHERE generation = ?", generation);
     if (!Number.isInteger(input.count) || next.length !== input.count) fail(409, "The calendar import is incomplete.");
-    const changes = [], notifications = [];
+    const changes = [], notifications = [], corrections = [], now = Date.now();
     const queuedIds = new Set((await db.prepare("SELECT assignment_id FROM calendar_assignment_outbox").all()).results.map(row => row.assignment_id));
     const appointmentsById = new Map(next.map(a => [a.id, a]));
+    const repairCandidates = s.assignments.filter(a => a.appointmentId && a.status === "cancelled" && a.note === LEGACY_PAST_NOTE && !a.calendarChange);
+    const history = repairCandidates.length ? (await db.prepare("SELECT * FROM team_inbox WHERE target = 'scheduling' AND target_id IN (SELECT value FROM json_each(?))")
+      .bind(JSON.stringify(repairCandidates.map(a => a.id))).all()).results : [];
     for (const a of s.assignments.filter(a => a.appointmentId && active(a))) {
       const appointment = appointmentsById.get(a.appointmentId);
-      if (!appointment) {
-        changes.push({ ...a, status: "cancelled", note: "Appointment removed from Calendar.", updatedAt: new Date().toISOString() });
-        notifications.push(...assignmentNotifications(a, "removed", [a.employeeId, "owner"]));
-      } else if (Date.parse(a.start) !== Date.parse(appointment.start) || Date.parse(a.end) !== Date.parse(appointment.end)) {
-        const status = Date.parse(appointment.start) > Date.now() ? "pending" : "cancelled";
-        changes.push({ ...a, start: appointment.start, end: appointment.end, status, conflictOverride: undefined,
-          note: status === "pending" ? "Calendar time changed. Please accept the new time." : "Time changed to a past appointment. Smooth must review it.", updatedAt: new Date().toISOString() });
-        notifications.push(...assignmentNotifications({ ...a, start: appointment.start, end: appointment.end }, status === "pending" ? "rescheduled" : "past", [a.employeeId, "owner"]));
-      }
+      const change = calendarTimeChange(a, appointment, now);
+      if (!change) continue;
+      changes.push(change.assignment);
+      notifications.push(...assignmentNotifications(change.assignment, change.event, [a.employeeId, "owner"]));
     }
+    for (const a of repairCandidates) {
+      const recovered = recoverDurationCancellation(a, appointmentsById.get(a.appointmentId), s.assignments, history, now);
+      if (!recovered) continue;
+      changes.push(recovered.assignment);
+      // Correct the existing cancellation message in place, retaining its read
+      // and deletion state. Recovery does not send or replay any notification.
+      corrections.push(...recovered.correctedAlerts.map(alert => ({ ...alert,
+        ...assignmentNotifications(recovered.assignment, "duration", [alert.userId])[0] })));
+    }
+    const importedDuration = assignment => ["duration", "duration_recovered"].includes(assignment.calendarChange?.kind) && Date.parse(assignment.start) <= now;
     await commit(db, s.state, mutation => [
       db.prepare(`UPDATE team_state SET generation = ?, synced_at = ? WHERE id = 1 AND ${guard}`).bind(generation, calendarReadAt, mutation),
       db.prepare(`UPDATE team_assignments SET data = (SELECT value FROM json_each(?) WHERE json_extract(value, '$.id') = team_assignments.id)
         WHERE id IN (SELECT json_extract(value, '$.id') FROM json_each(?)) AND ${guard}`)
         .bind(JSON.stringify(changes), JSON.stringify(changes), mutation),
-      ...changes.filter(assignment => queuedIds.has(assignment.id)).map(assignment => calendarQueueStatement(db, assignment, mutation)),
+      ...changes.filter(assignment => queuedIds.has(assignment.id)).map(assignment => importedDuration(assignment)
+        ? calendarDurationImportStatement(db, assignment, appointmentsById.get(assignment.appointmentId), mutation)
+        : calendarQueueStatement(db, assignment, mutation)),
+      ...corrections.map(alert => db.prepare(`UPDATE team_inbox SET title = ?, body = ? WHERE id = ? AND ${guard}`)
+        .bind(alert.title, alert.body, alert.id, mutation)),
+      db.prepare(`DELETE FROM team_notification_events WHERE id IN (SELECT value FROM json_each(?)) AND ${guard}`)
+        .bind(JSON.stringify(corrections.map(alert => alert.id)), mutation),
     ], notifications);
     // The old snapshot remains available until the atomic generation switch.
     await db.prepare("DELETE FROM team_appointments WHERE generation != ?").bind(generation).run();
     if (notifications.length) ctx.waitUntil(flushAlerts(env));
-    if (changes.some(assignment => queuedIds.has(assignment.id))) ctx.waitUntil(flushCalendarAssignments(env, { limit: 3 }));
+    if (changes.some(assignment => queuedIds.has(assignment.id) && !importedDuration(assignment))) ctx.waitUntil(flushCalendarAssignments(env, { limit: 3 }));
     return { synced: next.length };
   }
   if (["POST", "PATCH", "DELETE"].includes(request.method) &&

@@ -18,6 +18,15 @@ export function calendarQueueStatement(db, assignment, mutation) {
     .bind(assignment.id, crypto.randomUUID(), Date.now(), mutation);
 }
 
+/** Record an imported duration correction after start without replaying invites. */
+export function calendarDurationImportStatement(db, assignment, appointment, mutation) {
+  const invitation = appointment.calendarInvitations?.find(item => item.employeeId === assignment.employeeId);
+  const result = invitation ? { code: "calendar_imported", googleStatus: invitation.status } : { code: "event_started" };
+  return db.prepare(`UPDATE calendar_assignment_outbox SET version = ?, status = ?, result = ?,
+    attempts = 0, next_attempt_at = 0, lease_until = 0, updated_at = ? WHERE assignment_id = ? AND ${guard}`)
+    .bind(crypto.randomUUID(), invitation ? "synced" : "stale", JSON.stringify(result), Date.now(), assignment.id, mutation);
+}
+
 /** Bind writes and acknowledgements to the exact, unexpired claim, even if its version is reclaimed. */
 export function calendarDeliveryLease(db, row, until) {
   return {
