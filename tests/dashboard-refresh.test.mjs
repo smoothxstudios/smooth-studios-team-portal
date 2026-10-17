@@ -26,6 +26,20 @@ test('partial errors are reported without stopping successful reads and can be r
   await coordinator.run(); assert.equal(good, 2);
 });
 
+test('toolbar navigation during refresh waits for a fresh pass of the destination page', async () => {
+  const coordinator = createDashboardRefresh(); const wait = deferred();
+  let previousReads = 0, nextReads = 0;
+  const remove = coordinator.register(async () => { previousReads++; await wait.promise; throw new Error('Old page offline'); });
+  const previous = coordinator.run();
+  await Promise.resolve(); remove();
+  coordinator.register(async () => { nextReads++; return true; });
+  const next = coordinator.run(), repeatedTap = coordinator.run();
+  assert.equal(nextReads, 0);
+  wait.resolve(); await assert.rejects(previous); await Promise.all([next, repeatedTap]);
+  assert.equal(previousReads, 1); assert.equal(nextReads, 1);
+  await coordinator.run(); assert.equal(nextReads, 2, 'a later active-tab tap refreshes again');
+});
+
 test('a stalled read times out without leaving refresh locked', async () => {
   const coordinator = createDashboardRefresh(5);
   const remove = coordinator.register(() => new Promise(() => {}));

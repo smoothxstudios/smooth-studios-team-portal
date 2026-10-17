@@ -23,8 +23,8 @@ export function OwnerWeeklyHours({ employees, rentals, token }: { employees: Emp
   useEffect(() => { void refresh(); const update = () => { if (document.visibilityState === "visible") void refresh(); }; const timer = window.setInterval(update, 60_000); window.addEventListener("focus", update); return () => { sequence.current++; clearInterval(timer); window.removeEventListener("focus", update); }; }, [refresh]);
   const week = weeklyTeamHours(employees, rentals, schedule, now);
   return <section className="panel owner-weekly-hours"><div className="panel-heading"><div><h2>Team hours this week</h2><p>{formatDate(week.from, true)}–{formatDate(localInstant(`${week.through}T12:00`), true)} · Completed scheduled hours</p></div></div>
-    {loading && <p className="schedule-small" role="status">Updating hours…</p>}{error && <p className="schedule-warning" role="status">{error}</p>}
+    <div className="team-hours-body">{loading && <p className="schedule-small" role="status">Updating hours…</p>}{error && <p className="schedule-warning" role="status">{error}</p>}
     <div className="team-hours-grid">{week.people.map(person => <div key={person.id} className="team-hours-person"><span className="employee-avatar" style={{ background: teamAccent(person.id, person.accent) }}>{person.name.slice(0, 1)}</span><strong>{person.name}</strong><span>{person.hours.toLocaleString("en-US", { maximumFractionDigits: 2 })} <small>hrs</small></span></div>)}</div>
-    <p className="schedule-small">Monday–Sunday · Accepted appointments and tasks that have ended. Overlapping time counts once.</p>
+    <p className="schedule-small">Monday–Sunday · Completed, accepted work. Overlapping time counts once.</p></div>
   </section>;
 }

@@ -14,9 +14,7 @@ export function AlertsPage({ state, onOpen, isOwner = false }: { isOwner?: boole
   const groups = isOwner ? groupAlerts(state.alerts) : [{ id: "all", person: null, alerts: state.alerts }];
   const open = async (alert: DashboardAlert) => { if (await state.markRead(alert)) onOpen(alert); };
   return <section className="alerts-page" aria-label="Your alerts">
-    <div className="alerts-heading"><div><h2>Alerts</h2><p>Assignment updates and quiz reminders, all in one place.</p></div>
-
-    </div>
+    <div className="alerts-heading"><h2>Alerts</h2></div>
     <div className="alerts-controls">
       <div className="alerts-filters" role="group" aria-label="Filter alerts">
         <button aria-pressed={state.filter === "all"} disabled={state.busy} onClick={() => state.chooseFilter("all")}>All</button>
@@ -34,13 +32,13 @@ export function AlertsPage({ state, onOpen, isOwner = false }: { isOwner?: boole
         const Icon = alert.target === "quiz" ? Sparkles : alert.target === "creative" ? ClipboardList : CalendarDays;
         const expired = alert.expiresAt !== null && alert.expiresAt <= Date.now();
         return <li key={alert.id} className={`alert-card${alert.readAt ? "" : " is-unread"}`}>
-          <span className="alert-icon"><Icon size={20} /></span>
-          <div className="alert-content"><div className="alert-title"><h3>{alert.title}</h3>{!alert.readAt && <span className="alert-unread-dot" aria-label="Unread" />}</div>
-            <p>{alertBody(alert.body)}</p><time dateTime={new Date(alert.createdAt).toISOString()}>{stamp.format(alert.createdAt)}</time>
-            {expired && <small className="alert-expired">Earlier quiz reminder · Open to see today’s quiz.</small>}
-            <div className="alert-actions"><Button size="sm" variant="outline" disabled={state.busy} onClick={() => void open(alert)}>{alert.target === "quiz" ? "Open Daily Quiz" : alert.target === "availability" ? "View availability" : "View details"}<ArrowUpRight size={15} /></Button>
-              {!alert.readAt && <Button size="sm" variant="ghost" disabled={state.busy} onClick={() => void state.markRead(alert)}><Check size={15} />Mark read</Button>}</div>
-          </div>
+          <button type="button" className="alert-open" disabled={state.busy} onClick={() => void open(alert)} aria-label={`${alert.title}. ${alert.target === "quiz" ? "Open Daily Quiz" : alert.target === "availability" ? "View availability" : "View details"}`}>
+            <span className="alert-icon"><Icon size={17} aria-hidden="true" /></span>
+            <span className="alert-content"><span className="alert-title"><strong>{alert.title}</strong>{!alert.readAt && <span className="alert-unread-dot" aria-label="Unread" />}</span>
+              <span className="alert-preview">{alertBody(alert.body)}</span><time dateTime={new Date(alert.createdAt).toISOString()}>{stamp.format(alert.createdAt)}{expired ? " · Earlier reminder" : ""}</time>
+            </span><ArrowUpRight className="alert-open-arrow" size={15} aria-hidden="true" />
+          </button>
+          {!alert.readAt && <button type="button" className="alert-mark-read" disabled={state.busy} onClick={() => void state.markRead(alert)} aria-label={`Mark read: ${alert.title}`} title="Mark read"><Check size={18} aria-hidden="true" /></button>}
         </li>;
       })}
     </ul></section>)}

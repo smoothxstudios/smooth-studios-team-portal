@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "scripts/lib/calendar-assignments.mjs"
+      - "scripts/lib/dashboard-data.mjs"
+      - "scripts/lib/team-api.mjs"
+      - "lib/rental-details.mjs"
       - ".github/workflows/calendar-sync.yml"
   schedule:
     - cron: "*/5 * * * *"

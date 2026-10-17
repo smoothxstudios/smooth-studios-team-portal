@@ -14,8 +14,9 @@ export async function syncTeamSchedule(rentals, ownerPassword) {
     return response.json();
   }
   const generation = randomUUID();
-  // Deliberate allowlist: no payments, contact information, Stripe identifiers,
-  // credentials, or raw Calendar descriptions are copied to scheduling. Only filtered rental setup answers are included.
+  // Deliberate allowlist: filtered rental descriptions include client contact,
+  // quoted price, paid-online amount and setup answers for the assigned team.
+  // Stripe identifiers, credentials, admin links and raw descriptions stay out.
   const appointments = rentals.map(r => ({ id: r.id, title: r.title, customer: r.customer ?? "",
     start: r.start, end: r.end, priceCents: r.priceCents, rentalDetails: r.rentalDetails ?? "", acceptedEmployeeIds: r.assignedEmployeeIds }));
   for (let offset = 0; offset < appointments.length; offset += 50) {

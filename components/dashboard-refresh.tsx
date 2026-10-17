@@ -21,11 +21,12 @@ export function useRefreshSource(read: () => Promise<unknown>, enabled = true) {
 }
 
 type Phase = "idle" | "pulling" | "ready" | "refreshing" | "success" | "error";
-export function PullToRefresh({ page }: { page: string }) {
+export function PullToRefresh({ page, requestId = 0 }: { page: string; requestId?: number }) {
   const coordinator = useContext(RefreshContext);
   const slot = useRef<HTMLDivElement>(null);
   const { openMobile } = useSidebar();
   const blocked = useRef(openMobile);
+  const startRefresh = useRef<() => void>(() => {});
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
   useEffect(() => { blocked.current = openMobile; }, [openMobile]);
@@ -43,6 +44,18 @@ export function PullToRefresh({ page }: { page: string }) {
       });
     };
     const hide = () => { paint(0, false); setPhase("idle"); };
+    const refresh = () => {
+      if (disposed || busy) return;
+      window.clearTimeout(dismiss);
+      busy = true; paint(52, false); setPhase("refreshing"); setError("");
+      void coordinator.run().then(() => {
+        if (!disposed) { setPhase("success"); dismiss = window.setTimeout(hide, 350); }
+      }).catch((cause: unknown) => {
+        if (!disposed) { paint(80, false); setError(cause instanceof Error ? cause.message : "Couldn’t refresh. Pull again to retry."); setPhase("error"); dismiss = window.setTimeout(hide, 3000); }
+      }).finally(() => { busy = false; });
+    };
+    startRefresh.current = refresh;
+    setPhase("idle");
     const detach = attachPullToRefresh(root, {
       isBusy: () => busy,
       isBlocked: () => blocked.current,
@@ -52,16 +65,7 @@ export function PullToRefresh({ page }: { page: string }) {
         paint(distance, distance > 0);
         setPhase(distance <= 0 ? "idle" : distance >= PULL_REFRESH_THRESHOLD ? "ready" : "pulling");
       },
-      onRelease: () => {
-        busy = true; paint(52, false); setPhase("refreshing"); setError("");
-        void coordinator.run().then(() => {
-          if (!disposed) { setPhase("success"); dismiss = window.setTimeout(hide, 350); }
-        }).catch((cause: unknown) => {
-          if (!disposed) { paint(80, false); setError(cause instanceof Error ? cause.message : "Couldn’t refresh. Pull again to retry."); setPhase("error"); dismiss = window.setTimeout(hide, 3000); }
-        }).finally(() => {
-          busy = false;
-        });
-      },
+      onRelease: refresh,
     });
     return () => {
       disposed = true; detach(); cancelAnimationFrame(frame); window.clearTimeout(dismiss);
@@ -69,6 +73,16 @@ export function PullToRefresh({ page }: { page: string }) {
       delete root.dataset.pulling; document.documentElement.classList.remove("has-pull-refresh");
     };
   }, [coordinator, page]);
+  useEffect(() => {
+    if (!requestId) return;
+    // Run after the destination's effects register its data sources, including
+    // when the active toolbar button is tapped again without changing pages.
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      startRefresh.current();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [requestId]);
   const Icon = phase === "success" ? Check : phase === "error" ? WifiOff : phase === "refreshing" ? RefreshCw : ArrowDown;
   const text = phase === "ready" ? "Release to refresh" : phase === "refreshing" ? "Refreshing…" : phase === "success" ? "Refreshed" : phase === "error" ? error : phase === "pulling" ? "Pull to refresh" : "";
   return <div ref={slot} className="pull-refresh-slot" data-phase={phase}>

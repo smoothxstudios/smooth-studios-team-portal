@@ -85,6 +85,7 @@ YAxis
 function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; onRefresh: () => Promise<boolean>; sessionPassword: string; schedulingToken: string }) {
   useRefreshSource(onRefresh);
   const [view, setView] = useState<ViewKey>("overview");
+  const [toolbarRefresh, setToolbarRefresh] = useState(0);
   const [focusedAlert, setFocusedAlert] = useState<{ target: string; id: string } | null>(null);
   const [alertWorkLoading, setAlertWorkLoading] = useState(false);
   const navigate = (next: ViewKey) => { setFocusedAlert(null); setView(next); };
@@ -297,7 +298,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           <div className="topbar-heading"><MobileMenuButton /><div className="topbar-title"><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div></div>
           <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
         </header>
-        <PullToRefresh key={view} page={view} />
+        <PullToRefresh page={view} requestId={toolbarRefresh} />
         <div className="dashboard-refresh-body">
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
           {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} />}
@@ -383,7 +384,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
         <DashboardVersionFooter viewer={isOwner ? "owner" : "employee"} />
         </div>
       </SidebarInset>
-      <MobileToolbar isOwner={isOwner} view={view} unread={alerts.unreadCount} onNavigate={navigate} />
+      <MobileToolbar isOwner={isOwner} view={view} unread={alerts.unreadCount} onNavigate={next => { navigate(next); setToolbarRefresh(value => value + 1); }} />
       {isOwner && (
         <>
           <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={setPaymentOverrideOpen} open={paymentOverrideOpen} reviewRentals={reviewRentals} />

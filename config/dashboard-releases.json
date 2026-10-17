@@ -1,6 +1,30 @@
 {
-  "currentVersion": "2.25.0",
+  "currentVersion": "2.25.1",
   "releases": [
+    {
+      "id": "2026-10-17-mobile-layout-and-rental-details",
+      "version": "2.25.1",
+      "date": "2026-10-17",
+      "category": "Interface",
+      "title": "Tidier mobile summaries and booking details",
+      "changes": [
+        "Weekly team hours fit inside their card, with room for names and totals on small screens.",
+        "Alerts use slimmer tappable rows with a checkmark to mark an alert read; named person groups remain.",
+        "Temp Check and SmoothStars open on Overview, with separate Manage and History views. Large close and Done buttons stay visible while the panel scrolls.",
+        "Every mobile toolbar selection returns to the top and refreshes, including tapping the active page.",
+        "Rental descriptions show booking contact information, listed price, paid-online amount, the rental form name, and setup answers for the owner and assigned team."
+      ],
+      "employee": {
+        "title": "Compact alerts and complete rental details",
+        "changes": [
+          "Alerts are slimmer. Tap a row to open it or use its checkmark to mark it read.",
+          "Tap a mobile toolbar tab to return to the top and refresh, even when already on that page.",
+          "Rental descriptions include booking contact information, listed price, paid-online amount, and rental form answers.",
+          "My SmoothStars has a larger close button and a Done button that stay visible while scrolling."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-person-summaries-and-mobile-controls",
       "version": "2.25.0",
