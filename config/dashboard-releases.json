@@ -1,6 +1,19 @@
 {
-  "currentVersion": "2.24.3",
+  "currentVersion": "2.24.4",
   "releases": [
+    {
+      "id": "2026-10-17-dashboard-section-refactor",
+      "version": "2.24.4",
+      "date": "2026-10-17",
+      "category": "Maintenance",
+      "title": "Dashboard sections separated for safer maintenance",
+      "changes": [
+        "Separated navigation, sign-in, financial summaries, appointments, team cards, payouts, and payment forms into focused modules while retaining their existing screens and behavior.",
+        "Shared formatting and display-status helpers now live in one place; authentication, scheduling recovery, payment calculations, and live data integrations retain their existing behavior.",
+        "Added component rendering and shared-helper regression tests alongside the existing scheduling tests."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-17-schedule-mutation-refactor",
       "version": "2.24.3",
