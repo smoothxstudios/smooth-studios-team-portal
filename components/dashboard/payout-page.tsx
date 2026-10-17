@@ -1,4 +1,7 @@
 "use client";
+import { teamEarnings } from "@/lib/team-summary.mjs";
+import { teamAccent } from "@/lib/dashboard-presentation";
+import type { CreativeAssignment } from "@/lib/use-creative-work";
 
 import { ChartTooltip } from "@/components/dashboard/shared";
 import { Button } from "@/components/ui/button";
@@ -37,7 +40,9 @@ export function PayoutPage({
   setPaidThrough,
   setPayoutEmployee,
   payroll,
+  creative = [],
 }: {
+  creative?: CreativeAssignment[];
   employeeId?: string;
   payroll?: PayrollState;
   employees: Employee[];
@@ -58,6 +63,13 @@ export function PayoutPage({
   const hasChartData = monthly.some(month => month.paid > 0 || month.owed > 0);
   return (
     <section className={`payout-layout${isOwner ? "" : " employee-payout-layout"}`}>
+      {isOwner && <article className="panel team-payout-breakdown"><div className="panel-heading"><div><h2>Pay by team member</h2><p>All recorded earnings · appointments and approved creative work</p></div></div>
+        <div className="team-payout-people">{teamEarnings(employees, rentals, creative).map(person => <section className="team-payout-person" key={person.id}>
+          <div className="person-section-heading"><span className="employee-avatar" style={{ background: teamAccent(person.id, person.accent) }}>{person.name.slice(0, 1)}</span><h3>{person.name}</h3></div>
+          <dl><div><dt>To pay</dt><dd>{dollars(person.owed, true)}</dd></div><div><dt>Total earned</dt><dd>{dollars(person.earned, true)}</dd></div><div><dt>Paid / advance applied</dt><dd>{dollars(person.settled, true)}</dd></div></dl>
+          {person.missingRates > 0 && <p className="schedule-warning">Pay rate needed for {person.missingRates} appointment{person.missingRates === 1 ? "" : "s"}.</p>}
+        </section>)}</div>
+      </article>}
       <article className="panel payout-chart-panel">
         <div className="panel-heading"><div>{isOwner && <p className="eyebrow">Weekly · monthly · yearly</p>}<h2>{isOwner ? "Team payouts" : "Earnings summary"}</h2></div></div>
         <div className="payout-summary"><div><span>{isOwner ? "Paid to team" : "Paid"}</span><strong>{dollars(metrics.paid)}</strong></div><div><span>{isOwner ? "Earned, unpaid" : advance?.remainingCents ? "Advance remaining" : "Pay owed"}</span><strong>{dollars(!isOwner && advance?.remainingCents ? advance.remainingCents : metrics.owed, true)}</strong></div><div><span>{isOwner ? "Projected" : "Upcoming estimate"}</span><strong>{dollars(metrics.projected)}</strong></div></div>

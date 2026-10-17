@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronDown, ClipboardCheck, Contact, Copy, Eye, EyeOff, KeyRound, Pencil, Phone, Plus, RefreshCw, RotateCcw, Search, Wifi } from "lucide-react";
+import { Check, ChevronDown, ClipboardCheck, Contact, Copy, Eye, EyeOff, KeyRound, Pencil, Phone, Plus, RotateCcw, Search, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,7 +30,7 @@ export function StudioInfoPage({ token, isOwner, userId, section }: { token: str
     {error && <p className="creative-notice" role="alert">{error} <button onClick={() => void load()}>Try again</button></p>}
     {!data && !error && <p role="status">Loading studio information…</p>}
     {section === "reference" ? <>
-      <div className="creative-heading"><div><h2>Studio info</h2><p>Contacts, access, and Wi-Fi in one place.</p></div><div className="creative-toolbar-buttons"><Button variant="outline" size="sm" onClick={() => void load()} aria-label="Refresh studio information"><RefreshCw size={16} /></Button>{isOwner && data && <Button onClick={() => setEditor({ id: crypto.randomUUID(), category: "Contacts", label: "", value: "", note: "", kind: "text" })}><Plus size={17} />Add info</Button>}</div></div>
+      <div className="creative-heading"><div><h2>Studio info</h2><p>Contacts, access, and Wi-Fi in one place.</p></div><div className="creative-toolbar-buttons">{isOwner && data && <Button onClick={() => setEditor({ id: crypto.randomUUID(), category: "Contacts", label: "", value: "", note: "", kind: "text" })}><Plus size={17} />Add info</Button>}</div></div>
       <p className="studio-access-notice">For authorized team use. Do not share access details.</p>
       <div className="creative-filters"><label className="creative-search"><Search size={17} /><span className="sr-only">Search important information</span><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search door, Wi-Fi, contacts…" /></label><label><span className="sr-only">Information category</span><select value={category} onChange={event => setCategory(event.target.value)}><option value="all">All categories</option>{STUDIO_INFO_CATEGORIES.map(value => <option key={value}>{value}</option>)}</select></label></div>
       <div className="studio-info-sections">{STUDIO_INFO_CATEGORIES.filter(group => entries.some(item => item.category === group)).map(group => {

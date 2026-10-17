@@ -4,17 +4,14 @@ import { Button } from "@/components/ui/button";
 import { creativeEarnings } from "@/lib/creative-work.mjs";
 import { dollars,formatDate,paidEarnings,rentalState,teamAccent,unpaidEarnings } from "@/lib/dashboard-presentation";
 import type {
-DashboardPayload,
 Employee,PayrollState,Rental
 } from "@/lib/dashboard-types";
 import { type CreativeAssignment } from "@/lib/use-creative-work";
 import {
 CalendarDays
 } from "lucide-react";
-import { useState } from "react";
 
-export function TeamPage({ employees, rentals, creative, payroll, teamAccess, onSetup }: { employees: Employee[]; rentals: Rental[]; creative: CreativeAssignment[]; payroll?: PayrollState; teamAccess?: DashboardPayload["teamAccess"]; onSetup: () => void }) {
-  const [copied, setCopied] = useState("");
+export function TeamPage({ employees, rentals, creative, payroll, onSetup }: { employees: Employee[]; rentals: Rental[]; creative: CreativeAssignment[]; payroll?: PayrollState; onSetup: () => void }) {
   return (
     <div className="team-page-grid">
       {employees.map((employee) => {
@@ -30,8 +27,6 @@ export function TeamPage({ employees, rentals, creative, payroll, teamAccess, on
             <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>{advance?.remainingCents ? "Advance left" : "Still owed"}</span><strong>{dollars(advance?.remainingCents || owed, true)}</strong></div><div><span>Appointments</span><strong>{assigned.length}</strong></div></div>
             <div className="employee-next"><CalendarDays size={14} /><span>Next accepted</span><strong>{next ? formatDate(next.start, true) : "None scheduled"}</strong></div>
             {employee.onboarding && !employee.accessReady && <Button className="team-setup-action" variant="outline" onClick={onSetup}>Set up private account</Button>}
-            {teamAccess?.[employee.id] && <Button className="team-setup-action" variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(teamAccess[employee.id].password); setCopied(employee.id); } catch { setCopied(`unavailable:${employee.id}`); } }}>{copied === employee.id ? "Password copied" : "Copy sign-in password"}</Button>}
-            {copied === `unavailable:${employee.id}` && teamAccess?.[employee.id] && <p className="team-account-password">{teamAccess[employee.id].password}</p>}
           </article>
         );
       })}

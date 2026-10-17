@@ -1,7 +1,8 @@
 "use client";
+import { RentalDescription } from "@/components/rental-description";
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Plus, RefreshCw, Search, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -36,9 +37,9 @@ function Confirmation({ person }: { person: WorkEntry["confirmations"][number] }
   </li>;
 }
 
-export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, onAssign, onAvailability, onRefresh, busy, renderAssignment, onChecklist }: {
+export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, onAssign, onAvailability, busy, renderAssignment, onChecklist }: {
   schedule: TeamSchedule; employeeId: string; onEmployeeChange: (id: string) => void;
-  onAssign: (appointmentId?: string) => void; onAvailability: () => void; onRefresh: () => void;
+  onAssign: (appointmentId?: string) => void; onAvailability: () => void;
   onChecklist?: () => void; busy: boolean; renderAssignment: (item: TeamAssignment) => ReactNode;
 }) {
   const [now, setNow] = useState(Date.now);
@@ -105,6 +106,7 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
           <div>
             <p className="schedule-small">{dayLabel(studioLocal(item.start).slice(0, 10))} · {timeRange(item)}</p>
             {item.appointment && <p className="schedule-small">Appointment price: {(item.appointment.priceCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}</p>}
+            {item.appointment && /studio.*rental|rental.*studio/i.test(item.title) && <RentalDescription details={item.appointment.rentalDetails} />}
             {live.length ? <div className="agenda-offer-details">{live.map(renderAssignment)}</div> : <p className="schedule-small">{item.calendarIds.length ? "Staff confirmed through Google Calendar." : "No active offers. Choose Assign person to send one."}</p>}
             {previous.length > 0 && <div className="agenda-previous"><strong>Previous offers</strong>{previous.map(offer => <p key={offer.id}>{name(offer.employeeId)} · {offer.status}</p>)}</div>}
           </div>
@@ -114,7 +116,7 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
   }
 
   return <div className="owner-agenda">
-    <div className="agenda-heading"><div><h2>Your team’s schedule</h2><p>Bookings, tasks, and who’s covering them.</p></div><div className="schedule-actions"><Button onClick={() => onAssign()} disabled={busy}><Plus size={16} />Assign work</Button><Button onClick={onAvailability} variant="outline"><CalendarDays size={16} />Availability</Button></div></div>
+    <div className="agenda-heading"><div className="schedule-actions"><Button onClick={() => onAssign()} disabled={busy}><Plus size={16} />Assign work</Button><Button onClick={onAvailability} variant="outline"><CalendarDays size={16} />Availability</Button></div></div>
     <section className="schedule-panel agenda-panel" aria-label="Team calendar">
       <div className="agenda-controls">
         <div className="agenda-search-row"><label className="agenda-search"><Search size={17} aria-hidden="true" /><Input aria-label="Search schedule" placeholder="Find a client, booking, or teammate" type="search" value={query} onChange={event => setQuery(event.target.value)} /></label><label className="agenda-person-filter"><span className="sr-only">Team member</span><select aria-label="Team member" value={employeeId} onChange={event => onEmployeeChange(event.target.value)}><option value="all">Everyone</option>{TEAM.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label></div>
@@ -141,7 +143,7 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
           </section>;
         })}
       </div>}
-      <div className="agenda-sync"><span>{schedule.syncedAt ? `Calendar synced ${shortDate(schedule.syncedAt)} at ${time(schedule.syncedAt)} ET` : "Waiting for Calendar sync"}</span><Button variant="ghost" disabled={busy} onClick={onRefresh}><RefreshCw size={15} />Refresh</Button></div>
+      <div className="agenda-sync"><span>{schedule.syncedAt ? `Calendar synced ${shortDate(schedule.syncedAt)} at ${time(schedule.syncedAt)} ET` : "Waiting for Calendar sync"}</span></div>
     </section>
     <Dialog open={Boolean(focusedItem)} onOpenChange={open => { if (!open) setFocused(null); }}><DialogContent className="calendar-event-dialog"><DialogHeader><DialogTitle>{focusedItem?.kind === "work" ? "Booking & team" : "Team availability"}</DialogTitle><DialogDescription>{focused ? dayLabel(focused.day) : ""}</DialogDescription></DialogHeader>
       {focusedItem?.kind === "work" ? workCard(focusedItem, focused!.day, true) : focusedItem && <div className="calendar-availability-detail"><Person id={focusedItem.userId} /><h3>{focusedItem.title}</h3><p>{focusedItem.allDay ? "Full day" : timeRange(focusedItem)}</p>{focusedItem.note && <p>{focusedItem.note}</p>}<Button variant="outline" onClick={() => { setFocused(null); onAvailability(); }}>Manage availability</Button></div>}

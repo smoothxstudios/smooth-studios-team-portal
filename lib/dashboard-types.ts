@@ -75,6 +75,7 @@ export type StudioRulebook = {
 };
 
 export type Rental = {
+  rentalDetails?: string;
   id: string;
   stripeMatchKey?: string;
   title: string;

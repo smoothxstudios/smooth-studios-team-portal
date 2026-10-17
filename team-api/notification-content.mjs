@@ -38,7 +38,7 @@ export function assignmentNotifications(item, event, recipients) {
       past: { title: "Changed rental needs review", body: `${name} · ${detail} The assignment was cancelled because the new time is in the past.` },
     }[event];
     if (!content) throw new Error("Unsupported assignment notification.");
-    return { userId, kind: event === "offered" ? "assignment" : "schedule", ...notificationDetails(content), target: "scheduling", targetId: item.id };
+    return { userId, kind: event === "offered" ? "assignment" : "schedule", ...notificationDetails(content), target: "scheduling", targetId: item.id, personId: item.employeeId };
   });
 }
 
@@ -47,6 +47,6 @@ export function blockNotifications(item, removed, recipients) {
   const repeat = item.repeatUntil ? ` Repeats weekly through ${day.format(new Date(localInstant(`${item.repeatUntil}T12:00`)))}.` : "";
   return [...new Set(recipients)].map(userId => ({ userId, kind: "schedule",
     title: userId === "owner" ? `${person(item.userId)} ${removed ? "removed a time block" : "blocked time"}` : `Time block ${removed ? "removed" : "added"}`,
-    body: `${time}.${repeat} Open your schedule to review.`, target: "availability",
+    body: `${time}.${repeat}`, target: "availability", personId: item.userId,
   }));
 }

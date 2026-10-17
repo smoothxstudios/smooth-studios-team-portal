@@ -1,6 +1,30 @@
 {
-  "currentVersion": "2.24.4",
+  "currentVersion": "2.25.0",
   "releases": [
+    {
+      "id": "2026-10-17-person-summaries-and-mobile-controls",
+      "version": "2.25.0",
+      "date": "2026-10-17",
+      "category": "Interface",
+      "title": "Clearer team summaries and mobile controls",
+      "changes": [
+        "Home shows completed scheduled hours for each team member in the current Monday\u2013Sunday week.",
+        "Payouts shows each person\u2019s earned total, amount to pay, and settled earnings, including approved creative work and applied advances.",
+        "Availability keeps each person\u2019s preferred and unavailable times together. Owner alerts have named, color-marked groups.",
+        "Check-in management controls start closed and do not focus the action selector when a person opens. Team cards no longer offer password copying.",
+        "Pull-to-refresh works when the gesture starts on a button or card. Routine Refresh buttons and repeated headings are removed; error retry actions remain.",
+        "Time-block reasons start blank with a general placeholder. Rental descriptions include available setup answers from the booking."
+      ],
+      "employee": {
+        "title": "Rental details and smoother refresh",
+        "changes": [
+          "Open a rental to read available setup details alongside preparation instructions.",
+          "Pull down from a button or card at the top of a page to refresh; a tap still works normally.",
+          "Routine Refresh buttons are removed. Time-block reasons start blank with a general placeholder."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-dashboard-section-refactor",
       "version": "2.24.4",
@@ -77,7 +101,7 @@
         "The mobile toolbar tracks finger movement more smoothly, slides away while scrolling down, and returns on an upward scroll.",
         "The three-line menu button sits at the top left. The sidebar backdrop fades in and out with the drawer.",
         "The phone sidebar scrolls within its fixed header and footer without stretching past the ends. Scrolling over another tab no longer leaves a false selected highlight.",
-        "Team → People uses smaller cards with compact pay totals and a single-line next accepted date. The repeated status badge and oversized spacing are removed.",
+        "Team \u2192 People uses smaller cards with compact pay totals and a single-line next accepted date. The repeated status badge and oversized spacing are removed.",
         "Help explains pull-to-refresh, the hiding toolbar, and the five-minute Calendar and Stripe import schedule."
       ],
       "employee": {
@@ -237,14 +261,14 @@
       "title": "Clear steps for blocked notifications",
       "changes": [
         "Blocked notification alerts show device-specific recovery steps, including removing and re-adding the iPhone Home Screen app if permission settings do not resolve the issue.",
-        "Settings → Help includes a searchable “Notifications were not allowed” question with reinstall, permission, and test instructions.",
+        "Settings \u2192 Help includes a searchable \u201cNotifications were not allowed\u201d question with reinstall, permission, and test instructions.",
         "Dismissed permission prompts explain how to try again, while connection errors retain their own feedback."
       ],
       "employee": {
         "title": "Help with blocked notifications",
         "changes": [
           "Notification alerts explain what to do next when permission is blocked.",
-          "Search Settings → Help for “notifications not allowed” or “re-add app” to find the iPhone recovery steps."
+          "Search Settings \u2192 Help for \u201cnotifications not allowed\u201d or \u201cre-add app\u201d to find the iPhone recovery steps."
         ]
       },
       "commits": []
@@ -258,14 +282,14 @@
       "changes": [
         "Recorded advances apply to unpaid and future earned appointments and approved creative work, with existing cash payments preserved.",
         "Advance remaining replaces pay owed while credit is available. Normal owed balances return once it clears, including any earnings above the remaining advance.",
-        "Find step-by-step articles in Settings → Help with natural-language search and separate owner and employee guidance.",
+        "Find step-by-step articles in Settings \u2192 Help with natural-language search and separate owner and employee guidance.",
         "Removed repeated Rental checklist links from calendar cards. The checklist remains under Resources.",
-        "Smooth’s notification controls moved from Team Schedule to Settings → Preferences, matching the employee settings location."
+        "Smooth\u2019s notification controls moved from Team Schedule to Settings \u2192 Preferences, matching the employee settings location."
       ],
       "employee": {
         "title": "Help when you need it",
         "changes": [
-          "Search Settings → Help for how to use the dashboard, manage assignments, find earnings, and set up your device.",
+          "Search Settings \u2192 Help for how to use the dashboard, manage assignments, find earnings, and set up your device.",
           "If you have an advance, see its remaining balance and how earned work clears it.",
           "Find Rental Checklist under Resources; repeated calendar-card links have been removed."
         ]
@@ -284,14 +308,14 @@
         "Removed Paid to team from the Home summary; payment history remains in Payouts. Upcoming and total unpaid earnings use compact shortcuts.",
         "Upcoming appears above Needs attention on mobile.",
         "Settings tabs use a clear red selection. The access notice appears once at the top of Studio info, and repeated timezone reminders are removed.",
-        "Employee notification controls moved from Home and My Schedule to Settings → Preferences; enabled alerts keep working.",
+        "Employee notification controls moved from Home and My Schedule to Settings \u2192 Preferences; enabled alerts keep working.",
         "Points and star adjustment activity is visible only to Smooth. Employee responses contain totals and quiz progress without the administrative adjustment history."
       ],
       "commits": [],
       "employee": {
         "title": "Clearer settings and less clutter",
         "changes": [
-          "Manage notifications in Settings → Preferences. Existing enabled notifications keep working.",
+          "Manage notifications in Settings \u2192 Preferences. Existing enabled notifications keep working.",
           "The selected Settings tab has a clear red highlight. Repeated timezone reminders are removed.",
           "The access notice appears once at the top of Studio info.",
           "My SmoothStars focuses on your total, progress, and recent quiz answers."
@@ -308,8 +332,8 @@
         "Contacts expand when opened, and matching contacts open during a search. Contacts, Access, and Wi-Fi use compact grouped panels.",
         "Quick sign-in can reconnect an existing saved passkey and be tested from Settings. Failed sign-ins offer a direct password fallback.",
         "Passkey requests prefer this device and retain the authenticator connection hints returned during setup. Reconnecting verifies the selected account and preserves the existing encrypted sign-in if recovery fails.",
-        "Sync now and its last-update time moved to Settings → Preferences. The sidebar connection label and the introductory paragraph in What changed were removed.",
-        "The contact label Tay — Secretary is now Tay, with its existing number and notes preserved.",
+        "Sync now and its last-update time moved to Settings \u2192 Preferences. The sidebar connection label and the introductory paragraph in What changed were removed.",
+        "The contact label Tay \u2014 Secretary is now Tay, with its existing number and notes preserved.",
         "Rental Checklist opens directly from Resources in the sidebar. Home and schedule shortcuts open the same checklist.",
         "Future SmoothStars require 500 points. Existing stars, points, and progress are preserved, including manual awards and removals."
       ],
@@ -336,7 +360,7 @@
         "Employees see My Schedule, My Availability, Creative Work, and Earnings together under My work. Management stays in the owner menu.",
         "The current page has a clearer red highlight and arrow. Menu rows have consistent icons, spacing, and comfortable tap targets.",
         "Settings and the account controls stay at the bottom. SmoothStar progress scrolls with the menu so it does not crowd navigation on smaller screens.",
-        "Removed the extra sign-in text below the Continue button. Quick sign-in settings clarify that unlocking uses the device’s existing screen lock."
+        "Removed the extra sign-in text below the Continue button. Quick sign-in settings clarify that unlocking uses the device\u2019s existing screen lock."
       ],
       "employee": {
         "title": "Easier navigation",
@@ -345,7 +369,7 @@
           "Studio Guidelines, Productions, and Content Vault are grouped under Resources. External apps keep their new-tab indicators.",
           "The current page is easier to spot. Settings stays at the bottom, and choosing a page closes the mobile menu.",
           "SmoothStar progress remains in the sidebar below Resources.",
-          "Removed the extra sign-in text below the Continue button. Quick sign-in settings clarify that unlocking uses the device’s existing screen lock."
+          "Removed the extra sign-in text below the Continue button. Quick sign-in settings clarify that unlocking uses the device\u2019s existing screen lock."
         ]
       },
       "commits": []
@@ -398,7 +422,7 @@
       "category": "Interface",
       "title": "Settings and a simpler sign-in",
       "changes": [
-        "Face ID and quick sign-in show one focused sign-in screen. “Sign in to another account” opens the account and password form when needed.",
+        "Face ID and quick sign-in show one focused sign-in screen. \u201cSign in to another account\u201d opens the account and password form when needed.",
         "Every successful sign-in opens Home. Notification links still navigate an already-open session.",
         "Settings brings together Quick sign-in, appearance, Studio Info, and the rental checklist, simplifying the sidebar.",
         "Studio Info contains only Contacts, Access, and Wi-Fi, with existing codes and numbers preserved.",
@@ -407,7 +431,7 @@
       "employee": {
         "title": "A cleaner sign-in and Settings",
         "changes": [
-          "Face ID and quick sign-in show one focused sign-in screen. “Sign in to another account” opens the account and password form when needed.",
+          "Face ID and quick sign-in show one focused sign-in screen. \u201cSign in to another account\u201d opens the account and password form when needed.",
           "Every successful sign-in opens Home. Notification links still navigate an already-open session.",
           "Settings brings together Quick sign-in, appearance, Studio Info, and the rental checklist, simplifying the sidebar.",
           "Studio Info contains only Contacts, Access, and Wi-Fi, with existing codes and numbers preserved.",
@@ -461,7 +485,7 @@
       "category": "Interface",
       "title": "Update notes organized by day",
       "changes": [
-        "What changed combines updates from the same date into one entry, with changes organized by topic and the day’s version range shown together.",
+        "What changed combines updates from the same date into one entry, with changes organized by topic and the day\u2019s version range shown together.",
         "Search and topic filters still work across the complete history. The owner retains all notes; employee notes are selected before grouping so administrative changes stay out of their view."
       ],
       "employee": {
@@ -508,7 +532,7 @@
       "title": "Calendar-style scheduling and clear acceptance checks",
       "changes": [
         "The owner schedule uses circular dates, color-coded event cards, and employee initials with green acceptance checks for a more familiar calendar view.",
-        "Each employee’s response identifies Accepted in app or Calendar accepted. Both appear when confirmed in both places; a Google RSVP no longer hides a pending app response.",
+        "Each employee\u2019s response identifies Accepted in app or Calendar accepted. Both appear when confirmed in both places; a Google RSVP no longer hides a pending app response.",
         "Studio rental team notes appear at the top of the Google Calendar description, with a check for Accepted in app or a pending response marker. The scheduled sync carries the app response over as a backup copy; Google guest RSVP checks remain separate.",
         "Booking details and other Calendar notes are preserved when team notes move, update, or are removed."
       ],
@@ -523,7 +547,7 @@
       "changes": [
         "The owner schedule opens one day at a time, with a date strip, date picker, and week or 30-day views. Search by client, booking, or teammate and filter by employee or staffing status.",
         "Each Calendar booking and its portal offers share one card. Confirmed staff stay green; pending responses and conflicts are visible, with instructions and offer controls inside Details.",
-        "Time blocks and preferred work hours are grouped under each day’s expandable availability section. Past responses and Calendar help stay out of the main list.",
+        "Time blocks and preferred work hours are grouped under each day\u2019s expandable availability section. Past responses and Calendar help stay out of the main list.",
         "New Home Screen installs use Smooth Studios as the app name. The iPhone-generated notification attribution is controlled by iOS, and existing installs may retain their chosen name."
       ],
       "employee": {
@@ -563,7 +587,7 @@
       "category": "Team",
       "title": "Assignment alerts and Daily Quiz reminders",
       "changes": [
-        "New rental and task offers send an assignment alert to the assigned employee’s enabled devices. Tapping it opens their schedule to review and respond.",
+        "New rental and task offers send an assignment alert to the assigned employee\u2019s enabled devices. Tapping it opens their schedule to review and respond.",
         "Daily Quiz sends a reminder when the next question is ready after the two-hour wait, even with the app closed. The five-minute notification check respects the daily limit, Eastern midnight, and questions already shown or answered.",
         "Notification setup, device status, and a test button are available in a compact section on Home and Schedule. Existing enabled devices upgrade when their dashboard is opened.",
         "Each device has its own delivery receipt and retry limit so one failed device does not repeat an alert on devices that already received it. Lock-screen alerts contain no client, payment, or quiz-answer details."
@@ -611,7 +635,7 @@
       "category": "Team",
       "title": "Reset daily check-ins and manage SmoothStars",
       "changes": [
-        "Smooth can reset an employee’s Temp Check for today from Team, keeping earlier days and reopening the check-in immediately.",
+        "Smooth can reset an employee\u2019s Temp Check for today from Team, keeping earlier days and reopening the check-in immediately.",
         "Smooth can reopen a selected question from today, reverse its awarded points without making the balance negative, and let the employee try again. Other answers are kept.",
         "SmoothStars can be removed individually or in a chosen quantity without changing points. Removed stickers stay removed, and future point milestones still earn new ones.",
         "Each reset or reward adjustment requires a reason and is recorded in history. Stale requests and repeated clicks cannot erase a new response or apply the same adjustment twice."
@@ -684,7 +708,7 @@
           "Smaller centered Temp Check and Daily Quiz popups appear only on Home. Chilling joins the six mood choices in one row.",
           "Answer up to three questions daily: Easy for 5 points, Medium for 10, and Very Hard for 15. A correct answer plays a quick celebration.",
           "Find your points and SmoothStar progress in the sidebar. Every 100 points earns a SmoothStar; your previous points and answers are kept.",
-          "Daily Quiz replaces Daily creative, with shorter wording and difficulty buttons to move between today’s questions."
+          "Daily Quiz replaces Daily creative, with shorter wording and difficulty buttons to move between today\u2019s questions."
         ]
       },
       "commits": []
@@ -722,9 +746,9 @@
       "changes": [
         "Employees can add, edit, and remove preferred work days or specific hours, with optional weekly repeats.",
         "Availability combines work preferences with existing class and personal time blocks; Home now links directly to it.",
-        "Smooth can review each employee’s availability, see preferences on the weekly schedule, and distinguish full, partial, and unstated preferences while assigning work.",
+        "Smooth can review each employee\u2019s availability, see preferences on the weekly schedule, and distinguish full, partial, and unstated preferences while assigning work.",
         "Blocked time and existing work still flag conflicts. Preferences never create an assignment or earnings, and assignment acceptance remains required.",
-        "Preferences are stored privately with the scheduling service. Employees see only their own entries; Smooth can manage the team’s entries."
+        "Preferences are stored privately with the scheduling service. Employees see only their own entries; Smooth can manage the team\u2019s entries."
       ],
       "employee": {
         "changes": [
@@ -768,7 +792,7 @@
       "employee": {
         "changes": [
           "What changed focuses on design improvements and features that affect your daily work.",
-          "Version labels now follow the dashboard’s feature milestones. Earlier labels are marked retrospective in the history."
+          "Version labels now follow the dashboard\u2019s feature milestones. Earlier labels are marked retrospective in the history."
         ]
       },
       "commits": []
@@ -803,7 +827,7 @@
       "title": "A simpler employee Home",
       "changes": [
         "Home focuses on assignment offers, the next assignments, one Pay owed summary, and shortcuts to Block time and Studio Guidelines.",
-        "Earnings contains the charts, year selector, totals, and appointment breakdown. Past work lives under Schedule → Past.",
+        "Earnings contains the charts, year selector, totals, and appointment breakdown. Past work lives under Schedule \u2192 Past.",
         "Removed duplicate cards and empty charts from Home. Assignment details expand when needed.",
         "Live schedule changes take priority over older synced data, and repeated clicks cannot submit the same scheduling change twice."
       ],
@@ -815,7 +839,7 @@
       "employee": {
         "changes": [
           "Home focuses on assignment offers, your next assignments, one Pay owed summary, and shortcuts to Block time and Studio Guidelines.",
-          "Earnings contains the charts, year selector, totals, and appointment breakdown. Past work lives under Schedule → Past.",
+          "Earnings contains the charts, year selector, totals, and appointment breakdown. Past work lives under Schedule \u2192 Past.",
           "Duplicate cards and empty charts have been removed from Home. Expand an assignment when you need its preparation instructions."
         ]
       }

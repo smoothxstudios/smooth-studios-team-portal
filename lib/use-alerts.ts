@@ -6,6 +6,7 @@ import { useRefreshSource } from "@/components/dashboard-refresh";
 export type DashboardAlert = {
   id: string; sequence: number; kind: string; title: string; body: string;
   target: "scheduling" | "availability" | "creative" | "quiz"; targetId: string | null;
+  personId?: string | null;
   createdAt: number; expiresAt: number | null; readAt: number | null;
 };
 type InboxPage = { alerts: DashboardAlert[]; unreadCount: number; throughSequence: number; nextCursor: number | null };

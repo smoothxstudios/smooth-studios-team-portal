@@ -112,7 +112,7 @@ test('quiz inbox reminders require a started day, survive push being off and rec
 test('migration backfills queued events without replaying push, rolls back atomically, and normalizes destinations', async t => {
   const db = new DatabaseSync(':memory:'); t.after(() => db.close());
   const folder = new URL('../team-api/migrations/', import.meta.url);
-  for (const file of readdirSync(folder).filter(name => name.endsWith('.sql') && !name.startsWith('0018')).sort()) db.exec(readFileSync(new URL(file, folder), 'utf8'));
+  for (const file of readdirSync(folder).filter(name => name.endsWith('.sql') && name < '0018').sort()) db.exec(readFileSync(new URL(file, folder), 'utf8'));
   enqueue(db, 'before-migration');
   db.exec(readFileSync(new URL('0018_alerts_inbox.sql', folder), 'utf8'));
   assert.equal(db.prepare('SELECT COUNT(*) n FROM team_inbox').get().n, 1);
@@ -123,4 +123,16 @@ test('migration backfills queued events without replaying push, rolls back atomi
   enqueue(f.DB.sqlite, 'untrusted', 'jordyn', { title: 'Hello\nworld', target: 'https://example.invalid', targetId: 'javascript:bad' });
   const alert = (await f.call('jordyn', '/alerts')).data.alerts[0];
   assert.equal(alert.target, 'scheduling'); assert.equal(alert.targetId, null); assert.equal(alert.title, 'Hello world');
+});
+
+test('person attribution survives queue cleanup and stays scoped to the alert recipient', async t => {
+  const f = await fixture(); t.after(() => f.close());
+  enqueue(f.DB.sqlite, 'person-owned', 'owner', { personId: 'jordyn', body: 'Oct 20. Open your schedule to review.' });
+  enqueue(f.DB.sqlite, 'wrong-person', 'owner', { personId: 'not-a-member' });
+  f.DB.sqlite.prepare('DELETE FROM team_notification_events').run();
+  const result = (await f.call('owner', '/alerts')).data.alerts;
+  assert.equal(result.find(a => a.id === 'person-owned').personId, 'jordyn');
+  assert.equal(result.find(a => a.id === 'person-owned').body, 'Oct 20.');
+  assert.equal(result.find(a => a.id === 'wrong-person').personId, null);
+  assert.deepEqual((await f.call('jordyn', '/alerts')).data.alerts, []);
 });

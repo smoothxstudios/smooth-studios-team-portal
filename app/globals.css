@@ -1863,3 +1863,41 @@ button { cursor: pointer; }
   .pull-refresh-indicator svg { animation: none !important; transform: none !important; }
   .sidebar-backdrop { animation-duration: .01ms !important; }
 }
+
+/* Person-based summaries keep each teammate's information together on phones. */
+.person-section-heading { display: flex; align-items: center; gap: 10px; padding: 12px 0; }
+.person-section-heading h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.person-section-heading small { margin-left: auto; color: var(--muted-foreground); font-size: 12px; text-align: right; }
+.person-section-heading .employee-avatar, .team-hours-person .employee-avatar { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 50%; color: white; font-weight: 700; font-size: 13px; }
+.availability-people { display: grid; gap: 22px; }
+.availability-person { min-width: 0; border-top: 1px solid var(--border); }
+.availability-person .availability-columns { margin-top: 0; }
+.availability-person.is-owner .schedule-section-heading > p { display: none; }
+.availability-person .schedule-block { min-width: 0; }
+.alerts-person-group { margin-top: 20px; border-top: 1px solid var(--border); }
+.alerts-person-group .alerts-list { margin-top: 0; }
+.team-payout-breakdown { grid-column: 1 / -1; }
+.team-payout-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.team-payout-person { border: 1px solid var(--border); border-radius: 14px; padding: 0 14px 14px; min-width: 0; }
+.team-payout-person dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.team-payout-person dt { font-size: 11px; color: var(--muted-foreground); }
+.team-payout-person dd { margin: 4px 0 0; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.team-payout-person dl > div:first-child dd { color: var(--primary); }
+.team-hours-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin-bottom: 12px; }
+.team-hours-person { display: flex; gap: 10px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.team-hours-person > span:last-child { margin-left: auto; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.team-hours-person small { font-weight: 400; color: var(--muted-foreground); }
+.reward-controls-disclosure { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 14px 0; }
+.reward-controls-disclosure > summary { font-weight: 600; cursor: pointer; }
+.reward-controls-disclosure .reward-controls { margin-top: 12px; }
+.rental-description { margin: 12px 0; min-width: 0; }
+.rental-description h4 { margin-bottom: 6px; font-weight: 700; font-size: 13px; }
+.rental-description p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
+.rental-details-toggle { margin-top: 6px; font-size: 12px; white-space: normal; }
+.rental-details-toggle summary { cursor: pointer; }
+@media (max-width: 767px) {
+  .team-payout-people, .team-hours-grid { grid-template-columns: minmax(0, 1fr); }
+  .team-payout-person dd { font-size: 15px; }
+  .dashboard-main button, .dashboard-main a { touch-action: pan-y pinch-zoom; }
+  .person-section-heading { flex-wrap: wrap; }
+}

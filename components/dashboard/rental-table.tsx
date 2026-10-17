@@ -1,4 +1,5 @@
 "use client";
+import { RentalDescription } from "@/components/rental-description";
 
 import {
 Table,
@@ -81,7 +82,7 @@ export function RentalTable({ rentals, employeeId }: { rentals: Rental[]; employ
       <TableBody role="rowgroup">
         {rentals.map((rental) => (
           <TableRow key={rental.id} role="row">
-            <TableCell className="rental-name-cell" role="cell"><div className="rental-name"><strong>{rental.customer}</strong><span>{rental.title}</span></div></TableCell>
+            <TableCell className="rental-name-cell" role="cell"><div className="rental-name"><strong>{rental.customer}</strong><span>{rental.title}</span>{rental.rentalDetails && <details className="rental-details-toggle"><summary>Rental details</summary><RentalDescription details={rental.rentalDetails} /></details>}</div></TableCell>
             <TableCell className="rental-category-cell" role="cell"><CategoryBadge rental={rental} /></TableCell>
             <TableCell className="rental-date-cell" data-label="Date & time" role="cell"><div className="rental-date"><strong>{formatDate(rental.start, true)}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div></TableCell>
             <TableCell className="money-cell" data-label={employeeId ? "Price" : "Price / payment"} role="cell"><PaymentAmount rental={rental} showDetails={!employeeId} /></TableCell>

@@ -164,6 +164,6 @@ export const payrollAdvanceAllocations = sqliteTable("payroll_advance_allocation
 export const notificationInbox = sqliteTable("team_inbox", {
   sequence: integer("sequence").primaryKey({ autoIncrement: true }), id: text("id").notNull().unique(),
   userId: text("user_id").notNull(), kind: text("kind").notNull(), title: text("title").notNull(), body: text("body").notNull(),
-  target: text("target").notNull(), targetId: text("target_id"), createdAt: integer("created_at").notNull(),
+  target: text("target").notNull(), targetId: text("target_id"), personId: text("person_id"), createdAt: integer("created_at").notNull(),
   expiresAt: integer("expires_at"), readAt: integer("read_at"),
 }, table => [index("team_inbox_user_sequence").on(table.userId, table.sequence), index("team_inbox_user_unread").on(table.userId, table.readAt, table.sequence)]);

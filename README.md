@@ -101,7 +101,7 @@ When the token expires, replace only `DASHBOARD_GITHUB_TOKEN` and run one Calend
 
 ## Add the four new team members
 
-DaCari, Sorayia, Amia, and Terrill are included in the team roster. In the unlocked owner dashboard, open **Team → Set up private account**. Enter their email addresses, select a pay setup (or leave it unset), and activate the accounts. Strong individual passwords are generated locally and the submitted settings are encrypted with the owner session password before the workflow starts. After the workflow succeeds, refresh and copy each person's password from their team card. The setup does not send emails or calendar invitations.
+DaCari, Sorayia, Amia, and Terrill are included in the team roster. In the unlocked owner dashboard, open **Team → Set up private account**. Enter their email addresses, select a pay setup (or leave it unset), and activate the accounts. Strong individual passwords are generated locally and the submitted settings are encrypted with the owner session password before the workflow starts. After the workflow succeeds, the activated accounts appear in the sign-in picker. Team cards do not show or copy passwords. The setup does not send emails or calendar invitations.
 
 The activation workflow preserves existing accounts, updates backend authentication, imports Calendar/Stripe, and publishes the new encrypted dashboards. Identical retries are safe; existing activated accounts cannot be silently overwritten. Calendar sync, Studio Guidelines updates, and payroll workflows read the same private settings. Unactivated profiles are omitted from the login picker. Keep the owner password available: it encrypts both the owner dashboard and the private team settings.
 

@@ -6,7 +6,7 @@ class ElementFixture {
   constructor(parentElement, flags = {}) {
     Object.assign(this, { parentElement, clientWidth: 390, scrollWidth: 390, clientHeight: 100, scrollHeight: 100, overflowX: 'visible', overflowY: 'visible' }, flags);
   }
-  closest() { return this.interactive ? this : null; }
+  closest(selector) { return this.interactive || (this.tag && selector.split(", ").includes(this.tag)) ? this : null; }
 }
 function fixture() {
   const doc = new EventTarget(), win = new EventTarget(), root = new EventTarget();
@@ -78,4 +78,18 @@ test('cancel, extra fingers, non-cancelable scrolling, a new modal, resize and c
     const f = fixture(); f.pull(); interrupt(f); f.send('touchend', 152, 400);
     assert.equal(f.releases, 0); assert.equal(f.distance, 0); f.cleanup();
   }
+});
+
+test('a button or link supports a pull without a click, while ordinary taps and keyboard activation remain available', () => {
+  for (const tag of ['button', 'a']) {
+    const f = fixture(); f.target.tag = tag;
+    const click = (detail = 1) => { const event = new Event('click', { cancelable: true }); Object.defineProperty(event, 'detail', { value: detail }); f.root.dispatchEvent(event); return event; };
+    f.send('touchstart'); f.send('touchend'); assert.equal(click().defaultPrevented, false);
+    f.pull(); f.send('touchend', 152, 400); assert.equal(f.releases, 1); assert.equal(click().defaultPrevented, true);
+    assert.equal(click(0).defaultPrevented, false);
+    f.send('touchstart'); f.send('touchend'); assert.equal(click().defaultPrevented, false);
+    f.win.scrollY = 150; f.send('touchstart'); assert.equal(f.send('touchmove', 150, 80).defaultPrevented, false);
+    f.cleanup();
+  }
+  for (const tag of ['input', 'textarea', 'select']) { const f = fixture(); f.target.tag = tag; assert.equal(f.pull().defaultPrevented, false); f.cleanup(); }
 });

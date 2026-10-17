@@ -94,8 +94,8 @@ async function commit(db, state, makeStatements, notifications = []) {
   if (notifications.length) statements.push(db.prepare(`INSERT INTO team_notification_events (id, user_id, kind, payload, due_at)
     SELECT json_extract(value, '$.id'), json_extract(value, '$.userId'), json_extract(value, '$.kind'),
       json_extract(value, '$.payload'), ? FROM json_each(?) WHERE ${guard}`)
-    .bind(Date.now(), JSON.stringify(notifications.map(({ userId, kind, title, body, target, targetId }) => ({
-      id: crypto.randomUUID(), userId, kind, payload: JSON.stringify({ title, body, target, targetId }),
+    .bind(Date.now(), JSON.stringify(notifications.map(({ userId, kind, title, body, target, targetId, personId }) => ({
+      id: crypto.randomUUID(), userId, kind, payload: JSON.stringify({ title, body, target, targetId, personId }),
     }))), id));
   const result = await db.batch(statements);
   if (!result[0].meta.changes) fail(409, "The schedule changed. Refresh, review it, and try again.");
@@ -216,6 +216,7 @@ async function route(request, env, ctx) {
           !Number.isInteger(a.priceCents) || a.priceCents < 0 || !Array.isArray(a.acceptedEmployeeIds)) fail(400, "Invalid appointment snapshot.");
       return { id: text(a.id, 300), title: text(a.title, 300), customer: text(a.customer, 200, false),
         start: new Date(a.start).toISOString(), end: new Date(a.end).toISOString(), priceCents: a.priceCents,
+        rentalDetails: text(a.rentalDetails ?? "", 8000, false),
         acceptedEmployeeIds: [...new Set(a.acceptedEmployeeIds.map(p => person(p, true)))],
       };
     });

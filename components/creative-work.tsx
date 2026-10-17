@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Check, ClipboardList, Plus, RefreshCw, Search } from "lucide-react";
+import { ArrowUpRight, Check, ClipboardList, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -51,7 +51,7 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
     finally { setBusy(false); }
   };
   return <section className={`creative-work${earningsOnly ? " creative-work-earnings panel" : ""}`}>
-    <div className="creative-heading"><div><h2>{earningsOnly ? "Creative work payments" : "Creative work"}</h2><p>{earningsOnly ? "Approved work is included in your earnings totals above." : isOwner ? "Assign a deliverable, review the submission, and approve its pay." : "Your briefs, deadlines, submissions, and agreed pay."}</p></div><div className="creative-toolbar-buttons"><Button variant="outline" size="sm" onClick={() => void state.refresh()} aria-label="Refresh creative work"><RefreshCw size={16} /></Button>{isOwner && !earningsOnly && <Button onClick={() => { setEditor({ id: crypto.randomUUID() }); setError(""); }}><Plus size={17} />Assign work</Button>}</div></div>
+    <div className="creative-heading"><div><h2>{earningsOnly ? "Creative work payments" : "Creative work"}</h2><p>{earningsOnly ? "Approved work is included in your earnings totals above." : isOwner ? "Assign a deliverable, review the submission, and approve its pay." : "Your briefs, deadlines, submissions, and agreed pay."}</p></div><div className="creative-toolbar-buttons">{isOwner && !earningsOnly && <Button onClick={() => { setEditor({ id: crypto.randomUUID() }); setError(""); }}><Plus size={17} />Assign work</Button>}</div></div>
     {state.error && <p className="creative-notice" role="alert">{state.loaded ? "Showing the last loaded creative work. " : "Creative work totals are unavailable. "}{state.error}</p>}
     {!earningsOnly && <>
       <div className="creative-totals"><div><span>Awaiting review</span><strong>{state.items.filter(item => item.status === "submitted").length}</strong></div><div><span>Approved · unpaid</span><strong>{dollars(summary.metrics.owed)}</strong></div><div><span>Paid</span><strong>{dollars(summary.metrics.paid)}</strong></div></div>

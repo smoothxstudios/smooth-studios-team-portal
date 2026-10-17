@@ -15,9 +15,9 @@ export async function syncTeamSchedule(rentals, ownerPassword) {
   }
   const generation = randomUUID();
   // Deliberate allowlist: no payments, contact information, Stripe identifiers,
-  // credentials, or private Calendar descriptions are copied to scheduling.
+  // credentials, or raw Calendar descriptions are copied to scheduling. Only filtered rental setup answers are included.
   const appointments = rentals.map(r => ({ id: r.id, title: r.title, customer: r.customer ?? "",
-    start: r.start, end: r.end, priceCents: r.priceCents, acceptedEmployeeIds: r.assignedEmployeeIds }));
+    start: r.start, end: r.end, priceCents: r.priceCents, rentalDetails: r.rentalDetails ?? "", acceptedEmployeeIds: r.assignedEmployeeIds }));
   for (let offset = 0; offset < appointments.length; offset += 50) {
     await request("/sync/import", { generation, appointments: appointments.slice(offset, offset + 50) });
   }

@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, pbkdf2Sync, randomBytes }
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { rentalDetails } from "../../lib/rental-details.mjs";
 import { categorizeAppointment } from "../../lib/appointment-categories.mjs";
 import { summarizeStripeSnapshot } from "./stripe-data.mjs";
 import { calculateEmployeePayout, initializePayAdjustments } from "./employee-pay.mjs";
@@ -314,6 +315,7 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
     title,
     categoryId: category.id,
     category: category.label,
+    rentalDetails: category.id === "studio-rentals" ? rentalDetails(event.description) : "",
     customer: parsed.name ?? summaryCustomer(event.summary),
     start,
     end,

@@ -1,4 +1,5 @@
 "use client";
+import { OwnerWeeklyHours } from "@/components/dashboard/owner-weekly-hours";
 
 import { AlertsPage,UnreadBadge } from "@/components/alerts";
 import { CreativeWorkPage,CreativeWorkPreview } from "@/components/creative-work";
@@ -299,7 +300,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
         <PullToRefresh key={view} page={view} />
         <div className="dashboard-refresh-body">
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
-          {view === "alerts" && <AlertsPage state={alerts} onOpen={alert => void openAlert(alert)} />}
+          {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} />}
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Creative work totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "overview" && !isOwner && <CreativeWorkPreview state={creative} isOwner={false} onOpen={() => setView("creative")} />}
@@ -316,6 +317,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
                 <OwnerUpcoming rentals={upcoming} onSchedule={() => setView("scheduling")} />
                 <OwnerAttention reviewCount={reviewRentals.length} unmatchedCount={payload.stripeSummary?.unmatchedPaymentCount ?? payload.unmatchedStripePayments?.length ?? 0} stripeConnected={stripeConnected} onReview={reviewPayments} onMatch={() => openStripeMatch()} onPayouts={() => setView("payouts")} />
               </section>
+              <OwnerWeeklyHours employees={payload.employees} rentals={rentals} token={schedulingToken} />
               <CreativeWorkPreview state={creative} isOwner onOpen={() => setView("creative")} />
               <details className="owner-reports">
                 <summary>
@@ -365,12 +367,12 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           </article>}
           {view === "team" && isOwner && <Tabs defaultValue="people" className="owner-team-tabs">
             <TabsList aria-label="Team sections"><TabsTrigger value="people">People</TabsTrigger><TabsTrigger value="engagement">Check-ins &amp; rewards</TabsTrigger></TabsList>
-            <TabsContent value="people"><TeamPage payroll={payroll.state} employees={payload.employees} rentals={rentals} creative={creative.items} teamAccess={payload.teamAccess} onSetup={() => setTeamSetupOpen(true)} /></TabsContent>
+            <TabsContent value="people"><TeamPage payroll={payroll.state} employees={payload.employees} rentals={rentals} creative={creative.items} onSetup={() => setTeamSetupOpen(true)} /></TabsContent>
             <TabsContent value="engagement"><TeamEngagementReview token={schedulingToken} /></TabsContent>
           </Tabs>}
           {view === "payouts" && <>
             {!isOwner && <div className="employee-earnings-heading"><div><h2>My earnings</h2><p>Appointment and creative work earnings by year.</p></div><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
-            <PayoutPage payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
+            <PayoutPage creative={creative.items} payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
             <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} earningsOnly year={isOwner ? undefined : earningsYear} />
             {!isOwner && earningsYear === currentYear && <PeriodTotals creative={creative.items} employeeId={employeeId} rentals={visibleRentals} />}
             {!isOwner && employeeEarnings.rentals.length > 0 && <article className="panel employee-earnings-details"><div className="panel-heading"><div><h2>Earnings by appointment</h2><p>Upcoming amounts are estimates. Custom assignments are listed in Schedule.</p></div></div><RentalTable employeeId={employeeId} rentals={employeeEarnings.rentals} /></article>}

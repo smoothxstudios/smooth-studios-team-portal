@@ -1,3 +1,5 @@
+import { TEAM } from '../lib/team-schedule.mjs';
+import { alertBody } from '../lib/alert-presentation.mjs';
 import { notificationText } from './notification-content.mjs';
 
 const targets = new Set(['scheduling', 'availability', 'creative', 'quiz']);
@@ -19,7 +21,8 @@ export async function alertsRoute({ request, db, user, body, fail }) {
     return { ...summary, nextCursor: rows.length > 50 ? rows[49].sequence : null,
       alerts: rows.slice(0, 50).map(row => ({
         id: row.id, sequence: row.sequence, kind: row.kind,
-        title: notificationText(row.title, 80), body: notificationText(row.body, 360),
+        title: notificationText(row.title, 80), body: alertBody(notificationText(row.body, 360)),
+        personId: TEAM.some(person => person.id === row.person_id) ? row.person_id : null,
         target: targets.has(row.target) ? row.target : 'scheduling',
         targetId: typeof row.target_id === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(row.target_id) ? row.target_id : null,
         createdAt: row.created_at, expiresAt: row.expires_at, readAt: row.read_at,

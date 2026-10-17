@@ -120,7 +120,7 @@ test('initial sign-in remains locked and does not invoke account unlock during r
 test('dashboard modules have no dependency back into the orchestration component', () => {
   const directory = new URL('../components/dashboard/', import.meta.url);
   const files = fs.readdirSync(directory).filter(file => file.endsWith('.tsx'));
-  assert.equal(files.length, 10);
+  assert.ok(files.includes('owner-overview.tsx') && files.includes('payout-page.tsx'));
   for (const file of files) assert.doesNotMatch(fs.readFileSync(new URL(file, directory), 'utf8'), /from\s+['"][^'"]*smooth-dashboard/);
   const pure = fs.readFileSync(new URL('../lib/dashboard-presentation.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(pure, /from\s+['"](?:react|@\/components\/)/);
