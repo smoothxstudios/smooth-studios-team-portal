@@ -10,7 +10,7 @@
     "build": "vite build",
     "postbuild": "node scripts/build-pdf.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/test.mjs && node scripts/test-shot-order.mjs && node scripts/test-project-merge.mjs && node scripts/test-export.mjs && node scripts/test-storyboard.mjs && node scripts/test-uploads.mjs && node scripts/test-performance.mjs",
+    "test": "node scripts/test.mjs && node scripts/test-shot-order.mjs && node scripts/test-project-merge.mjs && node scripts/test-export.mjs && node scripts/test-storyboard.mjs && node scripts/test-uploads.mjs && node scripts/test-performance.mjs && node --test scripts/test-mobile-toolbar.mjs scripts/test-pull-to-refresh.mjs scripts/test-sidebar-swipe.mjs scripts/test-toolbar-navigation.mjs scripts/test-production-refresh.mjs",
     "deploy": "node scripts/deploy.mjs"
   },
   "dependencies": {

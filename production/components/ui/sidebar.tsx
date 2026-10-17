@@ -2,16 +2,18 @@
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { PanelLeftIcon } from "lucide-react"
+import { MenuIcon, XIcon } from "lucide-react"
 import { Slot } from "radix-ui"
 
 import { useIsMobile } from "@/hooks/use-mobile"
+import { attachSidebarSwipe } from "@/lib/sidebar-swipe.mjs"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -165,6 +167,15 @@ function Sidebar({
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
+  React.useEffect(() => {
+    if (!isMobile || openMobile || side !== "left" || collapsible === "none") return
+    return attachSidebarSwipe(document, () => setOpenMobile(true))
+  }, [isMobile, openMobile, side, collapsible, setOpenMobile])
+
+  React.useEffect(() => {
+    if (!isMobile && openMobile) setOpenMobile(false)
+  }, [isMobile, openMobile, setOpenMobile])
+
   if (collapsible === "none") {
     return (
       <div
@@ -187,7 +198,8 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          data-production-sidebar="true"
+          className="production-sidebar-drawer w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -196,10 +208,13 @@ function Sidebar({
           side={side}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+            <SheetTitle>Production Menu</SheetTitle>
+            <SheetDescription>Navigate your productions, project sections, and settings.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
+          <div className="flex h-full min-h-0 w-full flex-col">
+            <SheetClose asChild><Button type="button" variant="ghost" size="icon" className="production-sidebar-close absolute right-3 top-3 z-10 size-11" aria-label="Close production menu"><XIcon aria-hidden="true" /></Button></SheetClose>
+            {children}
+          </div>
         </SheetContent>
       </Sheet>
     )
@@ -258,7 +273,7 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, isMobile, openMobile, open } = useSidebar()
 
   return (
     <Button
@@ -266,15 +281,17 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
-      className={cn("size-7", className)}
+      className={cn("production-sidebar-trigger size-11 border-0 shadow-none", className)}
+      aria-label="Toggle production menu"
+      aria-expanded={isMobile ? openMobile : open}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
       }}
       {...props}
     >
-      <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
+      <MenuIcon />
+      <span className="sr-only">Production Menu</span>
     </Button>
   )
 }
@@ -374,7 +391,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+        "production-sidebar-content flex min-h-0 flex-1 flex-col gap-2 overflow-auto overscroll-contain group-data-[collapsible=icon]:overflow-hidden",
         className
       )}
       {...props}

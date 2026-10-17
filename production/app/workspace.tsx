@@ -23,6 +23,9 @@ import {uploadReference} from "@/lib/uploads";
 import {placeShotAtNumber} from "@/lib/shot-order";
 import type {ProjectChange,MergeChoices} from '@/lib/project-merge';
 import {ProjectDraftProvider,useProjectDraft,useOpenDrafts,ConflictReview,type PendingReview} from '@/components/project-collaboration';
+import {ProductionToolbar,ProductionRefresh,ThemeToggle} from '@/components/production-chrome';
+import {ProductionDataRefreshProvider,useProductionRead,useProductionRefresh} from '@/components/production-data-refresh';
+import {scrollToolbarToTop} from '@/lib/toolbar-navigation.mjs';
 import {AccountActions,useAccount} from "@/components/accounts";
 import {ProductionProjects,ProductionModules,SECTION_LABELS,type ProductionSection} from "@/components/production-panels";
 import {productionOf,defaultProduction,hasModule,STAGES} from "@/lib/production";
@@ -39,7 +42,7 @@ function ReferenceImage({image,className=""}:{image:Reference;className?:string}
   return failed?<span className={"image-failed "+className}><ImageIcon size={22}/>Image unavailable</span>:<img src={url} alt={image.caption||image.name} className={className} loading={className==='expanded-image'?'eager':'lazy'} decoding="async" onError={()=>setFailed(true)}/>;
 }
 
-export default function Workspace(){return <ProjectDraftProvider><SidebarProvider style={{"--sidebar-width":"236px"} as React.CSSProperties}><ShotWorkspace/><Toaster richColors position="bottom-right"/></SidebarProvider></ProjectDraftProvider>;}
+export default function Workspace(){return <ProductionDataRefreshProvider><ProjectDraftProvider><SidebarProvider style={{"--sidebar-width":"256px"} as React.CSSProperties}><ShotWorkspace/><Toaster richColors position="bottom-right"/></SidebarProvider></ProjectDraftProvider></ProductionDataRefreshProvider>;}
 
 function ShotWorkspace(){
   const [project,setProject]=useState<Project|null>(null),[projects,setProjects]=useState<ProjectSummary[]>([]);
@@ -51,7 +54,11 @@ function ShotWorkspace(){
   const [confirm,setConfirm]=useState<{title:string;description:string;action:()=>Promise<void>}|null>(null);
   const canEdit=!!user?.admin||project?.canEdit===true;
   const canManage=!!user?.admin||project?.canManage===true;
-  const locked=useRef(false);const requestSeq=useRef(0);const {setOpenMobile}=useSidebar();
+  const locked=useRef(false);const requestSeq=useRef(0),mutationSeq=useRef(0);const {setOpenMobile,openMobile}=useSidebar();
+  const toolbarScroll=useRef<ReturnType<typeof scrollToolbarToTop>|null>(null);
+  const [toolbarRefresh,setToolbarRefresh]=useState<{id:number;arrival:Promise<boolean>}|null>(null),[quietRefresh,setQuietRefresh]=useState(0);
+  const refreshData=useProductionRefresh();
+  useEffect(()=>()=>{toolbarScroll.current?.cancel();++requestSeq.current;},[]);
   const projectRef=useRef<Project|null>(null),snapshots=useRef(new Map<string,Project>()),pendingRemote=useRef<Project|null>(null);
   const [remoteWaiting,setRemoteWaiting]=useState(false),[syncProblem,setSyncProblem]=useState(''),[review,setReview]=useState<PendingReview|null>(null);
   const reviewRef=useRef<PendingReview|null>(null),drafts=useOpenDrafts(),draftsRef=useRef(drafts);draftsRef.current=drafts;
@@ -65,6 +72,7 @@ function ShotWorkspace(){
   function finishReview(choices:MergeChoices|null){reviewRef.current?.resolve(choices);reviewRef.current=null;setReview(null);}
   useEffect(()=>()=>{reviewRef.current?.resolve(null);},[]);
   const clearOpenProject=useCallback(()=>{
+    toolbarScroll.current?.cancel();toolbarScroll.current=null;
     ++requestSeq.current;reviewRef.current?.resolve(null);reviewRef.current=null;setReview(null);projectRef.current=null;snapshots.current.clear();pendingRemote.current=null;setRemoteWaiting(false);setSyncProblem('');setProject(null);setEditor(null);setCustomize(false);setProjectDialog(null);setExportScope(null);setConfirm(null);setSection("projects");setSaveError("");setLoadError("");setLoading(false);
   },[]);
 
@@ -127,9 +135,39 @@ function ShotWorkspace(){
     window.addEventListener("focus",refreshAccess);document.addEventListener("visibilitychange",refreshAccess);
     return()=>{stopped=true;window.clearInterval(timer);window.removeEventListener("focus",refreshAccess);document.removeEventListener("visibilitychange",refreshAccess);};
   },[user?.id,user?.admin,project?.id,clearOpenProject]);
+  // Read in place: opening a project again would reset filters and close drafts.
+  const refreshWorkspace=useCallback(async()=>{
+    if(locked.current)return true;
+    const seq=requestSeq.current,mutation=mutationSeq.current,active=projectRef.current;
+    try{
+      const [list,result]=await Promise.all([
+        request<{projects:ProjectSummary[]}>('/api/projects'),
+        active?.revision?request<{project?:Project;unchanged?:boolean}>('/api/projects/'+active.id+'?since='+active.revision):Promise.resolve(null),
+      ]);
+      if(seq!==requestSeq.current||mutation!==mutationSeq.current||locked.current)return true;
+      const current=projectRef.current;
+      if(current?.id!==active?.id)return true;
+      if(current?.revision&&!list.projects.some(p=>p.id===current.id)){
+        clearOpenProject();setProjects(list.projects);toast.info('Your access to this production has changed.');return true;
+      }
+      setProjects(list.projects.map(p=>current?.id===p.id&&(current.updatedAt||0)>p.updatedAt?summarize(current):p));
+      if(result?.project&&current?.id===result.project.id&&result.project.revision>current.revision){
+        if(draftsRef.current){if(!pendingRemote.current||result.project.revision>pendingRemote.current.revision)pendingRemote.current=result.project;setRemoteWaiting(true);}
+        else adoptProject(result.project);
+      }
+      setSyncProblem('');setLoadError('');return true;
+    }catch(e){
+      if(seq!==requestSeq.current||mutation!==mutationSeq.current)return true;
+      if(e instanceof RequestFailure&&[401,403,404].includes(e.status)){
+        clearOpenProject();setProjects(previous=>e.status===404?previous.filter(p=>p.id!==active?.id):[]);
+      }else setSyncProblem('Couldn’t update productions. Pull again to retry.');
+      return false;
+    }
+  },[adoptProject,clearOpenProject]);
+  useProductionRead(refreshWorkspace,!!user,user?.id);
   async function persist(p:Project,message?:string,teamAccountIds?:string[],shotId?:string,editBase?:Project){
     if(!user||(p.revision>0&&!user.admin&&p.canEdit!==true)){toast.error("You no longer have permission to edit this production.");return false;}
-    if(locked.current)return false;locked.current=true;setSaving(true);setSaveError("");const seq=requestSeq.current;
+    if(locked.current)return false;locked.current=true;++mutationSeq.current;setSaving(true);setSaveError("");const seq=requestSeq.current;
     try{
       let result:{project:Project};
       if(p.revision){
@@ -175,7 +213,28 @@ function ShotWorkspace(){
   const columns=project?.columns||DEFAULT_COLUMNS;const visibleFields=project?.fields.filter(f=>f.visible)||[];
   const listed=project&&!projects.some(p=>p.id===project.id)?[summarize(project),...projects]:projects;
   const projectSections=[["overview",LayoutDashboard],["shots",Clapperboard],["crew",Users],["files",FileText],["schedule",CalendarDays],["budget",Wallet]] as const;
-  function navigate(next:ProductionSection){setSection(next);setOpenMobile(false);}
+  function navigate(next:ProductionSection){toolbarScroll.current?.cancel();toolbarScroll.current=null;setSection(next);setOpenMobile(false);window.scrollTo({top:0,left:0,behavior:'instant'});}
+  const toolbarProject=!!project&&section!=="projects"&&section!=="settings";
+  const toolbarActive=section==='shots'?(view==='storyboard'?'storyboard':'shots'):section;
+  const toolbarItems=toolbarProject?[
+    {key:'projects',label:'Projects',icon:FolderOpen},{key:'overview',label:'Overview',icon:LayoutDashboard},
+    {key:'shots',label:'Shots',icon:List},{key:'storyboard',label:'Storyboard',icon:LayoutGrid},
+  ]:[{key:'projects',label:'Projects',icon:FolderOpen},{key:'new',label:'New',icon:Plus},{key:'settings',label:'Settings',icon:Settings}];
+  async function navigateToolbar(next:string){
+    if(locked.current||loading||draftsRef.current)return;
+    toolbarScroll.current?.cancel();
+    if(next==='new'){toolbarScroll.current=null;setProjectDialog('new');return;}
+    const movement=scrollToolbarToTop(window);toolbarScroll.current=movement;
+    if(next===toolbarActive){
+      setToolbarRefresh(previous=>({id:(previous?.id??0)+1,arrival:movement.finished}));
+      await movement.finished;if(toolbarScroll.current===movement)toolbarScroll.current=null;return;
+    }
+    if(!await movement.finished||toolbarScroll.current!==movement)return;
+    toolbarScroll.current=null;
+    if(next==='storyboard'||next==='shots'){setView(next==='storyboard'?'storyboard':'table');navigate('shots');}
+    else navigate(next as ProductionSection);
+    setQuietRefresh(value=>value+1);
+  }
   function openProduction(id:string){if(id!==project?.id||project.revision)loadProject(id);navigate("overview");}
 
   async function moveShot(shot:Shot,delta:number){
@@ -193,13 +252,15 @@ function ShotWorkspace(){
       <SidebarContent>
         <SidebarGroup><SidebarGroupLabel>WORKSPACE</SidebarGroupLabel><SidebarMenu><SidebarMenuItem><SidebarMenuButton isActive={section==="projects"} className="main-nav" onClick={()=>navigate("projects")} disabled={saving}><LayoutDashboard/><span>{user?.admin?"All productions":"Your productions"}</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu></SidebarGroup>
         {project&&section!=="projects"&&section!=="settings"&&<SidebarGroup><SidebarGroupLabel>THIS PRODUCTION</SidebarGroupLabel><SidebarMenu>{projectSections.filter(([key])=>hasModule(project,key)).map(([key,Icon])=><SidebarMenuItem key={key}><SidebarMenuButton isActive={section===key} disabled={saving||loading} onClick={()=>navigate(key)}><Icon/><span>{SECTION_LABELS[key]}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>}
-        <SidebarGroup><div className="sidebar-label-row"><SidebarGroupLabel>PROJECTS</SidebarGroupLabel>{user&&<Button variant="ghost" size="icon" aria-label="New production" disabled={saving||loading} onClick={()=>setProjectDialog("new")}><Plus size={16}/></Button>}</div><SidebarMenu>{listed.map(p=><SidebarMenuItem key={p.id}><SidebarMenuButton isActive={p.id===project?.id&&section!=="projects"} className="project-nav" disabled={saving||loading} onClick={()=>openProduction(p.id)}><FolderOpen/><span>{p.title}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>
+        <SidebarGroup><div className="sidebar-label-row"><SidebarGroupLabel>PROJECTS</SidebarGroupLabel>{user&&<Button variant="ghost" size="icon" aria-label="New production" disabled={saving||loading} onClick={()=>setProjectDialog("new")}><Plus size={16}/></Button>}</div><SidebarMenu>{listed.map(p=><SidebarMenuItem key={p.id}><SidebarMenuButton isActive={p.id===project?.id&&section!=="projects"&&section!=="settings"} className="project-nav" disabled={saving||loading} onClick={()=>openProduction(p.id)}><FolderOpen/><span>{p.title}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>
         {section==="shots"&&scenes.length>0&&<SidebarGroup><SidebarGroupLabel>SCENES</SidebarGroupLabel><SidebarMenu><SidebarMenuItem><SidebarMenuButton isActive={scene==="All scenes"} onClick={()=>{setScene("All scenes");setOpenMobile(false);}}><Film/><span>All scenes</span><span className="side-count">{allShots.length}</span></SidebarMenuButton></SidebarMenuItem>{scenes.map(s=><SidebarMenuItem key={s}><SidebarMenuButton isActive={scene===s} onClick={()=>{setScene(s);setOpenMobile(false);}}><span className="scene-number">{s.padStart(2,"0")}</span><span>Scene {s}</span><span className="side-count">{allShots.filter(x=>x.scene===s).length}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroup>}
       </SidebarContent>
       <SidebarFooter className="production-sidebar-footer"><SidebarMenu><SidebarMenuItem><SidebarMenuButton isActive={section==="settings"} onClick={()=>navigate("settings")} disabled={saving}><Settings size={17}/><span>Settings</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu><div className="side-footer"><span className="owner-avatar">{user?.name.trim().charAt(0)||"S"}</span><div><strong>{user?.name||"Smooth Studios"}</strong><small>{user?.admin?"Owner · All projects":"Team · Your projects"}</small></div></div></SidebarFooter>
     </Sidebar>
     <main className="workspace-main">
-      <header className="topbar"><div className="breadcrumb"><SidebarTrigger aria-label="Toggle project navigation"/><span>Productions</span><ChevronRight size={14}/><strong>{section==="projects"&&!user?.admin?"Your productions":SECTION_LABELS[section]}</strong></div><span className="save-state" role="status" title="Team updates sync automatically">{saving?<><Loader2 size={14} className="spin"/>Saving…</>:saveError?<><X size={14}/>Not saved</>:syncProblem?<><Loader2 size={14} className="spin"/>Reconnecting…</>:remoteWaiting?<>Team Updates</>:project?.revision?<><CheckCheck size={16}/>Saved</>:null}</span><AccountActions/></header>
+      <header className="topbar"><div className="breadcrumb"><SidebarTrigger aria-label="Toggle project navigation"/><span>Productions</span><ChevronRight size={14}/><strong>{section==="projects"&&!user?.admin?"Your productions":SECTION_LABELS[section]}</strong></div><span className="save-state" role="status" title="Team updates sync automatically">{saving?<><Loader2 size={14} className="spin"/>Saving…</>:saveError?<><X size={14}/>Not saved</>:syncProblem?<><Loader2 size={14} className="spin"/>Reconnecting…</>:remoteWaiting?<>Team Updates</>:project?.revision?<><CheckCheck size={16}/>Saved</>:null}</span><ThemeToggle/><AccountActions/></header>
+      <ProductionRefresh onRefresh={refreshData} blocked={openMobile||saving||loading||drafts>0} page={section+":"+view+":"+(project?.id||"")} request={toolbarRefresh} quietRequestId={quietRefresh}/>
+      <div className="production-refresh-body">
       {loading?<div className="workspace-loading"><Loader2 className="spin"/><p>Opening your productions…</p></div>:loadError?<Empty><EmptyHeader><EmptyMedia variant="icon"><FolderOpen/></EmptyMedia><EmptyTitle>Couldn’t open your projects</EmptyTitle><EmptyDescription>{loadError}</EmptyDescription></EmptyHeader><Button onClick={()=>loadProject()}>Try again</Button></Empty>:section==="settings"?<DashboardSettings admin={!!user?.admin}/>:section==="projects"?<ProductionProjects projects={listed} admin={!!user?.admin} onNew={()=>setProjectDialog("new")} onOpen={openProduction} onExport={()=>setExportScope("all")}/>:project&&user&&<>
         <section className="project-heading"><div><div className="eyebrow">{SECTION_LABELS[section].toUpperCase()}</div><div className="title-line"><h1>{project.title}</h1>{canEdit&&<Button variant="ghost" size="icon" aria-label="Edit project details" onClick={()=>setProjectDialog("edit")} disabled={saving}><Pencil size={17}/></Button>}</div><div className="project-meta"><span><Clapperboard size={14}/>{project.client||"Smooth Studios"}</span><span><CalendarDays size={14}/>{project.date?new Date(project.date+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}):"Shoot date not set"}</span><span className="project-stage">{productionOf(project).stage}</span></div></div><div className="project-actions"><Button variant="outline" onClick={()=>setExportScope("current")} disabled={saving}><Download size={16}/>Export PDF</Button>{user&&<><Button className="new-production-action" variant="outline" onClick={()=>setProjectDialog("new")} disabled={saving}><Plus/>New production</Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" aria-label="Project actions" disabled={saving}><MoreHorizontal/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>setProjectDialog("edit")}><Pencil/>Project details</DropdownMenuItem><DropdownMenuItem onSelect={()=>setProjectDialog("copy")}><Copy/>Copy shot list to new project</DropdownMenuItem>{project.revision>0&&canManage&&<><DropdownMenuSeparator/><DropdownMenuItem variant="destructive" onSelect={()=>setConfirm({title:"Delete this production?",description:"This removes the shot list, crew assignments, tasks, schedules, documents, and expenses for "+project.title+". This cannot be undone.",action:async()=>{try{await request("/api/projects/"+project.id,"DELETE");await loadProject();setSection("projects");toast.success("Production deleted");}catch(e){toast.error(errorText(e));}}})}><Trash2/>Delete production</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu></>}</div></section>
         <div className="mobile-section-picker"><Choice label="Project section" value={SECTION_LABELS[section]} options={projectSections.filter(([key])=>hasModule(project,key)).map(([key])=>SECTION_LABELS[key])} onChange={label=>{const item=projectSections.find(([key])=>SECTION_LABELS[key]===label);if(item)navigate(item[0]);}}/></div>
@@ -227,6 +288,8 @@ function ShotWorkspace(){
         </Tabs>
         </>}
       </>}
+      </div>
+      <ProductionToolbar items={toolbarItems} active={toolbarActive} onNavigate={navigateToolbar} hidden={openMobile||!!editor||customize||!!projectDialog||!!confirm||!!review||!!exportScope||drafts>0} disabled={saving||loading}/>
     </main>
     {project&&editor&&<ShotEditor key={editor.shot.id} initial={editor.shot} initialTab={editor.tab} canEdit={canEdit} projectId={project.revision?project.id:undefined} fields={project.fields} saving={saving} onSave={saveShot} onClose={()=>setEditor(null)}/>}
     {project&&canEdit&&customize&&<CustomizeDialog project={project} saving={saving} onSave={async(fields,columns)=>{const ok=await persist({...project,fields,columns},"Categories updated");if(ok)setCustomize(false);}} onClose={()=>setCustomize(false)}/>}

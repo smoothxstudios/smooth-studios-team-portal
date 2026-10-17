@@ -1,5 +1,6 @@
 "use client";
 import {useProjectDraft} from './project-collaboration';
+import {useProductionRead} from './production-data-refresh';
 import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from "react";
 import {createPortal} from "react-dom";
 import {ArrowUpRight,CalendarDays,Check,CheckCheck,CheckSquare,ChevronRight,Clapperboard,Clock3,Copy,Download,Eye,FileText,FolderOpen,Link2,Loader2,MapPin,Pencil,Plus,Printer,Receipt,Trash2,Upload,Users,Wallet} from "lucide-react";
@@ -41,7 +42,18 @@ export function ProductionModules({section,project,user,canEdit,save,saving,onSe
  const [confirm,setConfirm]=useState<{title:string;action:()=>Promise<void>}|null>(null),[deleting,setDeleting]=useState(false);
  useProjectDraft(!!confirm);
  const pd=productionOf(project),canManage=user.admin||project.canManage===true;
- async function reload(){if(!project.revision){setCrew([]);setFiles([]);return;}setLoading(true);setError("");try{const results=await Promise.all([request<{crew:CrewMember[]}>("/api/projects/"+project.id+"/crew"),request<{files:ProjectFile[]}>("/api/projects/"+project.id+"/files")]);setCrew(results[0].crew);setFiles(results[1].files);}catch(e){setError(errorText(e));}finally{setLoading(false);}}
+ const readId=useRef(0);
+ async function readRelated(showLoading=false){
+  const seq=++readId.current;
+  if(!project.revision){setCrew([]);setFiles([]);return true;}
+  if(showLoading)setLoading(true);
+  try{const results=await Promise.all([request<{crew:CrewMember[]}>("/api/projects/"+project.id+"/crew"),request<{files:ProjectFile[]}>("/api/projects/"+project.id+"/files")]);if(seq===readId.current){setCrew(results[0].crew);setFiles(results[1].files);setError("");}return true;}
+  catch(e){if(seq===readId.current)setError(errorText(e));return false;}
+  finally{if(seq===readId.current)setLoading(false);}
+ }
+ async function reload(){await readRelated(true);}
+ useProductionRead(()=>readRelated(),true,project.id+':'+section);
+ useEffect(()=>()=>{++readId.current;},[]);
  useEffect(()=>{reload();},[project.id,!!project.revision]);
  const change=(next:ProductionData,message="Project updated")=>canEdit?save({...project,production:next},message):Promise.resolve(false);
  const remove=(title:string,action:()=>Promise<void>)=>{if(canEdit)setConfirm({title,action});};

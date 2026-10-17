@@ -73,3 +73,14 @@ The home screen loads its verified account once and fetches only project summari
 Reference images use a small WebP display copy (up to 960 pixels and 256 KiB); enlargement and PDF export use the original bytes. Browsers create previews alongside new uploads. Preview failure never discards a successful original upload. During deployment, existing references are converted through the authenticated owner APIs only while the existing deployment credential still matches; originals stay unchanged. Failed conversions fall back to the original.
 
 Image responses are private and must revalidate with the server before reuse. Authorization runs before any 304 response, so removing project access blocks cached requests as well. Account-specific URLs and ETags separate browser account changes. Indexed image/project references are backfilled by migration 0005 and maintained atomically by project insert/update/delete triggers. No project data or preview bytes are published as static assets. Deployment readiness checks include the current app script, PDF module, authenticated preview revalidation, and anonymous access rejection.
+
+
+## Dashboard UI alignment — October 17, 2026
+
+Productions follows Studio Dashboard v2.26.1: neutral light/dark themes, red accents, compact headings and panels, divider rows, and 44px mobile controls. The theme control is available at sign-in and in the top bar, with the choice saved on the Production domain. Project permissions, signup, shared editing, uploads, and PDF formats retain their existing behavior.
+
+The mobile toolbar offers Projects, New, and Settings from the workspace. Inside a production it offers Projects, Overview, Shots, and Storyboard; enabled crew, files, schedule, and budget sections remain in the section selector and left menu. Tapping or sliding to another toolbar section glides to the top before opening it and updates data quietly. Re-tapping the current section glides up and refreshes in one motion. Pulling down at the top also refreshes. Reads update the mounted workspace, related crew/files, and account list without reloading the session or resetting shot filters. Open drafts block gesture refresh and receive shared project updates through the existing pending-revision flow.
+
+The toolbar slides below the screen after sustained downward scrolling and returns on upward scrolling. A left-edge swipe or the unbordered top-left menu button opens the drawer. The scrim fades with its motion; the drawer has an accessible close target and its own scrolling list. Form controls, nested scrollers, image/video interaction, dialogs, and pinch zoom retain their native gestures. Reduce Motion is respected.
+
+Validation includes the production typecheck/build and existing accounts, project privacy, collaboration, shot-order, uploads, and PDF regression suites, plus 29 navigation/refresh/gesture checks. Browser and physical-iPhone interaction QA were unavailable in this environment.
