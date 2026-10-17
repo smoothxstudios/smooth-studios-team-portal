@@ -22,6 +22,7 @@ permissions:
   pages: write
   id-token: write
 
+# Share the data-write lock with imports, while retaining every waiting deploy.
 concurrency:
   group: smooth-studios-data-writes
   cancel-in-progress: false
