@@ -199,7 +199,7 @@ function Sidebar({
           data-slot="sidebar"
           data-mobile="true"
           data-production-sidebar="true"
-          className="production-sidebar-drawer w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          className={cn("production-sidebar-drawer w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden", className)}
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
