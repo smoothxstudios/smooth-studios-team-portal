@@ -1780,6 +1780,8 @@ button { cursor: pointer; }
 .alerts-heading h2 { margin: 0 0 6px; font-size: 23px; letter-spacing: -.035em; }
 .alerts-heading p, .alert-content > p, .alerts-empty p { margin: 0; color: var(--muted-foreground); line-height: 1.6; font-size: 14px; }
 .alerts-controls { flex-wrap: wrap; margin-bottom: 18px; }
+.alerts-bulk-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.alerts-bulk-actions > button { min-height: 44px; }
 .alerts-undo { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-bottom: 12px; padding: 0 6px 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--muted-foreground); font-size: 12px; }
 .alerts-undo > button { min-width: 44px; min-height: 44px; padding: 8px; color: var(--foreground); font-weight: 650; border-radius: 8px; }
 .alerts-filters { display: inline-flex; padding: 4px; gap: 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
@@ -1831,6 +1833,7 @@ button { cursor: pointer; }
   .topbar-alerts { display: none; }
   .alerts-heading { margin-bottom: 18px; align-items: flex-start; }
   .alerts-heading h2 { font-size: 20px; }
+  .alerts-bulk-actions { width: 100%; justify-content: flex-end; }
   .alert-open { padding: 9px 10px; }
   .alert-open-arrow { display: none; }
 }
@@ -2078,8 +2081,8 @@ button { cursor: pointer; }
 .team-notifications-header h2 { font-size: 18px; font-weight: 650; }
 .team-notifications-header p { margin-top: 5px; font-size: 12px; line-height: 1.5; }
 .team-notifications-header > button { flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; }
-.team-notifications-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; min-width: 0; padding: 16px 18px; }
-.team-notifications-body form { gap: 16px; }
+.team-notifications-body { overflow-x: hidden; overflow-y: auto; overscroll-behavior: none; touch-action: pan-y pinch-zoom; min-height: 0; min-width: 0; max-width: 100%; padding: 16px 18px; }
+.team-notifications-body form { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .team-notification-recipients { min-width: 0; padding: 0; border: 0; }
 .team-notification-recipients > legend { font-size: 14px; font-weight: 650; }
 .team-notification-recipient-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; }

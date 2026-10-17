@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { attachScrollTapGuard } from "@/lib/scroll-tap-guard.mjs";
 import { alertBody, groupAlerts } from "@/lib/alert-presentation.mjs";
-import { Bell, CalendarDays, Check, CheckCheck, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
+import { Bell, CalendarDays, Check, CheckCheck, Mail, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -48,7 +48,10 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
         <button aria-pressed={state.filter === "all"} disabled={state.busy} onClick={() => state.chooseFilter("all")}>All</button>
         <button aria-pressed={state.filter === "unread"} disabled={state.busy} onClick={() => state.chooseFilter("unread")}>Unread <UnreadBadge count={state.unreadCount} /></button>
       </div>
-      <Button variant="ghost" disabled={state.busy || state.loading || !state.unreadCount} onClick={() => void state.markRead()}><CheckCheck size={16} />Mark all read</Button>
+      <div className="alerts-bulk-actions">
+        <Button variant="ghost" disabled={state.busy || state.loading || !state.unreadCount} onClick={() => void state.markRead()}><CheckCheck size={16} aria-hidden="true" />Mark all read</Button>
+        <Button variant="ghost" disabled={state.busy || state.loading || !state.throughSequence} onClick={() => void state.markAllUnread()}><Mail size={16} aria-hidden="true" />Mark all unread</Button>
+      </div>
     </div>
     {state.error && <p className="schedule-warning" role="alert">{state.error} <button onClick={() => void state.refresh()}>Try again</button></p>}
     {state.deletion && <div className="alerts-undo" role="status"><span>Alert deleted</span><button type="button" disabled={state.busy} onClick={() => void state.undoDelete()} aria-label={`Undo deletion: ${state.deletion.alert.title}`}>Undo</button></div>}

@@ -79,6 +79,26 @@ export function useAlerts(token: string, active: boolean) {
     } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "Couldn’t mark this alert as read."); return false; }
     finally { operation.current = false; setBusy(false); setLoading(false); }
   };
+  const markAllUnread = async () => {
+    if (operation.current || loading || !page.throughSequence) return false;
+    const throughSequence = page.throughSequence;
+    operation.current = true; const current = ++requestId.current; setBusy(true);
+    let saved = false;
+    try {
+      const result = await teamRequest<{ unreadCount: number; readAt: null }>(token, "/alerts/unread-all", { throughSequence }, "PATCH");
+      if (current === requestId.current) {
+        setPage(previous => ({ ...previous, unreadCount: result.unreadCount,
+          alerts: previous.alerts.map(item => item.sequence <= throughSequence ? { ...item, readAt: null } : item) }));
+        setError(""); saved = true;
+      }
+    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "Alerts couldn’t be marked unread. Try again."); }
+    finally { operation.current = false; }
+    // Previously read alerts may now belong in Unread, including older pages.
+    // Keep the saved state if this list refresh fails; the server update succeeded.
+    if (saved) await refresh();
+    setBusy(false); setLoading(false);
+    return saved;
+  };
   const deleteAlert = async (alert: DashboardAlert) => {
     if (operation.current) return false;
     operation.current = true; const current = ++requestId.current; setBusy(true);
@@ -110,6 +130,6 @@ export function useAlerts(token: string, active: boolean) {
     setBusy(false); setLoading(false);
     return restored;
   };
-  return { ...page, loading, busy, error, filter, deletion, chooseFilter, refresh, loadMore, markRead, deleteAlert, undoDelete };
+  return { ...page, loading, busy, error, filter, deletion, chooseFilter, refresh, loadMore, markRead, markAllUnread, deleteAlert, undoDelete };
 }
 export type AlertsState = ReturnType<typeof useAlerts>;

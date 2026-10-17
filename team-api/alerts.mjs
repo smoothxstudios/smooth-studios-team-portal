@@ -35,6 +35,15 @@ export async function alertsRoute({ request, db, user, body, fail }) {
         createdAt: row.created_at, expiresAt: row.expires_at, readAt: row.read_at,
       })) };
   }
+  if (request.method === 'PATCH' && url.pathname === '/alerts/unread-all') {
+    const input = await body(request);
+    if (!validSequence(input.throughSequence)) fail(400, 'Refresh Alerts before marking all as unread.');
+    // Reopen only this account's displayed snapshot, retaining deletion and
+    // the read state of newer alerts that arrived on another device.
+    await db.prepare('UPDATE team_inbox SET read_at = NULL WHERE user_id = ? AND deleted_at IS NULL AND sequence <= ? AND read_at IS NOT NULL')
+      .bind(user, input.throughSequence).run();
+    return { saved: true, readAt: null, unreadCount: await unreadCount(db, user) };
+  }
   if (request.method === 'PATCH' && ['/alerts/read', '/alerts/read-all'].includes(url.pathname)) {
     const input = await body(request), now = Date.now();
     if (url.pathname === '/alerts/read-all') {

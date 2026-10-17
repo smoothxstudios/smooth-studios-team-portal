@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.31.0",
+  "currentVersion": "2.32.0",
   "releases": [
+    {
+      "id": "2026-10-17-mark-alerts-unread-and-stable-reminders",
+      "version": "2.32.0",
+      "date": "2026-10-17",
+      "category": "Notifications",
+      "title": "Mark all alerts unread and steadier reminders",
+      "changes": [
+        "Mark all unread returns saved alerts in your own inbox to Unread, including earlier pages. Deleted alerts stay deleted, and newer arrivals keep their current status.",
+        "The Unread view and badges refresh after the bulk change. Mark all read remains beside the new action.",
+        "The reminder composer keeps its contents within the dialog while scrolling on a phone."
+      ],
+      "employee": {
+        "title": "Mark all alerts unread",
+        "changes": [
+          "Use Mark all unread in Alerts to revisit your saved notifications, including earlier pages. Deleted alerts stay deleted."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-studio-reminder-shortcuts",
       "version": "2.31.0",

@@ -88,6 +88,56 @@ test('pagination is stable with identical timestamps; mark-all preserves newer a
   for (const throughSequence of [null, -1, '1', 1.5]) assert.equal((await f.call('jordyn', '/alerts/read-all', { throughSequence }, 'PATCH')).status, 400);
 });
 
+test('mark all unread reopens the full account snapshot while preserving newer arrivals, deleted alerts and other people', async t => {
+  const f = await fixture(); t.after(() => f.close());
+  for (let i = 0; i < 64; i++) enqueue(f.DB.sqlite, `unread-all-${i}`);
+  enqueue(f.DB.sqlite, 'someone-else-read', 'rayne'); enqueue(f.DB.sqlite, 'owner-read', 'owner');
+  const first = (await f.call('jordyn', '/alerts')).data;
+  assert.equal(first.alerts.length, 50);
+  await f.call('jordyn', '/alerts/read-all', { throughSequence: first.throughSequence }, 'PATCH');
+  await f.call('jordyn', '/alerts', { ids: ['unread-all-10'] }, 'DELETE');
+  await f.call('rayne', '/alerts/read', { ids: ['someone-else-read'] }, 'PATCH');
+  await f.call('owner', '/alerts/read', { ids: ['owner-read'] }, 'PATCH');
+  enqueue(f.DB.sqlite, 'newer-read'); enqueue(f.DB.sqlite, 'newer-unread');
+  await f.call('jordyn', '/alerts/read', { ids: ['newer-read'] }, 'PATCH');
+  const item = { id: 'unchanged-assignment', employeeId: 'jordyn', status: 'pending', title: 'Synthetic assignment' };
+  f.DB.sqlite.prepare('INSERT INTO team_assignments(id,employee_id,data) VALUES(?,?,?)').run(item.id, item.employeeId, JSON.stringify(item));
+  const queueBefore = f.DB.sqlite.prepare('SELECT * FROM team_notification_events ORDER BY id').all();
+  mock.timers.setTime(now + 1000);
+  const result = await f.call('jordyn', '/alerts/unread-all', { throughSequence: first.throughSequence, userId: 'rayne' }, 'PATCH');
+  assert.equal(result.status, 200); assert.deepEqual(result.data, { saved: true, readAt: null, unreadCount: 64 });
+  const unread = (await f.call('jordyn', '/alerts?filter=unread')).data;
+  assert.equal(unread.alerts.length, 50); assert.equal(unread.unreadCount, 64);
+  const second = (await f.call('jordyn', `/alerts?filter=unread&before=${unread.nextCursor}`)).data;
+  assert.equal(second.alerts.length, 14);
+  assert.ok([...unread.alerts, ...second.alerts].every(alert => alert.readAt === null));
+  assert.ok(second.alerts.some(alert => alert.id === 'unread-all-0'), 'older paginated records are reopened too');
+  for (const id of ['newer-read', 'someone-else-read', 'owner-read']) {
+    assert.equal(f.DB.sqlite.prepare('SELECT read_at FROM team_inbox WHERE id=?').get(id).read_at, now);
+  }
+  const deleted = f.DB.sqlite.prepare('SELECT read_at,deleted_at FROM team_inbox WHERE id=?').get('unread-all-10');
+  assert.equal(deleted.read_at, now); assert.equal(deleted.deleted_at, now);
+  assert.equal((await f.call('rayne', '/alerts')).data.unreadCount, 0);
+  assert.equal((await f.call('owner', '/alerts')).data.unreadCount, 0);
+  assert.deepEqual(f.DB.sqlite.prepare('SELECT * FROM team_notification_events ORDER BY id').all(), queueBefore);
+  assert.deepEqual(JSON.parse(f.DB.sqlite.prepare('SELECT data FROM team_assignments WHERE id=?').get(item.id).data), item);
+  assert.deepEqual((await f.call('jordyn', '/alerts/unread-all', { throughSequence: first.throughSequence }, 'PATCH')).data, result.data);
+});
+
+test('mark all unread validates the displayed snapshot and retains authentication and empty-snapshot behavior', async t => {
+  const f = await fixture(); t.after(() => f.close());
+  enqueue(f.DB.sqlite, 'validate-unread');
+  await f.call('jordyn', '/alerts/read', { ids: ['validate-unread'] }, 'PATCH');
+  for (const throughSequence of [undefined, null, -1, '1', 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal((await f.call('jordyn', '/alerts/unread-all', { throughSequence }, 'PATCH')).status, 400);
+  }
+  assert.equal((await f.call('sync', '/alerts/unread-all', { throughSequence: 1 }, 'PATCH')).status, 403);
+  assert.equal((await f.call('unknown', '/alerts/unread-all', { throughSequence: 1 }, 'PATCH')).status, 401);
+  assert.deepEqual((await f.call('jordyn', '/alerts/unread-all', { throughSequence: 0 }, 'PATCH')).data, { saved: true, readAt: null, unreadCount: 0 });
+  assert.equal(f.DB.sqlite.prepare('SELECT read_at FROM team_inbox WHERE id=?').get('validate-unread').read_at, now);
+  assert.deepEqual((await f.call('rayne', '/alerts/unread-all', { throughSequence: 1 }, 'PATCH')).data, { saved: true, readAt: null, unreadCount: 0 });
+});
+
 test('quiz inbox reminders require a started day, survive push being off and receipt cleanup, and never duplicate', async t => {
   const f = await fixture(); delete f.env.VAPID_JWK; t.after(() => f.close());
   const mustNotSend = () => { throw new Error('Push is off'); };
