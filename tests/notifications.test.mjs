@@ -159,6 +159,9 @@ test("service worker shows distinct alerts and opens only approved dashboard des
   const settings = await show({ type: "schedule", title: "Connect Google Calendar", body: "Connect your account in Settings.", target: "settings" });
   handlers.notificationclick({ notification: { ...settings, close() {} }, waitUntil: p => pending = p }); await pending;
   assert.equal(opened.at(-1), `${scope}#settings`);
+  const availability = await show({ type: "schedule", title: "Update your availability", body: "Review your work preferences and blocked times.", target: "availability" });
+  handlers.notificationclick({ notification: { ...availability, close() {} }, waitUntil: p => pending = p }); await pending;
+  assert.equal(opened.at(-1), `${scope}#availability`);
   const invalidTarget = await show({ type: "schedule", title: "Studio reminder", body: "Check your app.", target: "https://untrusted.invalid" });
   handlers.notificationclick({ notification: { ...invalidTarget, close() {} }, waitUntil: p => pending = p }); await pending;
   assert.equal(opened.at(-1), `${scope}#scheduling`);

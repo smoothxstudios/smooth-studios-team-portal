@@ -24,6 +24,7 @@ import { StudioInfoPage } from "@/components/studio-info";
 import { TeamAccountSetup,type NewTeamSettings } from "@/components/team-account-setup";
 import { EmployeeEngagementBar,EmployeeEngagementProvider,SmoothStarSidebar,TeamEngagementReview } from "@/components/team-engagement";
 import { TeamSchedulingPage } from "@/components/team-scheduling";
+import { TeamNotifications } from "@/components/team-notifications";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -133,6 +134,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
       if (["connected", "error"].includes(new URLSearchParams(window.location.search).get("calendar") ?? "")) setView("settings");
       if (window.location.hash === "#alerts") setView("alerts");
       if (window.location.hash === "#settings") setView("settings");
+      if (window.location.hash === "#availability") setView("availability");
       if (window.location.hash === "#creative-work") setView("creative");
       if (window.location.hash === "#scheduling") setView("scheduling");
       if (window.location.hash === "#daily-quiz") setView("overview");
@@ -318,7 +320,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
         <PullToRefresh page={view} request={toolbarRefresh} quietRequestId={quietRefresh} />
         <div className="dashboard-refresh-body">
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
-          {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} />}
+          {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} action={isOwner ? <TeamNotifications token={schedulingToken} employees={payload.employees} /> : undefined} />}
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Creative work totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "overview" && !isOwner && <CreativeWorkPreview state={creative} isOwner={false} onOpen={() => setView("creative")} />}

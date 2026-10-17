@@ -2048,6 +2048,29 @@ button { cursor: pointer; }
 
 /* Team messages use the existing People screen without adding another card. */
 .team-notifications-controls { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+.alerts-heading .team-notifications-controls { margin-bottom: 0; }
+.team-notification-presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.team-notification-presets > button { display: flex; align-items: flex-start; gap: 8px; min-width: 0; min-height: 68px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; text-align: left; }
+.team-notification-presets > button > svg { flex: 0 0 17px; margin-top: 2px; color: var(--muted-foreground); }
+.team-notification-presets > button > span { display: grid; gap: 4px; min-width: 0; }
+.team-notification-presets strong { font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+.team-notification-presets small { color: var(--muted-foreground); font-size: 10px; line-height: 1.4; }
+.team-notification-presets > button[aria-pressed="true"] { border-color: var(--primary); background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); }
+.team-notification-presets > button:disabled { opacity: .5; }
+.team-notification-presets > button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.team-notification-rental-picker { display: grid; gap: 8px; min-width: 0; }
+.team-notification-rental-picker > button { justify-self: start; min-height: 44px; font-size: 12px; }
+.team-notification-rental-changed { display: grid; gap: 8px; border-left: 3px solid #d59615; padding-left: 12px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.team-notification-rental-changed > button { justify-self: start; min-height: 44px; }
+.team-notification-locked-recipient { display: grid; gap: 5px; }
+.team-notification-locked-recipient > span, .team-notification-locked-recipient > small { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.team-notification-locked-recipient > strong { font-size: 14px; font-weight: 650; }
+.team-notification-preview { display: grid; gap: 7px; min-width: 0; padding-left: 12px; border-left: 2px solid var(--primary); overflow-wrap: anywhere; }
+.team-notification-preview > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.team-notification-preview > div > span, .team-notification-preview > small { color: var(--muted-foreground); font-size: 11px; line-height: 1.5; }
+.team-notification-preview > div > button { min-height: 44px; padding: 8px; font-size: 12px; }
+.team-notification-preview > strong { font-size: 14px; font-weight: 650; }
+.team-notification-preview > p { font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
 .team-notifications-controls > button { min-height: 44px; }
 .team-notifications-dialog { display: flex; flex-direction: column; gap: 0; width: calc(100vw - 24px); max-width: 640px; max-height: calc(100dvh - 24px); padding: 0; overflow: hidden; border-radius: 18px; }
 .team-notifications-header { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 12px; flex-shrink: 0; padding: 16px 18px; border-bottom: 1px solid var(--border); text-align: left; }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { attachScrollTapGuard } from "@/lib/scroll-tap-guard.mjs";
 import { alertBody, groupAlerts } from "@/lib/alert-presentation.mjs";
 import { Bell, CalendarDays, Check, CheckCheck, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
@@ -31,7 +31,7 @@ function AlertOptions({ alert, state, onOpen }: { alert: DashboardAlert; state: 
   </DropdownMenu>;
 }
 
-export function AlertsPage({ state, onOpen, isOwner = false }: { isOwner?: boolean; state: AlertsState; onOpen: (alert: DashboardAlert) => void }) {
+export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner?: boolean; state: AlertsState; onOpen: (alert: DashboardAlert) => void; action?: ReactNode }) {
   const page = useRef<HTMLElement>(null);
   const [notice, setNotice] = useState<DashboardAlert | null>(null);
   useEffect(() => { if (page.current) return attachScrollTapGuard(page.current); }, []);
@@ -42,7 +42,7 @@ export function AlertsPage({ state, onOpen, isOwner = false }: { isOwner?: boole
     else onOpen(alert);
   };
   return <section ref={page} className="alerts-page" aria-label="Your alerts">
-    <div className="alerts-heading"><h2>Alerts</h2></div>
+    <div className="alerts-heading"><h2>Alerts</h2>{action}</div>
     <div className="alerts-controls">
       <div className="alerts-filters" role="group" aria-label="Filter alerts">
         <button aria-pressed={state.filter === "all"} disabled={state.busy} onClick={() => state.chooseFilter("all")}>All</button>
@@ -80,7 +80,7 @@ export function AlertsPage({ state, onOpen, isOwner = false }: { isOwner?: boole
         <p className="notification-full-message">{notice?.body}</p>
         <DialogFooter>
           <Button type="button" variant="outline" disabled={state.busy} onClick={async () => { if (notice && await state.deleteAlert(notice)) setNotice(null); }}><Trash2 size={16} />Delete</Button>
-          {notice && notice.target !== "alerts" && <Button type="button" onClick={() => { onOpen(notice); setNotice(null); }}>{notice.target === "settings" ? "Open Settings" : notice.target === "creative" ? "Open Creative work" : notice.targetId ? "Open assignment" : "Open Schedule"}<ArrowUpRight size={16} /></Button>}
+          {notice && notice.target !== "alerts" && <Button type="button" onClick={() => { onOpen(notice); setNotice(null); }}>{notice.target === "settings" ? "Open Settings" : notice.target === "availability" ? "Open Availability" : notice.target === "creative" ? "Open Creative work" : notice.targetId ? "Open assignment" : "Open Schedule"}<ArrowUpRight size={16} /></Button>}
           <Button type="button" variant="ghost" onClick={() => setNotice(null)}>Done</Button>
         </DialogFooter>
       </DialogContent>

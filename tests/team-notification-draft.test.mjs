@@ -35,3 +35,22 @@ test('invalid recipients, empty content, oversized text and unsupported destinat
     const f = fixture(); assert.throws(() => f.request.prepare({ ...draft, ...change })); assert.equal(f.count, 0);
   }
 });
+
+test('rental context stays pinned across retries and a different booking starts a new send intent', () => {
+  const f = fixture(), context = { type: 'rental', appointmentId: 'rental-a', start: '2026-12-20T14:00Z', end: '2026-12-20T15:00Z' };
+  const first = f.request.prepare({ ...draft, context });
+  const retry = f.request.prepare({ ...draft, context: { ...context, start: '2026-12-20T14:00:00.000Z', end: '2026-12-20T15:00:00.000Z' } });
+  assert.deepEqual(retry, first);
+  context.appointmentId = 'rental-b';
+  assert.equal(first.context.appointmentId, 'rental-a', 'later selection edits do not mutate an uncertain request');
+  assert.notEqual(f.request.prepare({ ...draft, context }).id, first.id);
+});
+
+test('availability destinations work while malformed rental context is rejected before allocating an ID', () => {
+  const f = fixture();
+  assert.equal(f.request.prepare({ ...draft, target: 'availability' }).target, 'availability');
+  for (const context of [{ type: 'other' }, { type: 'rental', appointmentId: '', start: 'bad', end: 'bad' },
+    { type: 'rental', appointmentId: 'rental-a', start: '2026-12-20T15:00Z', end: '2026-12-20T14:00Z' }]) {
+    const invalid = fixture(); assert.throws(() => invalid.request.prepare({ ...draft, context })); assert.equal(invalid.count, 0);
+  }
+});

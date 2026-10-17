@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.30.0",
+  "currentVersion": "2.31.0",
   "releases": [
+    {
+      "id": "2026-10-17-studio-reminder-shortcuts",
+      "version": "2.31.0",
+      "date": "2026-10-17",
+      "category": "Notifications",
+      "title": "Reminders for rentals and studio tasks",
+      "changes": [
+        "The notification composer starts with common studio reminders: rental responses, upcoming rentals, availability updates, Google Calendar connection, and refreshing the schedule. Custom messages remain available.",
+        "Rental reminders use current bookings and confirmed staff. The app checks selected times and recipients again before saving an upcoming-rental reminder; pending-response reminders still require a current pending offer.",
+        "Reminder text and destinations are filled in for you. Availability reminders open Availability directly, and Calendar connection reminders open Settings.",
+        "Smooth can open the composer from Alerts or Team → People; sent history and duplicate-safe retry behavior remain available."
+      ],
+      "employee": {
+        "title": "Clearer studio reminders",
+        "changes": [
+          "Studio reminders identify the selected rental or task. Availability reminders can open Availability directly from the notification."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-owner-reminders-and-immediate-tabs",
       "version": "2.30.0",
