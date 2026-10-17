@@ -14,6 +14,7 @@ import { CALENDAR_INVITATION_STATUSES } from "../lib/calendar-invitations.mjs";
 import { calendarAuthRoute } from "./calendar-auth.mjs";
 import { calendarQueueStatement, flushCalendarAssignments } from "./calendar-delivery.mjs";
 import { manualNoticesRoute } from "./manual-notices.mjs";
+import { withoutRemovedRentalStaff } from "../lib/rental-staff.mjs";
 
 const users = TEAM.map(p => p.id);
 const origins = new Set(["https://smoothxstudios.github.io", "https://dashboard.smoothstudios.co", "https://smooth-studios-team-portal.felixhansley.chatgpt.site"]);
@@ -131,7 +132,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 3, creativeWorkVersion: 2, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1 };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -227,7 +228,7 @@ async function route(request, env, ctx) {
       let result = {}; try { result = JSON.parse(row.result ?? "{}"); } catch { /* Keep a safe pending status. */ }
       let deliveryStatus = row.status;
       // A later Calendar import wins over an older outbound confirmation.
-      if (row.status === "synced" && Date.parse(s.state.synced_at) > row.updated_at && !["invitation_removed", "no_calendar_invitation"].includes(result.code)) {
+      if (row.status === "synced" && Date.parse(s.state.synced_at) > row.updated_at && !["invitation_removed", "person_removed", "no_calendar_invitation"].includes(result.code)) {
         const invitation = s.appointments.find(appointment => appointment.id === assignment.appointmentId)?.calendarInvitations?.find(item => item.employeeId === assignment.employeeId);
         result.googleStatus = invitation?.status;
         if (!invitation && assignment.status !== "cancelled") { deliveryStatus = "needs_review"; result.code = "invitation_missing"; }
@@ -242,7 +243,7 @@ async function route(request, env, ctx) {
       ? await jsonRows(db, "SELECT data FROM team_work_preferences")
       : await jsonRows(db, "SELECT data FROM team_work_preferences WHERE user_id = ?", user);
     return { revision: s.state.revision, syncedAt: s.state.synced_at, availabilityVersion: 1, workPreferences,
-      appointments: s.appointments.filter(a => isOwner || ids.has(a.id) || a.acceptedEmployeeIds.includes(user) ||
+      appointments: s.appointments.map(a => withoutRemovedRentalStaff(a, assignments, s.state.synced_at)).filter(a => isOwner || ids.has(a.id) || a.acceptedEmployeeIds.includes(user) ||
           a.calendarInvitations?.some(invitation => invitation.employeeId === user && invitation.status !== "declined"))
         .map(a => isOwner ? a : { ...a, acceptedEmployeeIds: a.acceptedEmployeeIds.filter(id => id === user),
           calendarInvitations: (a.calendarInvitations ?? []).filter(invitation => invitation.employeeId === user) }),
@@ -250,6 +251,38 @@ async function route(request, env, ctx) {
       devices: Object.fromEntries(devices.filter(d => isOwner || d.user_id === user).map(d => [d.user_id, d.count])),
       pushPublicKey: env.VAPID_JWK ? publicPushKey(JSON.parse(env.VAPID_JWK)) : null,
     };
+  }
+  if (request.method === "POST" && url.pathname === "/rental-staff/remove") {
+    owner(user);
+    const input = await body(request), s = await snapshot(db);
+    expectedRevision(input, s.state);
+    const employeeId = person(input.employeeId, true), appointmentId = text(input.appointmentId, 300);
+    const appointment = s.appointments.find(item => item.id === appointmentId);
+    if (!appointment) fail(404, "This rental is no longer available. Refresh the schedule.");
+    if (input.start !== appointment.start || input.end !== appointment.end) fail(409, "The rental time changed. Refresh and review it before removing anyone.");
+    futurePeriod(appointment.start, appointment.end);
+    const offers = s.assignments.filter(item => item.appointmentId === appointmentId && item.employeeId === employeeId &&
+      Date.parse(item.start) === Date.parse(appointment.start) && Date.parse(item.end) === Date.parse(appointment.end));
+    const existing = offers.filter(item => item.removeCalendarGuest && item.status === "cancelled").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+    if (existing && !offers.some(active)) {
+      const delivery = await db.prepare("SELECT status, result, updated_at FROM calendar_assignment_outbox WHERE assignment_id = ?").bind(existing.id).first();
+      const reInvited = delivery?.status === "synced" && Date.parse(s.state.synced_at) > delivery.updated_at &&
+        (appointment.acceptedEmployeeIds.includes(employeeId) || appointment.calendarInvitations?.some(item => item.employeeId === employeeId));
+      if (!reInvited) return { saved: true, removedAssignment: existing, notification: "Person removed from this rental in the app. Check the Google Calendar removal status below." };
+    }
+    if (!offers.length && !appointment.acceptedEmployeeIds.includes(employeeId) &&
+        !appointment.calendarInvitations?.some(item => item.employeeId === employeeId)) fail(404, "This person is not on this rental.");
+    const now = new Date(Math.max(Date.now(), ...offers.map(item => (Date.parse(item.createdAt) || 0) + 1))).toISOString();
+    const removed = { id: crypto.randomUUID(), employeeId, appointmentId, title: appointment.title, instructions: "",
+      start: appointment.start, end: appointment.end, status: "cancelled", createdAt: now, updatedAt: now,
+      removeCalendarGuest: true, note: "Removed from this rental by Smooth." };
+    await commit(db, s.state, mutation => [
+      ...offers.filter(active).map(item => saveAssignment(db, { ...item, status: "cancelled", updatedAt: now }, mutation)),
+      saveAssignment(db, removed, mutation), calendarQueueStatement(db, removed, mutation),
+    ], assignmentNotifications(removed, "cancelled", [employeeId]));
+    ctx.waitUntil(flushAlerts(env));
+    ctx.waitUntil(flushCalendarAssignments(env, { assignmentId: removed.id, limit: 1 }));
+    return { saved: true, removedAssignment: removed, notification: "Person removed from this rental in the app. Check the Google Calendar removal status below." };
   }
   if (request.method === "GET" && url.pathname === "/sync/accepted") {
     const assignments = await jsonRows(db, "SELECT data FROM team_assignments");

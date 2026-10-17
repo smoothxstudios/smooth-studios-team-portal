@@ -1,13 +1,16 @@
 "use client";
+import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
+import { rentalStaffRemovals } from "@/lib/rental-staff.mjs";
+import { ScheduleConfirmation } from "@/components/schedule-confirmation";
 import { RentalDescription } from "@/components/rental-description";
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Plus, Search, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Plus, Search, UserMinus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { OwnerScheduleCalendar } from "@/components/owner-schedule-calendar";
-import type { TeamAssignment, TeamSchedule } from "@/lib/team-api";
+import type { TeamAssignment, TeamAppointment, TeamSchedule } from "@/lib/team-api";
 import type { WorkEntry, AvailabilityEntry, ScheduleEntry as Entry, ScheduleView as View } from "@/lib/schedule-calendar-types";
 import { TEAM, STUDIO_ZONE, addLocalDays, assignmentConflicts, hasConflictOverride, localInstant, overlaps, studioLocal } from "@/lib/team-schedule.mjs";
 import { agendaMatchesStatus, agendaOnDay, buildScheduleAgenda } from "@/lib/schedule-agenda.mjs";
@@ -26,7 +29,7 @@ function timeRange(item: { start: string; end: string }) {
 function Person({ id }: { id: string }) {
   return <span className="schedule-person"><i style={{ background: TEAM.find(person => person.id === id)?.color }} />{name(id)}</span>;
 }
-function Confirmation({ person }: { person: WorkEntry["confirmations"][number] }) {
+function Confirmation({ person, onRemove, busy }: { person: WorkEntry["confirmations"][number]; onRemove?: () => void; busy: boolean }) {
   const accepted = person.appStatus === "accepted" || (!person.appStatus && person.calendarAccepted);
   return <li className={`agenda-guest ${accepted ? "accepted" : "pending"}`}>
     <span className="agenda-guest-avatar" style={{ background: TEAM.find(member => member.id === person.employeeId)?.color }} aria-hidden="true">
@@ -36,14 +39,17 @@ function Confirmation({ person }: { person: WorkEntry["confirmations"][number] }
       {person.appStatus && person.calendarAccepted && <span className="agenda-guest-calendar"><Check size={12} aria-hidden="true" />Calendar accepted</span>}
       {person.appStatus && person.calendarStatus && <span className="agenda-guest-response">{calendarInvitationLabel(person.calendarStatus)}</span>}
     </span>
+    {onRemove && <Button type="button" variant="ghost" size="icon" haptic="light" disabled={busy} className="rental-person-remove" aria-label={`Remove ${name(person.employeeId)} from rental`} onClick={onRemove}><UserMinus size={18} aria-hidden="true" /></Button>}
   </li>;
 }
 
-export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, onAssign, onAvailability, busy, renderAssignment, onChecklist }: {
+export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, onAssign, onAvailability, busy, renderAssignment, onChecklist, onRemovePerson, feedback }: {
+  onRemovePerson: (appointment: TeamAppointment, employeeId: string) => Promise<boolean>; feedback: ReactNode;
   schedule: TeamSchedule; employeeId: string; onEmployeeChange: (id: string) => void;
   onAssign: (appointmentId?: string) => void; onAvailability: () => void;
   onChecklist?: () => void; busy: boolean; renderAssignment: (item: TeamAssignment) => ReactNode;
 }) {
+  const [removing, setRemoving] = useState<{ appointmentId: string; employeeId: string } | null>(null);
   const [now, setNow] = useState(Date.now);
   const [selectedDay, setSelectedDay] = useState(() => studioLocal(now).slice(0, 10));
   const [view, setView] = useState<View>("month");
@@ -86,6 +92,8 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
   function assign(appointmentId?: string) { setFocused(null); onAssign(appointmentId); }
 
   function workCard(item: WorkEntry, day: string, expanded = false) {
+    const removal = removing?.appointmentId === item.appointment?.id ? removing : null;
+    const removals = item.appointment ? rentalStaffRemovals(item.appointment, schedule.assignments, schedule.syncedAt) as TeamAssignment[] : [];
     const live = item.assignments.filter(offer => ["pending", "accepted"].includes(offer.status));
     const previous = item.assignments.filter(offer => !["pending", "accepted"].includes(offer.status));
     const conflicts = live.filter(offer => !hasConflictOverride(offer) && assignmentConflicts(offer.employeeId, offer, schedule.blocks, schedule.assignments, schedule.appointments, offer.id).length);
@@ -97,9 +105,11 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
       </div>
       <div className="agenda-work-title"><h4>{item.customer || item.title}</h4>{item.customer && <p>{item.title}</p>}{!item.appointment && <small>Assignment</small>}</div>
       <div className="agenda-staff">
-        {item.confirmations.length > 0 && <ul className="agenda-guests" aria-label="Employee confirmations">{item.confirmations.map(person => <Confirmation person={person} key={person.employeeId} />)}</ul>}
+        {item.confirmations.length > 0 && <ul className="agenda-guests" aria-label="Employee confirmations">{item.confirmations.map(person => <Confirmation person={person} key={person.employeeId} busy={busy} onRemove={item.appointment && Date.parse(item.start) > now ? () => setRemoving({ appointmentId: item.appointment!.id, employeeId: person.employeeId }) : undefined} />)}</ul>}
         {conflicts.length > 0 && <div className="agenda-conflict"><AlertTriangle size={15} aria-hidden="true" />Time conflict · {conflicts.map(offer => name(offer.employeeId)).join(", ")}</div>}
       </div>
+      {removal && <ScheduleConfirmation label="Remove person from rental"><p>Remove {name(removal.employeeId)} from this rental? Their app offers will be cancelled and their Google Calendar invitation will be removed when connected.</p>{feedback}<div className="schedule-actions"><Button variant="outline" disabled={busy} onClick={() => setRemoving(null)}>Go back</Button><Button variant="destructive" disabled={busy} aria-busy={busy} onClick={async () => { if (item.appointment && await onRemovePerson(item.appointment, removal.employeeId)) setRemoving(null); }}>{busy ? "Removing…" : "Remove person"}</Button></div></ScheduleConfirmation>}
+      {removals.filter(offer => offer.calendarSync?.code !== "person_removed").map(offer => <div className="rental-removal-status" role="status" key={offer.id}><span>{name(offer.employeeId)} removed in app · Calendar removal</span><CalendarAssignmentStatus delivery={offer.calendarSync ?? { status: "pending", checkedAt: 0 }} /></div>)}
       <div className="agenda-work-actions">
         {onChecklist && item.appointment && /studio.*rental|rental.*studio/i.test(item.title) && <Button variant="outline" onClick={() => { setFocused(null); onChecklist(); }}>Rental checklist</Button>}
         {item.appointment && Date.parse(item.start) > now && <Button disabled={busy} variant={item.status === "unassigned" ? "default" : "outline"} onClick={() => assign(item.appointment!.id)}><Plus size={15} />{item.status === "unassigned" ? "Assign person" : "Add person"}</Button>}
@@ -110,7 +120,7 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
             {item.appointment && <p className="schedule-small">Appointment price: {(item.appointment.priceCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}</p>}
             {item.appointment && /studio.*rental|rental.*studio/i.test(item.title) && <RentalDescription details={item.appointment.rentalDetails} />}
             {live.length ? <div className="agenda-offer-details">{live.map(renderAssignment)}</div> : <p className="schedule-small">{item.calendarIds.length ? "Staff confirmed through Google Calendar." : item.pendingIds.length ? "Calendar invitations are awaiting a response in Google Calendar." : "No active offers. Choose Assign person to send one."}</p>}
-            {previous.length > 0 && <div className="agenda-previous"><strong>Previous offers</strong>{previous.map(offer => <p key={offer.id}>{name(offer.employeeId)} · {offer.status}</p>)}</div>}
+            {previous.length > 0 && <details className="agenda-previous"><summary>Previous offers ({previous.length})</summary>{previous.map(offer => <div key={offer.id}><p>{name(offer.employeeId)} · {offer.removeCalendarGuest ? "removed" : offer.status}</p>{offer.removeCalendarGuest && <CalendarAssignmentStatus delivery={offer.calendarSync} />}</div>)}</details>}
           </div>
         </details>
       </div>
@@ -148,7 +158,9 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
       <div className="agenda-sync"><span>{schedule.syncedAt ? `Calendar synced ${shortDate(schedule.syncedAt)} at ${time(schedule.syncedAt)} ET` : "Waiting for Calendar sync"}</span></div>
     </section>
     <Dialog open={Boolean(focusedItem)} onOpenChange={open => { if (!open) setFocused(null); }}><DialogContent className="calendar-event-dialog"><DialogHeader><DialogTitle>{focusedItem?.kind === "work" ? "Booking & team" : "Team availability"}</DialogTitle><DialogDescription>{focused ? dayLabel(focused.day) : ""}</DialogDescription></DialogHeader>
+      <div className="calendar-event-body"><div className="schedule-dialog-feedback">{feedback}</div>
       {focusedItem?.kind === "work" ? workCard(focusedItem, focused!.day, true) : focusedItem && <div className="calendar-availability-detail"><Person id={focusedItem.userId} /><h3>{focusedItem.title}</h3><p>{focusedItem.allDay ? "Full day" : timeRange(focusedItem)}</p>{focusedItem.note && <p>{focusedItem.note}</p>}<Button variant="outline" onClick={() => { setFocused(null); onAvailability(); }}>Manage availability</Button></div>}
+      </div>
     </DialogContent></Dialog>
     {history.length > 0 && <details className="schedule-panel agenda-history"><summary><span>Past offers & responses <small>{history.length}</small></span><ChevronDown size={17} aria-hidden="true" /></summary><div>{history.slice(0, 50).map(item => <div key={item.id}><Person id={item.employeeId} /><strong>{item.title}</strong><span>{shortDate(item.start)} · {time(item.start)}</span><span className={`schedule-status ${item.status}`}>{item.status === "pending" ? "No response" : item.status}</span></div>)}{history.length > 50 && <p className="schedule-small">Showing the latest 50 responses.</p>}</div></details>}
     <details className="agenda-help"><summary>Calendar & assignment details</summary><p>Assign work here or add the employee as a guest in Google Calendar. Calendar invitations sync here as invited, tentative, or accepted. Respond to Calendar invitations in Google Calendar. A green check with “Accepted in app” means the employee accepted a dashboard offer; those responses remain separate.</p><p>For studio rentals, open the Google Calendar event to see the same app response at the top of its description after the next sync. Syncing is scheduled every 5 minutes and can be delayed. This is a backup copy of the app response; Google’s guest RSVP check stays separate. Custom tasks stay here.</p><p>To reassign a booking, open Details, cancel the existing offer, then add the new person.</p></details>

@@ -51,10 +51,16 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeDisabled = false,
+  onOpenAutoFocus,
+  id: suppliedId,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  closeDisabled?: boolean
 }) {
+  const generatedId = React.useId()
+  const id = suppliedId ?? generatedId
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -65,12 +71,24 @@ function DialogContent({
           className
         )}
         {...props}
+        id={id}
+        data-has-close={showCloseButton || undefined}
+        onOpenAutoFocus={(event) => {
+          onOpenAutoFocus?.(event)
+          if (event.defaultPrevented) return
+          event.preventDefault()
+          const content = document.getElementById(id)
+          const heading = content?.querySelector<HTMLElement>('[data-slot="dialog-title"]')
+          if (heading) heading.tabIndex = -1
+          ;(heading ?? content)?.focus({ preventScroll: true })
+        }}
       >
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            disabled={closeDisabled}
+            className="modal-exit absolute top-2 right-2 z-10 grid size-12 place-items-center rounded-full bg-muted ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:size-5"
           >
             <XIcon />
             <span className="sr-only">Close</span>

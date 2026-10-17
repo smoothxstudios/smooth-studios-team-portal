@@ -268,3 +268,24 @@ test("an expired or reclaimed delivery lease cannot write or acknowledge another
   assert.equal((await fresh.acknowledge({ status: "synced", code: "response_confirmed", googleStatus: "accepted" }, 1100)).meta.changes, 1);
   assert.deepEqual(JSON.parse((await db.prepare("SELECT result FROM calendar_assignment_outbox").first()).result), { code: "response_confirmed", googleStatus: "accepted" });
 });
+
+test("explicit removal deletes manually added mapped aliases while keeping every other guest", async () => {
+  const f = fixture({ event: { attendees: [{ email: 'jordyn@example.invalid', responseStatus: 'needsAction' },
+    { email: 'alias@example.invalid', responseStatus: 'accepted' }, { email: 'rayne@example.invalid', responseStatus: 'accepted' }] } });
+  const result = await f.deliver({ assignment: { ...assignment, status: 'cancelled', removeCalendarGuest: true } });
+  assert.equal(result.code, 'person_removed');
+  const patch = f.calls.find(call => call.method === 'PATCH');
+  assert.deepEqual(patch.data.attendees, [{ email: 'rayne@example.invalid', responseStatus: 'accepted' }]);
+  assert.equal(patch.url.searchParams.get('sendUpdates'), 'all');
+  assert.equal(patch.headers['If-Match'], '"owner-1"');
+});
+
+test("explicit removal keeps the existing unrelated-guest and newer-offer safeguards", async () => {
+  const f = fixture({ event: { attendees: [{ email: 'jordyn@example.invalid' }, { email: 'customer@example.invalid' }] } });
+  assert.equal((await f.deliver({ assignment: { ...assignment, status: 'cancelled', removeCalendarGuest: true } })).code, 'guest_notifications_review');
+  assert.equal(f.calls.filter(call => call.method === 'PATCH').length, 0);
+  const other = fixture();
+  const removed = { ...assignment, status: 'cancelled', removeCalendarGuest: true };
+  assert.equal((await other.deliver({ assignment: removed, assignments: [removed, { ...assignment, id: 'newer', createdAt: '2026-10-17T11:00:00Z' }] })).code, 'newer_assignment');
+  assert.equal(other.calls.length, 0);
+});

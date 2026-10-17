@@ -120,7 +120,13 @@ export async function deliverCalendarAssignment({ assignment, assignments = [ass
     if (!existing && marker?.assignmentId === assignment.id && active(assignment)) return outcome("needs_review", "invitation_missing");
     let patch = null, guestChange = false;
     if (assignment.status === "cancelled") {
-      if (marker) {
+      if (assignment.removeCalendarGuest === true) {
+        if ((original.attendees ?? []).some(guest => emails.has(normalize(guest.email)) && guest.organizer)) return outcome("needs_review", "organizer_guest");
+        const attendees = (original.attendees ?? []).filter(guest => !emails.has(normalize(guest.email)));
+        guestChange = attendees.length !== (original.attendees ?? []).length;
+        if (!guestChange && !marker) return outcome("synced", "person_removed");
+        patch = { ...(guestChange ? { attendees } : {}), extendedProperties: privateProperties(original, employee.id, null) };
+      } else if (marker) {
         const attendees = (original.attendees ?? []).filter(guest => normalize(guest.email) !== normalize(marker.email));
         guestChange = attendees.length !== (original.attendees ?? []).length;
         patch = { ...(guestChange ? { attendees } : {}), extendedProperties: privateProperties(original, employee.id, null) };
@@ -143,12 +149,12 @@ export async function deliverCalendarAssignment({ assignment, assignments = [ass
     original = write.event;
     const after = eventProblem(original, assignment);
     if (after) return after;
-    if (assignment.status === "cancelled") return outcome("synced", "invitation_removed");
+    if (assignment.status === "cancelled") return outcome("synced", assignment.removeCalendarGuest ? "person_removed" : "invitation_removed");
     break;
   }
   const currentResponse = responseStatus(original, emails);
   if (assignment.status === "pending") return outcome("synced", "invitation_synced", currentResponse);
-  if (assignment.status === "cancelled") return outcome("synced", "invitation_removed");
+  if (assignment.status === "cancelled") return outcome("synced", assignment.removeCalendarGuest ? "person_removed" : "invitation_removed");
   if (currentResponse === assignment.status) return outcome("synced", "response_confirmed", currentResponse);
   if (assignment.status === "declined" && !invitationFor(original, emails)) return outcome("synced", "no_calendar_invitation");
   if (!employeeToken?.accessToken || !emails.has(normalize(employeeToken.email))) return outcome("needs_connection", "employee_connection", currentResponse);

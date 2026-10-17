@@ -1,6 +1,27 @@
 {
-  "currentVersion": "2.33.0",
+  "currentVersion": "2.34.0",
   "releases": [
+    {
+      "id": "2026-10-17-rental-controls-and-feedback",
+      "version": "2.34.0",
+      "date": "2026-10-17",
+      "category": "Scheduling",
+      "title": "Easier rental controls and clearer action feedback",
+      "changes": [
+        "Add person opens with its pickers closed until tapped. Shared dialog close buttons have larger touch targets, and booking and assignment exits stay visible while scrolling.",
+        "Cancel offer shows an inline confirmation, a saving state, and a clear result inside the booking. Previous offers stays collapsed.",
+        "Remove person clears a teammate from an upcoming rental in the app and queues removal of their Google Calendar invitation, including separately added invitations. Connection and review messages stay visible; past earnings and response history are preserved.",
+        "Important action buttons provide short haptic feedback on supported browsers, with visible progress and results on every device."
+      ],
+      "employee": {
+        "title": "Easier exits and clearer buttons",
+        "changes": [
+          "Dialogs open without automatically revealing picker options. Close buttons have larger touch targets.",
+          "Important actions provide visible feedback, with short vibrations where the browser supports them."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-home-layout-and-direct-alerts",
       "version": "2.33.0",

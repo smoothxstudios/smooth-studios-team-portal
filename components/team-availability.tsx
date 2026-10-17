@@ -86,7 +86,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
     <p className="schedule-small">No preference means no preference recorded. Existing assignments stay in place when availability changes; contact Smooth if you need an assignment changed.</p>
     </section>
 
-    <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>{form.id ? "Edit work preference" : "When do you want to work?"}</DialogTitle><DialogDescription>Choose a day or specific hours. Smooth uses this when assigning work.</DialogDescription></DialogHeader>
+    <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent closeDisabled={busy} className="schedule-modal"><DialogHeader><DialogTitle>{form.id ? "Edit work preference" : "When do you want to work?"}</DialogTitle><DialogDescription>Choose a day or specific hours. Smooth uses this when assigning work.</DialogDescription></DialogHeader>
       <form onSubmit={async e => {
         e.preventDefault(); setFormError("");
         try {
@@ -107,6 +107,6 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
         {(formError || error) && <p className="schedule-error" role="alert">{formError || error}</p>}
         <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={disabled}>{busy ? "Saving…" : "Save preference"}</Button></DialogFooter>
       </form></DialogContent></Dialog>
-    <Dialog open={Boolean(remove)} onOpenChange={value => { if (!busy && !value) setRemove(null); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Remove availability entry?</DialogTitle><DialogDescription>Remove {remove?.label}? Existing assignments will stay in place.</DialogDescription></DialogHeader>{error && <p className="schedule-error" role="alert">{error}</p>}<DialogFooter><Button disabled={busy} variant="outline" onClick={() => setRemove(null)}>Keep entry</Button><Button disabled={disabled} onClick={async () => { if (remove && await mutate(remove.path, {}, "DELETE")) setRemove(null); }}>Remove entry</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(remove)} onOpenChange={value => { if (!busy && !value) setRemove(null); }}><DialogContent closeDisabled={busy} className="schedule-modal"><DialogHeader><DialogTitle>Remove availability entry?</DialogTitle><DialogDescription>Remove {remove?.label}? Existing assignments will stay in place.</DialogDescription></DialogHeader>{error && <p className="schedule-error" role="alert">{error}</p>}<DialogFooter><Button disabled={busy} variant="outline" onClick={() => setRemove(null)}>Keep entry</Button><Button disabled={disabled} onClick={async () => { if (remove && await mutate(remove.path, {}, "DELETE")) setRemove(null); }}>Remove entry</Button></DialogFooter></DialogContent></Dialog>
   </>;
 }

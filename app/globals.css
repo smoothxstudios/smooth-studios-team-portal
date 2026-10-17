@@ -2155,3 +2155,34 @@ button { cursor: pointer; }
   .owner-layout-footer > button:first-child { flex-basis: 100%; margin-right: 0; justify-content: flex-start; }
 }
 .owner-home-section:empty { display: none; }
+
+/* Shared exits stay generous even when their icon is visually small. */
+[data-slot="dialog-content"] .modal-exit,
+[data-slot="sheet-content"] .modal-exit,
+[data-slot="dialog-content"] button[aria-label^="Close"],
+[data-slot="dialog-content"] button[aria-label^="Dismiss"],
+.mobile-sidebar-close {
+  min-width: 48px; min-height: 48px; width: 48px; height: 48px; flex-shrink: 0;
+  display: grid; place-items: center; touch-action: manipulation; border-radius: 8px;
+}
+[data-slot="dialog-content"][data-has-close] > [data-slot="dialog-header"] { padding-right: 64px; min-height: 36px; }
+.modal-exit > svg { width: 20px; height: 20px; pointer-events: none; }
+.modal-exit:active { background: var(--accent); }
+.calendar-event-dialog { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
+.calendar-event-dialog > [data-slot="dialog-header"] { padding: 20px 68px 16px 20px; flex-shrink: 0; }
+.calendar-event-body { min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y pinch-zoom; padding: 0 16px 16px; }
+.schedule-modal.assignment-dialog { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
+.assignment-dialog > [data-slot="dialog-header"] { padding: 22px 68px 16px 22px; flex-shrink: 0; }
+.assignment-dialog > form { overflow-y: auto; overflow-x: hidden; min-height: 0; padding: 0 22px 22px; overscroll-behavior: contain; touch-action: pan-y pinch-zoom; }
+.schedule-confirm-inline { display: grid; gap: 12px; padding: 14px; margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--muted); }
+.schedule-confirm-inline > p { margin: 0; font-size: 14px; line-height: 1.5; }
+.schedule-confirm-inline button { min-height: 44px; white-space: normal; }
+.agenda-guest-copy { flex: 1; min-width: 0; }
+.agenda-guests .rental-person-remove { min-width: 44px; min-height: 44px; flex: 0 0 44px; touch-action: manipulation; }
+.rental-removal-status { margin-top: 12px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.rental-removal-status p { margin: 4px 0 0; }
+.agenda-previous > summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+[data-slot="button"]:active:not(:disabled) { filter: brightness(.94); }
+
+.schedule-dialog-feedback { position: sticky; top: 0; z-index: 2; background: var(--card); }
+.schedule-dialog-feedback:empty { display: none; }

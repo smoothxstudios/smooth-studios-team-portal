@@ -1,4 +1,5 @@
 "use client";
+import { ScheduleConfirmation } from "@/components/schedule-confirmation";
 import { RentalDescription } from "@/components/rental-description";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { teamPushIsEnabled, teamRequest, type TeamSchedule, type TeamAssignment, type TimeBlock, type WorkPreference } from "@/lib/team-api";
+import { teamPushIsEnabled, teamRequest, type TeamSchedule, type TeamAppointment, type TeamAssignment, type TimeBlock, type WorkPreference } from "@/lib/team-api";
 import type { DashboardPayload } from "@/lib/dashboard-types";
 import { EmployeeHome, type EmployeeHomeOptions } from "@/components/employee-home";
 import { TeamAvailability } from "@/components/team-availability";
@@ -17,6 +18,7 @@ import { saveScheduleMutation, scheduleMutationMessage, scheduleMutationError } 
 import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps, workPreferenceMatch } from "@/lib/team-schedule.mjs";
 import { calendarInvitationStatus, calendarInvitationLabel, pendingCalendarInvitations } from "@/lib/calendar-invitations.mjs";
 import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
+import { hapticFeedback } from "@/lib/haptics.mjs";
 import { rentalAppointmentId } from "@/lib/alert-target.mjs";
 
 const personName = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
@@ -94,7 +96,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     try {
       const result = await saveScheduleMutation({
         path, method, data, revision: schedule.revision, userId, isOwner,
-        write: (revision: number) => teamRequest<{ notification?: string }>(token, path, { ...data, revision }, method),
+        write: (revision: number) => teamRequest<{ notification?: string; removedAssignment?: TeamAssignment }>(token, path, { ...data, revision }, method),
         refresh: () => teamRequest<TeamSchedule>(token, "/schedule"),
         onRefresh: (fresh: TeamSchedule) => { setSchedule(fresh); setNeedsRefresh(false); },
       });
@@ -103,11 +105,22 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       if (path.startsWith("/assignments/") && "status" in data && ["accepted", "declined", "cancelled"].includes(String(data.status))) {
         setSchedule(current => current ? { ...current, assignments: current.assignments.map(a => a.id === path.slice(13) ? { ...a, status: data.status as TeamAssignment["status"] } : a) } : current);
       }
+      if (path === "/rental-staff/remove" && result.removedAssignment) {
+        const removed = result.removedAssignment;
+        setSchedule(current => current ? { ...current,
+          appointments: current.appointments.map(a => a.id === removed.appointmentId ? { ...a,
+            acceptedEmployeeIds: a.acceptedEmployeeIds.filter(id => id !== removed.employeeId),
+            calendarInvitations: a.calendarInvitations?.filter(person => person.employeeId !== removed.employeeId) } : a),
+          assignments: [...current.assignments.filter(a => a.id !== removed.id).map(a => a.appointmentId === removed.appointmentId && a.employeeId === removed.employeeId &&
+            a.start === removed.start && a.end === removed.end && ["pending", "accepted"].includes(a.status) ? { ...a, status: "cancelled" as const } : a), removed],
+        } : current);
+      }
       // Once saved, a refresh failure must not invite a duplicate submission.
       setMessage(scheduleMutationMessage(path, data, method, result));
+      hapticFeedback("success");
       try { await load(); } catch { setError("Your change was saved, but the updated view could not load. Try again to load the latest view before making another change."); }
       return true;
-    } catch (e) { setError(scheduleMutationError(path, e)); return false; }
+    } catch (e) { setError(scheduleMutationError(path, e)); hapticFeedback("warning"); return false; }
     finally { mutationInFlight.current = false; setBusy(false); }
   }
 
@@ -161,12 +174,19 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     finally { setBusy(false); }
   }
   useRefreshSource(refreshManually);
+  async function removePerson(appointment: TeamAppointment, employeeId: string) {
+    return mutate("/rental-staff/remove", { appointmentId: appointment.id, employeeId, start: appointment.start, end: appointment.end });
+  }
+  const feedback = <>{message && <p role="status" className="schedule-success">{message}</p>}{error && <div role="alert" className="schedule-error"><p>{error}</p><Button disabled={busy} variant="outline" onClick={() => void refreshManually()}>Reload schedule</Button></div>}</>;
   function assignmentCard(item: TeamAssignment) {
+    const pendingChange = confirm?.path === `/assignments/${item.id}` ? confirm : null;
+    const action = pendingChange && "status" in pendingChange.data ? pendingChange.data.status : "override";
+    const actionLabel = action === "cancelled" ? "Cancel offer" : action === "declined" ? "Decline offer" : "Allow conflict";
     const appointment = schedule?.appointments.find(a => a.id === item.appointmentId);
     const busyConflicts = schedule ? assignmentConflicts(item.employeeId, item, schedule.blocks, schedule.assignments, schedule.appointments, item.id) : [];
     const conflictApproved = hasConflictOverride(item);
     return <article className="schedule-offer" key={item.id}>
-      <div className="schedule-row">{!home && <Person id={item.employeeId} />}<span className={`schedule-status ${item.status}`}>{item.status === "pending" && !future(item.start) ? "Needs Smooth’s review" : home ? "Awaiting your response" : item.status}</span></div>
+      <div className="schedule-row">{!home && <Person id={item.employeeId} />}<span className={`schedule-status ${item.status}`}>{item.status === "pending" && !future(item.start) ? "Needs Smooth’s review" : home && item.status === "pending" ? "Awaiting your response" : item.status}</span></div>
       <h3>{appointment?.title ?? item.title}</h3>
       {appointment?.customer && <p>{appointment.customer}</p>}
       <p><CalendarDays size={15} /> {date(item.start)} · {time(item.start)}–{time(item.end)}</p>
@@ -185,8 +205,13 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
           <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "declined" }, description: `Decline ${item.title} on ${date(item.start)}? Smooth will see your response.` })}><X size={16} />Decline</Button>
         </>}
         {isOwner && ["pending", "accepted"].includes(item.status) && future(item.start) && busyConflicts.length > 0 && !conflictApproved && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { overrideConflicts: true }, description: `Allow ${personName(item.employeeId)} to accept ${item.title} despite the recorded conflicts for ${date(item.start)} at ${time(item.start)}? Their acceptance is still required. Changing the appointment time clears this approval.` })}>Allow time conflict</Button>}
-        {isOwner && ["pending", "accepted"].includes(item.status) && future(item.start) && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "cancelled" }, description: `Cancel ${personName(item.employeeId)}’s app offer for ${item.title}? The app will also remove an invitation it created. Invitations added separately in Google Calendar stay available.` })}>Cancel offer</Button>}
+        {isOwner && ["pending", "accepted"].includes(item.status) && future(item.start) && <Button disabled={busy || needsRefresh} variant="outline" haptic="light" onClick={() => { setError(""); setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "cancelled" }, description: `Cancel ${personName(item.employeeId)}’s app offer for ${item.title}? The app will also remove an invitation it created. Invitations added separately in Google Calendar stay available. Use Remove person to remove them from the rental completely.` }); }}>Cancel offer</Button>}
       </div>
+      {pendingChange && <ScheduleConfirmation>
+        <p>{pendingChange.description}</p>
+        {error && <p className="schedule-error" role="alert">{error}</p>}
+        <div className="schedule-actions"><Button disabled={busy} variant="outline" onClick={() => setConfirm(null)}>Go back</Button><Button variant={action === "override" ? "default" : "destructive"} disabled={busy || needsRefresh} aria-busy={busy} onClick={async () => { if (await mutate(pendingChange.path, pendingChange.data, pendingChange.method)) setConfirm(null); }}>{busy ? action === "cancelled" ? "Cancelling…" : "Saving…" : actionLabel}</Button></div>
+      </ScheduleConfirmation>}
     </article>;
   }
 
@@ -209,7 +234,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     {schedule && !home && !availabilityOnly && (isOwner || scheduleTab === "upcoming") && <>
       {isOwner && calendarSync?.status === "needs_access" && <div className="schedule-warning" role="status"><strong>Google Calendar needs permission to show rental assignments</strong><p>In your rental calendar’s Settings and sharing, give <b>{calendarSync.serviceAccountEmail ?? "the existing dashboard service account"}</b> “Make changes to events” access. Rental team notes will appear after the next sync. Your assignments are saved here.</p></div>}
       {isOwner && calendarSync?.status === "retrying" && <p className="schedule-warning" role="status">Some rental team notes could not update in Google Calendar. They will retry on the next sync; your assignments are saved here.</p>}
-      {isOwner ? <OwnerScheduleAgenda onChecklist={onChecklist} schedule={schedule} employeeId={filter} onEmployeeChange={setFilter} onAssign={openAssignment} onAvailability={onAvailability ?? (() => openBlockTime())} busy={busy} renderAssignment={assignmentCard} /> : <>
+      {isOwner ? <OwnerScheduleAgenda feedback={feedback} onRemovePerson={removePerson} onChecklist={onChecklist} schedule={schedule} employeeId={filter} onEmployeeChange={setFilter} onAssign={openAssignment} onAvailability={onAvailability ?? (() => openBlockTime())} busy={busy} renderAssignment={assignmentCard} /> : <>
       <div className="schedule-toolbar"><div className="schedule-actions">
         <Button onClick={onAvailability ?? (() => openBlockTime())} variant="outline"><CalendarDays size={16} />Availability</Button>
         {isOwner && <Button onClick={() => openAssignment()} variant="outline"><Plus size={16} />Assign work</Button>}
@@ -248,7 +273,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     </>}
 
 
-    <Dialog open={blockOpen} onOpenChange={open => { if (!busy) setBlockOpen(open); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Block time</DialogTitle><DialogDescription>Add the time you are unavailable. Existing assignments are not cancelled.</DialogDescription></DialogHeader>
+    <Dialog open={blockOpen} onOpenChange={open => { if (!busy) setBlockOpen(open); }}><DialogContent closeDisabled={busy} className="schedule-modal"><DialogHeader><DialogTitle>Block time</DialogTitle><DialogDescription>Add the time you are unavailable. Existing assignments are not cancelled.</DialogDescription></DialogHeader>
       <form onSubmit={async e => { e.preventDefault(); if (await mutate("/blocks", { ...block, repeatUntil: block.weekly ? block.repeatUntil : null })) setBlockOpen(false); }}>
         {isOwner && <label>Team member<select value={block.userId} onChange={e => setBlock({ ...block, userId: e.target.value })}>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
         <label>Reason<Input required maxLength={120} value={block.reason} onChange={e => setBlock({ ...block, reason: e.target.value })} placeholder="Reason for being unavailable" /></label>
@@ -259,7 +284,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={() => setBlockOpen(false)}>Cancel</Button><Button disabled={busy || needsRefresh} type="submit">{busy ? "Saving…" : "Save time block"}</Button></DialogFooter>
       </form></DialogContent></Dialog>
 
-    <Dialog open={assignmentOpen} onOpenChange={open => { if (!busy) setAssignmentOpen(open); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Assign work</DialogTitle><DialogDescription>Create an offer for one employee. They confirm by accepting it in their dashboard.</DialogDescription></DialogHeader>
+    <Dialog open={assignmentOpen} onOpenChange={open => { if (!busy) setAssignmentOpen(open); }}><DialogContent closeDisabled={busy} className="schedule-modal assignment-dialog"><DialogHeader><DialogTitle>Assign work</DialogTitle><DialogDescription>Create an offer for one employee. They confirm by accepting it in their dashboard.</DialogDescription></DialogHeader>
       <form onSubmit={async e => { e.preventDefault(); if (await mutate("/assignments", assignment)) setAssignmentOpen(false); }}>
         <label>Rental or assignment<select value={assignment.appointmentId} onChange={e => setAssignment({ ...assignment, appointmentId: e.target.value, overrideConflicts: false })}><option value="">Custom assignment (no automatic commission)</option>{appointments.map(a => <option key={a.id} value={a.id}>{date(a.start)} {time(a.start)} · {a.customer} · {a.title}</option>)}</select></label>
         {selectedAppointment ? <p className="schedule-notice">{date(selectedAppointment.start)} · {time(selectedAppointment.start)}–{time(selectedAppointment.end)} · {money(selectedAppointment.priceCents)}<br />Calendar controls this rental’s date and price.</p> : <><label>Assignment title<Input required maxLength={160} value={assignment.title} onChange={e => setAssignment({ ...assignment, title: e.target.value })} placeholder="Prepare the studio, assist on location…" /></label><div className="schedule-form-pair"><label>Starts<Input required type="datetime-local" value={assignment.startLocal} onChange={e => setAssignment({ ...assignment, startLocal: e.target.value, overrideConflicts: false })} /></label><label>Ends<Input required type="datetime-local" value={assignment.endLocal} onChange={e => setAssignment({ ...assignment, endLocal: e.target.value, overrideConflicts: false })} /></label></div></>}
@@ -273,7 +298,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={() => setAssignmentOpen(false)}>Cancel</Button><Button disabled={busy || needsRefresh || (conflicts.length > 0 && !assignment.overrideConflicts) || alreadyInvited || alreadyOffered || !period} type="submit">{busy ? "Sending…" : "Send assignment offer"}</Button></DialogFooter>
       </form></DialogContent></Dialog>
 
-    <Dialog open={Boolean(focusId)} onOpenChange={open => { if (!open && !busy) onCloseFocus?.(); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>{focusedRentalId ? "Rental details" : "Assignment details"}</DialogTitle><DialogDescription>{focusedRentalId ? "Review the current rental and its team responses." : "Review the current assignment and its response."}</DialogDescription></DialogHeader>
+    <Dialog open={Boolean(focusId)} onOpenChange={open => { if (!open && !busy) onCloseFocus?.(); }}><DialogContent closeDisabled={busy} className="schedule-modal"><DialogHeader><DialogTitle>{focusedRentalId ? "Rental details" : "Assignment details"}</DialogTitle><DialogDescription>{focusedRentalId ? "Review the current rental and its team responses." : "Review the current assignment and its response."}</DialogDescription></DialogHeader><div className="schedule-dialog-feedback">{feedback}</div>
       {focusedRental ? <>
         <article className="schedule-offer">
           <h3>{focusedRental.title}</h3>
@@ -290,6 +315,6 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       {message && <p role="status" className="schedule-success">{message}</p>}
     </DialogContent></Dialog>
 
-    <Dialog open={Boolean(confirm)} onOpenChange={open => { if (!open && !busy) setConfirm(null); }}><DialogContent className="schedule-modal"><DialogHeader><DialogTitle>Confirm change</DialogTitle><DialogDescription>{confirm?.description}</DialogDescription></DialogHeader>{error && <p className="schedule-error" role="alert">{error}</p>}<DialogFooter><Button disabled={busy} variant="outline" onClick={() => setConfirm(null)}>Go back</Button><Button disabled={busy || needsRefresh} onClick={async () => { if (confirm && await mutate(confirm.path, confirm.data, confirm.method)) setConfirm(null); }}>Confirm</Button></DialogFooter></DialogContent></Dialog>
+
   </section>;
 }
