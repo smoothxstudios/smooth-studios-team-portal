@@ -54,7 +54,7 @@ test("a task assignment immediately sends an encrypted assignment alert only to 
   assert.deepEqual(sent.map(item => item.url), [mine.endpoint]);
   assert.equal(sent[0].payload.type, "assignment");
   assert.equal(sent[0].payload.title, "New task assignment");
-  assert.equal(sent[0].payload.body, "Synthetic task · Sat, Oct 17 · 1:00 PM–2:00 PM EDT. Tap to accept or decline.");
+  assert.equal(sent[0].payload.body, "Synthetic task · Sat, Oct 17 · 1:00 PM–2:00 PM. Tap to accept or decline.");
   assert.doesNotMatch(JSON.stringify(sent), /Private instructions/);
   assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) n FROM team_notification_events").get().n, 0);
   f.close();
@@ -145,8 +145,8 @@ test("service worker shows distinct alerts and opens only approved dashboard des
   assert.deepEqual(opened, [`${scope}#scheduling`, `${scope}#daily-quiz`, `${scope}#scheduling`, `${scope}#scheduling`]);
 
   async function show(payload) { let pending; handlers.push({ data: { json: () => payload }, waitUntil: p => pending = p }); await pending; return shown.at(-1); }
-  const accepted = await show({ type: "schedule", id: "response-1", title: "Jordyn accepted a rental", body: "Studio A Rental · Fri, Oct 16 · 3:00 PM–4:00 PM EDT.", url: "https://untrusted.invalid" });
-  const declined = await show({ type: "schedule", id: "response-2", title: "Rayne declined a rental", body: "Studio B Rental · Sat, Oct 17 · 3:00 PM–4:00 PM EDT." });
+  const accepted = await show({ type: "schedule", id: "response-1", title: "Jordyn accepted a rental", body: "Studio A Rental · Fri, Oct 16 · 3:00 PM–4:00 PM.", url: "https://untrusted.invalid" });
+  const declined = await show({ type: "schedule", id: "response-2", title: "Rayne declined a rental", body: "Studio B Rental · Sat, Oct 17 · 3:00 PM–4:00 PM." });
   assert.equal(accepted.title, "Jordyn accepted a rental");
   assert.match(accepted.body, /Studio A Rental/);
   assert.notEqual(accepted.tag, declined.tag);
@@ -205,8 +205,8 @@ test("two booking responses queue separately and send specific encrypted alerts 
   assert.equal(sent.length, 2); assert.ok(sent.every(item => item.url === owner.endpoint));
   const accepted = sent.find(item => item.payload.title === "Jordyn accepted a rental");
   const declined = sent.find(item => item.payload.title === "Rayne declined a rental");
-  assert.equal(accepted.payload.body, "Studio A Rental · Sat, Oct 17 · 1:00 PM–2:00 PM EDT.");
-  assert.equal(declined.payload.body, "Studio B Rental · Sun, Oct 18 · 3:00 PM–4:00 PM EDT. Choose another team member.");
+  assert.equal(accepted.payload.body, "Studio A Rental · Sat, Oct 17 · 1:00 PM–2:00 PM.");
+  assert.equal(declined.payload.body, "Studio B Rental · Sun, Oct 18 · 3:00 PM–4:00 PM. Choose another team member.");
   assert.doesNotMatch(JSON.stringify(sent.map(item => item.payload)), /PRIVATE|10000|instructions|priceCents|customer/i);
   assert.notEqual(accepted.payload.id, declined.payload.id);
   assert.notEqual(accepted.options.headers.Topic, declined.options.headers.Topic);
@@ -216,9 +216,9 @@ test("two booking responses queue separately and send specific encrypted alerts 
 });
 
 test("notification dates use studio time across midnight and DST; content is bounded and excludes unrelated fields", () => {
-  assert.equal(notificationTime("2026-10-18T03:00:00Z", "2026-10-18T05:00:00Z"), "Sat, Oct 17, 11:00 PM EDT–Sun, Oct 18, 1:00 AM EDT");
-  assert.equal(notificationTime("2026-11-01T05:30:00Z", "2026-11-01T06:30:00Z"), "Sun, Nov 1 · 1:30 AM EDT–1:30 AM EST");
-  assert.equal(notificationTime("2026-12-01T17:00:00Z", "2026-12-01T18:00:00Z"), "Tue, Dec 1 · 12:00 PM–1:00 PM EST");
+  assert.equal(notificationTime("2026-10-18T03:00:00Z", "2026-10-18T05:00:00Z"), "Sat, Oct 17, 11:00 PM–Sun, Oct 18, 1:00 AM");
+  assert.equal(notificationTime("2026-11-01T05:30:00Z", "2026-11-01T06:30:00Z"), "Sun, Nov 1 · 1:30 AM–1:30 AM");
+  assert.equal(notificationTime("2026-12-01T17:00:00Z", "2026-12-01T18:00:00Z"), "Tue, Dec 1 · 12:00 PM–1:00 PM");
   const details = notificationDetails({ title: "\nHello\u202e there", body: "x".repeat(500), url: "private", instructions: "private" });
   assert.deepEqual(details, { title: "Hello there", body: "x".repeat(360) });
   const item = { employeeId: "jordyn", appointmentId: "rental", title: "Studio A Rental", start: "2026-10-17T17:00:00Z", end: "2026-10-17T18:00:00Z" };
@@ -226,4 +226,19 @@ test("notification dates use studio time across midnight and DST; content is bou
   assert.equal(notices[0].title, "Jordyn’s rental time changed");
   assert.equal(notices[1].title, "Rental time changed");
   assert.match(notices[1].body, /accept the new time/);
+});
+
+test("availability push carries its own destination and omits timezone labels", async () => {
+  const f = await fixture(), d = device("availability-destination");
+  await f.call("owner", "/push/device", d);
+  const { blockNotifications } = await import("../team-api/notification-content.mjs");
+  const details = blockNotifications({ userId: "amia", startLocal: "2026-10-19T15:00", endLocal: "2026-10-19T18:30" }, false, ["owner"])[0];
+  let payload;
+  await deliverPush(d.endpoint, JSON.parse(f.env.VAPID_JWK), async (_url, options) => {
+    payload = d.decrypt(options.body); return new Response(null, { status: 201 });
+  }, { keys: d.keys, kind: "schedule", details });
+  assert.equal(payload.target, "availability");
+  assert.equal(payload.title, "Amia blocked time");
+  assert.equal(payload.body, "Mon, Oct 19 · 3:00 PM–6:30 PM.");
+  f.close();
 });

@@ -67,6 +67,7 @@ import { disableTeamPush } from "@/lib/team-api";
 import { teamToken } from "@/lib/team-auth.mjs";
 import { TEAM,studioLocal } from "@/lib/team-schedule.mjs";
 import { useAlerts,type DashboardAlert } from "@/lib/use-alerts";
+import { attachNotificationMessages, isNotificationHash } from "@/lib/notification-navigation.mjs";
 import { useCreativeWork } from "@/lib/use-creative-work";
 import { usePayroll } from "@/lib/use-payroll";
 import {
@@ -108,6 +109,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   const payroll = usePayroll(schedulingToken, payload.payroll);
   const creative = useCreativeWork(schedulingToken);
   const openAlert = async (alert: DashboardAlert) => {
+    toolbarScroll.current?.cancel(); toolbarScroll.current = null;
     setFocusedAlert(alert.targetId ? { target: alert.target, id: alert.targetId } : null);
     if (alert.target === "quiz") {
       setView("overview");
@@ -134,6 +136,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   }, [view]);
   useEffect(() => {
     const openSchedule = () => {
+      if (isNotificationHash(window.location.hash)) setFocusedAlert(null);
       if (["connected", "error"].includes(new URLSearchParams(window.location.search).get("calendar") ?? "")) setView("settings");
       if (window.location.hash === "#alerts") setView("alerts");
       if (window.location.hash === "#settings") setView("settings");
@@ -423,6 +426,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
 }
 
 export function SmoothDashboard() {
+  useEffect(() => attachNotificationMessages(window), []);
   const [profiles, setProfiles] = useState<AccessProfile[]>(FALLBACK_PROFILES);
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [dark, setDark] = useState(false);
@@ -493,8 +497,8 @@ export function SmoothDashboard() {
     setSchedulingToken(token);
     setSessionPassword(password);
     rememberProfile(profile.id);
-    // A fresh sign-in always starts at Home; notification links still navigate an open session.
-    window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    // Ordinary sign-ins start at Home; a notification tap survives unlocking.
+    if (!isNotificationHash(window.location.hash)) window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
     setPayload(unlocked);
   };
 

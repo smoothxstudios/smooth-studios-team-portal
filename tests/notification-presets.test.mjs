@@ -39,7 +39,7 @@ test('response reminders remain bound to the actual pending app offer and its on
 test('rental previews preserve the actual Eastern overnight time even with a long title', () => {
   const choice = notificationRentalChoices(schedule([{ ...booking, title: `Studio A Rental ${'long '.repeat(80)}` }]), now).bookings[0];
   const preview = notificationPresetMessage('upcoming-rental', choice);
-  assert.match(preview.body, /Oct 17, 11:30 PM EDT–Sun, Oct 18, 1:00 AM EDT/);
+  assert.match(preview.body, /Oct 17, 11:30 PM–Sun, Oct 18, 1:00 AM/);
   assert.ok(preview.body.length <= 360);
   assert.equal(preview.target, 'scheduling');
 });

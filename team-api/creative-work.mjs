@@ -71,8 +71,7 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
       case "submit": {
         if (user !== item.employeeId) fail(403, "Only the assigned employee can submit this work.");
         if (!["accepted", "revision"].includes(item.status)) fail(409, "Accept the offer before submitting, or wait for Smooth’s review.");
-        const urls = links(input.links);
-        if (!urls.length) fail(400, "Add at least one link to the work you’re submitting.");
+        const urls = links(input.links ?? []);
         if (item.submissions.length >= 50) fail(400, "This assignment has reached its submission limit. Contact Smooth.");
         item.submissions = [...item.submissions, { id: crypto.randomUUID(), submittedAt: now, links: urls, note: text(input.note ?? "", 4000, false) }];
         item.status = "submitted"; event = "submitted"; break;

@@ -14,17 +14,22 @@ export function notificationDetails(value) {
   return title && body ? { title, body } : {};
 }
 
-export function notificationTime(start, end) {
+export function notificationTime(start, end, { legacyTimezone = false } = {}) {
   const from = new Date(start), to = new Date(end);
   if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime())) return "Open your dashboard for the time";
+  if (!legacyTimezone) {
+    if (day.format(from) !== day.format(to)) return `${day.format(from)}, ${clock.format(from)}–${day.format(to)}, ${clock.format(to)}`;
+    return `${day.format(from)} · ${clock.format(from)}–${clock.format(to)}`;
+  }
+  // Retain the old format only for exact matching of saved recovery evidence.
   const firstZone = zoneName(from), lastZone = zoneName(to);
   if (day.format(from) !== day.format(to)) return `${day.format(from)}, ${clock.format(from)} ${firstZone}–${day.format(to)}, ${clock.format(to)} ${lastZone}`;
   return `${day.format(from)} · ${clock.format(from)}${firstZone !== lastZone ? ` ${firstZone}` : ""}–${clock.format(to)} ${lastZone}`;
 }
 
-export function assignmentNotifications(item, event, recipients) {
+export function assignmentNotifications(item, event, recipients, options) {
   const type = item.appointmentId ? "rental" : "task", name = person(item.employeeId);
-  const detail = `${notificationText(item.title, 120)} · ${notificationTime(item.start, item.end)}.`;
+  const detail = `${notificationText(item.title, 120)} · ${notificationTime(item.start, item.end, options)}.`;
   return [...new Set(recipients)].map(userId => {
     const owner = userId === "owner";
     const content = {

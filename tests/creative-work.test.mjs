@@ -15,7 +15,7 @@ async function submitted(f) {
 }
 test("past creative deadlines accept an omitted or blank brief", async t => {
   const f = await setup(); t.after(() => f.close());
-  assert.equal((await f.call("owner", "/health")).data.creativeWorkVersion, 2);
+  assert.equal((await f.call("owner", "/health")).data.creativeWorkVersion, 3);
   for (const instructions of [undefined, "", " \n "]) {
     const input = { ...offer(), dueLocal: "2025-10-05T18:00", instructions };
     if (instructions === undefined) delete input.instructions;
@@ -146,7 +146,7 @@ test("retries, invalid links, invalid amounts and inactive accounts fail safely"
   const hashes = JSON.parse(f.env.TEAM_TOKEN_HASHES); delete hashes.amia; f.env.TEAM_TOKEN_HASHES = JSON.stringify(hashes);
   assert.equal((await f.call("owner", "/creative-work", { ...offer(), employeeId: "amia" })).status, 400);
   let item = (await act(f, "jordyn", first.data.assignment, "accept")).data.assignment;
-  assert.equal((await act(f, "jordyn", item, "submit", { links: [] })).status, 400);
+  assert.equal((await act(f, "jordyn", item, "submit", { links: ["not-a-link"] })).status, 400);
   assert.equal((await act(f, "owner", item, "edit", offer())).status, 409);
   item = (await act(f, "owner", item, "cancel")).data.assignment;
   assert.equal(creativeEarnings([item]).metrics.projected, 0);
@@ -159,4 +159,25 @@ test("creative earnings use approval year and exact cents", () => {
   assert.equal(creativeEarnings([item], 2026).monthly[11].paid, 2500);
   assert.equal(moneyInputCents("19.99"), 1999);
   for (const invalid of ["1e3", "-1", "2.345", "", "100001", "0"]) assert.equal(moneyInputCents(invalid), null);
+});
+
+test("physical work can be submitted without links and still requires owner approval", async t => {
+  const f = await setup(); t.after(() => f.close());
+  for (const extra of [{ note: "Studio setup completed in person" }, { links: [], note: "" }]) {
+    let item = await create(f);
+    assert.equal((await act(f, "jordyn", item, "submit", extra)).status, 409);
+    item = (await act(f, "jordyn", item, "accept")).data.assignment;
+    assert.equal((await act(f, "rayne", item, "submit", extra)).status, 404);
+    item = (await act(f, "jordyn", item, "submit", extra)).data.assignment;
+    assert.equal(item.status, "submitted");
+    assert.deepEqual(item.submissions[0].links, []);
+    assert.equal(item.submissions[0].note, extra.note);
+    assert.equal(creativeOwed(item), 0);
+    assert.equal((await act(f, "jordyn", item, "approve")).status, 403);
+    item = (await act(f, "owner", item, "revise", { note: "Finish the final setup" })).data.assignment;
+    item = (await act(f, "jordyn", item, "submit", { links: [] })).data.assignment;
+    assert.equal(item.submissions.length, 2);
+    item = (await act(f, "owner", item, "approve")).data.assignment;
+    assert.equal(creativeOwed(item), item.amountCents);
+  }
 });

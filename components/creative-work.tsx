@@ -20,6 +20,7 @@ const openStatuses = ["offered", "accepted", "revision", "submitted"];
 const status = (item: CreativeAssignment) => item.status === "approved" && creativeOwed(item) === 0 ? "Paid" : CREATIVE_STATUS[item.status];
 
 function WorkLinks({ links }: { links: string[] }) {
+  if (!links.length) return null;
   return <ul className="creative-links">{links.map((link, i) => <li key={link}><a href={link} target="_blank" rel="noopener noreferrer">{new URL(link).hostname} · Link {i + 1}<ArrowUpRight size={15} /></a></li>)}</ul>;
 }
 
@@ -100,7 +101,7 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit }: { item: Creati
     </div>}
     {action && <form className="creative-action-form" onSubmit={submit}>
       <h3>{{ submit: "Submit your work", approve: "Approve submitted work", revise: "Request changes", pay: "Record a payout", cancel: "Cancel this assignment?", decline: "Decline this assignment?" }[action]}</h3>
-      {action === "submit" && <><p>Upload your files to the Content Vault or your sharing service, then add links Smooth can open.</p><label>Submission links · one per line<Textarea required maxLength={20500} value={links} onChange={event => setLinks(event.target.value)} placeholder="https://…" /></label><label>Submission notes · optional<Textarea maxLength={4000} value={note} onChange={event => setNote(event.target.value)} /></label></>}
+      {action === "submit" && <><p>Add links if there are files to review. For physical work or anything that does not need a link, leave them blank and send it for review.</p><label>Submission links · optional, one per line<Textarea maxLength={20500} value={links} onChange={event => setLinks(event.target.value)} placeholder="https://…" /></label><label>Submission notes · optional<Textarea maxLength={4000} value={note} onChange={event => setNote(event.target.value)} placeholder="What you completed or where Smooth can review it" /></label></>}
       {action === "approve" && <p>Approving adds <strong>{dollars(item.amountCents)}</strong> to {name(item.employeeId)}’s earnings. Any remaining advance is applied first.</p>}
       {action === "revise" && <label>Feedback · optional<Textarea maxLength={4000} value={note} onChange={event => setNote(event.target.value)} placeholder="What should be adjusted?" /></label>}
       {action === "cancel" && <p>This closes the assignment. No earnings have been approved for it.</p>}

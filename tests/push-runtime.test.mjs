@@ -43,7 +43,7 @@ test("Cloudflare runtime sends authenticated pushes and never follows provider r
         const encrypted = await deliverPush("https://web.push.apple.com/encrypted", jwk, fetch, { keys, kind: "quiz", ttl: 300 });
         if (!encrypted.accepted) throw new Error("Workerd encrypted push failed.");
         const [notice] = assignmentNotifications({ employeeId: "jordyn", appointmentId: "synthetic", title: "Studio A Rental", start: "2026-10-17T17:00:00Z", end: "2026-10-17T18:00:00Z" }, "accepted", ["owner"]);
-        if (!notice.body.includes("1:00 PM–2:00 PM EDT")) throw new Error("Incorrect studio time in Workerd.");
+        if (!notice.body.includes("1:00 PM–2:00 PM")) throw new Error("Incorrect studio time in Workerd.");
         const specific = await deliverPush("https://web.push.apple.com/specific", jwk, fetch, { keys, kind: "schedule", details: notice, notificationId: "synthetic-response" });
         if (!specific.accepted) throw new Error("Workerd specific push failed.");
       }};

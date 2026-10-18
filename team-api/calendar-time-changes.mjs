@@ -58,7 +58,7 @@ export function recoverDurationCancellation(assignment, appointment, assignments
       (row.user_id === assignment.employeeId && row.kind === "assignment")))
     .sort((a, b) => b.created_at - a.created_at || b.sequence - a.sequence);
   const cancellations = history.filter(row => {
-    const expected = assignmentNotifications(assignment, "past", [row.user_id])[0];
+    const expected = assignmentNotifications(assignment, "past", [row.user_id], { legacyTimezone: true })[0];
     return row.title === expected.title && row.body === expected.body && row.created_at >= cancelledAt && row.created_at <= cancelledAt + 5000;
   });
   if (!cancellations.length || history.some(row => row.created_at >= cancelledAt && !cancellations.includes(row))) return null;
@@ -72,7 +72,7 @@ export function recoverDurationCancellation(assignment, appointment, assignments
   const original = { ...assignment, end };
   const response = ["accepted", "offered", "rescheduled"].find(event => {
     if (event === "accepted" && evidence.user_id !== "owner") return false;
-    const expected = assignmentNotifications(original, event, [evidence.user_id])[0];
+    const expected = assignmentNotifications(original, event, [evidence.user_id], { legacyTimezone: true })[0];
     return evidence.title === expected.title && evidence.body === expected.body;
   });
   if (!response) return null;

@@ -1,6 +1,27 @@
 {
-  "currentVersion": "2.35.1",
+  "currentVersion": "2.35.2",
   "releases": [
+    {
+      "id": "2026-10-18-notification-navigation-touch",
+      "version": "2.35.2",
+      "date": "2026-10-18",
+      "category": "Dashboard",
+      "title": "Clearer alerts, reliable notification taps, and flexible submissions",
+      "changes": [
+        "Phone notifications open the related tab, including Availability updates, repeated taps, and after sign-in. Notification times omit EDT and EST while keeping studio time. The iPhone’s own app-name subtitle remains controlled by iOS.",
+        "Touching or scrolling over cards and buttons no longer triggers sticky hover highlighting. Keyboard focus and selected states remain visible.",
+        "Creative submissions can be sent without review links for physical work or any task that does not need them. Notes remain optional; Smooth still reviews and approves completed work before earnings are added."
+      ],
+      "employee": {
+        "title": "Smoother taps and easier work submissions",
+        "changes": [
+          "Phone notifications open their related tab, even after sign-in. Notification times are shorter.",
+          "Touching or scrolling over cards no longer leaves a hover highlight.",
+          "Submit work without a link when there are no files to review. You can add optional notes about what you completed."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-17-clear-advance-review",
       "version": "2.35.1",

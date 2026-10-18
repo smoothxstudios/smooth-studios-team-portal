@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Smooth Studios",
   "short_name": "Smooth Studios",
-  "start_url": "./#scheduling",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f5f6f8",

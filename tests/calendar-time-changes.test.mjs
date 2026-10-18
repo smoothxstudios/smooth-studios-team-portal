@@ -12,7 +12,7 @@ const appointment = { id: original.appointmentId, title: original.title, custome
 const cancelled = { ...original, end: appointment.end, status: "cancelled", note: LEGACY_PAST_NOTE, updatedAt: "2026-10-17T21:03:00.000Z" };
 const now = Date.parse("2026-10-17T22:00:00.000Z");
 function notice(item, event, user, createdAt, sequence) {
-  const n = assignmentNotifications(item, event, [user])[0];
+  const n = assignmentNotifications(item, event, [user], { legacyTimezone: true })[0];
   return { id: `notice-${sequence}`, sequence, user_id: user, kind: n.kind, title: n.title, body: n.body,
     target: n.target, target_id: n.targetId, person_id: n.personId, created_at: Date.parse(createdAt), read_at: null, deleted_at: null };
 }
