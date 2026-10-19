@@ -140,7 +140,6 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   useEffect(() => {
     const openSchedule = () => {
       if (isNotificationHash(window.location.hash)) setFocusedAlert(null);
-      if (["connected", "error"].includes(new URLSearchParams(window.location.search).get("calendar") ?? "")) setView("settings");
       if (window.location.hash === "#alerts") setView("alerts");
       if (window.location.hash === "#settings") setView("settings");
       if (window.location.hash === "#availability") setView("availability");
@@ -508,8 +507,8 @@ export function SmoothDashboard() {
     setSchedulingToken(token);
     setSessionPassword(password);
     rememberProfile(profile.id);
-    // Ordinary sign-ins start at Home; a notification tap survives unlocking.
-    if (!isNotificationHash(window.location.hash)) window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    // Every successful sign-in starts at Home, including saved notification links.
+    window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
     setPayload(unlocked);
   };
 

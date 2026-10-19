@@ -1,6 +1,23 @@
 {
-  "currentVersion": "2.40.1",
+  "currentVersion": "2.40.2",
   "releases": [
+    {
+      "id": "2026-10-19-always-start-home",
+      "version": "2.40.2",
+      "date": "2026-10-19",
+      "category": "Navigation",
+      "title": "Always start on Home after sign-in",
+      "changes": [
+        "Password and quick sign-in always open Home, even when the address still points to another tab or notification. Alerts continue opening their related pages while signed in."
+      ],
+      "employee": {
+        "title": "Sign-in opens Home",
+        "changes": [
+          "Every sign-in starts on Home. Open Alerts afterward to view a notification’s related item."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-19-check-in-relative-dates",
       "version": "2.40.1",
