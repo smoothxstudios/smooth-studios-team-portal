@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.38.8",
+  "currentVersion": "2.38.9",
   "releases": [
+    {
+      "id": "2026-10-19-smooth-flexible-availability",
+      "version": "2.38.9",
+      "date": "2026-10-19",
+      "category": "Scheduling",
+      "title": "Include Smooth in event plans",
+      "changes": [
+        "Smooth is shown with a flexible schedule in Availability and Event Planner. Add yourself through Plan crew and see your name on saved events, without setting fixed working hours. Your unavailable time and existing commitments still flag conflicts."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-19-events-stay-on-start-day",
       "version": "2.38.8",

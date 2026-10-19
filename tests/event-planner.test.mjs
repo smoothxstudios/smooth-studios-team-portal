@@ -110,3 +110,18 @@ test('overnight work belongs only to its starting studio day while conflicts spa
   assert.equal(crewFit('akiva',next,plan({events:[overnight,next]}),{}).status,'blocked');
   assert.equal(plannerOnDay(available('akiva','2026-10-23T22:00','2026-10-24T02:00'),'2026-10-24'),true);
 });
+
+test('Smooth has a flexible schedule but recorded conflicts still prevent double booking', async t => {
+  const p=plan(),e=p.events[0];
+  assert.equal(crewFit('owner',e,p,{}).status,'flexible');
+  assert.equal(crewFit('jordyn',e,p,{}).status,'unknown');
+  const time={start:localInstant(e.startLocal),end:localInstant(e.endLocal)};
+  assert.equal(crewFit('owner',e,p,{blocks:[{userId:'owner',startLocal:e.startLocal,endLocal:e.endLocal,reason:'Personal time'}]}).status,'blocked');
+  assert.equal(crewFit('owner',e,p,{appointments:[{id:'owner-booking',title:'Booked',acceptedEmployeeIds:['owner'],...time}]}).status,'blocked');
+  assert.equal(crewFit('owner',e,{...p,availability:[{...available('owner'),status:'unavailable'}]},{}).status,'blocked');
+  assert.equal(crewFit('owner',e,{...p,events:[e,{...e,id:'other',people:['owner']}]},{}).status,'blocked');
+  const f=await setup(t);p.events[0].people=['owner'];assert.equal((await save(f,p)).status,200);
+  assert.deepEqual((await f.call('owner','/event-planner')).data.events[0].people,['owner']);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_notification_events').get().n,0);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_assignments').get().n,0);
+});
