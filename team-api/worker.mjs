@@ -139,7 +139,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 3, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 3, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -618,7 +618,7 @@ const worker = {
     if (origin && !origins.has(origin)) return new Response(JSON.stringify({ error: "Origin not allowed." }), { status: 403, headers });
     if (origin) headers["access-control-allow-origin"] = origin;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...headers,
-      "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type", "access-control-max-age": "600" } });
+      "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type", "access-control-max-age": "600" } });
     try {
       const result = await route(request, env, ctx);
       if (result instanceof Response) {

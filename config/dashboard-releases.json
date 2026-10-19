@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.38.1",
+  "currentVersion": "2.38.2",
   "releases": [
+    {
+      "id": "2026-10-18-planner-browser-save",
+      "version": "2.38.2",
+      "date": "2026-10-18",
+      "category": "Scheduling",
+      "title": "Save event plans from the dashboard",
+      "changes": [
+        "Event imports, availability notes, and crew choices now save correctly from the live dashboard. If an earlier attempt failed, reload the planner and try again."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-18-google-connection-repair",
       "version": "2.38.1",

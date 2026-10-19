@@ -78,3 +78,13 @@ test('server rejects newly conflicting crew but retains existing plans for revie
   p.events[0].people=[];
   assert.equal((await save(f,p,2)).status,200);
 });
+
+
+test('dashboard browser preflight permits planner saves only for trusted origins', async () => {
+  const { default: worker } = await import('../team-api/worker.mjs');
+  for (const origin of ['https://dashboard.smoothstudios.co', 'https://untrusted.example']) {
+    const response = await worker.fetch(new Request('https://api.example.invalid/event-planner', {method:'OPTIONS', headers:{origin,'access-control-request-method':'PUT','access-control-request-headers':'authorization,content-type'}}), {}, {});
+    if (origin.includes('untrusted')) assert.equal(response.status,403);
+    else { assert.equal(response.status,204);assert.equal(response.headers.get('access-control-allow-origin'),origin);assert.ok(response.headers.get('access-control-allow-methods').split(', ').includes('PUT')); }
+  }
+});
