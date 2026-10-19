@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.39.0",
+  "currentVersion": "2.39.1",
   "releases": [
+    {
+      "id": "2026-10-19-planner-refactor",
+      "version": "2.39.1",
+      "date": "2026-10-19",
+      "category": "Scheduling",
+      "title": "More efficient event planning",
+      "changes": [
+        "Event Planner reuses crew availability and conflict checks while you browse, search, and edit. Refreshing the plan or schedule replaces those results, and changing coverage recalculates the affected crew checks.",
+        "Separated planner loading, forms, and calculations into focused components while preserving current scheduling and override behavior."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-19-planner-conflict-overrides",
       "version": "2.39.0",
