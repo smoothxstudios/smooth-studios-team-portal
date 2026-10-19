@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.38.5",
+  "currentVersion": "2.38.6",
   "releases": [
+    {
+      "id": "2026-10-18-planner-opens-today",
+      "version": "2.38.6",
+      "date": "2026-10-18",
+      "category": "Scheduling",
+      "title": "Event Planner opens on today",
+      "changes": [
+        "Event Planner starts on today in studio time when opened or resumed. Importing a plan also returns to today. Open forms and ordinary background data updates keep the date you are working on."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-18-planner-twelve-hour-times",
       "version": "2.38.5",
