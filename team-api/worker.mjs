@@ -7,6 +7,7 @@ import { sendQuizReminders } from "./quiz-notifications.mjs";
 import { assignmentNotifications, blockNotifications } from "./notification-content.mjs";
 import { creativeWorkRoute } from "./creative-work.mjs";
 import { requestBackgroundSync } from "./background-sync.mjs";
+import { sendRentalBalanceReminders } from "./rental-balance-reminders.mjs";
 import { pushReceiptRoute, notificationDeliveryRoute } from "./notification-delivery.mjs";
 import { alertsRoute } from "./alerts.mjs";
 import { eventPlannerRoute } from "./event-planner.mjs";
@@ -139,7 +140,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 3, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 3, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -319,7 +320,10 @@ async function route(request, env, ctx) {
     if (!Array.isArray(input.appointments) || input.appointments.length > 100) fail(400, "Import up to 100 appointments at a time.");
     const appointments = input.appointments.map(a => {
       if (!Number.isFinite(Date.parse(a.start)) || !Number.isFinite(Date.parse(a.end)) || Date.parse(a.end) <= Date.parse(a.start) ||
-          !Number.isInteger(a.priceCents) || a.priceCents < 0 || !Array.isArray(a.acceptedEmployeeIds)) fail(400, "Invalid appointment snapshot.");
+          !Number.isInteger(a.priceCents) || a.priceCents < 0 || !Array.isArray(a.acceptedEmployeeIds) ||
+          (a.fullyPaid !== undefined && typeof a.fullyPaid !== "boolean") ||
+          (a.paidOnlineCents !== undefined && a.paidOnlineCents !== null &&
+            (!Number.isSafeInteger(a.paidOnlineCents) || a.paidOnlineCents < 0))) fail(400, "Invalid appointment snapshot.");
       if (a.calendarInvitations !== undefined && (!Array.isArray(a.calendarInvitations) || a.calendarInvitations.length > users.length)) fail(400, "Invalid Calendar invitation snapshot.");
       const calendarInvitations = (a.calendarInvitations ?? []).map(invitation => {
         if (!invitation || !CALENDAR_INVITATION_STATUSES.includes(invitation.status)) fail(400, "Invalid Calendar invitation response.");
@@ -328,6 +332,7 @@ async function route(request, env, ctx) {
       if (new Set(calendarInvitations.map(invitation => invitation.employeeId)).size !== calendarInvitations.length) fail(400, "Repeated Calendar invitation.");
       return calendarRecord({ id: text(a.id, 300), title: text(a.title, 300), customer: text(a.customer, 200, false),
         start: new Date(a.start).toISOString(), end: new Date(a.end).toISOString(), priceCents: a.priceCents,
+        fullyPaid: a.fullyPaid, paidOnlineCents: a.paidOnlineCents,
         rentalDetails: text(a.rentalDetails ?? "", 8000, false),
         acceptedEmployeeIds: [...new Set(a.acceptedEmployeeIds.map(p => person(p, true)))],
         calendarInvitations,
@@ -643,7 +648,7 @@ const worker = {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(Promise.all([flushAlerts(env), sendQuizReminders(env), flushCalendarAssignments(env, { limit: 3 }), requestBackgroundSync(env)]));
+    ctx.waitUntil(Promise.all([flushAlerts(env), sendQuizReminders(env), sendRentalBalanceReminders(env), flushCalendarAssignments(env, { limit: 3 }), requestBackgroundSync(env)]));
   },
 };
 export default worker;
