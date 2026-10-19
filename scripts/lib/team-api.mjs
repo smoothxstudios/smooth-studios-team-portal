@@ -19,7 +19,8 @@ export async function syncTeamSchedule(rentals, ownerPassword, calendarConfigura
   // quoted price, paid-online amount and setup answers for the assigned team.
   // Stripe identifiers, credentials, admin links and raw descriptions stay out.
   const appointments = rentals.map(r => calendarRecord({ id: r.id, title: r.title, customer: r.customer ?? "",
-    start: r.start, end: r.end, priceCents: r.priceCents, rentalDetails: r.rentalDetails ?? "", acceptedEmployeeIds: r.assignedEmployeeIds,
+    start: r.start, end: r.end, priceCents: r.priceCents, fullyPaid: r.fullyPaid,
+    paidOnlineCents: r.paidOnlineCents, rentalDetails: r.rentalDetails ?? "", acceptedEmployeeIds: r.assignedEmployeeIds,
     calendarInvitations: r.calendarInvitations ?? [] }));
   const synced = await syncRecords({ request, prefix: '/sync', records: appointments, key: calendarKey, field: 'appointments',
     time: { calendarReadAt: calendarReadAt ?? new Date().toISOString() } });
