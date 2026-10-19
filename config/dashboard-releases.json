@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.39.3",
+  "currentVersion": "2.40.0",
   "releases": [
+    {
+      "id": "2026-10-19-rental-bts-and-balance-reminders",
+      "version": "2.40.0",
+      "date": "2026-10-19",
+      "category": "Studio operations",
+      "title": "BTS checklist steps and rental balance reminders",
+      "changes": [
+        "Add Record a BTS video, Post BTS video to Content Vault, and Ask for the trigger back to the shared rental checklist while preserving existing owner edits.",
+        "Notify confirmed rental staff once in the final ten minutes if recent Stripe/Calendar payment records show a remaining balance.",
+        "Skip paid-in-full bookings, unknown or stale payment totals, and unaccepted or removed staff. Keep an inbox record and prevent duplicate pushes across checks."
+      ],
+      "employee": {
+        "title": "BTS steps and checkout reminders",
+        "changes": [
+          "Record BTS, post it to Content Vault, and ask for the trigger back before checkout.",
+          "Receive a remaining-balance reminder during the final minutes of a rental when saved payment records confirm an amount is owed."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-19-second-reliability-audit",
       "version": "2.39.3",
