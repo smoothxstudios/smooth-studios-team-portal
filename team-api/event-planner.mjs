@@ -1,4 +1,4 @@
-import { validatePlan, crewFit, plannerPeople } from '../lib/event-planner.mjs';
+import { validatePlan, crewFit, plannerPeople, hasPlannerOverride } from '../lib/event-planner.mjs';
 
 export async function eventPlannerRoute({request,db,user,body,fail,snapshot}) {
   if (user !== 'owner') fail(403,'Only Smooth can view or edit the event staffing plan.');
@@ -17,10 +17,15 @@ export async function eventPlannerRoute({request,db,user,body,fail,snapshot}) {
   const assignmentKey = e => JSON.stringify([e.startLocal,e.endLocal,e.coverageStartLocal,e.coverageEndLocal,e.people,e.archived]);
   for (const event of plan.events.filter(e => !e.archived && e.people.length)) {
     const prior = current.events.find(e => e.id === event.id);
-    if (prior && assignmentKey(prior) === assignmentKey(event)) continue;
+    const unchanged = prior && assignmentKey(prior) === assignmentKey(event);
     for (const id of event.people) {
       const fit = crewFit(id,event,plan,schedule);
-      if (fit.status === 'blocked') fail(409,`${plannerPeople(plan).find(p => p.id === id)?.name || 'This person'} has a conflict: ${fit.reasons.join('; ')}. Adjust coverage or choose someone else.`);
+      const approval = event.conflictOverrides.find(a=>a.personId===id);
+      if (approval && !hasPlannerOverride(event,id,fit)) {
+        if (fit.status === 'blocked' && (!unchanged || !prior.conflictOverrides?.some(a=>a.personId===id && a.key===approval.key))) fail(409,'The conflict or coverage changed. Reopen Plan crew and review the override again.');
+        event.conflictOverrides = event.conflictOverrides.filter(a=>a.personId!==id);
+      }
+      if (!unchanged && fit.status === 'blocked' && !hasPlannerOverride(event,id,fit)) fail(409,`${plannerPeople(plan).find(p => p.id === id)?.name || 'This person'} has a conflict: ${fit.reasons.join('; ')}. Adjust coverage, choose someone else, or use Override & add in Plan crew.`);
     }
   }
   const result = await db.prepare('UPDATE owner_event_planner SET revision=revision+1,data=?,updated_at=? WHERE id=1 AND revision=? AND EXISTS(SELECT 1 FROM team_state WHERE id=1 AND revision=?)')

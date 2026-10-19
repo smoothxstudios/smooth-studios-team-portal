@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture } from './helpers/notification-fixture.mjs';
-import { emptyPlan, validatePlan, mergePlan, crewFit, plannerOnDay, plannerStartsOnDay } from '../lib/event-planner.mjs';
+import { emptyPlan, validatePlan, mergePlan, crewFit, plannerOnDay, plannerStartsOnDay, hasPlannerOverride } from '../lib/event-planner.mjs';
 import { localInstant } from '../lib/team-schedule.mjs';
 
 const event = extra => ({ id:'event-one', title:'Synthetic event', startLocal:'2026-10-23T22:00', endLocal:'2026-10-24T02:00', crewNeeded:2, people:[], ...extra });
@@ -124,4 +124,39 @@ test('Smooth has a flexible schedule but recorded conflicts still prevent double
   assert.deepEqual((await f.call('owner','/event-planner')).data.events[0].people,['owner']);
   assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_notification_events').get().n,0);
   assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_assignments').get().n,0);
+});
+
+test('owner can explicitly override one person’s current conflict without changing bookings or sending offers', async t => {
+  const f=await setup(t),p=plan({events:[event({people:['akiva']})]}),e=p.events[0];
+  const block={id:'busy',userId:'akiva',startLocal:e.startLocal,endLocal:e.endLocal,reason:'Unavailable'};
+  f.DB.sqlite.prepare('INSERT INTO team_blocks(id,user_id,data) VALUES(?,?,?)').run(block.id,block.userId,JSON.stringify(block));
+  assert.equal((await save(f,p)).status,409);
+  const fit=crewFit('akiva',e,p,{blocks:[block]});e.conflictOverrides=[{personId:'akiva',key:fit.conflictKey}];
+  assert.equal(hasPlannerOverride(e,'akiva',fit),true);
+  assert.equal((await f.call('jordyn','/event-planner',{...p,revision:0},'PUT')).status,403);
+  assert.equal((await save(f,p)).status,200);
+  const saved=(await f.call('owner','/event-planner')).data;
+  assert.deepEqual(saved.events[0].conflictOverrides,e.conflictOverrides);
+  assert.equal((await save(f,{...p,events:[{...e,coverageStartLocal:'2026-10-23T23:00'}]},1)).status,409,'changed coverage requires a fresh override');
+  const forged={...e,id:'different-event'};
+  assert.equal((await save(f,{...p,events:[forged]},1)).status,409,'approval cannot move to another event');
+  e.people.push('jordyn');
+  const other={...block,id:'busy-jordyn',userId:'jordyn'};
+  f.DB.sqlite.prepare('INSERT INTO team_blocks(id,user_id,data) VALUES(?,?,?)').run(other.id,other.userId,JSON.stringify(other));
+  assert.equal((await save(f,p,1)).status,409,'another person needs their own approval');
+  e.people=['akiva'];e.conflictOverrides=[];
+  assert.equal((await save(f,p,1)).status,200,'an existing plan can remain for review without claiming approval');
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_blocks').get().n,2);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_notification_events').get().n,0);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_assignments').get().n,0);
+});
+
+test('override keys distinguish new conflicts and reject malformed approvals', () => {
+  const p=plan({events:[event({people:['akiva']})]}),e=p.events[0];
+  const block={id:'first',userId:'akiva',startLocal:e.startLocal,endLocal:e.endLocal,reason:'Busy'};
+  const fit=crewFit('akiva',e,p,{blocks:[block]});e.conflictOverrides=[{personId:'akiva',key:fit.conflictKey}];
+  assert.equal(hasPlannerOverride(e,'akiva',crewFit('akiva',e,p,{blocks:[{...block,id:'second'}]})),false);
+  assert.equal(hasPlannerOverride(e,'akiva',crewFit('akiva',e,p,{blocks:[]})),false);
+  assert.throws(()=>validatePlan({...p,events:[{...e,conflictOverrides:[{personId:'jordyn',key:'anything'}]}]}));
+  assert.throws(()=>validatePlan({...p,events:[{...e,conflictOverrides:[{personId:'akiva',key:''}]}]}));
 });

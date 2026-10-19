@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.38.9",
+  "currentVersion": "2.39.0",
   "releases": [
+    {
+      "id": "2026-10-19-planner-conflict-overrides",
+      "version": "2.39.0",
+      "date": "2026-10-19",
+      "category": "Scheduling",
+      "title": "Override a crew conflict when planning",
+      "changes": [
+        "Use Override & add in Plan crew to select someone despite a listed conflict. The saved plan keeps the conflict visible and labels the override.",
+        "Overrides apply to the selected person, event coverage, and conflicts reviewed. Changed conflicts or coverage need another review. Availability, Calendar bookings, work offers, and earnings stay unchanged."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-19-smooth-flexible-availability",
       "version": "2.38.9",
