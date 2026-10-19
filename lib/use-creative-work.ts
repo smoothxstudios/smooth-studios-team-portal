@@ -4,6 +4,7 @@ import { teamRequest } from "@/lib/team-api";
 import { useRefreshSource } from "@/components/dashboard-refresh";
 
 export type CreativeAssignment = {
+  entryType?: "manual"; workCategory?: "onboarding" | "training" | "other"; earnedAt?: string;
   id: string; employeeId: string; version: number; title: string; instructions: string; references: string[];
   dueAt: string; amountCents: number; status: "offered" | "accepted" | "submitted" | "revision" | "approved" | "declined" | "cancelled";
   advanceAppliedCents?: number;
@@ -36,10 +37,10 @@ export function useCreativeWork(token: string) {
     window.addEventListener("focus", update); document.addEventListener("visibilitychange", update);
     return () => { invalidate(); window.clearTimeout(initial); window.clearInterval(interval); window.removeEventListener("focus", update); document.removeEventListener("visibilitychange", update); };
   }, [refresh]);
-  const mutate = async (input: Record<string, unknown>, item?: CreativeAssignment) => {
+  const mutate = async (input: Record<string, unknown>, item?: CreativeAssignment, manual = false) => {
     requestId.current++;
     try {
-      const result = await teamRequest<{ assignment: CreativeAssignment }>(token, item ? `/creative-work/${item.id}` : "/creative-work", item ? { ...input, version: item.version } : input, item ? "PATCH" : "POST");
+      const result = await teamRequest<{ assignment: CreativeAssignment }>(token, item ? `/creative-work/${item.id}` : manual ? "/creative-work/manual-pay" : "/creative-work", item ? { ...input, version: item.version } : input, item ? "PATCH" : "POST");
       requestId.current++;
       setItems(previous => [result.assignment, ...previous.filter(entry => entry.id !== result.assignment.id)]);
       setError(""); setLoading(false); setLoaded(true);
@@ -47,5 +48,6 @@ export function useCreativeWork(token: string) {
       return result.assignment;
     } catch (error) { await refresh(); throw error; }
   };
-  return { items, loading, loaded, error, refresh, mutate };
+  const addPay = (input: Record<string, unknown>) => mutate(input, undefined, true);
+  return { items, loading, loaded, error, refresh, mutate, addPay };
 }

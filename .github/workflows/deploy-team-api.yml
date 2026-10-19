@@ -47,6 +47,7 @@ jobs:
       - run: npm test
       - name: Deploy existing Worker and migrate its bound D1 database
         env:
+          DASHBOARD_GITHUB_TOKEN: ${{ secrets.DASHBOARD_GITHUB_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}

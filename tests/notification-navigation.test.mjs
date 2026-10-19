@@ -20,13 +20,13 @@ test('a warm notification tap routes even when the hash is unchanged; a locked p
   };
   send('availability'); send('availability');
   assert.equal(routed, 2); assert.equal(ack, 2);
-  for (const target of ['creative', 'scheduling', 'quiz', 'settings', 'alerts']) {
+  for (const target of ['creative', 'payouts', 'scheduling', 'quiz', 'settings', 'alerts']) {
     send(target); assert.ok(isNotificationHash(win.location.hash));
   }
   const before = win.location.hash;
-  send('https://untrusted.invalid'); assert.equal(win.location.hash, before); assert.equal(ack, 7);
+  send('https://untrusted.invalid'); assert.equal(win.location.hash, before); assert.equal(ack, 8);
   assert.equal(isNotificationHash('#unknown'), false);
-  detach(); send('availability'); assert.equal(ack, 7);
+  detach(); send('availability'); assert.equal(ack, 8);
 });
 
 test('service worker focuses and explicitly routes a warm app, with URL fallback for older pages', async () => {

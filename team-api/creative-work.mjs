@@ -3,9 +3,11 @@ import { reconcileAdvances, creativeAdvanceAmounts, withCreativeAdvance } from "
 import { creativeOwed } from "../lib/creative-work.mjs";
 import { notificationText } from "./notification-content.mjs";
 import { flushAlerts } from "./push.mjs";
+import { manualPayRoute } from "./manual-pay.mjs";
 
 export async function creativeWorkRoute({ request, db, user, env, ctx, body, fail }) {
   const url = new URL(request.url), isOwner = user === "owner";
+  if (url.pathname === "/creative-work/manual-pay") return manualPayRoute({ request, db, user, env, ctx, body, fail });
   const text = (value, max, required = true) => {
     if (typeof value !== "string" || value.length > max || (required && !value.trim())) fail(400, "Fill in the required fields and keep text within the displayed limits.");
     return value.trim();
@@ -115,7 +117,7 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
   const name = TEAM.find(p => p.id === item.employeeId).name;
   const recipient = isOwner ? item.employeeId : "owner";
   const title = isOwner ? ({ assigned: "New creative assignment", updated: "Creative assignment updated", approved: "Creative work approved", cancelled: "Creative assignment cancelled", "changes requested": "Changes requested", "payment recorded": "Creative payout recorded" }[event]) : `${name} ${event} creative work`;
-  const notification = JSON.stringify({ title, body: `${notificationText(item.title, 160)}. Open Creative Work to see the details.`, target: "creative", targetId: item.id, personId: item.employeeId });
+  const notification = JSON.stringify({ title: item.entryType === "manual" ? "Payment recorded" : title, body: `${notificationText(item.title, 160)}. ${item.entryType === "manual" ? "View the payment in Earnings." : "Open Creative Work to see the details."}`, target: item.entryType === "manual" ? "payouts" : "creative", targetId: item.id, personId: item.employeeId });
   const result = await db.batch([write,
     db.prepare(`INSERT INTO team_notification_events (id, user_id, kind, payload, due_at)
       SELECT ?, ?, 'creative', ?, ? WHERE EXISTS (SELECT 1 FROM team_creative_assignments WHERE id = ? AND mutation = ?)`)

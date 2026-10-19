@@ -6,6 +6,7 @@ import { subscriptionKeys } from "./push-encryption.mjs";
 import { sendQuizReminders } from "./quiz-notifications.mjs";
 import { assignmentNotifications, blockNotifications } from "./notification-content.mjs";
 import { creativeWorkRoute } from "./creative-work.mjs";
+import { requestBackgroundSync } from "./background-sync.mjs";
 import { alertsRoute } from "./alerts.mjs";
 import { dashboardLayoutRoute } from "./dashboard-layout.mjs";
 import { payrollRoute } from "./payroll.mjs";
@@ -135,7 +136,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 3, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1 };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 3, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 1, backgroundSyncVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -628,7 +629,7 @@ const worker = {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(Promise.all([flushAlerts(env), sendQuizReminders(env), flushCalendarAssignments(env, { limit: 3 })]));
+    ctx.waitUntil(Promise.all([flushAlerts(env), sendQuizReminders(env), flushCalendarAssignments(env, { limit: 3 }), requestBackgroundSync(env)]));
   },
 };
 export default worker;

@@ -50,3 +50,9 @@ test("negative remainders are retained and unknown pay rates are flagged", () =>
   assert.equal(week.missingRates, 1);
   assert.equal(week.afterTeamPay, -2000);
 });
+
+test("manual training pay belongs to its work period rather than its recording period", () => {
+  const manual = creative({entryType: 'manual', earnedAt: '2026-10-02T16:00:00Z', approvedAt: '2026-10-15T14:00:00Z'});
+  const [week, month] = ownerPeriodFinances([], [manual], now);
+  assert.equal(week.teamPay, 0); assert.equal(month.teamPay, 3000); assert.equal(month.stillOwed, 2000);
+});

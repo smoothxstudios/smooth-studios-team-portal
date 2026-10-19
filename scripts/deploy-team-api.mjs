@@ -48,6 +48,9 @@ if (!existing.some(secret => secret.name === "CALENDAR_CONNECTION_KEY")) {
   await secretRequest("PUT", { name: "CALENDAR_CONNECTION_KEY", text: Buffer.from(raw).toString("base64url"), type: "secret_text" });
 }
 await secretRequest("PUT", { name: "TEAM_TOKEN_HASHES", text: JSON.stringify(hashes), type: "secret_text" });
+const syncToken = process.env.DASHBOARD_GITHUB_TOKEN?.trim();
+if (!syncToken) throw new Error("DASHBOARD_GITHUB_TOKEN is required for automatic data sync.");
+await secretRequest("PUT", { name: "DASHBOARD_SYNC_TOKEN", text: syncToken, type: "secret_text" });
 
 function wrangler(args) {
   return new Promise((resolve, reject) => {
@@ -66,7 +69,7 @@ for (let attempt = 0; attempt < 10; attempt++) {
   try {
     const health = await fetch(`${TEAM_API_URL}/health`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
     const status = health.ok && await health.json();
-    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 4 && status.creativeWorkVersion === 3 && status.studioReferenceVersion === 1 && status.payrollVersion === 1 && status.alertsVersion === 3 && status.calendarInvitationsVersion === 1 && status.calendarDeliveryVersion === 1 && status.manualNoticesVersion === 1 && status.reminderTemplatesVersion === 1 && status.dashboardLayoutVersion === 1 && status.rentalStaffVersion === 1 && status.rentalTimeVersion === 1 && status.incrementalSyncVersion === 1 && status.payrollReviewVersion === 1);
+    ready = Boolean(status?.ready && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 4 && status.creativeWorkVersion === 3 && status.studioReferenceVersion === 1 && status.payrollVersion === 1 && status.alertsVersion === 3 && status.calendarInvitationsVersion === 1 && status.calendarDeliveryVersion === 1 && status.manualNoticesVersion === 1 && status.reminderTemplatesVersion === 1 && status.dashboardLayoutVersion === 1 && status.rentalStaffVersion === 1 && status.rentalTimeVersion === 1 && status.incrementalSyncVersion === 1 && status.payrollReviewVersion === 1 && status.manualPayVersion === 1 && status.backgroundSyncVersion === 1 && status.backgroundSyncReady);
   } catch { /* A transient deployment response is retried within this bound. */ }
   if (ready) break;
   if (attempt < 9) await new Promise(resolve => setTimeout(resolve, 2000));

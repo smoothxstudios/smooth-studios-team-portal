@@ -24,7 +24,7 @@ self.addEventListener("push", event => {
     icon: new URL("smooth-studios-logo.png", self.registration.scope).href,
     tag: id ? `smooth-${type}-${id}` : `smooth-${type}`,
     renotify: true,
-    data: { type, ...(["alerts", "settings", "scheduling", "creative", "availability", "quiz"].includes(payload?.target) ? { target: payload.target } : {}) },
+    data: { type, ...(["alerts", "settings", "scheduling", "creative", "availability", "payouts", "quiz"].includes(payload?.target) ? { target: payload.target } : {}) },
   }));
 });
 self.addEventListener("notificationclick", event => {
@@ -32,7 +32,7 @@ self.addEventListener("notificationclick", event => {
   const type = event.notification.data?.type;
   const notice = Object.hasOwn(notices, type) ? notices[type] : notices.schedule;
   // Never navigate to a URL supplied by a payload or notification data.
-  const targets = { alerts: "#alerts", settings: "#settings", scheduling: "#scheduling", creative: "#creative-work", availability: "#availability", quiz: "#daily-quiz" };
+  const targets = { alerts: "#alerts", settings: "#settings", scheduling: "#scheduling", creative: "#creative-work", availability: "#availability", payouts: "#payouts", quiz: "#daily-quiz" };
   const requested = event.notification.data?.target;
   const target = Object.hasOwn(targets, requested) ? requested : Object.keys(targets).find(key => targets[key] === notice.hash);
   const destination = new URL(`./${targets[target]}`, self.registration.scope).href;

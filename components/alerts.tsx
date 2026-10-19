@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { attachScrollTapGuard } from "@/lib/scroll-tap-guard.mjs";
 import { alertBody, groupAlerts } from "@/lib/alert-presentation.mjs";
-import { Bell, CalendarDays, Check, CheckCheck, Mail, ChevronDown, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
+import { Bell, Banknote, CalendarDays, Check, CheckCheck, Mail, ChevronDown, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -67,7 +67,7 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
       {isOwner && <header className="person-section-heading"><span className="employee-avatar" style={{ background: group.person?.color ?? "#64748b" }}>{group.person?.name.slice(0, 1) ?? "•"}</span><h3>{group.person?.name ?? "Other updates"}</h3><small>{group.alerts.length} alert{group.alerts.length === 1 ? "" : "s"}</small></header>}
       <ul className="alerts-list">
       {group.alerts.map((alert: DashboardAlert) => {
-        const Icon = alert.kind === "notice" ? Bell : alert.target === "quiz" ? Sparkles : alert.target === "creative" ? ClipboardList : CalendarDays;
+        const Icon = alert.kind === "notice" ? Bell : alert.target === "quiz" ? Sparkles : alert.target === "creative" ? ClipboardList : alert.target === "payouts" ? Banknote : CalendarDays;
         const expired = alert.expiresAt !== null && alert.expiresAt <= Date.now();
         return <li key={alert.id} className={`alert-card${alert.readAt ? "" : " is-unread"}`}>
           <button type="button" className="alert-open" disabled={state.busy} onClick={() => void open(alert)} aria-label={`${alert.title}. ${alert.target === "settings" ? "Open Settings" : alert.target === "alerts" ? "Read notification" : alert.target === "quiz" ? "Open Daily Quiz" : alert.target === "availability" ? "View availability" : "View details"}`}>

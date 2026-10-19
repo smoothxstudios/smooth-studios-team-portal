@@ -134,11 +134,11 @@ test('opening an editor during a fetch defers the update without losing it or re
   editing = false; await reader(); assert.equal(applied, 1, 'the deferred publication is still applied afterward');
 });
 
-test('quiet checks run every minute, pause hidden/offline, resume once, and clean up on logout', async () => {
+test('quiet checks run every thirty seconds, pause hidden/offline, resume once, and clean up on logout', async () => {
   const win = new EventTarget(), doc = new EventTarget();
   let clock = 0, timer, reads = 0, cleared = false, fail = false;
   win.navigator = { onLine: true }; doc.visibilityState = 'visible';
-  win.setInterval = (callback, delay) => { assert.equal(delay, 60_000); timer = callback; return 1; };
+  win.setInterval = (callback, delay) => { assert.equal(delay, 30_000); timer = callback; return 1; };
   win.clearInterval = id => { assert.equal(id, 1); cleared = true; };
   const flush = () => new Promise(resolve => setImmediate(resolve));
   const stop = attachQuietSnapshotRefresh(async () => { reads++; if (fail) throw new Error('Offline'); }, { win, doc, now: () => clock });

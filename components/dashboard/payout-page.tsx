@@ -2,6 +2,7 @@
 import { teamEarnings } from "@/lib/team-summary.mjs";
 import { teamAccent } from "@/lib/dashboard-presentation";
 import type { CreativeAssignment } from "@/lib/use-creative-work";
+import type { ReactNode } from "react";
 
 import { ChartTooltip } from "@/components/dashboard/shared";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,9 @@ export function PayoutPage({
   setPayoutEmployee,
   payroll,
   creative = [],
+  addPay,
 }: {
+  addPay?: ReactNode;
   creative?: CreativeAssignment[];
   employeeId?: string;
   payroll?: PayrollState;
@@ -63,7 +66,7 @@ export function PayoutPage({
   const hasChartData = monthly.some(month => month.paid > 0 || month.owed > 0);
   return (
     <section className={`payout-layout${isOwner ? "" : " employee-payout-layout"}`}>
-      {isOwner && <article className="panel team-payout-breakdown"><div className="panel-heading"><div><h2>Pay by team member</h2><p>All recorded earnings · appointments and approved creative work</p></div></div>
+      {isOwner && <article className="panel team-payout-breakdown"><div className="panel-heading"><div><h2>Pay by team member</h2><p>Appointments, training, onboarding, and other earned pay</p></div>{addPay}</div>
         <div className="team-payout-people">{teamEarnings(employees, rentals, creative).map(person => <section className="team-payout-person" key={person.id}>
           <div className="person-section-heading"><span className="employee-avatar" style={{ background: teamAccent(person.id, person.accent) }}>{person.name.slice(0, 1)}</span><h3>{person.name}</h3></div>
           <dl><div><dt>Amount owed</dt><dd>{dollars(person.owed, true)}</dd></div><div><dt>Total earned</dt><dd>{dollars(person.earned, true)}</dd></div><div><dt>Paid</dt><dd>{dollars(person.cashPaid, true)}</dd></div>{person.advanceApplied > 0 && <div className="team-payout-advance"><dt>Advance applied</dt><dd>{dollars(person.advanceApplied, true)}</dd></div>}</dl>

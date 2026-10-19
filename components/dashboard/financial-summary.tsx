@@ -32,7 +32,7 @@ export function OwnerFinancialSummary({ rentals, creative, upcomingCount, totalO
         {!payReady && <p className="owner-finance-status" role="status">{period.missingRates ? "Set missing employee pay rates to finish this total." : creative.error ? "Team pay is unavailable. Refresh to finish this total." : "Loading team pay…"}</p>}
       </article>;
     })}</div>
-    <p className="owner-finance-basis">Completed, fully paid appointments, including tips. Team pay includes approved creative work. Before fees and other expenses.</p>
+    <p className="owner-finance-basis">Completed, fully paid appointments, including tips. Team pay includes approved creative work, onboarding, training, and other recorded pay. Before fees and other expenses.</p>
     <div className="owner-finance-shortcuts"><button onClick={onSchedule}><CalendarDays size={16} />{upcomingCount} upcoming appointments<ChevronRight size={15} /></button><button onClick={onPayouts}><WalletCards size={16} />Total still owed: {ready ? dollars(totalOwed, true) : "—"}<ChevronRight size={15} /></button></div>
   </section>;
 }

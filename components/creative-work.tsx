@@ -14,10 +14,11 @@ import type { CreativeAssignment, CreativeWorkState } from "@/lib/use-creative-w
 
 const dollars = (cents: number) => (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 const date = (value: string) => new Date(value).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+const workDate = (value: string) => new Date(value).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
 const name = (id: string) => TEAM.find(member => member.id === id)?.name ?? id;
 const splitLinks = (value: string) => value.split(/\n/).map(link => link.trim()).filter(Boolean);
 const openStatuses = ["offered", "accepted", "revision", "submitted"];
-const status = (item: CreativeAssignment) => item.status === "approved" && creativeOwed(item) === 0 ? "Paid" : CREATIVE_STATUS[item.status];
+const status = (item: CreativeAssignment) => item.status === "approved" && creativeOwed(item) === 0 ? "Paid" : item.entryType === "manual" ? "Unpaid" : CREATIVE_STATUS[item.status];
 
 function WorkLinks({ links }: { links: string[] }) {
   if (!links.length) return null;
@@ -38,8 +39,9 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
   const [selected, setSelected] = useState<string | null>(null), [editor, setEditor] = useState<{ item?: CreativeAssignment; id: string } | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const selectedItem = state.items.find(item => item.id === (focusId ?? selected));
-  const summary = creativeEarnings(state.items, year);
-  const visible = (earningsOnly ? summary.items : state.items).filter(item => {
+  const workItems = earningsOnly ? state.items : state.items.filter(item => item.entryType !== "manual");
+  const summary = creativeEarnings(workItems, year);
+  const visible = (earningsOnly ? summary.items : workItems).filter(item => {
     if (earningsOnly) return item.status === "approved";
     return (person === "all" || item.employeeId === person) &&
       (filter === "all" || (filter === "active" ? openStatuses.includes(item.status) : filter === "closed" ? ["declined", "cancelled"].includes(item.status) : item.status === filter)) &&
@@ -52,7 +54,7 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
     finally { setBusy(false); }
   };
   return <section className={`creative-work${earningsOnly ? " creative-work-earnings panel" : ""}`}>
-    <div className="creative-heading"><div><h2>{earningsOnly ? "Creative work payments" : "Creative work"}</h2><p>{earningsOnly ? "Approved work is included in your earnings totals above." : isOwner ? "Assign a deliverable, review the submission, and approve its pay." : "Your briefs, deadlines, submissions, and agreed pay."}</p></div><div className="creative-toolbar-buttons">{isOwner && !earningsOnly && <Button onClick={() => { setEditor({ id: crypto.randomUUID() }); setError(""); }}><Plus size={17} />Assign work</Button>}</div></div>
+    <div className="creative-heading"><div><h2>{earningsOnly ? "Other work & payments" : "Creative work"}</h2><p>{earningsOnly ? "Training, onboarding, and approved creative work are included in the totals above." : isOwner ? "Assign a deliverable, review the submission, and approve its pay." : "Your briefs, deadlines, submissions, and agreed pay."}</p></div><div className="creative-toolbar-buttons">{isOwner && !earningsOnly && <Button onClick={() => { setEditor({ id: crypto.randomUUID() }); setError(""); }}><Plus size={17} />Assign work</Button>}</div></div>
     {state.error && <p className="creative-notice" role="alert">{state.loaded ? "Showing the last loaded creative work. " : "Creative work totals are unavailable. "}{state.error}</p>}
     {!earningsOnly && <>
       <div className="creative-totals"><div><span>Awaiting review</span><strong>{state.items.filter(item => item.status === "submitted").length}</strong></div><div><span>Approved · unpaid</span><strong>{dollars(summary.metrics.owed)}</strong></div><div><span>Paid</span><strong>{dollars(summary.metrics.paid)}</strong></div></div>
@@ -60,11 +62,11 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
     </>}
     {state.loading ? <p role="status">Loading creative work…</p> : <div className="creative-grid">{visible.map(item => <button className="creative-card" key={item.id} onClick={() => { setSelected(item.id); setError(""); }}>
       <div className="creative-card-top"><span className={`creative-status is-${item.status}`}>{status(item)}</span>{isOwner && <span className="creative-person"><i style={{ background: teamAccent(item.employeeId) }} />{name(item.employeeId)}</span>}</div>
-      <h3>{item.title}</h3><p className={!earningsOnly && openStatuses.includes(item.status) && Date.parse(item.dueAt) < now ? "creative-overdue" : ""}>{earningsOnly ? `Approved ${date(item.approvedAt!)}` : `Due ${date(item.dueAt)}`}</p>
+      <h3>{item.title}</h3><p className={!earningsOnly && openStatuses.includes(item.status) && Date.parse(item.dueAt) < now ? "creative-overdue" : ""}>{earningsOnly ? `${item.entryType === "manual" ? "Worked" : "Approved"} ${item.entryType === "manual" ? workDate(creativeEarningDate(item)) : date(creativeEarningDate(item))}` : `Due ${date(item.dueAt)}`}</p>
       <div className="creative-card-bottom"><strong>{dollars(item.amountCents)}</strong><span>{item.status === "approved" ? creativeOwed(item) ? `${dollars(creativeOwed(item))} owed` : "Paid in full" : "Earned after approval"}<ArrowUpRight size={16} /></span></div>
     </button>)}</div>}
-    {!state.loading && !state.error && !visible.length && <div className="creative-empty"><ClipboardList size={26} /><h3>{earningsOnly ? "No approved creative work yet" : state.items.length ? "No assignments match" : "No creative assignments yet"}</h3><p>{earningsOnly ? "Approved assignments will appear here automatically." : isOwner ? "Create work such as an edit, photo selection, design, or social post." : "Smooth’s creative assignments will appear here with a brief, deadline, and agreed pay."}</p></div>}
-    <Dialog open={Boolean(focusId || selectedItem)} onOpenChange={open => { if (!open && !busy) { setSelected(null); onCloseFocus?.(); } }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{selectedItem?.title ?? "Creative assignment"}</DialogTitle><DialogDescription>{selectedItem ? `${name(selectedItem.employeeId)} · ${status(selectedItem)} · Due ${date(selectedItem.dueAt)}` : "Review the current assignment details."}</DialogDescription></DialogHeader>
+    {!state.loading && !state.error && !visible.length && <div className="creative-empty"><ClipboardList size={26} /><h3>{earningsOnly ? "No additional pay recorded" : workItems.length ? "No assignments match" : "No creative assignments yet"}</h3><p>{earningsOnly ? "Training, onboarding, other pay, and approved creative assignments appear here." : isOwner ? "Create work such as an edit, photo selection, design, or social post." : "Smooth’s creative assignments will appear here with a brief, deadline, and agreed pay."}</p></div>}
+    <Dialog open={Boolean(focusId || selectedItem)} onOpenChange={open => { if (!open && !busy) { setSelected(null); onCloseFocus?.(); } }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{selectedItem?.title ?? "Creative assignment"}</DialogTitle><DialogDescription>{selectedItem ? `${name(selectedItem.employeeId)} · ${status(selectedItem)} · ${selectedItem.entryType === "manual" ? "Worked" : "Due"} ${selectedItem.entryType === "manual" ? workDate(selectedItem.dueAt) : date(selectedItem.dueAt)}` : "Review the current assignment details."}</DialogDescription></DialogHeader>
       {!selectedItem && <p role="status">{state.loading || focusLoading ? "Loading assignment…" : state.error || "This assignment is no longer available to this account."}</p>}
       {selectedItem && <WorkDetails key={selectedItem.id} item={selectedItem} isOwner={isOwner} busy={busy} error={error} act={act} onEdit={() => { setEditor({ id: selectedItem.id, item: selectedItem }); setSelected(null); onCloseFocus?.(); }} />}
     </DialogContent></Dialog>
@@ -85,12 +87,12 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit }: { item: Creati
     if (await act(input, item)) { setAction(""); setNote(""); setLinks(""); }
   };
   return <div className="creative-details">
-    <div className="creative-totals"><div><span>Agreed pay</span><strong>{dollars(item.amountCents)}</strong></div><div><span>Paid</span><strong>{dollars(paid)}</strong></div><div><span>{item.status === "approved" ? "Owed" : "After approval"}</span><strong>{dollars(item.status === "approved" ? owed : openStatuses.includes(item.status) ? item.amountCents : 0)}</strong></div></div>
+    <div className="creative-totals"><div><span>{item.entryType === "manual" ? "Recorded pay" : "Agreed pay"}</span><strong>{dollars(item.amountCents)}</strong></div><div><span>Paid</span><strong>{dollars(paid)}</strong></div><div><span>{item.status === "approved" ? "Owed" : "After approval"}</span><strong>{dollars(item.status === "approved" ? owed : openStatuses.includes(item.status) ? item.amountCents : 0)}</strong></div></div>
     {Boolean(item.advanceAppliedCents) && <p className="creative-hint">{dollars(item.advanceAppliedCents!)} of these earnings is covered by the advance.</p>}
-    {(item.instructions || item.references.length > 0) && <section><h3>{item.instructions ? "Brief" : "References"}</h3>{item.instructions && <p className="creative-prose">{item.instructions}</p>}{item.references.length > 0 && <WorkLinks links={item.references} />}</section>}
+    {(item.instructions || item.references.length > 0) && <section><h3>{item.instructions ? item.entryType === "manual" ? "Notes" : "Brief" : "References"}</h3>{item.instructions && <p className="creative-prose">{item.instructions}</p>}{item.references.length > 0 && <WorkLinks links={item.references} />}</section>}
     {item.submissions.length > 0 && <section><h3>Submissions</h3>{[...item.submissions].reverse().map((submission, index) => <div key={submission.id} className="creative-submission"><strong>{index === 0 ? "Latest submission" : "Earlier submission"} · {date(submission.submittedAt)}</strong><WorkLinks links={submission.links} />{submission.note && <p className="creative-prose">{submission.note}</p>}</div>)}</section>}
     {item.history.some(entry => entry.note) && <section><h3>Feedback</h3>{[...item.history].reverse().filter(entry => entry.note).map(entry => <div key={entry.id} className="creative-submission"><strong>{entry.event} · {date(entry.at)}</strong><p className="creative-prose">{entry.note}</p></div>)}</section>}
-    {item.payments.length > 0 && <section><h3>Payment history</h3>{item.payments.map(payment => <p key={payment.id} className="creative-payment-line"><strong>{dollars(payment.amountCents)}</strong><span>{date(payment.paidAt)}{payment.method ? ` · ${payment.method}` : ""}</span></p>)}</section>}
+    {item.payments.length > 0 && <section><h3>Payment history</h3>{item.payments.map(payment => <p key={payment.id} className="creative-payment-line"><strong>{dollars(payment.amountCents)}</strong><span>{item.entryType === "manual" && "recordedAt" in payment ? workDate(payment.paidAt) : date(payment.paidAt)}{payment.method ? ` · ${payment.method}` : ""}</span></p>)}</section>}
     {!action && <div className="creative-actions">
       {!isOwner && item.status === "offered" && <><Button disabled={busy} onClick={() => void act({ action: "accept" }, item)}><Check size={17} />Accept assignment</Button><Button variant="outline" disabled={busy} onClick={() => show("decline")}>Decline</Button></>}
       {!isOwner && ["accepted", "revision"].includes(item.status) && <Button disabled={busy} onClick={() => show("submit")}>Submit work</Button>}
@@ -118,7 +120,7 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit }: { item: Creati
 function WorkEditor({ editor, employees, state, onClose }: { editor: { id: string; item?: CreativeAssignment }; employees: Employee[]; state: CreativeWorkState; onClose: () => void }) {
   const item = editor.item;
   const activeEmployees = employees.filter(employee => !employee.onboarding || employee.accessReady);
-  const [employeeId, setEmployeeId] = useState(item?.employeeId ?? activeEmployees[0]?.id ?? "");
+  const [employeeId, setEmployeeId] = useState(item?.employeeId ?? "");
   const [title, setTitle] = useState(item?.title ?? ""), [instructions, setInstructions] = useState(item?.instructions ?? "");
   const [due, setDue] = useState(item ? studioLocal(item.dueAt).slice(0, 16) : ""), [pay, setPay] = useState(item ? (item.amountCents / 100).toFixed(2) : "");
   const [references, setReferences] = useState(item?.references.join("\n") ?? ""), [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -133,7 +135,7 @@ function WorkEditor({ editor, employees, state, onClose }: { editor: { id: strin
   };
   return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{item ? "Edit creative offer" : "Assign creative work"}</DialogTitle><DialogDescription>A deliverable with a deadline and fixed pay. The deadline does not block their calendar.</DialogDescription></DialogHeader>
     <form className="creative-editor" onSubmit={submit}>
-      <label>Assign to<select required disabled={Boolean(item)} value={employeeId} onChange={event => setEmployeeId(event.target.value)}>{activeEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>
+      <label>Assign to<select required disabled={Boolean(item)} value={employeeId} onChange={event => setEmployeeId(event.target.value)}><option value="" disabled>Choose a person</option>{activeEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>
       <label>Assignment title<Input required maxLength={160} value={title} onChange={event => setTitle(event.target.value)} placeholder="Edit a recap video, retouch a photo set…" /></label>
       <label>Brief & deliverables · optional<Textarea maxLength={8000} rows={5} value={instructions} onChange={event => setInstructions(event.target.value)} placeholder="Add instructions or deliverable details if needed." /></label>
       <div className="creative-form-row"><label>Deadline<Input required type="datetime-local" value={due} onChange={event => setDue(event.target.value)} /></label><label>Agreed pay (USD)<Input required inputMode="decimal" value={pay} onChange={event => setPay(event.target.value)} placeholder="0.00" /></label></div>

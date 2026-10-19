@@ -67,6 +67,7 @@ import { disableTeamPush } from "@/lib/team-api";
 import { teamToken } from "@/lib/team-auth.mjs";
 import { TEAM,studioLocal } from "@/lib/team-schedule.mjs";
 import { useAlerts,type DashboardAlert } from "@/lib/use-alerts";
+import { AddPay } from "@/components/dashboard/add-pay";
 import { attachNotificationMessages, isNotificationHash } from "@/lib/notification-navigation.mjs";
 import { useCreativeWork } from "@/lib/use-creative-work";
 import { usePayroll } from "@/lib/use-payroll";
@@ -115,8 +116,8 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
       setView("overview");
       if (window.location.hash === "#daily-quiz") window.dispatchEvent(new Event("hashchange"));
       else window.location.hash = "#daily-quiz";
-    } else if (alert.target === "creative") {
-      setView("creative"); setAlertWorkLoading(true);
+    } else if (alert.target === "creative" || alert.target === "payouts") {
+      setView(alert.target); setAlertWorkLoading(true);
       try { await creative.refresh(); } finally { setAlertWorkLoading(false); }
     } else setView(alert.target === "settings" ? "settings" : alert.target === "alerts" ? "alerts" : alert.target === "availability" ? "availability" : "scheduling");
   };
@@ -141,6 +142,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
       if (window.location.hash === "#alerts") setView("alerts");
       if (window.location.hash === "#settings") setView("settings");
       if (window.location.hash === "#availability") setView("availability");
+      if (window.location.hash === "#payouts") setView("payouts");
       if (window.location.hash === "#creative-work") setView("creative");
       if (window.location.hash === "#scheduling") setView("scheduling");
       if (window.location.hash === "#daily-quiz") setView("overview");
@@ -328,7 +330,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
           {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} action={isOwner ? <TeamNotifications token={schedulingToken} employees={payload.employees} /> : undefined} />}
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
-          {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Creative work totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
+          {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Other work and pay totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "overview" && !isOwner && <CreativeWorkPreview state={creative} isOwner={false} onOpen={() => setView("creative")} />}
           {view === "payouts" && payroll.error && <p className="schedule-warning" role="status">{payroll.error}</p>}
           {view === "payouts" && isOwner && <AdvanceReview token={schedulingToken} payroll={payroll.state} employees={payload.employees} onReviewed={payroll.updateReviewSummary} onOpenSource={(kind, id) => {
@@ -400,9 +402,9 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
             <TabsContent value="engagement"><TeamEngagementReview token={schedulingToken} /></TabsContent>
           </Tabs>}
           {view === "payouts" && <>
-            {!isOwner && <div className="employee-earnings-heading"><div><h2>My earnings</h2><p>Appointment and creative work earnings by year.</p></div><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
-            <PayoutPage creative={creative.items} payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
-            <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} earningsOnly year={isOwner ? undefined : earningsYear} />
+            {!isOwner && <div className="employee-earnings-heading"><div><h2>My earnings</h2><p>Appointment, training, and other work earnings by year.</p></div><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
+            <PayoutPage addPay={isOwner ? <AddPay employees={payload.employees} state={creative} /> : undefined} creative={creative.items} payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
+            <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} earningsOnly focusLoading={alertWorkLoading} focusId={focusedAlert?.target === "payouts" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} year={isOwner ? undefined : earningsYear} />
             {!isOwner && earningsYear === currentYear && <PeriodTotals creative={creative.items} employeeId={employeeId} rentals={visibleRentals} />}
             {!isOwner && employeeEarnings.rentals.length > 0 && <article className="panel employee-earnings-details"><div className="panel-heading"><div><h2>Earnings by appointment</h2><p>Upcoming amounts are estimates. Custom assignments are listed in Schedule.</p></div></div><RentalTable employeeId={employeeId} rentals={employeeEarnings.rentals} /></article>}
           </>}

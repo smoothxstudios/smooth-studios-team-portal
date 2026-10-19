@@ -74,7 +74,7 @@ Create `smoothxstudios/smooth-studios-team-portal` as a private repository and p
 | `DASHBOARD_PASSWORD_RAYNE` | Generated Rayne password |
 | `DASHBOARD_GITHUB_TOKEN` | Fine-grained token limited to this repository with Actions read/write permission |
 
-The Calendar workflow is scheduled every 5 minutes, refreshes the encrypted payloads and rental team notes, commits the encrypted data, and deploys the updated GitHub Page. GitHub can delay scheduled workflows; the dashboard shows the actual last sync time, and **Sync now** remains available.
+The existing Cloudflare five-minute cron dispatches the Calendar workflow when the last import is at least two minutes old. A D1 lease prevents duplicate dispatches and checks for active imports or backend deployments; GitHub’s schedule remains a fallback. The workflow refreshes the encrypted payloads and rental team notes, commits the encrypted data, and deploys the updated GitHub Page. The server trigger avoids GitHub’s delayed scheduled starts; workflow execution still takes time. Visible dashboards check for published snapshots every 30 seconds while preserving open forms and scroll position. The dashboard shows the actual last sync time, and **Sync now** remains available.
 
 Each `EMPLOYEE_EMAIL_*` secret accepts one address or multiple comma-separated addresses. Addresses are matched case-insensitively and duplicate entries are ignored. Keep every address in GitHub Secrets rather than committing it to the repository.
 
@@ -97,7 +97,7 @@ The Stripe key is optional during deployment. If it is absent, the dashboard con
 5. Copy the token once and save it as the repository secret `DASHBOARD_GITHUB_TOKEN`.
 6. Run **Sync Smooth Studios Calendar** once. The next owner sign-in will include the workflow controls; employee dashboards will not receive the token.
 
-When the token expires, replace only `DASHBOARD_GITHUB_TOKEN` and run one Calendar sync. Dashboard passwords do not need to change.
+When the token expires, replace `DASHBOARD_GITHUB_TOKEN`, run the backend deployment to refresh its `DASHBOARD_SYNC_TOKEN` secret, and run one Calendar sync. Dashboard passwords do not need to change.
 
 ## Add the four new team members
 
@@ -135,6 +135,7 @@ Saved answer drafts and deferred-question progress are encrypted with the owner 
 - **Mark employee earnings paid**: Smooth chooses a paid-through date in the dashboard. It updates the payout ledger, rebuilds encrypted data, and redeploys the site.
 - **Update customer payment**: Smooth chooses an appointment and confirms payment received by invoice, cash, or another method, marks it not fully paid, or clears the manual status.
 - **Match Stripe payment**: Smooth selects an unmatched Stripe charge and the Calendar appointment it belongs to. The saved match is reused on every future sync, and multiple charges can be linked to one appointment for deposits and final payments.
+- **Add pay**: Smooth records onboarding, training, and other completed work in Payouts. Entries use the work date, retain the recording date, and distinguish still owed from already paid. Existing non-rental payroll safeguards and person-specific advance allocation apply; no money is transferred.
 - **Sync Calendar and Stripe**: scheduled every 5 minutes and can also be started from the dashboard.
 
 The dashboard verifies that the encrypted workflow token belongs to `smoothxstudios`, triggers the selected GitHub Action, and follows its status through completion. Closing or logging out of the owner dashboard discards the decrypted token from the browser session.

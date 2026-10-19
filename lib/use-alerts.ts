@@ -5,7 +5,7 @@ import { useRefreshSource } from "@/components/dashboard-refresh";
 
 export type DashboardAlert = {
   id: string; sequence: number; kind: string; title: string; body: string;
-  target: "scheduling" | "availability" | "creative" | "quiz" | "settings" | "alerts"; targetId: string | null;
+  target: "scheduling" | "availability" | "creative" | "quiz" | "settings" | "alerts" | "payouts"; targetId: string | null;
   personId?: string | null;
   createdAt: number; expiresAt: number | null; readAt: number | null;
 };

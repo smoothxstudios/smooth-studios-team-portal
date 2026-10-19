@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.35.2",
+  "currentVersion": "2.36.0",
   "releases": [
+    {
+      "id": "2026-10-18-manual-pay-automatic-sync",
+      "version": "2.36.0",
+      "date": "2026-10-18",
+      "category": "Dashboard",
+      "title": "Manual pay, blank assignment choices, and more reliable background sync",
+      "changes": [
+        "Add pay in Payouts records onboarding, training, and other completed work. Choose the person, date, amount, and whether it is still owed or already paid. Totals and payment details update without transferring money. Existing advances remain limited to their own person.",
+        "New rental and creative assignments start with a blank employee selection. Existing offer edits retain their assigned employee.",
+        "A five-minute server trigger starts due Calendar and payment imports without relying on delayed GitHub scheduled starts. Duplicate-run protection and incremental imports remain in place. Visible dashboards quietly check for new published data every 30 seconds."
+      ],
+      "employee": {
+        "title": "Additional pay and faster data updates",
+        "changes": [
+          "Onboarding, training, and other pay added by Smooth appear in Earnings with their payment status. Pay alerts open their details.",
+          "Published Calendar and payment updates are checked more often while the app is open. Forms and scroll position stay in place."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-18-notification-navigation-touch",
       "version": "2.35.2",
