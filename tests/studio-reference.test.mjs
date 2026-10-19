@@ -125,6 +125,21 @@ test("reference cleanup preserves contacts, access, Wi-Fi and every generic chec
   f.close();
 });
 
+test("BTS, Vault and trigger checklist update retains other owner-edited steps", async () => {
+  const f = await setup();
+  try {
+    const existing = content();
+    f.DB.sqlite.prepare("UPDATE studio_reference SET revision = 4, data = ? WHERE id = 1").run(JSON.stringify(existing));
+    const sql = readFileSync(new URL("../team-api/migrations/0031_rental_bts_and_balance_reminders.sql", import.meta.url), "utf8");
+    f.DB.sqlite.exec(sql.split("-- One receipt per rental/end/person")[0]);
+    const saved = JSON.parse(f.DB.sqlite.prepare("SELECT data FROM studio_reference WHERE id = 1").get().data);
+    assert.deepEqual(saved.checklist.slice(0, existing.checklist.length), existing.checklist);
+    assert.deepEqual(saved.checklist.slice(-3).map(item => item.label),
+      ["Record a BTS video", "Post BTS video to Content Vault", "Ask for the trigger back"]);
+    assert.equal(f.DB.sqlite.prepare("SELECT revision FROM studio_reference WHERE id = 1").get().revision, 7);
+  } finally { f.close(); }
+});
+
 test('checklist writes reject a concurrent staffing change within the same sync generation', async t => {
   const f = await setup(); t.after(() => f.close());
   await f.call('owner','/studio-reference',{...content(),revision:0},'PATCH');
