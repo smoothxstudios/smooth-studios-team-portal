@@ -18,7 +18,8 @@ export function useAlerts(token: string, active: boolean) {
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [deletion, setDeletion] = useState<{ alert: DashboardAlert } | null>(null);
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState("");
-  const requestId = useRef(0), operation = useRef(false), pages = useRef(1);
+  const requestId = useRef(0), operation = useRef(false), pages = useRef(1), lifetime = useRef(0);
+  useEffect(() => () => { lifetime.current++; operation.current = false; }, [token]);
   const refresh = useCallback(async () => {
     if (operation.current) return false;
     const current = ++requestId.current;
@@ -43,9 +44,11 @@ export function useAlerts(token: string, active: boolean) {
   useEffect(() => {
     const start = window.setTimeout(() => void refresh(), 0);
     const update = () => { if (document.visibilityState === "visible") void refresh(); };
+    const receipt = (event: MessageEvent) => { if (event.data?.type === "smooth-alerts-read") update(); };
     const interval = window.setInterval(update, 60_000);
     window.addEventListener("focus", update); document.addEventListener("visibilitychange", update);
-    return () => { ++requestId.current; window.clearTimeout(start); window.clearInterval(interval); window.removeEventListener("focus", update); document.removeEventListener("visibilitychange", update); };
+    navigator.serviceWorker?.addEventListener("message", receipt);
+    return () => { ++requestId.current; window.clearTimeout(start); window.clearInterval(interval); window.removeEventListener("focus", update); document.removeEventListener("visibilitychange", update); navigator.serviceWorker?.removeEventListener("message", receipt); };
   }, [refresh]);
   const chooseFilter = (next: "all" | "unread") => {
     if (next === filter || operation.current) return;
@@ -66,18 +69,21 @@ export function useAlerts(token: string, active: boolean) {
   const markRead = async (alert?: DashboardAlert, opened = false) => {
     if (operation.current) return false;
     if (alert?.readAt && !opened) return true;
-    operation.current = true; const current = ++requestId.current; setBusy(true);
+    operation.current = true; ++requestId.current;
+    const session = lifetime.current; setBusy(true);
     try {
       const result = await teamRequest<{ unreadCount: number; readAt: number }>(token, alert ? opened ? "/alerts/open" : "/alerts/read" : "/alerts/read-all",
         alert ? { ids: [alert.id] } : { throughSequence: page.throughSequence }, "PATCH");
-      if (current === requestId.current) {
+      // Opening an alert changes tabs before this write finishes. A list-request
+      // cleanup must not discard a confirmed read/count for the same account.
+      if (session === lifetime.current) {
         setPage(previous => ({ ...previous, unreadCount: result.unreadCount,
           alerts: previous.alerts.map(item => (!alert ? item.sequence <= page.throughSequence : item.id === alert.id) && !item.readAt ? { ...item, readAt: result.readAt } : item).filter(item => filter !== "unread" || !item.readAt) }));
         setError("");
       }
-      return current === requestId.current;
-    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "Couldn’t mark this alert as read."); return false; }
-    finally { operation.current = false; setBusy(false); setLoading(false); }
+      return session === lifetime.current;
+    } catch (error) { if (session === lifetime.current) setError(error instanceof Error ? error.message : "Couldn’t mark this alert as read."); return false; }
+    finally { if (session === lifetime.current) { operation.current = false; setBusy(false); setLoading(false); } }
   };
   const markAllUnread = async () => {
     if (operation.current || loading || !page.throughSequence) return false;

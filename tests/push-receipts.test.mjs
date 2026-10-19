@@ -52,6 +52,29 @@ test('bulk read cannot masquerade as opened, and in-app opens belong only to the
   await f.call('jordyn','/alerts/open',{ids:['synthetic-receipt']},'PATCH');
   assert.equal((await f.call('owner','/notifications/delivery?person=jordyn')).data.alerts[0].openedAt,now);
 });
+test('opening a phone alert stays read on later account requests; delivery alone and receipt retries do not change deliberate unread status',async t=>{
+  const f=await setup(t), d=device('persistent-read');await f.call('jordyn','/push/device',d);
+  event(f);event(f,'other-inbox','rayne');
+  let payload;
+  await flushAlerts(f.env,async(_url,options)=>{payload=d.decrypt(options.body);return new Response(null,{status:201});});
+  assert.equal(await receipt(f,payload.receipt,'received'),200);
+  assert.equal((await f.call('jordyn','/alerts?summary=1')).data.unreadCount,1);
+  mock.timers.setTime(now+1000);
+  assert.equal(await receipt(f,payload.receipt,'opened'),200);
+  const reopened=(await f.call('jordyn','/alerts')).data;
+  assert.equal(reopened.unreadCount,0);assert.equal(reopened.alerts[0].readAt,now+1000);
+  assert.equal((await f.call('rayne','/alerts')).data.unreadCount,1);
+  assert.equal((await f.call('owner','/alerts')).data.unreadCount,0);
+  // A repeated receipt is a network retry, not a new tap after Mark all → Unread.
+  await f.call('jordyn','/alerts/unread-all',{throughSequence:reopened.throughSequence},'PATCH');
+  mock.timers.setTime(now+2000);await receipt(f,payload.receipt,'opened');
+  assert.equal((await f.call('jordyn','/alerts')).data.unreadCount,1);
+  await f.call('jordyn','/alerts/open',{ids:[payload.id]},'PATCH');
+  assert.equal((await f.call('jordyn','/alerts')).data.unreadCount,0);
+  await f.call('jordyn','/alerts',{ids:[payload.id]},'DELETE');
+  await receipt(f,payload.receipt,'opened');
+  assert.equal((await f.call('jordyn','/alerts')).data.alerts.length,0);
+});
 test('transient failures back off, successful devices stay deduplicated, and permanent failures are visible',async t=>{
   const f=await setup(t), good=device('good'), flaky=device('flaky');await f.call('jordyn','/push/device',good);await f.call('jordyn','/push/device',flaky);event(f);
   const calls=[];let recover=false;
@@ -94,4 +117,17 @@ test('service worker reports only after display succeeds, retries a lost receipt
   assert.equal(actions.filter(a=>a[0]==='receipt'&&a[1]==='opened').length,2);
   assert.ok(actions.some(a=>a[0]==='open'&&a[1]==='https://dashboard.smoothstudios.co/#availability'));
   failDisplay=true;const before=actions.length;await assert.rejects(push());assert.equal(actions.length,before);
+});
+
+test('a successful phone open tells the dashboard to refresh only after its read receipt is saved',async()=>{
+  const source=await readFile(new URL('../public/team-sw.js',import.meta.url),'utf8'),handlers={},actions=[];
+  const scope='https://dashboard.smoothstudios.co/';let saved=false;
+  const opened={url:scope,postMessage(message){assert.equal(saved,true);actions.push(message.type);}};
+  let scans=0;
+  vm.runInNewContext(source,{URL,AbortSignal,fetch:async()=>{await Promise.resolve();saved=true;return new Response(null,{status:200});},self:{
+    addEventListener:(type,fn)=>handlers[type]=fn,registration:{scope},
+    clients:{matchAll:async()=>++scans===1?[]:[opened,{url:'https://other.example.invalid/',postMessage(){throw Error('Wrong scope');}}],openWindow:async()=>actions.push('navigation')},
+  }});
+  let done;handlers.notificationclick({notification:{data:{type:'schedule',target:'availability',receipt:'x'.repeat(43)},close(){}},waitUntil:p=>done=p});await done;
+  assert.deepEqual(actions,['navigation','smooth-alerts-read']);
 });

@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.38.3",
+  "currentVersion": "2.38.4",
   "releases": [
+    {
+      "id": "2026-10-18-persistent-alert-read-status",
+      "version": "2.38.4",
+      "date": "2026-10-18",
+      "category": "Notifications",
+      "title": "Read alerts stay read when you return",
+      "changes": [
+        "Opening a phone notification now marks its inbox alert read, so it stays read after signing out and back in. Receiving a notification alone leaves it unread; retrying an old receipt preserves an intentional Mark all → Unread action.",
+        "Unread badges update after a phone notification is opened and after an in-app alert opens another tab. Saved read status is kept when navigating away.",
+        "Removed the introductory heading and slogan from Event Planner, bringing its controls and calendar to the top."
+      ],
+      "employee": {
+        "title": "Read alerts stay read",
+        "changes": [
+          "Opening an alert from your phone or inside the dashboard saves its read status for your next sign-in. Unread badges update when you open the related page."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-18-planner-layout",
       "version": "2.38.3",

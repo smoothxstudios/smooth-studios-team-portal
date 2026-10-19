@@ -9,16 +9,18 @@ const notices = {
   test: { title: "Notifications are connected", body: "This device can receive Smooth Studios alerts.", hash: "#scheduling" },
 };
 async function reportReceipt(receipt, stage) {
-  if (typeof receipt !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(receipt)) return;
+  if (typeof receipt !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(receipt)) return false;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const response = await fetch("https://smooth-studios-team-api.smoothxstudios.workers.dev/push/receipt", {
         method: "POST", credentials: "omit", redirect: "error", headers: { "content-type": "application/json" },
         body: JSON.stringify({ receipt, stage }), signal: AbortSignal.timeout(3000),
       });
-      if (response.ok || response.status === 400 || response.status === 404) return;
+      if (response.ok) return true;
+      if (response.status === 400 || response.status === 404) return false;
     } catch { /* Missing receipts remain unconfirmed, never falsely delivered. */ }
   }
+  return false;
 }
 self.addEventListener("push", event => {
   let type = "schedule", payload;
@@ -70,5 +72,13 @@ self.addEventListener("notificationclick", event => {
       if (!await handled) await existing.navigate(destination);
     }
     else await self.clients.openWindow(destination);
-  })()]));
+  })()]).then(async ([saved]) => {
+    if (!saved) return;
+    // Focus/navigation can refresh the page before the receipt is saved.
+    // Ask open dashboards to read the confirmed count once it has committed.
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows.filter(client => client.url.startsWith(self.registration.scope))) {
+      try { client.postMessage({ type: "smooth-alerts-read" }); } catch { /* Closed windows load it on their next sign-in. */ }
+    }
+  }));
 });

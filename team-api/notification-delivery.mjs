@@ -1,8 +1,9 @@
 import { TEAM } from '../lib/team-schedule.mjs';
 import { notificationText } from './notification-content.mjs';
 
-// A random, per-alert/per-device receipt grants only these two timestamp writes.
-// It grants no account access and is sent only inside that device's encrypted push.
+// A random, per-alert/per-device receipt confirms delivery/opening of that alert.
+// Its first open also marks that inbox entry read. It grants no account access
+// and is sent only inside that device's encrypted push.
 export async function pushReceiptRoute({request, db, body, fail}) {
   const input = await body(request), now = Date.now();
   if (!/^[A-Za-z0-9_-]{43}$/.test(input?.receipt ?? '') || !['received', 'opened'].includes(input?.stage)) fail(400, 'Invalid notification receipt.');
@@ -11,14 +12,19 @@ export async function pushReceiptRoute({request, db, body, fail}) {
   if (!row) fail(404, 'Notification receipt expired.');
   const opened = input.stage === 'opened';
   await db.batch([
+    // Check before recording this device's first open, in the same transaction.
+    // A duplicate receipt must not undo a later explicit Mark all → Unread.
+    db.prepare(`UPDATE team_inbox SET push_received_at = COALESCE(push_received_at, ?),
+      opened_at = CASE WHEN ? THEN COALESCE(opened_at, ?) ELSE opened_at END,
+      read_at = CASE WHEN ? AND deleted_at IS NULL AND EXISTS
+        (SELECT 1 FROM team_push_deliveries WHERE receipt_token = ? AND opened_at IS NULL)
+        THEN COALESCE(read_at, ?) ELSE read_at END
+      WHERE id = ?`)
+      .bind(now, opened ? 1 : 0, now, opened ? 1 : 0, input.receipt, now, row.alert_id),
     db.prepare(`UPDATE team_push_deliveries SET completed_at = COALESCE(completed_at, ?), result = 'received', received_at = COALESCE(received_at, ?),
       opened_at = CASE WHEN ? THEN COALESCE(opened_at, ?) ELSE opened_at END
       WHERE receipt_token = ? AND (received_at IS NULL OR (? AND opened_at IS NULL))`)
       .bind(now, now, opened ? 1 : 0, now, input.receipt, opened ? 1 : 0),
-    db.prepare(`UPDATE team_inbox SET push_received_at = COALESCE(push_received_at, ?),
-      opened_at = CASE WHEN ? THEN COALESCE(opened_at, ?) ELSE opened_at END
-      WHERE id = ? AND (push_received_at IS NULL OR (? AND opened_at IS NULL))`)
-      .bind(now, opened ? 1 : 0, now, row.alert_id, opened ? 1 : 0),
   ]);
   return {saved: true};
 }
