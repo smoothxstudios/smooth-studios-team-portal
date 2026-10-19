@@ -4,7 +4,7 @@ import { teamRequest } from "@/lib/team-api";
 import { useRefreshSource } from "@/components/dashboard-refresh";
 
 export type CreativeAssignment = {
-  entryType?: "manual"; workCategory?: "onboarding" | "training" | "other"; earnedAt?: string;
+  entryType?: "manual"; workCategory?: string; earnedAt?: string;
   id: string; employeeId: string; version: number; title: string; instructions: string; references: string[];
   dueAt: string; amountCents: number; status: "offered" | "accepted" | "submitted" | "revision" | "approved" | "declined" | "cancelled";
   advanceAppliedCents?: number;

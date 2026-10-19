@@ -5,11 +5,13 @@ import { AlertCircle, ArrowUpRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { dollars, formatDate, formatTime, teamAccent } from "@/lib/dashboard-presentation";
-import type { Employee, PayrollReview, PayrollState } from "@/lib/dashboard-types";
+import type { Employee, PayrollReview, PayrollState, Rental } from "@/lib/dashboard-types";
 import { teamRequest } from "@/lib/team-api";
+import { advanceCorrectionChecks } from "@/lib/advance-correction.mjs";
 
-export function AdvanceReview({ token, payroll, employees, onOpenSource, onReviewed }: {
+export function AdvanceReview({ token, payroll, employees, rentals, onOpenSource, onReviewed, onFixPayment, onSync }: {
   token: string; payroll?: PayrollState; employees: Employee[];
+  rentals: Rental[]; onFixPayment: (id: string) => void; onSync: () => void;
   onOpenSource: (kind: PayrollReview["kind"], id: string) => void;
   onReviewed: (reviews: PayrollReview[]) => void;
 }) {
@@ -57,8 +59,14 @@ export function AdvanceReview({ token, payroll, employees, onOpenSource, onRevie
                 {item.cashFloorCents > 0 && <div><dt>Prior cash recorded</dt><dd>{dollars(item.cashFloorCents, true)}</dd></div>}
               </dl>
               <p className="advance-review-next">{item.nextStep}</p>
+              {item.kind === "rental" && <div className="advance-correction"><h4>How to correct this</h4>
+                {advanceCorrectionChecks(item, rentals.find(rental => rental.id === item.sourceId)).map(check => <p key={check.label} className={check.ok ? "check-passed" : "check-needed"}><strong>{check.ok ? "✓" : "Needs attention"} · {check.label}</strong><span>{check.detail}</span></p>)}
+                <p>After correcting the rental or payment, use Sync Calendar, then reopen this review and choose Check again. If the current earning is intentionally lower or the rental was cancelled, the saved credit still needs a separate pay adjustment; checking again does not remove it.</p>
+              </div>}
               <div className="advance-review-actions">
+                {item.kind === "rental" && rentals.some(rental => rental.id === item.sourceId && !rental.fullyPaid && Date.parse(rental.end) <= Date.now()) && <Button onClick={() => { setOpen(false); onFixPayment(item.sourceId); }}>Update customer payment</Button>}
                 {item.sourceAvailable && <Button variant="outline" onClick={() => { setOpen(false); onOpenSource(item.kind, item.sourceId); }}>Open {item.kind === "rental" ? "rental" : "task"}<ArrowUpRight size={15} /></Button>}
+                {item.kind === "rental" && <Button variant="outline" onClick={() => { setOpen(false); onSync(); }}>Sync Calendar</Button>}
                 <details><summary>Record reference</summary><code>{item.sourceId}</code><span>Credit first recorded {formatDate(item.creditedAt, true)}</span></details>
               </div>
             </article>)}

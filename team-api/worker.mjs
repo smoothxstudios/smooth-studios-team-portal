@@ -9,6 +9,7 @@ import { creativeWorkRoute } from "./creative-work.mjs";
 import { requestBackgroundSync } from "./background-sync.mjs";
 import { pushReceiptRoute, notificationDeliveryRoute } from "./notification-delivery.mjs";
 import { alertsRoute } from "./alerts.mjs";
+import { eventPlannerRoute } from "./event-planner.mjs";
 import { dashboardLayoutRoute } from "./dashboard-layout.mjs";
 import { payrollRoute } from "./payroll.mjs";
 import { studioReferenceRoute } from "./studio-reference.mjs";
@@ -138,7 +139,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 3, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 1, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 3, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -172,6 +173,7 @@ async function route(request, env, ctx) {
     return { saved: true };
   }
   if (url.pathname === "/alerts" || url.pathname.startsWith("/alerts/")) return alertsRoute({ request, db, user, body, fail });
+  if (url.pathname === "/event-planner") return eventPlannerRoute({ request, db, user, body, fail, snapshot });
   if (url.pathname === "/dashboard-layout") return dashboardLayoutRoute({ request, db, user, body, fail });
   if (url.pathname === "/payroll" || url.pathname.startsWith("/payroll/") || url.pathname.startsWith("/sync/payroll")) return payrollRoute({ request, db, user, env, body, fail });
   if (["/studio-reference", "/sync/studio-reference", "/rental-checklists"].includes(url.pathname) || url.pathname.startsWith("/rental-checklists/")) return studioReferenceRoute({ request, db, user, env, body, fail });

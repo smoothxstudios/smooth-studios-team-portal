@@ -25,6 +25,7 @@ import { StudioGuidePage } from "@/components/studio-guide";
 import { StudioInfoPage } from "@/components/studio-info";
 import { TeamAccountSetup,type NewTeamSettings } from "@/components/team-account-setup";
 import { EmployeeEngagementBar,EmployeeEngagementProvider,SmoothStarSidebar,TeamEngagementReview } from "@/components/team-engagement";
+import { EventPlanner } from "@/components/event-planner";
 import { TeamSchedulingPage } from "@/components/team-scheduling";
 import { TeamNotifications } from "@/components/team-notifications";
 import { Badge } from "@/components/ui/badge";
@@ -145,6 +146,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
       if (window.location.hash === "#availability") setView("availability");
       if (window.location.hash === "#payouts") setView("payouts");
       if (window.location.hash === "#creative-work") setView("creative");
+      if (window.location.hash === "#event-planner" && isOwner) setView("planner");
       if (window.location.hash === "#scheduling") setView("scheduling");
       if (window.location.hash === "#daily-quiz") setView("overview");
       if (["#guidelines", "#guidelines-questions"].includes(window.location.hash)) setView("guide");
@@ -158,6 +160,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   const [paidThrough, setPaidThrough] = useState(new Date().toISOString().slice(0, 10));
   const [payoutEmployee, setPayoutEmployee] = useState("all");
   const [paymentOverrideOpen, setPaymentOverrideOpen] = useState(false);
+  const [paymentReviewRentalId, setPaymentReviewRentalId] = useState("");
   const [stripeMatchOpen, setStripeMatchOpen] = useState(false);
   const [stripeMatchPaymentId, setStripeMatchPaymentId] = useState("");
   const [workflowOpen, setWorkflowOpen] = useState(false);
@@ -334,7 +337,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Other work and pay totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "overview" && !isOwner && <CreativeWorkPreview state={creative} isOwner={false} onOpen={() => setView("creative")} />}
           {view === "payouts" && payroll.error && <p className="schedule-warning" role="status">{payroll.error}</p>}
-          {view === "payouts" && isOwner && <AdvanceReview token={schedulingToken} payroll={payroll.state} employees={payload.employees} onReviewed={payroll.updateReviewSummary} onOpenSource={(kind, id) => {
+          {view === "payouts" && isOwner && <AdvanceReview token={schedulingToken} payroll={payroll.state} employees={payload.employees} rentals={rentals} onSync={openCalendarSync} onFixPayment={id => { setPaymentReviewRentalId(id); setPaymentOverrideOpen(true); }} onReviewed={payroll.updateReviewSummary} onOpenSource={(kind, id) => {
             const target = kind === "rental" ? "scheduling" : "creative";
             const focusId = kind === "rental" ? rentalAlertTargetId(id) : id;
             setFocusedAlert(focusId ? { target, id: focusId } : null); setView(focusId ? target : "rentals");
@@ -404,12 +407,13 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           </Tabs>}
           {view === "payouts" && <>
             {!isOwner && <div className="employee-earnings-heading"><div><h2>My earnings</h2><p>Appointment, training, and other work earnings by year.</p></div><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
-            <PayoutPage addPay={isOwner ? <AddPay employees={payload.employees} state={creative} /> : undefined} creative={creative.items} payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
+            <PayoutPage addPay={isOwner ? <AddPay token={schedulingToken} employees={payload.employees} state={creative} /> : undefined} creative={creative.items} payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
             <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} earningsOnly focusLoading={alertWorkLoading} focusId={focusedAlert?.target === "payouts" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} year={isOwner ? undefined : earningsYear} />
             {!isOwner && earningsYear === currentYear && <PeriodTotals creative={creative.items} employeeId={employeeId} rentals={visibleRentals} />}
             {!isOwner && employeeEarnings.rentals.length > 0 && <article className="panel employee-earnings-details"><div className="panel-heading"><div><h2>Earnings by appointment</h2><p>Upcoming amounts are estimates. Custom assignments are listed in Schedule.</p></div></div><RentalTable employeeId={employeeId} rentals={employeeEarnings.rentals} /></article>}
           </>}
           {view === "guide" && <StudioGuidePage isOwner={isOwner} draftPassword={sessionPassword} teamToken={schedulingToken} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
+          {view === "planner" && isOwner && <EventPlanner token={schedulingToken} onSchedule={() => setView("scheduling")} onAvailability={() => setView("availability")} />}
           {(view === "scheduling" || view === "availability") && <TeamSchedulingPage onChecklist={openChecklist} focusId={focusedAlert?.target === "scheduling" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} availabilityOnly={view === "availability"} onAvailability={() => setView("availability")} isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
         </div>
         <DashboardVersionFooter viewer={isOwner ? "owner" : "employee"} />
@@ -418,7 +422,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
       <MobileToolbar isOwner={isOwner} view={view} unread={alerts.unreadCount} onNavigate={navigateToolbar} />
       {isOwner && (
         <>
-          <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={setPaymentOverrideOpen} open={paymentOverrideOpen} reviewRentals={reviewRentals} />
+          <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={open => { setPaymentOverrideOpen(open); if (!open) setPaymentReviewRentalId(""); }} open={paymentOverrideOpen} initialEventId={paymentReviewRentalId} reviewRentals={reviewRentals} />
           <StripeMatchForm initialPaymentId={stripeMatchPaymentId} onContinue={openWorkflow} onOpenChange={setStripeMatchOpen} open={stripeMatchOpen} payments={payload.unmatchedStripePayments ?? []} rentals={rentals} />
           <GithubWorkflowDialog access={payload.workflowAccess} onOpenChange={setWorkflowOpen} open={workflowOpen} request={workflowRequest} />
         </>

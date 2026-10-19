@@ -2,6 +2,7 @@ import { TEAM, localInstant, studioLocal } from "../lib/team-schedule.mjs";
 import { reconcileAdvances, withCreativeAdvance } from "./payroll.mjs";
 import { notificationText } from "./notification-content.mjs";
 import { flushAlerts } from "./push.mjs";
+import { DEFAULT_PAY_WORK_TYPES } from "../lib/pay-work-types.mjs";
 
 // Manual earnings share the existing non-rental ledger and payout safeguards.
 // They never create a Calendar offer or bypass another assignment's approval.
@@ -19,11 +20,14 @@ export async function manualPayRoute({ request, db, user, env, ctx, body, fail }
   };
   if (!/^[a-f0-9-]{36}$/.test(input.id ?? "")) fail(400, "Reopen Add pay and try again.");
   if (!TEAM.some(p => p.id === input.employeeId && p.id !== "owner") || !JSON.parse(env.TEAM_TOKEN_HASHES)[input.employeeId]) fail(400, "Choose a team member with an active dashboard account.");
-  if (!["onboarding", "training", "other"].includes(input.category)) fail(400, "Choose the type of work.");
+  const workType = DEFAULT_PAY_WORK_TYPES.find(item => item.id === input.category)
+    || (typeof input.category === 'string' && input.category.length <= 100
+      ? await db.prepare('SELECT id,label FROM owner_pay_work_types WHERE id=?').bind(input.category).first() : null);
+  if (!workType) fail(400, "Choose a saved work type or use Add option first.");
   if (!["owed", "paid"].includes(input.paymentStatus)) fail(400, "Choose whether this pay is owed or already paid.");
   if (!Number.isSafeInteger(input.amountCents) || input.amountCents <= 0 || input.amountCents > 10_000_000) fail(400, "Enter an amount between $0.01 and $100,000.");
   const earnedAt = day(input.workDate), paidAt = input.paymentStatus === "paid" ? day(input.paidDate) : null;
-  const title = input.category === "other" ? text(input.title, 160, true) : input.category === "training" ? "Training" : "Onboarding";
+  const title = input.category === "other" ? text(input.title, 160, true) : workType.label;
   const note = text(input.note ?? "", 4000), method = input.paymentStatus === "paid" ? text(input.method ?? "", 80) : "";
   const receipt = { employeeId: input.employeeId, category: input.category, title, workDate: input.workDate, amountCents: input.amountCents,
     paymentStatus: input.paymentStatus, paidDate: paidAt ? input.paidDate : null, method, note };

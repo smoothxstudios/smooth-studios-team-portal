@@ -18,7 +18,7 @@ export const MONEY = new Intl.NumberFormat("en-US", { style: "currency", currenc
 
 export const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 
-export type ViewKey = "alerts" | "overview" | "rentals" | "team" | "payouts" | "guide" | "checklists" | "scheduling" | "availability" | "creative" | "settings";
+export type ViewKey = "planner" | "alerts" | "overview" | "rentals" | "team" | "payouts" | "guide" | "checklists" | "scheduling" | "availability" | "creative" | "settings";
 
 export type RentalState = "upcoming" | "earned" | "paid" | "awaiting";
 

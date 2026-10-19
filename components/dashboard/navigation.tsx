@@ -40,6 +40,7 @@ export type NavigationItem = { key: ViewKey; label: string; icon: typeof LayoutD
 export const NAV_ITEMS: NavigationItem[] = [
   { key: "overview", label: "Home", icon: House, group: "home" },
   { key: "alerts", label: "Alerts", icon: Bell, group: "home" },
+  { key: "planner", label: "Event Planner", icon: Users, group: "work", ownerOnly: true },
   { key: "scheduling", label: "Team Schedule", icon: CalendarDays, group: "work" },
   { key: "availability", label: "Availability", icon: CalendarCheck, group: "work" },
   { key: "creative", label: "Creative Work", icon: ClipboardList, group: "work" },

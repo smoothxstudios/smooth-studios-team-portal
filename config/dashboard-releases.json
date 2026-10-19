@@ -1,6 +1,20 @@
 {
-  "currentVersion": "2.37.0",
+  "currentVersion": "2.38.0",
   "releases": [
+    {
+      "id": "2026-10-18-event-staffing-planner",
+      "version": "2.38.0",
+      "date": "2026-10-18",
+      "category": "Scheduling",
+      "title": "Event coverage and saved pay options",
+      "changes": [
+        "Event Planner shows daily events alongside live Calendar bookings and studio tasks. Choose one or two crew members, adjust coverage hours, and see availability, pending offers, and overlapping plans before saving.",
+        "Add guest crew and date-specific availability notes. Unknown availability and missing end times stay visible. Plans save privately across devices and support import, export, editing and archiving. Crew plans do not send work offers or change earnings.",
+        "Add pay now lets you create named work types and reuse them across devices. Adding a work type does not create an earning or payment.",
+        "Advance review shows rental completion, customer payment, and pay setup checks, with direct links to payment correction and Calendar sync. Existing advance credit stays preserved."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-18-sporadic-checkins-delivery-status",
       "version": "2.37.0",

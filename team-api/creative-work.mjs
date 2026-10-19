@@ -4,10 +4,12 @@ import { creativeOwed } from "../lib/creative-work.mjs";
 import { notificationText } from "./notification-content.mjs";
 import { flushAlerts } from "./push.mjs";
 import { manualPayRoute } from "./manual-pay.mjs";
+import { payWorkTypesRoute } from "./pay-work-types.mjs";
 
 export async function creativeWorkRoute({ request, db, user, env, ctx, body, fail }) {
   const url = new URL(request.url), isOwner = user === "owner";
   if (url.pathname === "/creative-work/manual-pay") return manualPayRoute({ request, db, user, env, ctx, body, fail });
+  if (url.pathname === "/creative-work/work-types") return payWorkTypesRoute({ request, db, user, body, fail });
   const text = (value, max, required = true) => {
     if (typeof value !== "string" || value.length > max || (required && !value.trim())) fail(400, "Fill in the required fields and keep text within the displayed limits.");
     return value.trim();

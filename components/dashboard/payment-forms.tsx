@@ -29,11 +29,13 @@ export function PaymentOverrideForm({
   onOpenChange,
   onContinue,
   reviewRentals,
+  initialEventId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onContinue: (request: OwnerWorkflowRequest) => void;
   reviewRentals: Rental[];
+  initialEventId?: string;
 }) {
   const [eventId, setEventId] = useState("");
   const [paidStatus, setPaidStatus] = useState<"true" | "false" | "clear">("true");
@@ -44,11 +46,11 @@ export function PaymentOverrideForm({
     if (initialized.current) return;
     const resetTimer = window.setTimeout(() => {
       initialized.current = true;
-      setEventId(reviewRentals[0]?.id ?? "");
+      setEventId(reviewRentals.some(rental => rental.id === initialEventId) ? initialEventId! : reviewRentals[0]?.id ?? "");
       setPaidStatus("true");
     }, 0);
     return () => window.clearTimeout(resetTimer);
-  }, [open, reviewRentals]);
+  }, [open, reviewRentals, initialEventId]);
 
   const selected = reviewRentals.find((rental) => rental.id === eventId);
   const statusLabels = { true: "Payment received by invoice, cash, or other", false: "Not fully paid", clear: "Use automatic payment records" };

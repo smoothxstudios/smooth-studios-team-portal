@@ -178,3 +178,15 @@ export const notificationInbox = sqliteTable("team_inbox", {
   expiresAt: integer("expires_at"), readAt: integer("read_at"), deletedAt: integer("deleted_at"),
   pushAcceptedAt: integer("push_accepted_at"), pushReceivedAt: integer("push_received_at"), openedAt: integer("opened_at"),
 }, table => [index("team_inbox_user_sequence").on(table.userId, table.deletedAt, table.sequence), index("team_inbox_user_unread").on(table.userId, table.deletedAt, table.readAt, table.sequence)]);
+
+export const ownerEventPlanner = sqliteTable("owner_event_planner", {
+  id: integer("id").primaryKey(),
+  revision: integer("revision").notNull().default(0),
+  data: text("data").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+}, table => [check("owner_event_planner_single_owner", sql`${table.id} = 1`), check("owner_event_planner_revision", sql`${table.revision} >= 0`)]);
+
+export const ownerPayWorkTypes = sqliteTable("owner_pay_work_types", {
+  id: text("id").primaryKey(), label: text("label").notNull(),
+  normalizedLabel: text("normalized_label").notNull().unique(), createdAt: text("created_at").notNull(),
+}, table => [check("pay_work_type_label_length", sql`length(${table.label}) BETWEEN 1 AND 60`)]);

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./event-planner.css";
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
 
@@ -2240,3 +2241,13 @@ button { cursor: pointer; }
 .delivery-alert-list p { font-size: 14px; margin: 4px 0; overflow-wrap: anywhere; }
 .delivery-alert-list small { font-size: 11px; color: var(--muted-foreground); }
 .delivery-confirmed { color: #168251; font-weight: 600; }
+.pay-work-types { display:grid; gap:6px; }
+.pay-work-types > button { justify-self:start; }
+.pay-work-type-editor { padding:12px; border:1px solid var(--border); border-radius:10px; display:grid; gap:10px; }
+.pay-work-type-editor > div { display:flex; gap:8px; flex-wrap:wrap; }
+.advance-correction { display:grid; gap:10px; border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px; font-size:13px; }
+.advance-correction h4 { font-weight:700; }
+.advance-correction p { display:grid; gap:3px; }
+.advance-correction .check-passed strong { color:var(--muted-foreground); }
+.advance-correction .check-needed strong { color:#b45309; }
+.dark .advance-correction .check-needed strong { color:#fbbf24; }
