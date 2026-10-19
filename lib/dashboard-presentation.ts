@@ -6,7 +6,7 @@ Rental,
 UnmatchedStripePayment
 } from "@/lib/dashboard-types";
 import { customerFullyPaid } from "@/lib/owner-finances.mjs";
-import { TEAM } from "@/lib/team-schedule.mjs";
+import { TEAM, studioLocal } from "@/lib/team-schedule.mjs";
 
 export const FALLBACK_PROFILES: AccessProfile[] = TEAM.map(person => ({ id: person.id, label: person.name, role: person.id === "owner" ? "owner" : "employee" }));
 
@@ -125,4 +125,16 @@ export function stripeAppointmentScore(payment: UnmatchedStripePayment, rental: 
   else if (distance <= 45) score += 20;
   else if (distance <= 180) score += 8;
   return score;
+}
+
+export function formatCheckInTime(value: string | number, now = Date.now()) {
+  const day = studioLocal(value).slice(0, 10);
+  const today = studioLocal(now).slice(0, 10);
+  const previousDay = new Date(`${today}T12:00:00Z`);
+  previousDay.setUTCDate(previousDay.getUTCDate() - 1);
+  const label = day === today ? "Today" : day === previousDay.toISOString().slice(0, 10) ? "Yesterday" : null;
+  const time = new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_TIME_ZONE, hour: "numeric", minute: "2-digit" });
+  return label ? `${label} at ${time.format(new Date(value))}` : new Intl.DateTimeFormat("en-US", {
+    timeZone: STUDIO_TIME_ZONE, month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  }).format(new Date(value));
 }

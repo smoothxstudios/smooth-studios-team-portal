@@ -5,6 +5,7 @@ import { Check, ChevronRight, Clock3, Smile, Sparkles, Star, X } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSidebar } from "@/components/ui/sidebar";
+import { formatCheckInTime } from "@/lib/dashboard-presentation";
 import { teamRequest } from "@/lib/team-api";
 import { useRefreshSource } from "@/components/dashboard-refresh";
 import { MOODS, nextEngagementPrompt, QUIZ_TIERS, STAR_POINTS } from "@/lib/team-engagement.mjs";
@@ -191,7 +192,7 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
         <div className="engagement-popup-heading"><DialogTitle>{panel === "mood" ? "Temp Check" : "Daily Quiz"}</DialogTitle><button type="button" className="engagement-close" aria-label={panel === "mood" ? "Dismiss Temp Check" : "Dismiss Daily Quiz"} disabled={busy} onClick={dismiss}><X size={19} /></button></div>
         <DialogDescription className={panel === "mood" ? "engagement-muted" : "sr-only"}>{panel === "mood" ? state?.moodDue ? "How are you feeling?" : "You're checked in for now." : "One question at a time, with two hours between answers. Up to three different difficulties each day."}</DialogDescription>
         {state && (panel === "mood" ? <>
-          {state.moodDue ? <div className="temp-check-moods">{MOODS.map(mood => <button type="button" key={mood.id} disabled={busy} onClick={() => recordMood(mood.id)} aria-label={`I'm feeling ${mood.label.toLowerCase()}`}><span aria-hidden="true">{mood.emoji}</span><strong>{mood.label}</strong></button>)}</div> : <div className="temp-check-saved">{latestMood ? <><span aria-hidden="true">{latestMood.emoji}</span><strong>{latestMood.label}</strong><small>{clock(state.lastMood!.createdAt)}</small></> : <strong>You skipped this check-in.</strong>}</div>}
+          {state.moodDue ? <div className="temp-check-moods">{MOODS.map(mood => <button type="button" key={mood.id} disabled={busy} onClick={() => recordMood(mood.id)} aria-label={`I'm feeling ${mood.label.toLowerCase()}`}><span aria-hidden="true">{mood.emoji}</span><strong>{mood.label}</strong></button>)}</div> : <div className="temp-check-saved">{latestMood ? <><span aria-hidden="true">{latestMood.emoji}</span><strong>{latestMood.label}</strong><small>{formatCheckInTime(state.lastMood!.createdAt)}</small></> : <strong>You skipped this check-in.</strong>}</div>}
           <Button variant="outline" disabled={busy} onClick={dismiss}>{state.moodDue ? "Skip for now" : "Done"}</Button>
         </> : current && <>
           <div className="engagement-row quiz-current-tier"><strong>{tierLabel(current.question.tier)} · {current.question.points} points</strong><span>{state.answeredToday}/3 answered today</span></div>
@@ -308,7 +309,7 @@ export function TeamEngagementReview({ token }: { token: string }) {
       return <button type="button" key={person.userId} className="team-checkin-card" onClick={() => { setReviewView("overview"); setSelected(person.userId); }}>
         <span className="engagement-row"><strong className="schedule-person"><i style={{ background: person.color }} />{person.name}</strong><ChevronRight size={16} /></span>
         <span className="team-checkin-mood">{mood ? <><span aria-hidden="true">{mood.emoji}</span>{mood.label}</> : "No check-in yet"}</span>
-        <small>{person.moods[0] ? `${clock(person.moods[0].createdAt)}` : "Employees can skip a check-in."}</small>
+        <small>{person.moods[0] ? `${formatCheckInTime(person.moods[0].createdAt)}` : "Employees can skip a check-in."}</small>
         <span className="team-checkin-score"><Star size={16} />{person.summary.points} points · {person.summary.stars} SmoothStars</span>
         <small>Today: {person.today.length}/3 answered · +{person.today.reduce((sum, attempt) => sum + attempt.points, 0)} points</small>
       </button>;
@@ -319,7 +320,7 @@ export function TeamEngagementReview({ token }: { token: string }) {
         <div className="engagement-review-tabs" role="group" aria-label="Employee check-in views">{(["overview", "manage", "history"] as const).map(tab => <button type="button" key={tab} aria-pressed={reviewView === tab} disabled={saving} onClick={() => { setReviewView(tab); if (reviewBody.current) reviewBody.current.scrollTop = 0; }}>{tab === "overview" ? "Overview" : tab === "manage" ? "Manage" : "History"}</button>)}</div>
         <div className="engagement-detail-body" ref={reviewBody}>
         {member && reviewView === "overview" && <>
-          <section className="engagement-overview-card"><h3>Latest Temp Check</h3><div className="team-checkin-mood">{moodFor(member.moods[0]?.mood) ? <><span aria-hidden="true">{moodFor(member.moods[0].mood)?.emoji}</span><strong>{moodFor(member.moods[0].mood)?.label}</strong></> : <span>No check-in yet</span>}</div>{member.moods[0] && <p className="engagement-muted">{clock(member.moods[0].createdAt)}</p>}</section>
+          <section className="engagement-overview-card"><h3>Latest Temp Check</h3><div className="team-checkin-mood">{moodFor(member.moods[0]?.mood) ? <><span aria-hidden="true">{moodFor(member.moods[0].mood)?.emoji}</span><strong>{moodFor(member.moods[0].mood)?.label}</strong></> : <span>No check-in yet</span>}</div>{member.moods[0] && <p className="engagement-muted">{formatCheckInTime(member.moods[0].createdAt)}</p>}</section>
           <StarCollection summary={member.summary} /><StarGoal summary={member.summary} />
           <section className="engagement-overview-card"><h3>Daily Quiz</h3><p><strong>{member.today.length}/3</strong> answered today · <strong>+{member.today.reduce((sum, attempt) => sum + attempt.points, 0)}</strong> points</p><p className="engagement-muted">All time: {member.summary.correct} correct · {member.summary.incorrect} incorrect</p></section>
         </>}
@@ -342,7 +343,7 @@ export function TeamEngagementReview({ token }: { token: string }) {
         </form>
         </>}
         {member && reviewView === "history" && <div className="engagement-history-sections">
-          <details><summary>Temp Checks <small>{member.moods.length}</small></summary><div className="team-mood-history">{member.moods.length ? member.moods.map(checkin => { const mood = moodFor(checkin.mood); return <div key={checkin.id}><strong><span aria-hidden="true">{mood?.emoji}</span> {mood?.label}</strong><span>{clock(checkin.createdAt)}</span></div>; }) : <p className="engagement-muted">No check-ins recorded yet.</p>}</div></details>
+          <details><summary>Temp Checks <small>{member.moods.length}</small></summary><div className="team-mood-history">{member.moods.length ? member.moods.map(checkin => { const mood = moodFor(checkin.mood); return <div key={checkin.id}><strong><span aria-hidden="true">{mood?.emoji}</span> {mood?.label}</strong><span>{formatCheckInTime(checkin.createdAt)}</span></div>; }) : <p className="engagement-muted">No check-ins recorded yet.</p>}</div></details>
           <details><summary>Points &amp; SmoothStars <small>{member.rewards.length}</small></summary>{member.rewards.length ? <RewardHistory rewards={member.rewards} /> : <p className="engagement-muted">No adjustments yet.</p>}</details>
           <details><summary>Quiz answers <small>{member.history.length}</small></summary><AttemptHistory attempts={member.history} /></details>
           <details><summary>Resets <small>{member.resets?.length ?? 0}</small></summary>{member.resets?.length ? <div className="reward-history">{member.resets.map(reset => <div key={reset.id}><strong>{reset.kind === "mood" ? "Temp Check reset" : `${tierLabel(reset.tier ?? "")} question reset · −${reset.pointsRemoved} points`}</strong><p>{reset.reason}</p><small>{clock(reset.createdAt)}</small></div>)}</div> : <p className="engagement-muted">No resets yet.</p>}</details>
