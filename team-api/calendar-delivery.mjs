@@ -51,7 +51,7 @@ function googleUrl(calendarId, eventId) {
   return new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events${eventId ? `/${encodeURIComponent(eventId)}` : ""}`);
 }
 async function google(fetcher, url, token, options = {}) {
-  const response = await fetcher(url, { redirect: "error", signal: AbortSignal.timeout(15_000), ...options,
+  const response = await fetcher(url, { ...options, redirect: "manual", signal: AbortSignal.timeout(15_000),
     headers: { authorization: `Bearer ${token.accessToken}`, ...(options.body ? { "content-type": "application/json" } : {}), ...options.headers } });
   if (!response.ok) return { status: response.status };
   try { return { status: response.status, event: await response.json() }; }

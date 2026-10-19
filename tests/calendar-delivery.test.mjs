@@ -22,6 +22,7 @@ function fixture({ event = {}, propagate = true, alternateId = false, conflict =
   let current = { ...clone(baseEvent), ...clone(event) }, revision = 1, conflicted = false;
   const calls = [];
   const fetcher = async (value, options = {}) => {
+    assert.equal(options.redirect, "manual", "Invitation requests must not forward credentials on redirects");
     const url = new URL(value), method = options.method ?? "GET", data = options.body ? JSON.parse(options.body) : null;
     calls.push({ url, method, data, headers: options.headers });
     const own = url.pathname.includes("/calendars/primary/");
@@ -75,6 +76,16 @@ test("a new app offer sends one native invitation, preserves team guests and pri
   assert.deepEqual(JSON.parse(f.current().extendedProperties.private.smoothAppGuest_jordyn), { email: employeeToken.email, assignmentId: assignment.id });
   await f.deliver();
   assert.equal(f.calls.filter(call => call.method === "PATCH").length, 1);
+});
+
+test("Google redirects are rejected without forwarding Calendar tokens or sending an invitation", async () => {
+  const calls=[];
+  const result=await deliverCalendarAssignment({assignment,config,ownerToken,now,fetcher:async(url,options)=>{
+    calls.push(String(url)); assert.equal(options.redirect,"manual");
+    return new Response(null,{status:302,headers:{location:"https://untrusted.example.invalid/"}});
+  }});
+  assert.deepEqual(result,{status:"retrying",code:"google_unavailable"});
+  assert.equal(calls.length,1); assert.equal(new URL(calls[0]).hostname,"www.googleapis.com");
 });
 
 test("adding or removing app guests holds for review when it would notify unrelated guests", async () => {

@@ -3,10 +3,12 @@ import test, { mock } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { calendarAccessToken, calendarAuthRoute, getCalendarConfig } from '../team-api/calendar-auth.mjs';
+import { calendarConnectionError } from '../lib/calendar-connection-errors.mjs';
 
 const API = 'https://smooth-studios-team-api.smoothxstudios.workers.dev';
 const CALLBACK = `${API}/calendar/oauth/callback`;
 const EVENTS = 'https://www.googleapis.com/auth/calendar.events';
+const errorLocation = reason => `https://dashboard.smoothstudios.co/?calendar=error&calendar_reason=${reason}`;
 const LIST = 'https://www.googleapis.com/auth/calendar.calendarlist.readonly';
 const now = Date.parse('2026-10-17T18:00:00Z');
 mock.timers.enable({ apis: ['Date'], now });
@@ -44,14 +46,18 @@ function fixture(t) {
   mock.method(globalThis, 'fetch', async (input, options = {}) => {
     const url = String(input), form = options.body instanceof URLSearchParams ? Object.fromEntries(options.body) : null;
     f.calls.push({ url, options, form });
+    assert.equal(options.redirect, 'manual', 'Google credentials must never follow redirects and must use a Workerd-supported mode');
+    if (f.redirectAt === url) return new Response(null, {status:302, headers:{location:'https://untrusted.example.invalid/'}});
+    if (f.networkFailure) throw new Error('SYNTHETIC PRIVATE PROVIDER FAILURE');
     if (url === 'https://oauth2.googleapis.com/token') {
       if (form.grant_type === 'refresh_token') {
         if (f.refreshUnavailable) throw new Error('SYNTHETIC PRIVATE GOOGLE ERROR');
         if (f.refreshError) return json({ error: f.refreshError, error_description: 'SYNTHETIC PRIVATE GOOGLE ERROR' }, 400);
         return json({ access_token: 'refreshed-access-token', expires_in: 3600, scope: EVENTS, token_type: 'Bearer' });
       }
+      if (f.tokenError) return json({error:f.tokenError, error_description:'SYNTHETIC PRIVATE TOKEN ERROR'},400);
       return json({ access_token: 'synthetic-access-token', refresh_token: 'synthetic-refresh-token', expires_in: 3600,
-        scope: `openid email ${EVENTS} ${LIST}`, token_type: 'Bearer' });
+        scope: f.scopes ?? `openid email ${EVENTS} ${LIST}`, token_type: 'Bearer' });
     }
     if (url === 'https://openidconnect.googleapis.com/v1/userinfo') {
       await f.afterProfile?.();
@@ -133,21 +139,21 @@ test('callback rejects missing or mismatched cookies, expired state, retries and
   const flow = await f.begin();
   for (const cookie of [null, '__Host-smooth_calendar_oauth=bad-cookie']) {
     const result = await f.complete(flow, cookie);
-    assert.equal(result.response.headers.get('location'), 'https://dashboard.smoothstudios.co/?calendar=error');
+    assert.equal(result.response.headers.get('location'), errorLocation('session'));
   }
   assert.equal(f.calls.length, 0);
   const [first, duplicate] = await Promise.all([f.complete(flow), f.complete(flow)]);
   assert.deepEqual([first, duplicate].map(result => result.response.headers.get('location')).sort(), [
-    'https://dashboard.smoothstudios.co/?calendar=connected', 'https://dashboard.smoothstudios.co/?calendar=error',
+    'https://dashboard.smoothstudios.co/?calendar=connected', errorLocation('session'),
   ].sort());
   assert.equal(f.calls.filter(call => call.form?.grant_type === 'authorization_code').length, 1);
   assert.equal((await f.call(null, flow.connect.data.authorizationUrl)).response.headers.get('location'), 'https://dashboard.smoothstudios.co/?calendar=error');
   const expired = await f.begin(); mock.timers.setTime(now + 600001);
-  assert.equal((await f.complete(expired)).response.headers.get('location'), 'https://dashboard.smoothstudios.co/?calendar=error');
+  assert.equal((await f.complete(expired)).response.headers.get('location'), errorLocation('session'));
   mock.timers.setTime(now);
   const denied = await f.begin();
   const result = await f.call(null, `${CALLBACK}?state=${denied.state}&error=PRIVATE_GOOGLE_ERROR&return=https://attacker.invalid`, undefined, 'GET', denied.cookie);
-  assert.equal(result.response.headers.get('location'), 'https://dashboard.smoothstudios.co/?calendar=error');
+  assert.equal(result.response.headers.get('location'), errorLocation('consent'));
   assert.equal(await result.response.text(), '');
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM calendar_connections').get().n, 1);
 });
@@ -157,12 +163,12 @@ test('wrong or unverified employee Google accounts cannot be attached; owner mus
   for (const [address, verified] of [['rayne@example.invalid', true], ['jordyn@example.invalid', false]]) {
     f.address = address; f.verified = verified;
     const result = await f.complete(await f.begin());
-    assert.equal(result.response.headers.get('location'), 'https://dashboard.smoothstudios.co/?calendar=error');
+    assert.equal(result.response.headers.get('location'), errorLocation('account'));
   }
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM calendar_connections').get().n, 0);
   f.address = 'owner@example.invalid'; f.verified = true; f.accessRole = 'reader';
   const denied = await f.begin('owner'); assert.ok(denied.authorization.searchParams.get('scope').includes(LIST));
-  assert.equal((await f.complete(denied)).response.headers.get('location'), 'https://dashboard.smoothstudios.co/?calendar=error');
+  assert.equal((await f.complete(denied)).response.headers.get('location'), errorLocation('calendar_access'));
   f.accessRole = 'writer';
   assert.equal((await f.complete(await f.begin('owner'))).response.headers.get('location'), 'https://dashboard.smoothstudios.co/?calendar=connected');
   const employeeStatus = (await f.call('rayne', '/calendar/connection')).data;
@@ -197,14 +203,14 @@ test('disconnect affects only the caller, revokes its token and invalidates in-f
   const same = await f.setup(); assert.equal(same.data.configured, true);
   assert.equal((await f.call('rayne', '/calendar/connection')).data.connected, true);
   f.afterProfile = async () => { f.afterProfile = null; await f.call('rayne', '/calendar/connection', {}, 'DELETE'); };
-  assert.equal((await f.complete(pending)).response.headers.get('location'), 'https://dashboard.smoothstudios.co/?calendar=error');
+  assert.equal((await f.complete(pending)).response.headers.get('location'), errorLocation('save'));
   assert.equal((await f.call('rayne', '/calendar/connection')).data.connected, false);
   f.address = 'jordyn@example.invalid'; await f.complete(await f.begin());
   const oldState = await f.begin();
   await f.call('owner', '/calendar/setup', client('replacement'));
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM calendar_connections').get().n, 0);
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM calendar_oauth_states').get().n, 0);
-  assert.equal((await f.complete(oldState)).response.headers.get('location'), 'https://dashboard.smoothstudios.co/?calendar=error');
+  assert.equal((await f.complete(oldState)).response.headers.get('location'), errorLocation('session'));
 });
 
 test('changing a private employee alias invalidates only that connection and ciphertext cannot be moved between users', async t => {
@@ -218,4 +224,27 @@ test('changing a private employee alias invalidates only that connection and cip
   assert.equal((await f.call('jordyn', '/calendar/connect', {})).status, 409);
   await f.call('jordyn', '/calendar/connection', {}, 'DELETE');
   assert.ok(f.calls.some(call => call.url.endsWith('/revoke') && call.form.token === 'synthetic-refresh-token'));
+});
+
+test('connection failures explain the next action without returning provider errors or following redirects', async t => {
+  const f = fixture(t); await f.setup();
+  for (const [problem, reason] of [
+    [{networkFailure:true}, 'google_unavailable'],
+    [{tokenError:'invalid_client'}, 'setup'],
+    [{tokenError:'invalid_grant'}, 'session'],
+    [{tokenError:'PRIVATE_GOOGLE_ERROR'}, 'google_unavailable'],
+    [{scopes:'openid email'}, 'permissions'],
+    [{redirectAt:'https://oauth2.googleapis.com/token'}, 'google_unavailable'],
+  ]) {
+    Object.assign(f,{networkFailure:false,tokenError:null,scopes:null,redirectAt:null},problem);
+    const result = await f.complete(await f.begin());
+    assert.equal(result.response.headers.get('location'), errorLocation(reason));
+    assert.doesNotMatch(result.response.headers.get('location'), /PRIVATE|secret|token|example/);
+    assert.equal(await result.response.text(), '');
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM calendar_connections').get().n,0);
+  }
+  assert.ok(f.calls.every(call => new URL(call.url).hostname.endsWith('.googleapis.com')));
+  assert.match(calendarConnectionError('calendar_access'), /can’t edit the studio rental calendar/);
+  assert.doesNotMatch(calendarConnectionError('<script>PRIVATE'), /PRIVATE|script/);
+  assert.doesNotMatch(calendarConnectionError('__proto__'), /Object/);
 });

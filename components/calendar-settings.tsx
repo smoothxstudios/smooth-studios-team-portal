@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useRefreshSource } from "@/components/dashboard-refresh";
 import { teamRequest } from "@/lib/team-api";
 import { TEAM, TEAM_API_URL } from "@/lib/team-schedule.mjs";
+import { calendarConnectionError } from "@/lib/calendar-connection-errors.mjs";
 
 type CalendarConnection = {
   configured: boolean; connected: boolean; email?: string; ownerConnected: boolean;
@@ -20,6 +21,7 @@ export function CalendarSettings({ token, isOwner }: { token: string; isOwner: b
   const upload = useRef<HTMLInputElement>(null);
   const request = useRef(0), lifetime = useRef(0), operation = useRef(false);
   const callback = useRef<string | null>(null);
+  const callbackReason = useRef<string | null>(null);
 
   const refresh = useCallback(async (): Promise<CalendarConnection | false> => {
     const id = ++request.current;
@@ -29,8 +31,8 @@ export function CalendarSettings({ token, isOwner }: { token: string; isOwner: b
       setConnection(next); setError("");
       if (callback.current) {
         if (callback.current === "connected" && next.connected) setMessage("Google Calendar connected.");
-        else { setMessage(""); setError("Google Calendar wasn’t connected. Please try again."); }
-        callback.current = null;
+        else { setMessage(""); setError(calendarConnectionError(callbackReason.current)); }
+        callback.current = null; callbackReason.current = null;
       }
       return next;
     } catch {
@@ -44,7 +46,9 @@ export function CalendarSettings({ token, isOwner }: { token: string; isOwner: b
     const url = new URL(window.location.href), result = url.searchParams.get("calendar");
     if (result === "connected" || result === "error") {
       callback.current = result;
+      callbackReason.current = url.searchParams.get("calendar_reason");
       url.searchParams.delete("calendar");
+      url.searchParams.delete("calendar_reason");
       window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
       setMessage(result === "connected" ? "Checking your Google Calendar connection…" : "");
     }

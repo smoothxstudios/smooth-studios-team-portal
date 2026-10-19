@@ -1,5 +1,6 @@
 import { TEAM } from '../lib/team-schedule.mjs';
 import { base64url, unbase64url, tokenHash } from '../lib/team-auth.mjs';
+import { CALENDAR_CONNECTION_ERRORS } from '../lib/calendar-connection-errors.mjs';
 
 const API = 'https://smooth-studios-team-api.smoothxstudios.workers.dev';
 const CALLBACK = `${API}/calendar/oauth/callback`;
@@ -15,9 +16,10 @@ const noCache = { 'cache-control': 'no-store', pragma: 'no-cache', 'referrer-pol
 const scopes = user => ['openid', 'email', EVENTS_SCOPE, ...(user === 'owner' ? [LIST_SCOPE] : [])];
 const cookie = (value, lifetime = 600) => `${COOKIE}=${value}; Path=/; Max-Age=${lifetime}; Secure; HttpOnly; SameSite=Lax`;
 
-function finish(connected) {
+function finish(connected, reason) {
+  const detail = !connected && Object.hasOwn(CALENDAR_CONNECTION_ERRORS, reason) ? `&calendar_reason=${reason}` : '';
   return new Response(null, { status: 303, headers: { ...noCache,
-    location: `${DASHBOARD}?calendar=${connected ? 'connected' : 'error'}`, 'set-cookie': cookie('', 0) } });
+    location: `${DASHBOARD}?calendar=${connected ? 'connected' : 'error'}${detail}`, 'set-cookie': cookie('', 0) } });
 }
 async function encryptionKey(env) {
   if (!validRandom(env.CALENDAR_CONNECTION_KEY)) throw new Error('Calendar connection encryption is unavailable.');
@@ -78,7 +80,9 @@ async function connection(env, user, settings, config) {
   } catch { return null; }
 }
 async function google(url, options) {
-  return fetch(url, { ...options, redirect: 'error', signal: AbortSignal.timeout(15_000) });
+  // Workerd accepts follow/manual, not error. Manual keeps credentials on the
+  // fixed Google endpoint and treats redirects as unsuccessful responses.
+  return fetch(url, { ...options, redirect: 'manual', signal: AbortSignal.timeout(15_000) });
 }
 async function revoke(token) {
   try { await google('https://oauth2.googleapis.com/revoke', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token }) }); }
@@ -164,40 +168,54 @@ async function start(request, env) {
 async function callback(request, env) {
   const url = new URL(request.url), state = url.searchParams.get('state');
   const browser = request.headers.get('cookie')?.split(';').map(part => part.trim()).find(part => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
-  if (!validRandom(state) || !validRandom(browser)) return finish(false);
-  let receivedToken = null;
+  if (!validRandom(state) || !validRandom(browser)) return finish(false, 'session');
+  let receivedToken = null, reason = 'session';
   try {
     const stateHash = await tokenHash(state), browserHash = await tokenHash(browser), now = Date.now();
     const row = await env.DB.prepare('SELECT * FROM calendar_oauth_states WHERE state_hash = ?').bind(stateHash).first();
     const settings = await oauthSettings(env), config = await getCalendarConfig(env);
-    if (!row || !settings || !config || row.config_version !== settings.version || row.browser_hash !== browserHash || row.started_at === null || row.used_at !== null || row.expires_at <= now) return finish(false);
+    if (!row || !settings || !config || row.config_version !== settings.version || row.browser_hash !== browserHash || row.started_at === null || row.used_at !== null || row.expires_at <= now) return finish(false, 'session');
     const claimed = await env.DB.prepare(`UPDATE calendar_oauth_states SET used_at = ? WHERE state_hash = ? AND browser_hash = ?
       AND used_at IS NULL AND started_at IS NOT NULL AND expires_at > ? AND config_version = ?`)
       .bind(now, stateHash, browserHash, now, settings.version).run();
-    if (!claimed.meta.changes || url.searchParams.has('error')) return finish(false);
+    if (!claimed.meta.changes) return finish(false, 'session');
+    if (url.searchParams.has('error')) return finish(false, 'consent');
     const code = url.searchParams.get('code');
-    if (!code || code.length > 4096) return finish(false);
+    if (!code || code.length > 4096) return finish(false, 'session');
     const stored = await open(env, `state:${stateHash}`, row.data);
+    reason = 'google_unavailable';
     const response = await google('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ client_id: settings.clientId, client_secret: settings.clientSecret, code, code_verifier: stored.verifier, redirect_uri: CALLBACK, grant_type: 'authorization_code' }) });
     const tokens = await response.json().catch(() => ({}));
-    if (!response.ok || typeof tokens.access_token !== 'string' || !tokens.access_token || tokens.access_token.length > 16384 ||
-        !Number.isFinite(tokens.expires_in) || tokens.expires_in <= 0 || typeof tokens.scope !== 'string' || !tokens.scope.split(' ').includes(EVENTS_SCOPE) ||
-        (row.user_id === 'owner' && !tokens.scope.split(' ').includes(LIST_SCOPE))) return finish(false);
+    if (!response.ok) return finish(false, tokens.error === 'invalid_client' ? 'setup' : tokens.error === 'invalid_grant' ? 'session' : reason);
+    if (typeof tokens.access_token !== 'string' || !tokens.access_token || tokens.access_token.length > 16384 ||
+        !Number.isFinite(tokens.expires_in) || tokens.expires_in <= 0) return finish(false, reason);
     receivedToken = tokens.refresh_token || tokens.access_token;
+    reason = 'permissions';
+    if (typeof tokens.scope !== 'string' || !tokens.scope.split(' ').includes(EVENTS_SCOPE) ||
+        (row.user_id === 'owner' && !tokens.scope.split(' ').includes(LIST_SCOPE))) throw new Error('Missing Calendar permissions.');
+    reason = 'google_unavailable';
     const profileResponse = await google('https://openidconnect.googleapis.com/v1/userinfo', { headers: { authorization: `Bearer ${tokens.access_token}` } });
-    const profile = profileResponse.ok ? await profileResponse.json() : null;
+    if (!profileResponse.ok) throw new Error('Profile request failed.');
+    const profile = await profileResponse.json();
     const address = email(profile?.email);
+    reason = 'account';
     if (!address || profile.email_verified !== true || typeof profile.sub !== 'string' || !profile.sub || !expectedEmployeeEmail(config, row.user_id, address)) throw new Error('Calendar account did not match.');
     if (row.user_id === 'owner') {
+      reason = 'google_unavailable';
       const access = await google(`https://www.googleapis.com/calendar/v3/users/me/calendarList/${encodeURIComponent(config.calendarId)}`, { headers: { authorization: `Bearer ${tokens.access_token}` } });
+      if (!access.ok && ![401, 403, 404].includes(access.status)) throw new Error('Calendar request failed.');
       const entry = access.ok ? await access.json() : null;
+      reason = 'calendar_access';
       if (!entry || !['writer', 'owner'].includes(entry.accessRole)) throw new Error('Studio Calendar access is missing.');
     }
+    reason = 'save';
     const previous = await connection(env, row.user_id, settings, config);
     const refreshToken = typeof tokens.refresh_token === 'string' && tokens.refresh_token && tokens.refresh_token.length <= 16384 ? tokens.refresh_token
       : previous?.value.email === address && previous.value.subject === profile.sub ? previous.value.refreshToken : null;
+    reason = 'offline_access';
     if (!refreshToken) throw new Error('Offline Calendar access is missing.');
+    reason = 'save';
     const value = { accessToken: tokens.access_token, refreshToken, expiresAt: Date.now() + Math.min(tokens.expires_in, 86400) * 1000,
       email: address, subject: profile.sub, clientVersion: settings.version, ...(row.user_id === 'owner' ? { calendarId: config.calendarId } : {}) };
     const data = await seal(env, `connection:${row.user_id}`, value);
@@ -210,7 +228,7 @@ async function callback(request, env) {
       .bind(row.user_id, data, Date.now(), stateHash, now, Date.now(), settings.version).run();
     if (!saved.meta.changes) throw new Error('Calendar connection changed.');
     return finish(true);
-  } catch { if (receivedToken) await revoke(receivedToken); return finish(false); }
+  } catch { if (receivedToken) await revoke(receivedToken); return finish(false, reason); }
 }
 
 export async function calendarAuthRoute({ request, env, user, body, fail }) {

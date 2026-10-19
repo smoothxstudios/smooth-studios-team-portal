@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.38.0",
+  "currentVersion": "2.38.1",
   "releases": [
+    {
+      "id": "2026-10-18-google-connection-repair",
+      "version": "2.38.1",
+      "date": "2026-10-18",
+      "category": "Scheduling",
+      "title": "Google Calendar connection repair",
+      "changes": [
+        "Fixed the server request issue that prevented Google Calendar from connecting after approval. The same correction applies to invitations, RSVP updates, token renewal, and disconnection.",
+        "Connection failures now explain the next step, such as retrying, approving missing Calendar access, or choosing the account that can edit the studio Calendar. Uploaded Google setup stays saved for a retry."
+      ],
+      "employee": {
+        "title": "Google Calendar connection repair",
+        "changes": [
+          "Google Calendar can finish connecting after approval. If connection fails, Settings explains what to check before trying again."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-18-event-staffing-planner",
       "version": "2.38.0",
