@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.38.7",
+  "currentVersion": "2.38.8",
   "releases": [
+    {
+      "id": "2026-10-19-events-stay-on-start-day",
+      "version": "2.38.8",
+      "date": "2026-10-19",
+      "category": "Scheduling",
+      "title": "Overnight events stay on their starting day",
+      "changes": [
+        "Event Planner keeps each event, studio booking, and task on the day it starts, including day counts and crew summaries. Overnight availability and conflict checks still include the full scheduled time."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-19-custom-crew-size",
       "version": "2.38.7",

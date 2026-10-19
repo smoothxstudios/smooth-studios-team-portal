@@ -7,7 +7,7 @@ import {Input} from '@/components/ui/input';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from '@/components/ui/dialog';
 import {teamRequest,type TeamSchedule} from '@/lib/team-api';
 import {studioLocal,localInstant,addLocalDays,blockOccurrences} from '@/lib/team-schedule.mjs';
-import {emptyPlan,validatePlan,mergePlan,plannerPeople,plannerOnDay,crewFit} from '@/lib/event-planner.mjs';
+import {emptyPlan,validatePlan,mergePlan,plannerPeople,plannerOnDay,plannerStartsOnDay,crewFit} from '@/lib/event-planner.mjs';
 import {plannerTimeText} from '@/lib/planner-time.mjs';
 import type {PlannerData,PlannerState,PlannerEvent,PlannerAvailability} from '@/lib/event-planner-types';
 import {useRefreshSource} from '@/components/dashboard-refresh';
@@ -58,11 +58,11 @@ export function EventPlanner({token,onSchedule,onAvailability}:{token:string;onS
   const people=plan?plannerPeople(plan):[];
   const personName=(id:string)=>people.find(p=>p.id===id)?.name||id;
   const week=startOfWeek(day),days=Array.from({length:7},(_,i)=>plusDay(week,i));
-  const events=plan?.events.filter(e=>(showArchived||!e.archived)&&plannerOnDay(e,day)&&(!needsCrew||!e.crewNeeded||e.people.length<e.crewNeeded)&&`${e.title} ${e.location}`.toLowerCase().includes(search.toLowerCase()))||[];
-  const appointments=schedule?.appointments.filter(a=>plannerOnDay(a,day)&&`${a.title} ${a.customer}`.toLowerCase().includes(search.toLowerCase()))||[];
-  const tasks=schedule?.assignments.filter(a=>!a.appointmentId&&['pending','accepted'].includes(a.status)&&plannerOnDay(a,day)&&a.title.toLowerCase().includes(search.toLowerCase()))||[];
+  const events=plan?.events.filter(e=>(showArchived||!e.archived)&&plannerStartsOnDay(e,day)&&(!needsCrew||!e.crewNeeded||e.people.length<e.crewNeeded)&&`${e.title} ${e.location}`.toLowerCase().includes(search.toLowerCase()))||[];
+  const appointments=schedule?.appointments.filter(a=>plannerStartsOnDay(a,day)&&`${a.title} ${a.customer}`.toLowerCase().includes(search.toLowerCase()))||[];
+  const tasks=schedule?.assignments.filter(a=>!a.appointmentId&&['pending','accepted'].includes(a.status)&&plannerStartsOnDay(a,day)&&a.title.toLowerCase().includes(search.toLowerCase()))||[];
   const entries=[...events.map(e=>({start:e.startLocal,event:e})),...appointments.map(a=>({start:studioLocal(a.start),appointment:a})),...tasks.map(t=>({start:studioLocal(t.start),task:t}))].sort((a,b)=>a.start.localeCompare(b.start));
-  const dayEvents=plan?.events.filter(e=>!e.archived&&plannerOnDay(e,day))||[];
+  const dayEvents=plan?.events.filter(e=>!e.archived&&plannerStartsOnDay(e,day))||[];
   const unfilled=dayEvents.filter(e=>!e.crewNeeded||e.people.length<e.crewNeeded).length;
   const conflicts=dayEvents.filter(e=>e.people.some(id=>crewFit(id,e,plan!,schedule!).status==='blocked')).length;
   function optionsFor(event:PlannerEvent){return people.map(p=>({...p,fit:crewFit(p.id,event,plan!,schedule!)})).sort((a,b)=>({available:0,check:1,unknown:2,blocked:3}[a.fit.status as 'available']-({available:0,check:1,unknown:2,blocked:3}[b.fit.status as 'available'])));}
@@ -80,7 +80,7 @@ export function EventPlanner({token,onSchedule,onAvailability}:{token:string;onS
     <header className="planner-heading"><div className="planner-actions"><Button disabled={disabled} onClick={()=>setEdit(freshEvent(day))}><Plus size={17}/>Add event</Button><Button variant="outline" onClick={()=>{setManage(true);setAvailability(null);}}>Crew availability</Button><Button variant="outline" aria-label="Refresh event planner" disabled={busy} onClick={()=>void load()}><RefreshCw size={16}/></Button></div></header>
     {feedback}
     <div className="planner-calendar"><div className="planner-datebar"><div className="planner-actions"><Button variant="outline" aria-label="Previous week" onClick={()=>setDay(plusDay(day,-7))}><ChevronLeft size={18}/></Button><strong>{dayLabel(week,{month:'short',day:'numeric'})} - {dayLabel(plusDay(week,6),{month:'short',day:'numeric',year:'numeric'})}</strong><Button variant="outline" aria-label="Next week" onClick={()=>setDay(plusDay(day,7))}><ChevronRight size={18}/></Button></div><div className="planner-actions"><Button variant="ghost" onClick={()=>setDay(today())}>Today</Button><label className="sr-only" htmlFor="planner-day">Choose date</label><Input id="planner-day" type="date" value={day} onChange={e=>e.target.value&&setDay(e.target.value)}/></div></div>
-    <div className="planner-days" role="group" aria-label="Choose a day">{days.map(d=>{const count=plan.events.filter(e=>!e.archived&&plannerOnDay(e,d)).length;return <button key={d} aria-label={`${dayLabel(d)} · ${count} ${count===1?'event':'events'}`} aria-pressed={d===day} onClick={()=>setDay(d)}><span>{dayLabel(d,{weekday:'short'})}</span><strong>{d.slice(8)}</strong><small><span className="planner-day-count">{count}</span><span className="planner-day-count-label"> {count===1?'event':'events'}</span></small></button>;})}</div></div>
+    <div className="planner-days" role="group" aria-label="Choose a day">{days.map(d=>{const count=plan.events.filter(e=>!e.archived&&plannerStartsOnDay(e,d)).length;return <button key={d} aria-label={`${dayLabel(d)} · ${count} ${count===1?'event':'events'}`} aria-pressed={d===day} onClick={()=>setDay(d)}><span>{dayLabel(d,{weekday:'short'})}</span><strong>{d.slice(8)}</strong><small><span className="planner-day-count">{count}</span><span className="planner-day-count-label"> {count===1?'event':'events'}</span></small></button>;})}</div></div>
     <div className="planner-summary"><div><strong>{dayEvents.length}</strong><span>Events</span></div><div><strong>{unfilled}</strong><span>Need crew</span></div><div className={conflicts?'has-conflict':''}><strong>{conflicts}</strong><span>Crew conflicts</span></div><div><strong>{appointments.length}</strong><span>Studio bookings</span></div></div>
     <div className="planner-mobile-switch" role="group" aria-label="Planner view"><button aria-pressed={mobileView==='events'} onClick={()=>setMobileView('events')}><CalendarDays size={16}/>Day’s events <span>{dayEvents.length}</span></button><button aria-pressed={mobileView==='crew'} onClick={()=>setMobileView('crew')}><Users size={16}/>Crew today</button></div>
     <div className="planner-columns"><div className="planner-day-content"><div className="planner-list-heading"><h3>{dayLabel(day)}</h3><Input aria-label="Search this day" placeholder="Search events or bookings" value={search} onChange={e=>setSearch(e.target.value)}/></div>

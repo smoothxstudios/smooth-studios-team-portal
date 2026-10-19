@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture } from './helpers/notification-fixture.mjs';
-import { emptyPlan, validatePlan, mergePlan, crewFit, plannerOnDay } from '../lib/event-planner.mjs';
+import { emptyPlan, validatePlan, mergePlan, crewFit, plannerOnDay, plannerStartsOnDay } from '../lib/event-planner.mjs';
 import { localInstant } from '../lib/team-schedule.mjs';
 
 const event = extra => ({ id:'event-one', title:'Synthetic event', startLocal:'2026-10-23T22:00', endLocal:'2026-10-24T02:00', crewNeeded:2, people:[], ...extra });
@@ -96,4 +96,17 @@ test('custom crew sizes support more than two people and persist through the API
   assert.equal(saved.crewNeeded,5);assert.deepEqual(saved.people,['owner','akiva','jordyn']);
   assert.throws(()=>plan({events:[event({crewNeeded:2,people:saved.people})]}));
   assert.equal((await save(f,{...p,events:[{...saved,crewNeeded:1.5}]},1)).status,400);
+});
+
+test('overnight work belongs only to its starting studio day while conflicts span midnight', () => {
+  const overnight=event({people:['akiva'],coverageStartLocal:'2026-10-24T00:30'});
+  for(const work of [overnight,{start:'2026-10-24T02:00:00Z',end:'2026-10-24T06:00:00Z'}]) {
+    assert.equal(plannerStartsOnDay(work,'2026-10-23'),true);
+    assert.equal(plannerStartsOnDay(work,'2026-10-24'),false);
+  }
+  assert.equal(plannerStartsOnDay(event({startLocal:'2026-10-24T00:00'}),'2026-10-24'),true);
+  assert.equal(plannerStartsOnDay(event({endLocal:''}),'2026-10-23'),true);
+  const next=event({id:'after-midnight',startLocal:'2026-10-24T01:00',endLocal:'2026-10-24T03:00'});
+  assert.equal(crewFit('akiva',next,plan({events:[overnight,next]}),{}).status,'blocked');
+  assert.equal(plannerOnDay(available('akiva','2026-10-23T22:00','2026-10-24T02:00'),'2026-10-24'),true);
 });

@@ -1,6 +1,6 @@
 {
   "name": "smooth-studios-team-portal",
-  "version": "2.38.7",
+  "version": "2.38.8",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
