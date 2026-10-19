@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.38.6",
+  "currentVersion": "2.38.7",
   "releases": [
+    {
+      "id": "2026-10-19-custom-crew-size",
+      "version": "2.38.7",
+      "date": "2026-10-19",
+      "category": "Scheduling",
+      "title": "Enter the crew size you need",
+      "changes": [
+        "Type the number of people needed in Add event, Edit event, or Plan crew. Crew size is no longer limited to one or two people. Editing the number keeps your crew selections; remove a selected person before saving a smaller crew."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-18-planner-opens-today",
       "version": "2.38.6",

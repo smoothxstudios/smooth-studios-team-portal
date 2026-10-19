@@ -48,7 +48,7 @@ test('imports preserve existing crew choices, support guests and validate malfor
   const incoming=plan({guests:[{id:'guest-one',name:'Guest One'}]});
   const current=structuredClone(incoming);current.events[0].people=['guest-one'];
   assert.deepEqual(mergePlan(current,incoming),current);
-  for(const edit of [ {crewNeeded:3}, {people:['akiva','akiva']}, {people:['missing']}, {endLocal:'2026-10-22T22:00'}, {startLocal:'2026-02-30T22:00'} ]) assert.throws(()=>plan({events:[event(edit)]}));
+  for(const edit of [ {crewNeeded:-1}, {crewNeeded:1.5}, {crewNeeded:"3"}, {crewNeeded:Number.MAX_SAFE_INTEGER+1}, {people:['akiva','akiva']}, {people:['missing']}, {endLocal:'2026-10-22T22:00'}, {startLocal:'2026-02-30T22:00'} ]) assert.throws(()=>plan({events:[event(edit)]}));
   assert.throws(()=>plan({guests:[{id:'owner',name:'Guest'}]}));
 });
 
@@ -87,4 +87,13 @@ test('dashboard browser preflight permits planner saves only for trusted origins
     if (origin.includes('untrusted')) assert.equal(response.status,403);
     else { assert.equal(response.status,204);assert.equal(response.headers.get('access-control-allow-origin'),origin);assert.ok(response.headers.get('access-control-allow-methods').split(', ').includes('PUT')); }
   }
+});
+
+test('custom crew sizes support more than two people and persist through the API', async t => {
+  const f=await setup(t),p=plan({events:[event({crewNeeded:5,people:['owner','akiva','jordyn']})]});
+  assert.equal((await save(f,p)).status,200);
+  const saved=(await f.call('owner','/event-planner')).data.events[0];
+  assert.equal(saved.crewNeeded,5);assert.deepEqual(saved.people,['owner','akiva','jordyn']);
+  assert.throws(()=>plan({events:[event({crewNeeded:2,people:saved.people})]}));
+  assert.equal((await save(f,{...p,events:[{...saved,crewNeeded:1.5}]},1)).status,400);
 });
