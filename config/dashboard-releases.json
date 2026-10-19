@@ -1,6 +1,27 @@
 {
-  "currentVersion": "2.39.2",
+  "currentVersion": "2.39.3",
   "releases": [
+    {
+      "id": "2026-10-19-second-reliability-audit",
+      "version": "2.39.3",
+      "date": "2026-10-19",
+      "category": "Reliability",
+      "title": "Alert navigation and payment workflow safeguards",
+      "changes": [
+        "Deleting, restoring, and marking alerts unread keep their confirmed results when you switch tabs while the save finishes.",
+        "The dashboard stays usable when browser storage is blocked; appearance changes still work for the current session.",
+        "Payment cutoffs use the studio date and reject impossible or future dates. Payment overrides reject missing inputs before changing data.",
+        "Queued payment workflows start from the latest saved data and handle owner-entered values as literal inputs."
+      ],
+      "employee": {
+        "title": "Alerts stay consistent when switching pages",
+        "changes": [
+          "Alert deletion, Undo, and Mark all → Unread keep updating your inbox and badge while you move between tabs.",
+          "The dashboard stays usable when browser storage is blocked."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-19-reliability-audit",
       "version": "2.39.2",

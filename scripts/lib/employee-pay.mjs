@@ -3,6 +3,15 @@ export function studioDate(value, timeZone = "America/New_York") {
   return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
 }
 
+export function validatePaidThrough(value, now = Date.now(), timeZone = "America/New_York") {
+  const parsed = new Date(`${value}T12:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "") || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new Error("--through must be a valid YYYY-MM-DD date");
+  }
+  if (value > studioDate(now, timeZone)) throw new Error("--through cannot be a future date");
+  return value;
+}
+
 export function initializePayAdjustments(config, ledger) {
   ledger.employees ??= {};
   for (const employee of config.employees) {

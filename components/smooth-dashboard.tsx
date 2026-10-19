@@ -157,7 +157,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   }, []);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
-  const [paidThrough, setPaidThrough] = useState(new Date().toISOString().slice(0, 10));
+  const [paidThrough, setPaidThrough] = useState(() => studioLocal(Date.now()).slice(0, 10));
   const [payoutEmployee, setPayoutEmployee] = useState("all");
   const [paymentOverrideOpen, setPaymentOverrideOpen] = useState(false);
   const [paymentReviewRentalId, setPaymentReviewRentalId] = useState("");
@@ -451,7 +451,8 @@ export function SmoothDashboard() {
   }, [signedIn, refreshSnapshot]);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("smooth-theme");
+    let savedTheme: string | null = null;
+    try { savedTheme = localStorage.getItem("smooth-theme"); } catch { /* Use device appearance when storage is unavailable. */ }
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const themeTimer = window.setTimeout(() => setDark(savedTheme ? savedTheme === "dark" : prefersDark), 0);
     return () => window.clearTimeout(themeTimer);
@@ -487,7 +488,7 @@ export function SmoothDashboard() {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem("smooth-theme", dark ? "dark" : "light");
+    try { localStorage.setItem("smooth-theme", dark ? "dark" : "light"); } catch { /* Appearance still works for this session. */ }
   }, [dark]);
 
   const unlock = async (profile: AccessProfile, password: string) => {

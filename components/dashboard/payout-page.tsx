@@ -1,4 +1,5 @@
 "use client";
+import { studioLocal } from "@/lib/team-schedule.mjs";
 import { teamEarnings } from "@/lib/team-summary.mjs";
 import { teamAccent } from "@/lib/dashboard-presentation";
 import type { CreativeAssignment } from "@/lib/use-creative-work";
@@ -106,7 +107,7 @@ export function PayoutPage({
           </div>
           <div className="payout-control">
             <label htmlFor="paid-through">Mark paid through</label>
-            <input id="paid-through" max={new Date().toISOString().slice(0, 10)} onChange={(event) => setPaidThrough(event.target.value)} type="date" value={paidThrough} />
+            <input id="paid-through" max={studioLocal(Date.now()).slice(0, 10)} onChange={(event) => setPaidThrough(event.target.value)} type="date" value={paidThrough} />
           </div>
           <div className="workflow-scope"><ReceiptText size={16} /><span>{payoutScopeLabel} · {eligibleAppointments} eligible appointment{eligibleAppointments === 1 ? "" : "s"}</span></div>
           <Button className="github-button" onClick={onContinue}>Review and mark paid <ArrowRight size={16} /></Button>

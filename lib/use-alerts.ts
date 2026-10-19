@@ -88,52 +88,52 @@ export function useAlerts(token: string, active: boolean) {
   const markAllUnread = async () => {
     if (operation.current || loading || !page.throughSequence) return false;
     const throughSequence = page.throughSequence;
-    operation.current = true; const current = ++requestId.current; setBusy(true);
+    operation.current = true; ++requestId.current; const session = lifetime.current; setBusy(true);
     let saved = false;
     try {
       const result = await teamRequest<{ unreadCount: number; readAt: null }>(token, "/alerts/unread-all", { throughSequence }, "PATCH");
-      if (current === requestId.current) {
+      if (session === lifetime.current) {
         setPage(previous => ({ ...previous, unreadCount: result.unreadCount,
           alerts: previous.alerts.map(item => item.sequence <= throughSequence ? { ...item, readAt: null } : item) }));
         setError(""); saved = true;
       }
-    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "Alerts couldn’t be marked unread. Try again."); }
-    finally { operation.current = false; }
+    } catch (error) { if (session === lifetime.current) setError(error instanceof Error ? error.message : "Alerts couldn’t be marked unread. Try again."); }
+    finally { if (session === lifetime.current) operation.current = false; }
     // Previously read alerts may now belong in Unread, including older pages.
     // Keep the saved state if this list refresh fails; the server update succeeded.
-    if (saved) await refresh();
-    setBusy(false); setLoading(false);
+    if (saved && session === lifetime.current) await refresh();
+    if (session === lifetime.current) { setBusy(false); setLoading(false); }
     return saved;
   };
   const deleteAlert = async (alert: DashboardAlert) => {
     if (operation.current) return false;
-    operation.current = true; const current = ++requestId.current; setBusy(true);
+    operation.current = true; ++requestId.current; const session = lifetime.current; setBusy(true);
     try {
       const result = await teamRequest<{ unreadCount: number; deletedAt: number }>(token, "/alerts", { ids: [alert.id] }, "DELETE");
-      if (current === requestId.current) {
+      if (session === lifetime.current) {
         setPage(previous => ({ ...previous, unreadCount: result.unreadCount, alerts: previous.alerts.filter(item => item.id !== alert.id) }));
         setDeletion({ alert }); setError("");
       }
-      return current === requestId.current;
-    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "This alert couldn’t be deleted. Try again."); return false; }
-    finally { operation.current = false; setBusy(false); setLoading(false); }
+      return session === lifetime.current;
+    } catch (error) { if (session === lifetime.current) setError(error instanceof Error ? error.message : "This alert couldn’t be deleted. Try again."); return false; }
+    finally { if (session === lifetime.current) { operation.current = false; setBusy(false); setLoading(false); } }
   };
   const undoDelete = async () => {
     if (!deletion || operation.current) return false;
-    operation.current = true; const current = ++requestId.current; setBusy(true);
+    operation.current = true; ++requestId.current; const session = lifetime.current; setBusy(true);
     let restored = false;
     try {
       const result = await teamRequest<Summary>(token, "/alerts/restore", { ids: [deletion.alert.id] }, "PATCH");
-      if (current === requestId.current) {
+      if (session === lifetime.current) {
         setPage(previous => ({ ...previous, unreadCount: result.unreadCount }));
         setDeletion(null); setError(""); restored = true;
       }
-    } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "This alert couldn’t be restored. Try again."); }
-    finally { operation.current = false; }
+    } catch (error) { if (session === lifetime.current) setError(error instanceof Error ? error.message : "This alert couldn’t be restored. Try again."); }
+    finally { if (session === lifetime.current) operation.current = false; }
     // Re-read the current filter and loaded pages so another device's read state
     // and any arrivals during deletion stay authoritative after Undo.
-    if (restored) await refresh();
-    setBusy(false); setLoading(false);
+    if (restored && session === lifetime.current) await refresh();
+    if (session === lifetime.current) { setBusy(false); setLoading(false); }
     return restored;
   };
   return { ...page, loading, busy, error, filter, deletion, chooseFilter, refresh, loadMore, markRead, markAllUnread, deleteAlert, undoDelete };

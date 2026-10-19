@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { readTeamSettings } from "./lib/team-settings.mjs";
-import { initializePayAdjustments, markEmployeeThrough } from "./lib/employee-pay.mjs";
+import { initializePayAdjustments, markEmployeeThrough, validatePaidThrough } from "./lib/employee-pay.mjs";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -9,12 +9,8 @@ const args = new Map(process.argv.slice(2).map((value, index, all) => value.star
 const paidThrough = args.get("through");
 const employeeId = args.get("employee") ?? "all";
 
-if (!/^\d{4}-\d{2}-\d{2}$/.test(paidThrough ?? "") || Number.isNaN(new Date(`${paidThrough}T12:00:00Z`).getTime())) {
-  throw new Error("--through must be a valid YYYY-MM-DD date");
-}
-if (paidThrough > new Date().toISOString().slice(0, 10)) throw new Error("--through cannot be a future date");
-
 const config = JSON.parse(await readFile(path.join(root, "config/studio.config.json"), "utf8"));
+validatePaidThrough(paidThrough, Date.now(), config.timeZone);
 const ledgerPath = path.join(root, "data/payout-ledger.json");
 const ledger = JSON.parse(await readFile(ledgerPath, "utf8"));
 const settings = await readTeamSettings(root, config, process.env.DASHBOARD_PASSWORD_OWNER);
