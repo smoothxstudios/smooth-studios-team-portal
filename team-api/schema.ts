@@ -46,6 +46,12 @@ export const rentalChecklists = sqliteTable("rental_checklists", {
   id: text("id").primaryKey(), appointmentId: text("appointment_id").notNull(), version: integer("version").notNull().default(1), data: text("data").notNull(),
 }, table => [index("rental_checklist_appointment_idx").on(table.appointmentId)]);
 
+export const rentalBalanceReminders = sqliteTable("rental_balance_reminders", {
+  id: text("id").primaryKey(), appointmentId: text("appointment_id").notNull(),
+  endTime: text("end_time").notNull(), userId: text("user_id").notNull(),
+  payload: text("payload").notNull(), dueAt: integer("due_at").notNull(), endsAt: integer("ends_at").notNull(),
+}, table => [uniqueIndex("rental_balance_unique").on(table.appointmentId, table.endTime, table.userId)]);
+
 export const engagementState = sqliteTable("team_engagement_state", {
   userId: text("user_id").primaryKey(),
   nextMoodAt: integer("next_mood_at").notNull().default(0),
