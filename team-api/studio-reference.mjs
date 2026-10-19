@@ -63,7 +63,9 @@ export async function studioReferenceRoute({ request, db, user, env, body, fail 
     const assignments = isOwner ? [] : (await db.prepare("SELECT data FROM team_assignments WHERE employee_id = ?").bind(user).all()).results.map(row => JSON.parse(row.data));
     const allowed = appointments.filter(appointment => isOwner || appointment.acceptedEmployeeIds.includes(user) || assignments.some(item =>
       item.appointmentId === appointment.id && item.status === "accepted" && item.start === appointment.start && item.end === appointment.end));
-    const rentals = await Promise.all(allowed.map(async appointment => ({ ...appointment, checklistId: await tokenHash(`${appointment.id}|${appointment.start}|${appointment.end}`) })));
+    const rentals = await Promise.all(allowed.map(async appointment => ({ ...appointment,
+      ...(isOwner ? {} : { fullyPaid: undefined, paidOnlineCents: undefined }),
+      checklistId: await tokenHash(`${appointment.id}|${appointment.start}|${appointment.end}`) })));
     if (request.method === "GET" && url.pathname === "/rental-checklists") {
       const saved = (await db.prepare("SELECT id, data, version FROM rental_checklists WHERE appointment_id IN (SELECT value FROM json_each(?))")
         .bind(JSON.stringify(rentals.map(item => item.id))).all()).results;
