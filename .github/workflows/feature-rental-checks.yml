@@ -1,0 +1,23 @@
+name: Validate rental operations feature
+
+on:
+  push:
+    branches: [feature/rental-bts-trigger-and-balance-reminders-20261019]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build:github-pages
+        env:
+          GITHUB_PAGES_BASE_PATH: /smooth-studios-team-portal
