@@ -1,6 +1,28 @@
 {
-  "currentVersion": "2.39.1",
+  "currentVersion": "2.39.2",
   "releases": [
+    {
+      "id": "2026-10-19-reliability-audit",
+      "version": "2.39.2",
+      "date": "2026-10-19",
+      "category": "Reliability",
+      "title": "Calendar sync and planner recovery fixes",
+      "changes": [
+        "Concurrent Google Calendar connection checks share one token refresh instead of briefly reporting a missing connection.",
+        "Calendar full imports reject older snapshots and preserve other uploads still in progress.",
+        "Event Planner resumes background updates after closing availability notes. Correctable form errors keep editing available, invalid coverage times show an error, and import errors stay visible in the dialog.",
+        "Period totals use studio time across month and daylight-saving boundaries. Manual pay belongs to its work date rather than its later recording date.",
+        "Rental checklist saves now reject a concurrent staffing or checklist-template change instead of using outdated access."
+      ],
+      "employee": {
+        "title": "More reliable Calendar updates",
+        "changes": [
+          "Improved Calendar connection checks and protection against outdated schedule imports.",
+          "Earnings period totals follow studio time and the work date for training or other manual pay."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-19-planner-refactor",
       "version": "2.39.1",

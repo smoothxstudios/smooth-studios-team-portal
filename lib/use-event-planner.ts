@@ -45,18 +45,25 @@ export function useEventPlanner(token: string, isEditing: boolean) {
 
   async function save(next: PlannerData, notice = 'Plan saved.') {
     if (!plan || inFlight.current || stale) return false;
-    inFlight.current = true; ++sequence.current;
+    let checked;
+    try { checked = validatePlan(next); }
+    catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Check the plan details.');
+      return false;
+    }
+    inFlight.current = true; const request = ++sequence.current;
     setBusy(true); setError(''); setMessage('');
     try {
-      const checked = validatePlan(next);
       const result = await teamRequest<PlannerState>(token, '/event-planner', { ...checked, revision: plan.revision }, 'PUT');
+      if (request !== sequence.current) return false;
       setPlan(result); setMessage(notice);
       return true;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save.'); setStale(true);
+      if (request === sequence.current) { setError(caught instanceof Error ? caught.message : 'Could not save.'); setStale(true); }
       return false;
     } finally {
-      inFlight.current = false; setBusy(false);
+      inFlight.current = false;
+      if (request === sequence.current) setBusy(false);
     }
   }
 

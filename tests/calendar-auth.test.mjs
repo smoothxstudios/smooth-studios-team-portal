@@ -248,3 +248,18 @@ test('connection failures explain the next action without returning provider err
   assert.doesNotMatch(calendarConnectionError('<script>PRIVATE'), /PRIVATE|script/);
   assert.doesNotMatch(calendarConnectionError('__proto__'), /Object/);
 });
+
+test('concurrent token reads share decryption as well as the refresh request', async t => {
+  const f = fixture(t); await f.setup(); await f.complete(await f.begin());
+  mock.timers.setTime(now + 3600000);
+  const prepare = f.env.DB.prepare.bind(f.env.DB);
+  let connectionReads = 0;
+  f.env.DB.prepare = sql => {
+    if (sql === 'SELECT * FROM calendar_connections WHERE user_id = ?') connectionReads++;
+    return prepare(sql);
+  };
+  const values = await Promise.all(Array.from({length: 20}, () => calendarAccessToken(f.env, 'jordyn')));
+  assert.ok(values.every(value => value?.accessToken === 'refreshed-access-token'));
+  assert.equal(connectionReads, 1, 'no caller can retain an old encrypted row while another completes its refresh');
+  assert.equal(f.calls.filter(call => call.form?.grant_type === 'refresh_token').length, 1);
+});

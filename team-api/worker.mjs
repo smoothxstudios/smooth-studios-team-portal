@@ -335,16 +335,22 @@ async function route(request, env, ctx) {
     });
     const state = await db.prepare("SELECT generation FROM team_state WHERE id = 1").first();
     if (state.generation === generation) fail(409, "Create a new import generation.");
-    if (input.incremental === true) await trackImport(db, 'calendar', generation);
+    await trackImport(db, 'calendar', generation);
     await db.prepare(`INSERT INTO team_appointments (generation, id, data)
-      SELECT ?, json_extract(value, '$.id'), value FROM json_each(?) WHERE true
-      ON CONFLICT(generation, id) DO UPDATE SET data = excluded.data WHERE team_appointments.data != excluded.data`).bind(generation, JSON.stringify(appointments)).run();
+      SELECT ?, json_extract(value, '$.id'), value FROM json_each(?)
+      WHERE NOT EXISTS (SELECT 1 FROM team_state WHERE id = 1 AND generation = ?)
+      ON CONFLICT(generation, id) DO UPDATE SET data = excluded.data WHERE team_appointments.data != excluded.data`).bind(generation, JSON.stringify(appointments), generation).run();
     return { imported: appointments.length };
   }
   if (request.method === "POST" && url.pathname === "/sync/commit") {
     const input = await body(request), generation = text(input.generation, 80), s = await snapshot(db);
     const calendarReadAt = input.calendarReadAt === undefined ? new Date(Date.now()).toISOString() : text(input.calendarReadAt, 40);
     if (!Number.isFinite(Date.parse(calendarReadAt)) || Date.parse(calendarReadAt) > Date.now() + 60_000 || Date.parse(calendarReadAt) < Date.now() - 86400_000) fail(400, "Invalid Calendar read time.");
+    if (input.incremental !== true && (generation === s.state.generation ||
+        (s.state.synced_at && (Date.parse(calendarReadAt) < Date.parse(s.state.synced_at) ||
+          (input.calendarReadAt !== undefined && Date.parse(calendarReadAt) === Date.parse(s.state.synced_at)))))) {
+      fail(409, "A newer Calendar sync is already saved. Retry with a fresh Calendar read.");
+    }
     const staged = await jsonRows(db, "SELECT data FROM team_appointments WHERE generation = ?", generation);
     let next = staged, syncStats;
     if (input.incremental === true) {
@@ -380,6 +386,8 @@ async function route(request, env, ctx) {
     await commit(db, s.state, mutation => [
       db.prepare(`UPDATE team_state SET generation = ?, synced_at = ? WHERE id = 1 AND ${guard}`)
         .bind(input.incremental === true ? s.state.generation : generation, calendarReadAt, mutation),
+      ...(input.incremental !== true ? [db.prepare(`DELETE FROM sync_imports WHERE kind = 'calendar' AND generation = ? AND ${guard}`)
+        .bind(generation, mutation)] : []),
       ...(input.incremental === true ? [
         ...recordBatches(staged).map(rows => db.prepare(`INSERT INTO team_appointments(generation, id, data)
           SELECT ?, json_extract(value, '$.id'), value FROM json_each(?) WHERE ${guard}
@@ -402,7 +410,8 @@ async function route(request, env, ctx) {
         .bind(JSON.stringify(corrections.map(alert => alert.id)), mutation),
     ], notifications);
     // The old snapshot remains available until the atomic generation switch.
-    if (input.incremental !== true) await db.prepare("DELETE FROM team_appointments WHERE generation != ?").bind(generation).run();
+    if (input.incremental !== true) await db.prepare(`DELETE FROM team_appointments WHERE generation = ?
+      AND generation != (SELECT generation FROM team_state WHERE id = 1)`).bind(s.state.generation).run();
     if (notifications.length) ctx.waitUntil(flushAlerts(env));
     if (changes.some(assignment => queuedIds.has(assignment.id) && !importedDuration(assignment))) ctx.waitUntil(flushCalendarAssignments(env, { limit: 3 }));
     return { synced: next.length, ...(syncStats ? { syncStats } : {}) };

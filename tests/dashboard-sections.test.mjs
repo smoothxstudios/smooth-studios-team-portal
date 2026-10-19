@@ -159,3 +159,14 @@ if (process.env.DASHBOARD_COMPARE_BEFORE === '1') {
     assert.equal(renderNavigation(navigation.DashboardNavigation, props), renderNavigation(before.DashboardNavigation, props));
   });
 }
+
+test('period totals place manual pay on its work date, not the later approval date', () => {
+  const html = render(financial.PeriodTotals, {rentals:[], employeeId:'jordyn', creative:[{
+    id:'manual-fixture',employeeId:'jordyn',entryType:'manual',status:'approved',amountCents:2500,
+    earnedAt:'2026-10-09T04:00:00.000Z',approvedAt:'2026-10-17T06:00:00.000Z',payments:[],
+  }]});
+  const sections = html.split('class="period-total"');
+  assert.match(sections[1], /This week<\/span><strong>\$0<\/strong>/);
+  assert.match(sections[2], /This month<\/span><strong>\$25<\/strong>/);
+  assert.match(sections[3], /This year<\/span><strong>\$25<\/strong>/);
+});

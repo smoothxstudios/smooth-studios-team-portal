@@ -154,3 +154,20 @@ test('normalization avoids rewrites for equivalent timestamps and reordered gues
   assert.deepEqual(recordDelta([a], desired, saved, calendarKey), { changed: [], removed: [] });
   await assert.rejects(recordManifest([a, a], calendarKey), /Duplicate/);
 });
+
+test('full Calendar imports reject stale reads and preserve another upload in progress', async t => {
+  const f = await setup(); t.after(() => f.close());
+  const old = crypto.randomUUID(), newer = crypto.randomUUID();
+  const readAt = offset => new Date(Date.now() - offset).toISOString();
+  const oldTime = readAt(3000), newTime = readAt(2000);
+  await f.request('/sync/import', { generation: old, appointments: [rental('old')] });
+  await f.request('/sync/import', { generation: newer, appointments: [rental('new')] });
+  await f.request('/sync/commit', { generation: old, count: 1, calendarReadAt: oldTime });
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) n FROM team_appointments WHERE generation = ?').get(newer).n, 1);
+  await f.request('/sync/commit', { generation: newer, count: 1, calendarReadAt: newTime });
+  const stale = crypto.randomUUID();
+  await f.request('/sync/import', { generation: stale, appointments: [rental('stale')] });
+  assert.equal((await f.call('sync', '/sync/commit', { generation: stale, count: 1, calendarReadAt: oldTime })).status, 409);
+  assert.equal((await f.call('sync', '/sync/commit', { generation: newer, count: 1, calendarReadAt: readAt(1000) })).status, 409);
+  assert.deepEqual(f.rentals().map(r => r.id), ['new']);
+});

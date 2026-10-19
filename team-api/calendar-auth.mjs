@@ -93,13 +93,22 @@ const pendingRefreshes = new WeakMap();
 /** Return only to server-side delivery code. Never include tokens in JSON responses. */
 export async function calendarAccessToken(env, user) {
   if (!TEAM.some(person => person.id === user)) return null;
+  // Coalesce the entire read/decrypt/refresh operation. A slower decrypt can
+  // otherwise resume after another refresh has finished with an obsolete row.
+  let pending = pendingRefreshes.get(env.DB);
+  if (!pending) { pending = new Map(); pendingRefreshes.set(env.DB, pending); }
+  if (pending.has(user)) return pending.get(user);
+  const operation = readCalendarAccessToken(env, user);
+  pending.set(user, operation);
+  try { return await operation; }
+  finally { if (pending.get(user) === operation) pending.delete(user); }
+}
+
+async function readCalendarAccessToken(env, user) {
   const settings = await oauthSettings(env), config = await getCalendarConfig(env);
   const saved = await connection(env, user, settings, config);
   if (!saved) return null;
   if (saved.value.expiresAt > Date.now() + 60_000) return { accessToken: saved.value.accessToken, email: saved.value.email };
-  let pending = pendingRefreshes.get(env.DB);
-  if (!pending) { pending = new Map(); pendingRefreshes.set(env.DB, pending); }
-  if (pending.has(user)) return pending.get(user);
   const refresh = (async () => {
     let response;
     try { response = await google('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -129,8 +138,7 @@ export async function calendarAccessToken(env, user) {
     if (!result.meta.changes) return null;
     return { accessToken: value.accessToken, email: value.email };
   })();
-  pending.set(user, refresh);
-  try { return await refresh; } finally { if (pending.get(user) === refresh) pending.delete(user); }
+  return refresh;
 }
 
 async function status(env, user) {

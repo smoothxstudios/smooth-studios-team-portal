@@ -56,3 +56,17 @@ test("manual training pay belongs to its work period rather than its recording p
   const [week, month] = ownerPeriodFinances([], [manual], now);
   assert.equal(week.teamPay, 0); assert.equal(month.teamPay, 3000); assert.equal(month.stillOwed, 2000);
 });
+
+test('summary periods use studio dates and calendar weeks across DST', async () => {
+  const { studioPeriods } = await import('../lib/owner-finances.mjs');
+  const [week, month, year] = studioPeriods(Date.parse('2026-11-02T02:00:00Z'));
+  assert.equal(week.start.toISOString(), '2026-10-26T04:00:00.000Z');
+  assert.equal(week.end.toISOString(), '2026-11-02T05:00:00.000Z');
+  assert.equal((week.end - week.start) / 3600000, 169);
+  assert.equal(month.start.toISOString(), '2026-11-01T04:00:00.000Z');
+  assert.equal(month.previous.toISOString(), '2026-10-01T04:00:00.000Z');
+  assert.equal(year.start.toISOString(), '2026-01-01T05:00:00.000Z');
+  const boundary = studioPeriods(Date.parse('2027-01-01T02:00:00Z'));
+  assert.equal(boundary[1].start.toISOString(), '2026-12-01T05:00:00.000Z');
+  assert.equal(boundary[2].start.toISOString(), '2026-01-01T05:00:00.000Z');
+});

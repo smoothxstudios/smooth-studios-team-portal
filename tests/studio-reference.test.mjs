@@ -124,3 +124,21 @@ test("reference cleanup preserves contacts, access, Wi-Fi and every generic chec
   assert.deepEqual(teamView.checklist, legacy.checklist);
   f.close();
 });
+
+test('checklist writes reject a concurrent staffing change within the same sync generation', async t => {
+  const f = await setup(); t.after(() => f.close());
+  await f.call('owner','/studio-reference',{...content(),revision:0},'PATCH');
+  await importCalendar(f,[rental]);
+  const item=(await f.call('jordyn','/rental-checklists')).data.rentals[0];
+  const prepare=f.DB.prepare.bind(f.DB);
+  f.DB.prepare=sql=>{
+    if(sql.startsWith('INSERT INTO rental_checklists')) {
+      f.DB.sqlite.prepare('UPDATE team_state SET revision=revision+1 WHERE id=1').run();
+      f.DB.sqlite.prepare("UPDATE team_appointments SET data=json_set(data,'$.acceptedEmployeeIds',json('[]')) WHERE id=?").run(rental.id);
+    }
+    return prepare(sql);
+  };
+  const result=await f.call('jordyn',`/rental-checklists/${item.checklistId}`,{action:'check',itemId:'prep',checked:true,version:0},'PATCH');
+  assert.equal(result.status,409);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) n FROM rental_checklists').get().n,0);
+});

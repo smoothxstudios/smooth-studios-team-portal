@@ -115,6 +115,9 @@ test('import read time keeps an older snapshot from overriding a newer verified 
   try {
     assert.equal((await offer(f)).status, 200); await Promise.allSettled(f.pending);
     const confirmedAt = Date.now() - 1000;
+    // Both incoming reads follow the active snapshot, but straddle the RSVP verification.
+    f.DB.sqlite.prepare('UPDATE team_state SET synced_at = ? WHERE id = 1')
+      .run(new Date(confirmedAt - 10000).toISOString());
     f.DB.sqlite.prepare("UPDATE calendar_assignment_outbox SET status = 'synced', result = ?, updated_at = ?")
       .run(JSON.stringify({ code: 'response_confirmed', googleStatus: 'accepted' }), confirmedAt);
     const publish = async (calendarReadAt, status) => {

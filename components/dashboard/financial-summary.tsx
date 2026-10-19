@@ -1,11 +1,12 @@
 "use client";
 
+import { creativeEarningDate } from "@/lib/creative-work.mjs";
 import { APPOINTMENT_CATEGORIES } from "@/lib/appointment-categories.mjs";
 import { appointmentCategory,dollars,formatDate } from "@/lib/dashboard-presentation";
 import type {
 Rental
 } from "@/lib/dashboard-types";
-import { customerFullyPaid,ownerPeriodFinances,recognizedRevenue } from "@/lib/owner-finances.mjs";
+import { customerFullyPaid,ownerPeriodFinances,recognizedRevenue,studioPeriods } from "@/lib/owner-finances.mjs";
 import { useCreativeWork,type CreativeAssignment } from "@/lib/use-creative-work";
 import {
 CalendarDays,
@@ -39,16 +40,7 @@ export function OwnerFinancialSummary({ rentals, creative, upcomingCount, totalO
 
 export function PeriodTotals({ rentals, employeeId, creative = [] }: { rentals: Rental[]; employeeId?: string; creative?: CreativeAssignment[] }) {
   const now = new Date();
-  const weekStart = new Date(now);
-  weekStart.setHours(0, 0, 0, 0);
-  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const yearStart = new Date(now.getFullYear(), 0, 1);
-  const periods = [
-    { label: "This week", start: weekStart, previous: new Date(weekStart.getTime() - 7 * 86400000) },
-    { label: "This month", start: monthStart, previous: new Date(now.getFullYear(), now.getMonth() - 1, 1) },
-    { label: "This year", start: yearStart, previous: new Date(now.getFullYear() - 1, 0, 1) },
-  ];
+  const periods = studioPeriods(now.getTime());
   const amountFor = (rental: Rental) => {
     if (employeeId) {
       if (!customerFullyPaid(rental) || new Date(rental.end) > now) return 0;
@@ -65,13 +57,13 @@ export function PeriodTotals({ rentals, employeeId, creative = [] }: { rentals: 
   return (
     <section className="period-strip">
       <div className="period-strip-title"><Clock3 size={17} /><div><strong>Period totals</strong><span>Week · month · year</span></div></div>
-      {periods.map((period, index) => {
-        const end = index === 0 ? new Date(weekStart.getTime() + 7 * 86400000) : index === 1 ? new Date(now.getFullYear(), now.getMonth() + 1, 1) : new Date(now.getFullYear() + 1, 0, 1);
+      {periods.map(period => {
+        const end = period.end;
         const previousEnd = period.start;
         const currentItems = rentals.filter((rental) => new Date(rental.start) >= period.start && new Date(rental.start) < end);
         const previousItems = rentals.filter((rental) => new Date(rental.start) >= period.previous && new Date(rental.start) < previousEnd);
         const earnedWork = creative.filter(item => item.status === "approved" && (!employeeId || item.employeeId === employeeId));
-        const workTotal = (start: Date, end: Date) => earnedWork.filter(item => new Date(item.approvedAt!) >= start && new Date(item.approvedAt!) < end).reduce((sum, item) => sum + item.amountCents, 0);
+        const workTotal = (start: Date, end: Date) => earnedWork.filter(item => new Date(creativeEarningDate(item)) >= start && new Date(creativeEarningDate(item)) < end).reduce((sum, item) => sum + item.amountCents, 0);
         const total = currentItems.reduce((sum, rental) => sum + amountFor(rental), 0) + (employeeId ? workTotal(period.start, end) : 0);
         const previousTotal = previousItems.reduce((sum, rental) => sum + amountFor(rental), 0) + (employeeId ? workTotal(period.previous, previousEnd) : 0);
         const secondary = currentItems.reduce((sum, rental) => sum + secondaryFor(rental), 0) + (employeeId ? 0 : workTotal(period.start, end));
@@ -80,7 +72,7 @@ export function PeriodTotals({ rentals, employeeId, creative = [] }: { rentals: 
           <div className="period-total" key={period.label}>
             <span>{period.label}</span>
             <strong>{dollars(total)}</strong>
-            <small>{employeeId ? `${secondary} completed appointment${secondary === 1 ? "" : "s"}${workTotal(period.start, end) ? " + approved creative work" : ""}` : `${dollars(secondary)} earned payroll`}</small>
+            <small>{employeeId ? `${secondary} completed appointment${secondary === 1 ? "" : "s"}${workTotal(period.start, end) ? " + approved work" : ""}` : `${dollars(secondary)} earned payroll`}</small>
             {(change !== null || !employeeId) && <em className={change !== null && change < 0 ? "down" : ""}>{change === null ? "No prior comparison" : `${change >= 0 ? "+" : ""}${change}% vs prior`}</em>}
           </div>
         );

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { createHmac } from "node:crypto";
 import test, { mock } from "node:test";
@@ -8,13 +8,9 @@ import { teamToken, tokenHash, unbase64url } from "../lib/team-auth.mjs";
 import { TEAM, addLocalDays, blockOccurrences, localInstant, assignmentConflicts, hasConflictOverride, workPreferenceMatch } from "../lib/team-schedule.mjs";
 import { deliverPush, publicPushKey, pushEndpoint, vapidAuthorization, flushAlerts } from "../team-api/push.mjs";
 
-const schema = await readFile(new URL("../team-api/migrations/0000_brief_ravenous.sql", import.meta.url), "utf8");
-const seed = await readFile(new URL("../team-api/migrations/0001_initial_state.sql", import.meta.url), "utf8");
-const questionsSchema = await readFile(new URL("../team-api/migrations/0002_guideline_questions.sql", import.meta.url), "utf8");
-const preferencesSchema = await readFile(new URL("../team-api/migrations/0003_work_preferences.sql", import.meta.url), "utf8");
-const notificationSchema = await readFile(new URL("../team-api/migrations/0009_push_notifications.sql", import.meta.url), "utf8");
-const specificNotificationSchema = await readFile(new URL("../team-api/migrations/0010_specific_notifications.sql", import.meta.url), "utf8");
-const calendarSchemas = await Promise.all(["0018_alerts_inbox.sql", "0021_google_calendar_connections.sql", "0022_calendar_assignment_outbox.sql", "0028_push_receipts.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
+const migrationsFolder = new URL("../team-api/migrations/", import.meta.url);
+const schemas = await Promise.all((await readdir(migrationsFolder)).filter(name => name.endsWith('.sql')).sort()
+  .map(name => readFile(new URL(name, migrationsFolder), 'utf8')));
 const ids = [...TEAM.map(person => person.id), "sync"];
 const tokens = Object.fromEntries(await Promise.all(ids.map(async id => [id, await teamToken(`synthetic-test-password-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(ids.map(async id => [id, await tokenHash(tokens[id])])));
@@ -23,7 +19,7 @@ mock.timers.enable({ apis: ["Date"], now });
 test.after(() => mock.timers.reset());
 
 class D1TestDatabase {
-  constructor() { this.sqlite = new DatabaseSync(":memory:"); this.sqlite.exec(schema); this.sqlite.exec(seed); this.sqlite.exec(questionsSchema); this.sqlite.exec(preferencesSchema); this.sqlite.exec(notificationSchema); this.sqlite.exec(specificNotificationSchema); calendarSchemas.forEach(sql => this.sqlite.exec(sql)); }
+  constructor() { this.sqlite = new DatabaseSync(":memory:"); schemas.forEach(sql => this.sqlite.exec(sql)); }
   prepare(sql) {
     const sqlite = this.sqlite;
     let args = [];

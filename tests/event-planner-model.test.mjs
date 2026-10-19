@@ -33,3 +33,12 @@ test('day grouping, search, archive filtering and summary counts retain their me
   assert.equal(searched.dayEvents.length,1);assert.equal(searched.unfilled,1);
   assert.equal(model.forDay('2026-10-23','Night',true).entries.length,1);
 });
+
+test('invalid draft coverage is reported before evaluating candidates', async () => {
+  const { plannerCoverageError } = await import('../lib/event-planner.mjs');
+  assert.equal(plannerCoverageError(plan.events[0]), '');
+  for (const coverageStartLocal of ['invalid', '2026-03-08T02:30', '2026-10-25T12:00']) {
+    assert.ok(plannerCoverageError({...plan.events[0], coverageStartLocal}));
+  }
+  assert.equal(plannerCoverageError({...plan.events[0],coverageEndLocal:'2026-10-24T01:00'}), '');
+});

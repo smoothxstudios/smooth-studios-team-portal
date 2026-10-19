@@ -58,7 +58,7 @@ export async function studioReferenceRoute({ request, db, user, env, body, fail 
     return { saved: true };
   }
   if (url.pathname === "/rental-checklists" || url.pathname.startsWith("/rental-checklists/")) {
-    const state = await db.prepare("SELECT generation FROM team_state WHERE id = 1").first();
+    const state = await db.prepare("SELECT generation, revision FROM team_state WHERE id = 1").first();
     const appointments = (await db.prepare("SELECT data FROM team_appointments WHERE generation = ?").bind(state.generation).all()).results.map(row => JSON.parse(row.data)).filter(isRental);
     const assignments = isOwner ? [] : (await db.prepare("SELECT data FROM team_assignments WHERE employee_id = ?").bind(user).all()).results.map(row => JSON.parse(row.data));
     const allowed = appointments.filter(appointment => isOwner || appointment.acceptedEmployeeIds.includes(user) || assignments.some(item =>
@@ -84,9 +84,10 @@ export async function studioReferenceRoute({ request, db, user, env, body, fail 
       else fail(400, "Choose a checklist action.");
       const version = input.version + 1;
       const result = await db.prepare(`INSERT INTO rental_checklists (id, appointment_id, version, data)
-        SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM team_state WHERE id = 1 AND generation = ?)
+        SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM team_state WHERE id = 1 AND generation = ? AND revision = ?)
+          AND EXISTS (SELECT 1 FROM studio_reference WHERE id = 1 AND revision = ?)
         ON CONFLICT(id) DO UPDATE SET data = excluded.data, version = excluded.version WHERE rental_checklists.version = ?`)
-        .bind(id, rental.id, version, JSON.stringify(progress), state.generation, input.version).run();
+        .bind(id, rental.id, version, JSON.stringify(progress), state.generation, state.revision, row.revision, input.version).run();
       if (!result.meta.changes) fail(409, "The rental or checklist changed. Refresh before trying again.");
       return { progress: { ...progress, version } };
     }

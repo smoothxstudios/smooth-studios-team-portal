@@ -208,7 +208,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   const monthly = useMemo(() => {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month) => ({ month, revenue: 0, payroll: 0, paid: 0, owed: 0 }));
     for (const rental of visibleRentals) {
-      const month = new Date(rental.start).getUTCMonth();
+      const month = Number(studioLocal(rental.start).slice(5, 7)) - 1;
       months[month].revenue += recognizedRevenue(rental);
       const payouts = employeeId ? [rental.employeePayouts[employeeId]].filter(Boolean) : Object.values(rental.employeePayouts);
       for (const payout of payouts) {
