@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.38.4",
+  "currentVersion": "2.38.5",
   "releases": [
+    {
+      "id": "2026-10-18-planner-twelve-hour-times",
+      "version": "2.38.5",
+      "date": "2026-10-18",
+      "category": "Scheduling",
+      "title": "AM/PM times in crew availability",
+      "changes": [
+        "Event Planner availability details and crew conflict messages now show 12-hour AM/PM times, including times in saved notes. For example, 18:05 appears as 6:05 PM and 00:00 as 12:00 AM."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-18-persistent-alert-read-status",
       "version": "2.38.4",
