@@ -5,10 +5,10 @@ import test, { mock } from "node:test";
 import worker from "../team-api/worker.mjs";
 import { TEAM } from "../lib/team-schedule.mjs";
 import { teamToken, tokenHash } from "../lib/team-auth.mjs";
-import { TEMP_CHECK_INTERVAL_MS, QUIZ_INTERVAL_MS, MOODS, QUIZ_TIERS, nextEngagementPrompt, starProgress } from "../lib/team-engagement.mjs";
+import { TEMP_CHECK_MIN_MS, TEMP_CHECK_MAX_MS, QUIZ_INTERVAL_MS, MOODS, QUIZ_TIERS, nextEngagementPrompt, starProgress } from "../lib/team-engagement.mjs";
 import { dailyQuestion, employeeQuestionCandidates, publicQuestion, QUESTION_BANK, QUESTION_BANKS } from "../team-api/creative-questions.mjs";
 
-const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql", "0009_push_notifications.sql", "0016_smoothstar_500_points.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
+const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql", "0009_push_notifications.sql", "0027_temp_check_pacing.sql", "0016_smoothstar_500_points.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
 const tokens = Object.fromEntries(await Promise.all([...TEAM.map(p => p.id), "sync"].map(async id => [id, await teamToken(`synthetic-engagement-test-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(Object.entries(tokens).map(async ([id, token]) => [id, await tokenHash(token)])));
 const now = Date.parse("2026-10-15T17:00:00Z"), today = "2026-10-15";
@@ -100,18 +100,19 @@ test("moods remain private and independent of quiz points, assignments, and noti
   assert.equal(f.alerts.length, 0);
 });
 
-test("Temp Check keeps a three-hour server cooldown and idempotent concurrent retries", async () => {
+test("Temp Check keeps a varied server cooldown and idempotent concurrent retries", async () => {
   const f = fixture(), input = mood();
   const requests = await Promise.all(Array.from({ length: 6 }, () => f.call("amia", "/engagement/mood", input)));
   assert.ok(requests.every(r => r.status === 200));
   assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_mood_checkins").get().n, 1);
-  assert.equal(requests[0].data.nextMoodAt, now + TEMP_CHECK_INTERVAL_MS);
+  const nextMoodAt = requests[0].data.nextMoodAt;
+  assert.ok(nextMoodAt >= now + TEMP_CHECK_MIN_MS && nextMoodAt <= now + TEMP_CHECK_MAX_MS);
   mock.timers.setTime(now + 60000);
-  assert.equal((await f.call("amia", "/engagement/mood", input)).data.nextMoodAt, now + TEMP_CHECK_INTERVAL_MS);
+  assert.equal((await f.call("amia", "/engagement/mood", input)).data.nextMoodAt, nextMoodAt);
   assert.equal((await f.call("amia", "/engagement/mood", mood("sad"))).status, 409);
-  mock.timers.setTime(now + TEMP_CHECK_INTERVAL_MS - 1);
+  mock.timers.setTime(nextMoodAt - 1);
   assert.equal((await f.call("amia")).data.moodDue, false);
-  mock.timers.setTime(now + TEMP_CHECK_INTERVAL_MS);
+  mock.timers.setTime(nextMoodAt);
   assert.equal((await f.call("amia", "/engagement/mood", mood("tired"))).status, 200);
   const g = fixture();
   const competing = await Promise.all([g.call("rayne", "/engagement/mood", mood("happy")), g.call("rayne", "/engagement/mood", mood("sad"))]);
@@ -133,6 +134,27 @@ test("skip is persistent and optional, while question dismissal applies only to 
   assert.equal(next.questionDue, true);
   assert.notEqual(next.currentQuestionId, input.questionId);
   assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_mood_checkins").get().n, 0);
+});
+
+test("sporadic Temp Check prompts claim once across repeat visits and devices while staying answerable", async () => {
+  const f = fixture();
+  const responses = await Promise.all(Array.from({length: 5}, () => f.call('jordyn', '/engagement/mood-prompt', {})));
+  assert.equal(responses.filter(r => r.data.promptClaimed).length, 1);
+  const state = (await f.call('jordyn')).data, next = state.nextMoodPromptAt;
+  assert.equal(state.moodDue, true); assert.equal(state.moodPromptDue, false);
+  assert.ok(next >= now + TEMP_CHECK_MIN_MS && next <= now + TEMP_CHECK_MAX_MS);
+  assert.notEqual(nextEngagementPrompt(state), 'mood');
+  mock.timers.setTime(now + 30 * 60_000);
+  assert.equal((await f.call('jordyn', '/engagement/mood-prompt', {})).data.promptClaimed, false);
+  assert.equal((await f.call('jordyn')).data.nextMoodPromptAt, next);
+  mock.timers.setTime(next);
+  assert.equal((await f.call('jordyn', '/engagement/mood-prompt', {})).data.promptClaimed, true);
+  assert.equal((await f.call('jordyn', '/engagement/mood', mood())).status, 200);
+  assert.equal((await f.call('jordyn', '/engagement/mood-prompt', {})).data.promptClaimed, false);
+  const reset = await resetInput(f, 'mood');
+  assert.equal((await f.call('owner', '/engagement/reset', reset)).status, 200);
+  assert.equal((await f.call('jordyn', '/engagement/mood-prompt', {})).data.promptClaimed, true);
+  assert.equal((await f.call('owner', '/engagement/mood-prompt', {})).status, 403);
 });
 
 test("random difficulty is persisted across refreshes and simultaneous devices", async () => {
@@ -294,7 +316,7 @@ test("quiz and mood intervals measure elapsed hours across daylight-saving chang
     const saved = (await f.call("rayne", "/engagement/answer", input)).data;
     assert.equal(saved.nextQuestionAt, time + QUIZ_INTERVAL_MS);
     const checked = (await f.call("rayne", "/engagement/mood", mood())).data;
-    assert.equal(checked.nextMoodAt, time + TEMP_CHECK_INTERVAL_MS);
+    assert.ok(checked.nextMoodAt >= time + TEMP_CHECK_MIN_MS && checked.nextMoodAt <= time + TEMP_CHECK_MAX_MS);
     mock.timers.setTime(time + QUIZ_INTERVAL_MS - 1);
     assert.equal((await f.call("rayne")).data.available, false);
     mock.timers.setTime(time + QUIZ_INTERVAL_MS);

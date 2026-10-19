@@ -67,6 +67,7 @@ import { disableTeamPush } from "@/lib/team-api";
 import { teamToken } from "@/lib/team-auth.mjs";
 import { TEAM,studioLocal } from "@/lib/team-schedule.mjs";
 import { useAlerts,type DashboardAlert } from "@/lib/use-alerts";
+import { NotificationDelivery } from "@/components/notification-delivery";
 import { AddPay } from "@/components/dashboard/add-pay";
 import { attachNotificationMessages, isNotificationHash } from "@/lib/notification-navigation.mjs";
 import { useCreativeWork } from "@/lib/use-creative-work";
@@ -328,7 +329,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
         <PullToRefresh page={view} request={toolbarRefresh} quietRequestId={quietRefresh} />
         <div className="dashboard-refresh-body">
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
-          {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} action={isOwner ? <TeamNotifications token={schedulingToken} employees={payload.employees} /> : undefined} />}
+          {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} action={isOwner ? <div className="alerts-owner-actions"><NotificationDelivery token={schedulingToken}/><TeamNotifications token={schedulingToken} employees={payload.employees} /></div> : undefined} />}
           {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Other work and pay totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "overview" && !isOwner && <CreativeWorkPreview state={creative} isOwner={false} onOpen={() => setView("creative")} />}
@@ -439,7 +440,10 @@ export function SmoothDashboard() {
   const refreshSnapshot = useCallback(() => snapshotReader.current?.() ?? Promise.resolve(false), []);
   const signedIn = Boolean(payload);
   useEffect(() => {
-    if (signedIn) return attachQuietSnapshotRefresh(refreshSnapshot);
+    if (signedIn) {
+      if ("serviceWorker" in navigator) void navigator.serviceWorker.getRegistration(new URL("./", window.location.href).href).then(registration => registration?.update()).catch(() => {});
+      return attachQuietSnapshotRefresh(refreshSnapshot);
+    }
   }, [signedIn, refreshSnapshot]);
 
   useEffect(() => {

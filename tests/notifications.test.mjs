@@ -60,7 +60,7 @@ test("a task assignment immediately sends an encrypted assignment alert only to 
   f.close();
 });
 
-test("concurrent flushes claim once and retry only the failed device, at most four attempts", async () => {
+test("concurrent flushes claim once and retry only the failed device, with bounded backoff and at most eight attempts", async () => {
   const f = await fixture(), first = device("success"), second = device("retry");
   await f.call("jordyn", "/push/device", first); await f.call("jordyn", "/push/device", second);
   f.DB.sqlite.prepare("INSERT INTO team_alerts(user_id, id, due_at, kind) VALUES ('jordyn', 'retry-test', ?, 'assignment')").run(now);
@@ -69,9 +69,9 @@ test("concurrent flushes claim once and retry only the failed device, at most fo
   await Promise.all([flushAlerts(f.env, provider), flushAlerts(f.env, provider)]);
   assert.equal(sent.filter(url => url === first.endpoint).length, 1);
   assert.equal(sent.filter(url => url === second.endpoint).length, 1);
-  for (let attempt = 1; attempt <= 5; attempt++) { mock.timers.setTime(now + attempt * 300_000); await flushAlerts(f.env, provider); }
+  for (let attempt = 1; attempt <= 8; attempt++) { mock.timers.setTime(now + attempt * 3600_000); await flushAlerts(f.env, provider); }
   assert.equal(sent.filter(url => url === first.endpoint).length, 1);
-  assert.equal(sent.filter(url => url === second.endpoint).length, 4);
+  assert.equal(sent.filter(url => url === second.endpoint).length, 8);
   assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) n FROM team_alerts").get().n, 0);
   f.close();
 });

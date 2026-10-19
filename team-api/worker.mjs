@@ -7,6 +7,7 @@ import { sendQuizReminders } from "./quiz-notifications.mjs";
 import { assignmentNotifications, blockNotifications } from "./notification-content.mjs";
 import { creativeWorkRoute } from "./creative-work.mjs";
 import { requestBackgroundSync } from "./background-sync.mjs";
+import { pushReceiptRoute, notificationDeliveryRoute } from "./notification-delivery.mjs";
 import { alertsRoute } from "./alerts.mjs";
 import { dashboardLayoutRoute } from "./dashboard-layout.mjs";
 import { payrollRoute } from "./payroll.mjs";
@@ -124,6 +125,7 @@ function approveConflict(period) {
 
 async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
+  if (request.method === "POST" && url.pathname === "/push/receipt") return pushReceiptRoute({request, db, body, fail});
   if (request.method === "GET" && ["/calendar/oauth/start", "/calendar/oauth/callback"].includes(url.pathname)) {
     const result = await calendarAuthRoute({ request, env, user: null, body, fail });
     if (url.pathname.endsWith("/callback")) ctx.waitUntil(flushCalendarAssignments(env, { limit: 3 }));
@@ -136,11 +138,12 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 3, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 1, backgroundSyncVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 3, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 1, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
   else if (user === "sync") fail(403, "Sync access is restricted to synchronization endpoints.");
+  if (request.method === "GET" && url.pathname === "/notifications/delivery") return notificationDeliveryRoute({request, db, env, user, fail});
   if (["/notifications", "/notifications/sent"].includes(url.pathname) || /^\/assignments\/[^/]+\/remind$/.test(url.pathname)) return manualNoticesRoute({ request, env, user, body, fail, ctx });
   if (url.pathname.startsWith("/calendar/")) return calendarAuthRoute({ request, env, user, body, fail });
   if (request.method === "POST" && url.pathname === "/sync/calendar/configuration") {

@@ -1,5 +1,5 @@
 import { TEAM, studioLocal, localInstant, addLocalDays } from "../lib/team-schedule.mjs";
-import { MOODS, TEMP_CHECK_INTERVAL_MS, QUIZ_INTERVAL_MS, QUIZ_TIERS, STAR_POINTS, starProgress } from "../lib/team-engagement.mjs";
+import { MOODS, nextTempCheckAt, QUIZ_INTERVAL_MS, QUIZ_TIERS, STAR_POINTS, starProgress } from "../lib/team-engagement.mjs";
 import { employeeQuestionCandidates, publicQuestion } from "./creative-questions.mjs";
 import { resetEngagement } from "./engagement-admin.mjs";
 
@@ -100,6 +100,8 @@ async function employeeState(db, user, now) {
   const quiz = attempts.map(attempt => ({ question: attempt.question, attempt }));
   if (question) quiz.push({ question, attempt: null });
   return { quizVersion: 3, serverNow: now, day, moodDue: (state?.next_mood_at ?? 0) <= now,
+    moodPromptDue: Math.max(state?.next_mood_at ?? 0, state?.next_mood_prompt_at ?? 0) <= now,
+    nextMoodPromptAt: Math.max(state?.next_mood_at ?? 0, state?.next_mood_prompt_at ?? 0),
     nextMoodAt: state?.next_mood_at ?? 0, moodRevision: state?.mood_revision ?? 0, lastMood: moodRow(latest),
     questionDue: available && offer.dismissed_at === null, available,
     currentQuestionId: question?.id ?? attempts.at(-1)?.question.id ?? null,
@@ -175,6 +177,13 @@ export async function engagementRoute({ request, db, user, env, body, fail }) {
   if (user === "owner") fail(403, "Temp Check and daily questions are for employee accounts. Review them in Team.");
   await preserveLegacyAttempts(db, user);
   if (request.method === "GET" && path === "/engagement") return employeeState(db, user, now);
+  if (request.method === "POST" && path === "/engagement/mood-prompt") {
+    await db.prepare("INSERT OR IGNORE INTO team_engagement_state (user_id) VALUES (?)").bind(user).run();
+    const claimed = await db.prepare(`UPDATE team_engagement_state SET next_mood_prompt_at = ?
+      WHERE user_id = ? AND next_mood_at <= ? AND next_mood_prompt_at <= ?`)
+      .bind(nextTempCheckAt(now), user, now, now).run();
+    return { ...await employeeState(db, user, now), promptClaimed: Boolean(claimed.meta.changes) };
+  }
   if (request.method === "POST" && path === "/engagement/mood") {
     const input = await body(request);
     if (!MOODS.some(m => m.id === input.mood)) fail(400, "Choose one of the mood icons.");
@@ -184,13 +193,14 @@ export async function engagementRoute({ request, db, user, env, body, fail }) {
     if (duplicate) return employeeState(db, user, now);
     await db.prepare("INSERT OR IGNORE INTO team_engagement_state (user_id) VALUES (?)").bind(user).run();
     // The conditional update and insert share one transaction. Two devices can
-    // never log two moods or restart the timer for the same three-hour period.
+    // never log two moods or restart the same shared randomized cooldown.
+    const nextMoodAt = nextTempCheckAt(now);
     const result = await db.batch([
-      db.prepare("UPDATE team_engagement_state SET next_mood_at = ?, last_mood_id = ?, mood_revision = mood_revision + 1 WHERE user_id = ? AND next_mood_at <= ?")
-        .bind(now + TEMP_CHECK_INTERVAL_MS, id, user, now),
+      db.prepare("UPDATE team_engagement_state SET next_mood_at = ?, next_mood_prompt_at = ?, last_mood_id = ?, mood_revision = mood_revision + 1 WHERE user_id = ? AND next_mood_at <= ?")
+        .bind(nextMoodAt, nextMoodAt, id, user, now),
       db.prepare(`INSERT OR IGNORE INTO team_mood_checkins (id, user_id, mood, created_at)
         SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM team_engagement_state WHERE user_id = ? AND last_mood_id = ? AND next_mood_at = ?)`)
-        .bind(id, user, input.mood, now, user, id, now + TEMP_CHECK_INTERVAL_MS),
+        .bind(id, user, input.mood, now, user, id, nextMoodAt),
     ]);
     if (!result[0].meta.changes) {
       const saved = await db.prepare("SELECT id FROM team_mood_checkins WHERE id = ? AND user_id = ?").bind(id, user).first();
@@ -203,8 +213,9 @@ export async function engagementRoute({ request, db, user, env, body, fail }) {
     if (!["mood", "question"].includes(input.kind)) fail(400, "Choose the prompt to dismiss.");
     await db.prepare("INSERT OR IGNORE INTO team_engagement_state (user_id) VALUES (?)").bind(user).run();
     if (input.kind === "mood") {
-      await db.prepare("UPDATE team_engagement_state SET next_mood_at = ?, mood_revision = mood_revision + 1 WHERE user_id = ? AND next_mood_at <= ?")
-        .bind(now + TEMP_CHECK_INTERVAL_MS, user, now).run();
+      const nextMoodAt = nextTempCheckAt(now);
+      await db.prepare("UPDATE team_engagement_state SET next_mood_at = ?, next_mood_prompt_at = ?, mood_revision = mood_revision + 1 WHERE user_id = ? AND next_mood_at <= ?")
+        .bind(nextMoodAt, nextMoodAt, user, now).run();
     } else {
       if (input.day !== day) fail(409, "A new studio day has started. Refresh for today's question.");
       const offer = await pendingOffer(db, user, day);

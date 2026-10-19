@@ -135,6 +135,8 @@ Saved answer drafts and deferred-question progress are encrypted with the owner 
 - **Mark employee earnings paid**: Smooth chooses a paid-through date in the dashboard. It updates the payout ledger, rebuilds encrypted data, and redeploys the site.
 - **Update customer payment**: Smooth chooses an appointment and confirms payment received by invoice, cash, or another method, marks it not fully paid, or clears the manual status.
 - **Match Stripe payment**: Smooth selects an unmatched Stripe charge and the Calendar appointment it belongs to. The saved match is reused on every future sync, and multiple charges can be linked to one appointment for deposits and final payments.
+- **Notification delivery**: Alerts → Delivery separates push-service acceptance, confirmed device receipt, and deliberate opens, with person filters and retry/setup warnings. Employees reopen the updated app once to update their notification handler.
+- **Temp Check**: optional Home prompts use a shared, varied 60–100 minute interval across repeat visits and devices.
 - **Add pay**: Smooth records onboarding, training, and other completed work in Payouts. Entries use the work date, retain the recording date, and distinguish still owed from already paid. Existing non-rental payroll safeguards and person-specific advance allocation apply; no money is transferred.
 - **Sync Calendar and Stripe**: scheduled every 5 minutes and can also be started from the dashboard.
 

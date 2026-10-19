@@ -49,6 +49,7 @@ export const rentalChecklists = sqliteTable("rental_checklists", {
 export const engagementState = sqliteTable("team_engagement_state", {
   userId: text("user_id").primaryKey(),
   nextMoodAt: integer("next_mood_at").notNull().default(0),
+  nextMoodPromptAt: integer("next_mood_prompt_at").notNull().default(0),
   moodRevision: integer("mood_revision").notNull().default(0),
   lastMoodId: text("last_mood_id"),
   questionDismissedDay: text("question_dismissed_day").notNull().default(""),
@@ -147,7 +148,9 @@ export const pushDeliveries = sqliteTable("team_push_deliveries", {
   alertId: text("alert_id").notNull(), deviceId: text("device_id").notNull(),
   attempts: integer("attempts").notNull().default(0), dueAt: integer("due_at").notNull().default(0),
   leaseUntil: integer("lease_until").notNull().default(0), completedAt: integer("completed_at"), createdAt: integer("created_at").notNull(),
-}, table => [primaryKey({ columns: [table.alertId, table.deviceId] }), index("team_push_deliveries_created").on(table.createdAt)]);
+  receiptToken: text("receipt_token"), result: text("result"), providerStatus: integer("provider_status"),
+  receivedAt: integer("received_at"), openedAt: integer("opened_at"),
+}, table => [primaryKey({ columns: [table.alertId, table.deviceId] }), index("team_push_deliveries_created").on(table.createdAt), uniqueIndex("team_push_receipt_token").on(table.receiptToken).where(sql`${table.receiptToken} IS NOT NULL`)]);
 
 // Advance credits settle earned work; original cash-payment records stay intact.
 export const payrollState = sqliteTable("payroll_state", {
@@ -173,4 +176,5 @@ export const notificationInbox = sqliteTable("team_inbox", {
   userId: text("user_id").notNull(), kind: text("kind").notNull(), title: text("title").notNull(), body: text("body").notNull(),
   target: text("target").notNull(), targetId: text("target_id"), personId: text("person_id"), createdAt: integer("created_at").notNull(),
   expiresAt: integer("expires_at"), readAt: integer("read_at"), deletedAt: integer("deleted_at"),
+  pushAcceptedAt: integer("push_accepted_at"), pushReceivedAt: integer("push_received_at"), openedAt: integer("opened_at"),
 }, table => [index("team_inbox_user_sequence").on(table.userId, table.deletedAt, table.sequence), index("team_inbox_user_unread").on(table.userId, table.deletedAt, table.readAt, table.sequence)]);

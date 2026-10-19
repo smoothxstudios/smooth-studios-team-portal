@@ -14,7 +14,7 @@ const questionsSchema = await readFile(new URL("../team-api/migrations/0002_guid
 const preferencesSchema = await readFile(new URL("../team-api/migrations/0003_work_preferences.sql", import.meta.url), "utf8");
 const notificationSchema = await readFile(new URL("../team-api/migrations/0009_push_notifications.sql", import.meta.url), "utf8");
 const specificNotificationSchema = await readFile(new URL("../team-api/migrations/0010_specific_notifications.sql", import.meta.url), "utf8");
-const calendarSchemas = await Promise.all(["0021_google_calendar_connections.sql", "0022_calendar_assignment_outbox.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
+const calendarSchemas = await Promise.all(["0018_alerts_inbox.sql", "0021_google_calendar_connections.sql", "0022_calendar_assignment_outbox.sql", "0028_push_receipts.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
 const ids = [...TEAM.map(person => person.id), "sync"];
 const tokens = Object.fromEntries(await Promise.all(ids.map(async id => [id, await teamToken(`synthetic-test-password-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(ids.map(async id => [id, await tokenHash(tokens[id])])));

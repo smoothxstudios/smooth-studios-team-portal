@@ -33,7 +33,7 @@ test('stale data dispatches only the fixed main workflow, and simultaneous check
   assert.equal(dispatch.url, 'https://api.github.com/repos/smoothxstudios/smooth-studios-team-portal/actions/workflows/calendar-sync.yml/dispatches');
   assert.deepEqual(JSON.parse(dispatch.options.body), {ref: 'main'});
   assert.equal(dispatch.options.headers.authorization, 'Bearer synthetic-token');
-  assert.equal(dispatch.options.redirect, 'error');
+  assert.equal(dispatch.options.redirect, 'manual');
   assert.equal(state(env).result, 'requested');
   assert.equal((await requestBackgroundSync(env, mock.send, now + 5 * 60_000)).status, 'pending');
   assert.equal(mock.calls.length, 2);

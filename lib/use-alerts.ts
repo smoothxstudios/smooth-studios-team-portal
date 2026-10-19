@@ -63,12 +63,12 @@ export function useAlerts(token: string, active: boolean) {
     } catch (error) { if (current === requestId.current) setError(error instanceof Error ? error.message : "More alerts couldn’t be loaded."); }
     finally { operation.current = false; setBusy(false); }
   };
-  const markRead = async (alert?: DashboardAlert) => {
+  const markRead = async (alert?: DashboardAlert, opened = false) => {
     if (operation.current) return false;
-    if (alert?.readAt) return true;
+    if (alert?.readAt && !opened) return true;
     operation.current = true; const current = ++requestId.current; setBusy(true);
     try {
-      const result = await teamRequest<{ unreadCount: number; readAt: number }>(token, alert ? "/alerts/read" : "/alerts/read-all",
+      const result = await teamRequest<{ unreadCount: number; readAt: number }>(token, alert ? opened ? "/alerts/open" : "/alerts/read" : "/alerts/read-all",
         alert ? { ids: [alert.id] } : { throughSequence: page.throughSequence }, "PATCH");
       if (current === requestId.current) {
         setPage(previous => ({ ...previous, unreadCount: result.unreadCount,

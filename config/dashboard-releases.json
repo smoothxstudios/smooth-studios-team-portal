@@ -1,6 +1,28 @@
 {
-  "currentVersion": "2.36.0",
+  "currentVersion": "2.37.0",
   "releases": [
+    {
+      "id": "2026-10-18-sporadic-checkins-delivery-status",
+      "version": "2.37.0",
+      "date": "2026-10-18",
+      "category": "Notifications",
+      "title": "Sporadic Temp Checks and clearer notification delivery",
+      "changes": [
+        "Temp Checks use a varied 60–100 minute interval shared across visits and devices. Reopening the app does not repeat the same popup; responses and skips start a fresh interval. Daily Quiz timing stays the same.",
+        "Alerts → Delivery shows each person’s registered devices and recent alerts, separating push-service acceptance, confirmed device receipt, and deliberate opens. Older or unconfirmed alerts are never labeled delivered without evidence.",
+        "Temporary push failures retry with increasing spacing, successful devices stay deduplicated, and expired or rejected subscriptions are flagged. Alert navigation proceeds even if its read-status update fails. Employees should reopen the updated app once for new device receipts.",
+        "Automatic sync requests use the redirect mode supported by the server runtime, correcting the issue found during unattended verification."
+      ],
+      "employee": {
+        "title": "Occasional check-ins and more reliable alerts",
+        "changes": [
+          "Temp Checks appear occasionally across visits, with a varied 60–100 minute interval. Checking the app repeatedly does not keep reopening the same popup.",
+          "Reopen the app once to update notifications. Smooth can see when a device confirms receiving an alert or you open it. That status does not say you read the full message.",
+          "Alert links still open their page if saving the read status is temporarily unavailable."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-18-manual-pay-automatic-sync",
       "version": "2.36.0",

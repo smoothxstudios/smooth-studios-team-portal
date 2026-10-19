@@ -40,9 +40,9 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
   useEffect(() => { if (bulkOpen && bulkMenu.current) return attachScrollTapGuard(bulkMenu.current); }, [bulkOpen]);
   const groups = isOwner ? groupAlerts(state.alerts) : [{ id: "all", person: null, alerts: state.alerts }];
   const open = async (alert: DashboardAlert) => {
-    if (!await state.markRead(alert)) return;
     if (alert.kind === "notice" && alert.target === "alerts") setNotice(alert);
     else onOpen(alert);
+    await state.markRead(alert, true);
   };
   return <section ref={page} className="alerts-page" aria-label="Your alerts">
     <div className="alerts-heading"><h2>Alerts</h2>{action}</div>

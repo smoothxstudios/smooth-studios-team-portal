@@ -8,6 +8,18 @@ const notices = {
   quiz: { title: "Quiz Time", body: "Your next creative question is ready. Answer it to earn points toward a SmoothStar.", hash: "#daily-quiz" },
   test: { title: "Notifications are connected", body: "This device can receive Smooth Studios alerts.", hash: "#scheduling" },
 };
+async function reportReceipt(receipt, stage) {
+  if (typeof receipt !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(receipt)) return;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch("https://smooth-studios-team-api.smoothxstudios.workers.dev/push/receipt", {
+        method: "POST", credentials: "omit", redirect: "error", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ receipt, stage }), signal: AbortSignal.timeout(3000),
+      });
+      if (response.ok || response.status === 400 || response.status === 404) return;
+    } catch { /* Missing receipts remain unconfirmed, never falsely delivered. */ }
+  }
+}
 self.addEventListener("push", event => {
   let type = "schedule", payload;
   try {
@@ -19,13 +31,16 @@ self.addEventListener("push", event => {
   const title = clean(payload?.title, 80), body = clean(payload?.body, 360).replace(/(\d{1,2}:\d{2} [AP]M) (?:EDT|EST)\b/g, "$1");
   const id = typeof payload?.id === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(payload.id) ? payload.id : null;
   // Lead with the response; the OS already displays the studio app name/icon.
-  event.waitUntil(self.registration.showNotification(title && body ? title : notice.title, {
+  event.waitUntil((async () => {
+    await self.registration.showNotification(title && body ? title : notice.title, {
     body: title && body ? body : notice.body,
     icon: new URL("smooth-studios-logo.png", self.registration.scope).href,
     tag: id ? `smooth-${type}-${id}` : `smooth-${type}`,
     renotify: true,
-    data: { type, ...(["alerts", "settings", "scheduling", "creative", "availability", "payouts", "quiz"].includes(payload?.target) ? { target: payload.target } : {}) },
-  }));
+    data: { type, receipt: payload?.receipt, ...(["alerts", "settings", "scheduling", "creative", "availability", "payouts", "quiz"].includes(payload?.target) ? { target: payload.target } : {}) },
+    });
+    await reportReceipt(payload?.receipt, "received");
+  })());
 });
 self.addEventListener("notificationclick", event => {
   event.notification.close();
@@ -36,7 +51,7 @@ self.addEventListener("notificationclick", event => {
   const requested = event.notification.data?.target;
   const target = Object.hasOwn(targets, requested) ? requested : Object.keys(targets).find(key => targets[key] === notice.hash);
   const destination = new URL(`./${targets[target]}`, self.registration.scope).href;
-  event.waitUntil((async () => {
+  event.waitUntil(Promise.all([reportReceipt(event.notification.data?.receipt, "opened"), (async () => {
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     const existing = windows.find(client => client.url.startsWith(self.registration.scope));
     if (existing) {
@@ -55,5 +70,5 @@ self.addEventListener("notificationclick", event => {
       if (!await handled) await existing.navigate(destination);
     }
     else await self.clients.openWindow(destination);
-  })());
+  })()]));
 });

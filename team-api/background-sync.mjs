@@ -12,10 +12,11 @@ export async function requestBackgroundSync(env, send = fetch, now = Date.now())
     WHERE id = 1 AND requested_at <= ? AND (lease_until <= ? OR requested_at < ?)`)
     .bind(now, now + leaseFor, now - freshFor, now, syncedAt).run();
   if (!claim.meta.changes) return { status: "pending" };
+  // Workerd supports manual redirects; never forward the bearer token to another host.
   const headers = { authorization: `Bearer ${env.DASHBOARD_SYNC_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "Smooth-Studios-Sync", "x-github-api-version": "2022-11-28" };
   let status = "unknown", leaseUntil = now + leaseFor;
   try {
-    const response = await send(`${repository}/actions/runs?per_page=20`, { headers, redirect: "error", signal: AbortSignal.timeout(10_000) });
+    const response = await send(`${repository}/actions/runs?per_page=20`, { headers, redirect: "manual", signal: AbortSignal.timeout(10_000) });
     if (!response.ok) { status = "check_failed"; if (response.body) await response.body.cancel(); }
     else {
       const data = await response.json();
@@ -24,7 +25,7 @@ export async function requestBackgroundSync(env, send = fetch, now = Date.now())
       if (running) { status = "running"; leaseUntil = now + 5 * 60_000; }
       else {
         const dispatched = await send(`${repository}/actions/workflows/calendar-sync.yml/dispatches`, {
-          method: "POST", headers: { ...headers, "content-type": "application/json" }, redirect: "error",
+          method: "POST", headers: { ...headers, "content-type": "application/json" }, redirect: "manual",
           body: JSON.stringify({ ref: "main" }), signal: AbortSignal.timeout(10_000),
         });
         status = dispatched.status === 204 ? "requested" : "dispatch_failed";

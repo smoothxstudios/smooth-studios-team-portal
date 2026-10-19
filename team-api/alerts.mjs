@@ -45,7 +45,7 @@ export async function alertsRoute({ request, db, user, body, fail }) {
       .bind(user, input.throughSequence).run();
     return { saved: true, readAt: null, unreadCount: await unreadCount(db, user) };
   }
-  if (request.method === 'PATCH' && ['/alerts/read', '/alerts/read-all'].includes(url.pathname)) {
+  if (request.method === 'PATCH' && ['/alerts/read', '/alerts/read-all', '/alerts/open'].includes(url.pathname)) {
     const input = await body(request), now = Date.now();
     if (url.pathname === '/alerts/read-all') {
       if (!validSequence(input.throughSequence)) fail(400, 'Refresh Alerts before marking all as read.');
@@ -54,6 +54,11 @@ export async function alertsRoute({ request, db, user, body, fail }) {
         .bind(now, user, input.throughSequence).run();
     } else {
       if (!validAlertIds(input?.ids)) fail(400, 'Choose valid alerts to mark as read.');
+      if (url.pathname === '/alerts/open') {
+        if (input.ids.length !== 1) fail(400, 'Open one alert at a time.');
+        await db.prepare('UPDATE team_inbox SET opened_at = ? WHERE user_id = ? AND deleted_at IS NULL AND id = ? AND opened_at IS NULL')
+          .bind(now, user, input.ids[0]).run();
+      }
       await db.prepare('UPDATE team_inbox SET read_at = ? WHERE user_id = ? AND deleted_at IS NULL AND id IN (SELECT value FROM json_each(?)) AND read_at IS NULL')
         .bind(now, user, JSON.stringify(input.ids)).run();
     }

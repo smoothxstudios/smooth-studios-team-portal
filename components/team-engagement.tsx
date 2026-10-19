@@ -75,7 +75,8 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
   const requestSequence = useRef(0), busyRef = useRef(false), shown = useRef(new Set<string>());
   const moodRequestId = useRef("");
   const popupRef = useRef<HTMLDivElement>(null);
-  const mounted = useRef(false);
+  const mounted = useRef(false), homeActiveRef = useRef(homeActive);
+  homeActiveRef.current = homeActive;
   const checkedState = (result: EmployeeEngagement) => {
     if (result.quizVersion !== 3 || !Array.isArray(result.quiz)) throw new Error("Daily Quiz is updating. Please refresh in a moment.");
     return result;
@@ -123,9 +124,18 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
     if (panel || progressOpen || document.querySelector('[role="dialog"][data-state="open"]')) return;
     const kind = nextEngagementPrompt(state, homeActive) as "mood" | "question" | null;
     if (!kind) return;
-    const key = kind === "mood" ? `mood:${state.moodRevision ?? 0}:${state.nextMoodAt}` : `question:${state.currentQuestionId}`;
+    const key = kind === "mood" ? `mood:${state.moodRevision ?? 0}:${state.nextMoodPromptAt ?? state.nextMoodAt}` : `question:${state.currentQuestionId}`;
     if (shown.current.has(key)) return;
-    shown.current.add(key); setPanel(kind);
+    shown.current.add(key);
+    if (kind === "mood") {
+      // Reserve this prompt once across visits/devices before opening it. A
+      // reserved prompt remains answerable, but another visit cannot reopen it.
+      void save("/engagement/mood-prompt", {}, result => {
+        if (result.promptClaimed && homeActiveRef.current && document.visibilityState === "visible" && !document.querySelector('[role="dialog"][data-state="open"]')) setPanel("mood");
+      }).then(saved => { if (!saved) shown.current.delete(key); });
+      return;
+    }
+    setPanel(kind);
     if (kind === "question") {
       // Each server-issued question prompts once, including across devices.
       void save("/engagement/dismiss", { kind, day: state.day, questionId: state.currentQuestionId }, () => {});
@@ -138,8 +148,9 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
     const sequence = ++requestSequence.current;
     try {
       const result = checkedState(await teamRequest<EmployeeEngagement>(token, path, data));
-      if (mounted.current && sequence === requestSequence.current) { setState(result); onSuccess(result); }
-    } catch (e) { if (mounted.current) setError(e instanceof Error ? e.message : "This wasn't saved. Please try again."); }
+      if (mounted.current && sequence === requestSequence.current) { setState(result); onSuccess(result); return true; }
+      return false;
+    } catch (e) { if (mounted.current) setError(e instanceof Error ? e.message : "This wasn't saved. Please try again."); return false; }
     finally { busyRef.current = false; if (mounted.current) setBusy(false); }
   }
   function recordMood(mood: string) {

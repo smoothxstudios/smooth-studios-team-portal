@@ -17,6 +17,7 @@ export type MoodCheckin = { id: string; mood: string; createdAt: string };
 export type EmployeeEngagement = {
   quizVersion: 3;
   serverNow: number; day: string; moodDue: boolean; nextMoodAt: number; moodRevision: number;
+  moodPromptDue?: boolean; nextMoodPromptAt?: number; promptClaimed?: boolean;
   lastMood: MoodCheckin | null; questionDue: boolean; available: boolean;
   currentQuestionId: string | null; answeredToday: number; nextQuestionAt: number | null;
   quiz: { question: CreativeQuestion; attempt: CreativeAttempt | null }[];
