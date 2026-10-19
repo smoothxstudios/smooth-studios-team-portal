@@ -255,7 +255,8 @@ async function route(request, env, ctx) {
     return { revision: s.state.revision, syncedAt: s.state.synced_at, availabilityVersion: 1, workPreferences,
       appointments: s.appointments.map(a => withoutRemovedRentalStaff(a, assignments, s.state.synced_at)).filter(a => isOwner || ids.has(a.id) || a.acceptedEmployeeIds.includes(user) ||
           a.calendarInvitations?.some(invitation => invitation.employeeId === user && invitation.status !== "declined"))
-        .map(a => isOwner ? a : { ...a, acceptedEmployeeIds: a.acceptedEmployeeIds.filter(id => id === user),
+        .map(a => isOwner ? a : { ...a, fullyPaid: undefined, paidOnlineCents: undefined,
+          acceptedEmployeeIds: a.acceptedEmployeeIds.filter(id => id === user),
           calendarInvitations: (a.calendarInvitations ?? []).filter(invitation => invitation.employeeId === user) }),
       blocks: s.blocks.filter(b => isOwner || b.userId === user), assignments,
       devices: Object.fromEntries(devices.filter(d => isOwner || d.user_id === user).map(d => [d.user_id, d.count])),
