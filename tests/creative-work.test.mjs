@@ -15,7 +15,7 @@ async function submitted(f) {
 }
 test("past creative deadlines accept an omitted or blank brief", async t => {
   const f = await setup(); t.after(() => f.close());
-  assert.equal((await f.call("owner", "/health")).data.creativeWorkVersion, 3);
+  assert.equal((await f.call("owner", "/health")).data.creativeWorkVersion, 4);
   for (const instructions of [undefined, "", " \n "]) {
     const input = { ...offer(), dueLocal: "2025-10-05T18:00", instructions };
     if (instructions === undefined) delete input.instructions;
@@ -147,7 +147,8 @@ test("retries, invalid links, invalid amounts and inactive accounts fail safely"
   assert.equal((await f.call("owner", "/creative-work", { ...offer(), employeeId: "amia" })).status, 400);
   let item = (await act(f, "jordyn", first.data.assignment, "accept")).data.assignment;
   assert.equal((await act(f, "jordyn", item, "submit", { links: ["not-a-link"] })).status, 400);
-  assert.equal((await act(f, "owner", item, "edit", offer())).status, 409);
+  item = (await act(f, "owner", item, "edit", { ...offer(), title: "Updated brief" })).data.assignment;
+  assert.equal(item.status, "offered");
   item = (await act(f, "owner", item, "cancel")).data.assignment;
   assert.equal(creativeEarnings([item]).metrics.projected, 0);
   f.close();
@@ -180,4 +181,87 @@ test("physical work can be submitted without links and still requires owner appr
     item = (await act(f, "owner", item, "approve")).data.assignment;
     assert.equal(creativeOwed(item), item.amountCents);
   }
+});
+
+test('multiple people receive linked private offers with independent earnings and retry-safe alerts', async t => {
+  const f = await setup(); t.after(() => f.close());
+  const input = { ...offer(), employeeIds: ['jordyn','rayne','akiva'] };
+  const result = await f.call('owner','/creative-work',input);
+  assert.equal(result.status,200);
+  const items = result.data.assignments;
+  assert.equal(items.length,3); assert.equal(new Set(items.map(item=>item.groupId)).size,1);
+  assert.equal(new Set(items.map(item=>item.id)).size,3);
+  assert.equal(creativeEarnings(items).metrics.projected,37500);
+  for (const person of input.employeeIds) {
+    const list = (await f.call(person,'/creative-work')).data.assignments;
+    assert.equal(list.length,1); assert.equal(list[0].employeeId,person);
+    assert.equal((await act(f,person,items.find(item=>item.employeeId!==person),'accept')).status,404);
+  }
+  const retry = await f.call('owner','/creative-work',input);
+  assert.equal(retry.data.duplicate,true); assert.equal(retry.data.assignments.length,3);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_notification_events').get().n,3);
+  let item=items[0];item=(await act(f,'jordyn',item,'accept')).data.assignment;
+  item=(await act(f,'jordyn',item,'submit',{links:[]})).data.assignment;
+  item=(await act(f,'owner',item,'approve')).data.assignment;
+  const all=(await f.call('owner','/creative-work')).data.assignments;
+  assert.equal(creativeEarnings(all).metrics.owed,12500);
+  assert.equal(all.filter(item=>item.status==='offered').length,2);
+  assert.equal((await act(f,'owner',item,'edit',offer())).status,409);
+});
+
+test('adding people preserves original terms, prevents duplicate membership and rejects stale edits', async t => {
+  const f=await setup();t.after(()=>f.close());
+  let original=await create(f);
+  original=(await act(f,'jordyn',original,'accept')).data.assignment;
+  const result=await act(f,'owner',original,'add-people',{...offer(), employeeIds:['rayne','akiva'], amountCents:5000});
+  assert.equal(result.status,200);assert.equal(result.data.assignments.length,3);
+  const anchor=result.data.assignment;
+  assert.equal(anchor.amountCents,12500);assert.equal(anchor.status,'accepted');
+  assert.equal(result.data.assignments.filter(item=>item.amountCents===5000).length,2);
+  const before=f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_notification_events').get().n;
+  assert.equal((await act(f,'owner',original,'add-people',{...offer(),employeeIds:['amia']})).status,409);
+  assert.equal((await act(f,'owner',anchor,'add-people',{...offer(),employeeIds:['rayne','amia']})).status,409);
+  assert.equal((await f.call('owner','/creative-work')).data.assignments.length,3);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_notification_events').get().n,before);
+  assert.equal((await act(f,'jordyn',anchor,'add-people',{...offer(),employeeIds:['amia']})).status,403);
+  const child=result.data.assignments.find(item=>item.employeeId==='rayne');
+  const added=await act(f,'owner',child,'add-people',{...offer(),employeeIds:['amia']});
+  assert.equal(added.status,200);
+  assert.equal(added.data.assignments[1].groupId,anchor.groupId);
+});
+
+test('edited active work requires renewed acceptance and preserves submitted history', async t => {
+  const f=await setup();t.after(()=>f.close());
+  const item=await submitted(f);
+  const result=await act(f,'owner',item,'edit',{...offer(), title:'Updated deliverable',amountCents:15000});
+  assert.equal(result.status,200);
+  const changed=result.data.assignment;
+  assert.equal(changed.status,'offered');assert.equal(changed.amountCents,15000);
+  assert.deepEqual(changed.submissions,item.submissions);
+  assert.equal(creativeOwed(changed),0);
+  assert.equal((await act(f,'owner',changed,'approve')).status,409);
+  assert.equal((await act(f,'jordyn',changed,'submit',{links:[]})).status,409);
+  assert.equal((await act(f,'owner',item,'edit',offer())).status,409);
+  assert.equal((await act(f,'jordyn',changed,'accept')).status,200);
+});
+
+test('invalid multi-person selections create neither offers nor notifications', async t => {
+  const f=await setup();t.after(()=>f.close());
+  for (const employeeIds of [[],['jordyn','jordyn'],['jordyn','owner'],['jordyn','missing'],'jordyn']) {
+    assert.equal((await f.call('owner','/creative-work',{...offer(),employeeIds})).status,400);
+  }
+  const hashes=JSON.parse(f.env.TEAM_TOKEN_HASHES);delete hashes.amia;f.env.TEAM_TOKEN_HASHES=JSON.stringify(hashes);
+  assert.equal((await f.call('owner','/creative-work',{...offer(),employeeIds:['jordyn','amia']})).status,400);
+  assert.equal((await f.call('owner','/creative-work')).data.assignments.length,0);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_notification_events').get().n,0);
+});
+
+test('concurrent additions from different people in one work create only one new offer', async t => {
+  const f=await setup();t.after(()=>f.close());
+  const created=await f.call('owner','/creative-work',{...offer(),employeeIds:['jordyn','rayne']});
+  const results=await Promise.all(created.data.assignments.map(item=>act(f,'owner',item,'add-people',{...offer(),employeeIds:['akiva']})));
+  assert.deepEqual(results.map(result=>result.status).sort(),[200,409]);
+  const all=(await f.call('owner','/creative-work')).data.assignments;
+  assert.equal(all.length,3);assert.equal(all.filter(item=>item.employeeId==='akiva').length,1);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_notification_events').get().n,3);
 });

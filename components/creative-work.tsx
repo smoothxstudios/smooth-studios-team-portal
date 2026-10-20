@@ -36,7 +36,7 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
   const [now, setNow] = useState(Date.now);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
   const [search, setSearch] = useState(""), [filter, setFilter] = useState("active"), [person, setPerson] = useState("all");
-  const [selected, setSelected] = useState<string | null>(null), [editor, setEditor] = useState<{ item?: CreativeAssignment; id: string } | null>(null);
+  const [selected, setSelected] = useState<string | null>(null), [editor, setEditor] = useState<{ item?: CreativeAssignment; id: string; addPeople?: boolean } | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const selectedItem = state.items.find(item => item.id === (focusId ?? selected));
   const workItems = earningsOnly ? state.items : state.items.filter(item => item.entryType !== "manual");
@@ -47,6 +47,12 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
       (filter === "all" || (filter === "active" ? openStatuses.includes(item.status) : filter === "closed" ? ["declined", "cancelled"].includes(item.status) : item.status === filter)) &&
       `${item.title} ${item.instructions} ${name(item.employeeId)}`.toLowerCase().includes(search.toLowerCase());
   }).sort((a, b) => earningsOnly ? creativeEarningDate(b).localeCompare(creativeEarningDate(a)) : a.dueAt.localeCompare(b.dueAt));
+  const cards: CreativeAssignment[][] = [];
+  for (const item of visible) {
+    const group = isOwner && !earningsOnly ? cards.find(entries => (entries[0].groupId ?? entries[0].id) === (item.groupId ?? item.id)) : undefined;
+    if (group) group.push(item); else cards.push([item]);
+  }
+  const teamItems = selectedItem ? state.items.filter(item => (item.groupId ?? item.id) === (selectedItem.groupId ?? selectedItem.id)) : [];
   const act = async (input: Record<string, unknown>, item: CreativeAssignment) => {
     setBusy(true); setError("");
     try { await state.mutate(input, item); return true; }
@@ -60,21 +66,22 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
       <div className="creative-totals"><div><span>Awaiting review</span><strong>{state.items.filter(item => item.status === "submitted").length}</strong></div><div><span>Approved · unpaid</span><strong>{dollars(summary.metrics.owed)}</strong></div><div><span>Paid</span><strong>{dollars(summary.metrics.paid)}</strong></div></div>
       <div className="creative-filters"><label className="creative-search"><Search size={17} /><span className="sr-only">Search creative work</span><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search assignments" /></label><label><span className="sr-only">Assignment status</span><select value={filter} onChange={event => setFilter(event.target.value)}><option value="active">Active work</option><option value="submitted">Awaiting review</option><option value="approved">Approved & paid</option><option value="closed">Declined & cancelled</option><option value="all">All work</option></select></label>{isOwner && <label><span className="sr-only">Employee</span><select value={person} onChange={event => setPerson(event.target.value)}><option value="all">Everyone</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>}</div>
     </>}
-    {state.loading ? <p role="status">Loading creative work…</p> : <div className="creative-grid">{visible.map(item => <button className="creative-card" key={item.id} onClick={() => { setSelected(item.id); setError(""); }}>
-      <div className="creative-card-top"><span className={`creative-status is-${item.status}`}>{status(item)}</span>{isOwner && <span className="creative-person"><i style={{ background: teamAccent(item.employeeId) }} />{name(item.employeeId)}</span>}</div>
+    {state.loading ? <p role="status">Loading creative work…</p> : <div className="creative-grid">{cards.map(group => { const item = group[0]; return <button className="creative-card" key={item.id} onClick={() => { setSelected(item.id); setError(""); }}>
+      <div className="creative-card-top"><span className={`creative-status is-${item.status}`}>{group.length > 1 ? `${group.length} people` : status(item)}</span>{isOwner && <span className="creative-person"><i style={{ background: teamAccent(item.employeeId) }} />{group.map(person => name(person.employeeId)).join(", ")}</span>}</div>
       <h3>{item.title}</h3><p className={!earningsOnly && openStatuses.includes(item.status) && Date.parse(item.dueAt) < now ? "creative-overdue" : ""}>{earningsOnly ? `${item.entryType === "manual" ? "Worked" : "Approved"} ${item.entryType === "manual" ? workDate(creativeEarningDate(item)) : date(creativeEarningDate(item))}` : `Due ${date(item.dueAt)}`}</p>
-      <div className="creative-card-bottom"><strong>{dollars(item.amountCents)}</strong><span>{item.status === "approved" ? creativeOwed(item) ? `${dollars(creativeOwed(item))} owed` : "Paid in full" : "Earned after approval"}<ArrowUpRight size={16} /></span></div>
-    </button>)}</div>}
+      <div className="creative-card-bottom"><strong>{dollars(group.reduce((sum, person) => sum + person.amountCents, 0))}{group.length > 1 && " total"}</strong><span>{group.length > 1 ? "Review each person" : item.status === "approved" ? creativeOwed(item) ? `${dollars(creativeOwed(item))} owed` : "Paid in full" : "Earned after approval"}<ArrowUpRight size={16} /></span></div>
+    </button>; })}</div>}
     {!state.loading && !state.error && !visible.length && <div className="creative-empty"><ClipboardList size={26} /><h3>{earningsOnly ? "No additional pay recorded" : workItems.length ? "No assignments match" : "No creative assignments yet"}</h3><p>{earningsOnly ? "Training, onboarding, other pay, and approved creative assignments appear here." : isOwner ? "Create work such as an edit, photo selection, design, or social post." : "Smooth’s creative assignments will appear here with a brief, deadline, and agreed pay."}</p></div>}
     <Dialog open={Boolean(focusId || selectedItem)} onOpenChange={open => { if (!open && !busy) { setSelected(null); onCloseFocus?.(); } }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{selectedItem?.title ?? "Creative assignment"}</DialogTitle><DialogDescription>{selectedItem ? `${name(selectedItem.employeeId)} · ${status(selectedItem)} · ${selectedItem.entryType === "manual" ? "Worked" : "Due"} ${selectedItem.entryType === "manual" ? workDate(selectedItem.dueAt) : date(selectedItem.dueAt)}` : "Review the current assignment details."}</DialogDescription></DialogHeader>
       {!selectedItem && <p role="status">{state.loading || focusLoading ? "Loading assignment…" : state.error || "This assignment is no longer available to this account."}</p>}
-      {selectedItem && <WorkDetails key={selectedItem.id} item={selectedItem} isOwner={isOwner} busy={busy} error={error} act={act} onEdit={() => { setEditor({ id: selectedItem.id, item: selectedItem }); setSelected(null); onCloseFocus?.(); }} />}
+      {isOwner && teamItems.length > 1 && <div className="creative-team-tabs" role="group" aria-label="Assigned people">{teamItems.map(person => <Button key={person.id} variant={selectedItem?.id === person.id ? "default" : "outline"} disabled={busy} aria-pressed={selectedItem?.id === person.id} onClick={() => { onCloseFocus?.(); setSelected(person.id); setError(""); }}>{name(person.employeeId)} · {status(person)}</Button>)}</div>}
+      {selectedItem && <WorkDetails key={selectedItem.id} item={selectedItem} isOwner={isOwner} busy={busy} error={error} act={act} onAddPeople={() => { setEditor({ id: selectedItem.id, item: selectedItem, addPeople: true }); setSelected(null); onCloseFocus?.(); }} onEdit={() => { setEditor({ id: selectedItem.id, item: selectedItem }); setSelected(null); onCloseFocus?.(); }} />}
     </DialogContent></Dialog>
     {editor && <WorkEditor key={`${editor.id}-${editor.item?.version ?? 0}`} editor={editor} employees={employees} state={state} onClose={() => setEditor(null)} />}
   </section>;
 }
 
-function WorkDetails({ item, isOwner, busy, error, act, onEdit }: { item: CreativeAssignment; isOwner: boolean; busy: boolean; error: string; act: (input: Record<string, unknown>, item: CreativeAssignment) => Promise<boolean>; onEdit: () => void }) {
+function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople }: { item: CreativeAssignment; isOwner: boolean; busy: boolean; error: string; act: (input: Record<string, unknown>, item: CreativeAssignment) => Promise<boolean>; onEdit: () => void; onAddPeople: () => void }) {
   const [action, setAction] = useState(""), [note, setNote] = useState(""), [links, setLinks] = useState(""), [pay, setPay] = useState(""), [method, setMethod] = useState("");
   const [validation, setValidation] = useState("");
   const owed = creativeOwed(item), paid = creativePaid(item);
@@ -98,7 +105,8 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit }: { item: Creati
       {!isOwner && ["accepted", "revision"].includes(item.status) && <Button disabled={busy} onClick={() => show("submit")}>Submit work</Button>}
       {isOwner && item.status === "submitted" && <><Button disabled={busy} onClick={() => show("approve")}><Check size={17} />Approve work</Button><Button variant="outline" disabled={busy} onClick={() => show("revise")}>Request changes</Button></>}
       {isOwner && item.status === "approved" && owed > 0 && <Button disabled={busy} onClick={() => show("pay")}>Record payout</Button>}
-      {isOwner && item.status === "offered" && <Button variant="outline" disabled={busy} onClick={onEdit}>Edit offer</Button>}
+      {isOwner && item.entryType !== "manual" && openStatuses.includes(item.status) && <Button variant="outline" disabled={busy} onClick={onEdit}>Edit work</Button>}
+      {isOwner && item.entryType !== "manual" && !["cancelled", "declined"].includes(item.status) && <Button variant="outline" disabled={busy} onClick={onAddPeople}><Plus size={17} />Add people</Button>}
       {isOwner && openStatuses.includes(item.status) && <Button variant="ghost" disabled={busy} onClick={() => show("cancel")}>Cancel assignment</Button>}
     </div>}
     {action && <form className="creative-action-form" onSubmit={submit}>
@@ -117,10 +125,12 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit }: { item: Creati
   </div>;
 }
 
-function WorkEditor({ editor, employees, state, onClose }: { editor: { id: string; item?: CreativeAssignment }; employees: Employee[]; state: CreativeWorkState; onClose: () => void }) {
+function WorkEditor({ editor, employees, state, onClose }: { editor: { id: string; item?: CreativeAssignment; addPeople?: boolean }; employees: Employee[]; state: CreativeWorkState; onClose: () => void }) {
   const item = editor.item;
-  const activeEmployees = employees.filter(employee => !employee.onboarding || employee.accessReady);
-  const [employeeId, setEmployeeId] = useState(item?.employeeId ?? "");
+  const adding = Boolean(editor.addPeople);
+  const assigned = item ? state.items.filter(entry => (entry.groupId ?? entry.id) === (item.groupId ?? item.id)).map(entry => entry.employeeId) : [];
+  const activeEmployees = employees.filter(employee => (!employee.onboarding || employee.accessReady) && (!adding || !assigned.includes(employee.id)));
+  const [employeeIds, setEmployeeIds] = useState<string[]>(item && !adding ? [item.employeeId] : []);
   const [title, setTitle] = useState(item?.title ?? ""), [instructions, setInstructions] = useState(item?.instructions ?? "");
   const [due, setDue] = useState(item ? studioLocal(item.dueAt).slice(0, 16) : ""), [pay, setPay] = useState(item ? (item.amountCents / 100).toFixed(2) : "");
   const [references, setReferences] = useState(item?.references.join("\n") ?? ""), [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -129,20 +139,21 @@ function WorkEditor({ editor, employees, state, onClose }: { editor: { id: strin
     const amountCents = moneyInputCents(pay);
     if (!amountCents) { setError("Enter a fixed payment amount with up to two decimal places."); return; }
     setBusy(true);
-    try { await state.mutate({ id: editor.id, action: "edit", employeeId, title, instructions, dueLocal: due, amountCents, references: splitLinks(references) }, item); onClose(); }
+    try { await state.mutate({ id: editor.id, action: adding ? "add-people" : "edit", employeeIds, title, instructions, dueLocal: due, amountCents, references: splitLinks(references) }, item); onClose(); }
     catch (error) { setError(error instanceof Error ? error.message : "Assignment couldn’t be saved."); }
     finally { setBusy(false); }
   };
-  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{item ? "Edit creative offer" : "Assign creative work"}</DialogTitle><DialogDescription>A deliverable with a deadline and fixed pay. The deadline does not block their calendar.</DialogDescription></DialogHeader>
+  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{adding ? "Add people to creative work" : item ? "Edit creative work" : "Assign creative work"}</DialogTitle><DialogDescription>{item && !adding ? `Editing ${name(item.employeeId)}’s assignment. Changes to accepted work require them to accept again.` : "Choose people for this work. Each person receives the fixed pay shown below after their work is approved."}</DialogDescription></DialogHeader>
     <form className="creative-editor" onSubmit={submit}>
-      <label>Assign to<select required disabled={Boolean(item)} value={employeeId} onChange={event => setEmployeeId(event.target.value)}><option value="" disabled>Choose a person</option>{activeEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>
+      {item && !adding ? <p className="creative-hint">Assigned to {name(item.employeeId)}</p> : <fieldset className="creative-people"><legend>{adding ? "Add to this work" : "Assign to"}</legend>{activeEmployees.map(employee => <label key={employee.id}><input type="checkbox" checked={employeeIds.includes(employee.id)} onChange={event => setEmployeeIds(current => event.target.checked ? [...current, employee.id] : current.filter(id => id !== employee.id))} /><span>{employee.name}</span></label>)}{!activeEmployees.length && <p>Everyone with an active account is already assigned.</p>}</fieldset>}
+
       <label>Assignment title<Input required maxLength={160} value={title} onChange={event => setTitle(event.target.value)} placeholder="Edit a recap video, retouch a photo set…" /></label>
       <label>Brief & deliverables · optional<Textarea maxLength={8000} rows={5} value={instructions} onChange={event => setInstructions(event.target.value)} placeholder="Add instructions or deliverable details if needed." /></label>
-      <div className="creative-form-row"><label>Deadline<Input required type="datetime-local" value={due} onChange={event => setDue(event.target.value)} /></label><label>Agreed pay (USD)<Input required inputMode="decimal" value={pay} onChange={event => setPay(event.target.value)} placeholder="0.00" /></label></div>
+      <div className="creative-form-row"><label>Deadline<Input required type="datetime-local" value={due} onChange={event => setDue(event.target.value)} /></label><label>Pay per person (USD)<Input required inputMode="decimal" value={pay} onChange={event => setPay(event.target.value)} placeholder="0.00" /></label></div>
       <label>Reference links · optional, one per line<Textarea maxLength={20500} value={references} onChange={event => setReferences(event.target.value)} placeholder="https://…" /></label>
-      <p className="creative-hint">The employee accepts, submits their work, and earns the agreed amount when you approve it.</p>
+      <p className="creative-hint">{adding ? "Existing assignments stay unchanged. " : ""}{employeeIds.length} {employeeIds.length === 1 ? "person" : "people"} · {dollars((moneyInputCents(pay) ?? 0) * employeeIds.length)} total agreed pay. Each person accepts, submits, and earns their own pay after approval.</p>
       {error && <p className="login-error" role="alert">{error}</p>}
-      <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy || !employeeId} type="submit">{busy ? "Saving…" : item ? "Save offer" : "Assign work"}</Button></DialogFooter>
+      <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy || !employeeIds.length} type="submit">{busy ? "Saving…" : adding ? "Add people" : item ? "Save changes" : "Assign work"}</Button></DialogFooter>
     </form>
   </DialogContent></Dialog>;
 }

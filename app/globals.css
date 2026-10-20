@@ -2251,3 +2251,10 @@ button { cursor: pointer; }
 .advance-correction .check-passed strong { color:var(--muted-foreground); }
 .advance-correction .check-needed strong { color:#b45309; }
 .dark .advance-correction .check-needed strong { color:#fbbf24; }
+
+.creative-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; border: 0; padding: 0; }
+.creative-people legend { font-weight: 600; margin-bottom: 8px; }
+.creative-editor .creative-people label { display: flex; align-items: center; gap: 10px; min-height: 48px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; }
+.creative-editor .creative-people input { width: 20px; height: 20px; min-height: 20px; accent-color: var(--primary); flex: 0 0 auto; }
+.creative-team-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.creative-card .creative-person { flex-wrap: wrap; text-align: right; }

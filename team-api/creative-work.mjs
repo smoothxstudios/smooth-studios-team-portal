@@ -1,3 +1,4 @@
+import { createCreativeOffers } from "./creative-offers.mjs";
 import { TEAM, localInstant } from "../lib/team-schedule.mjs";
 import { reconcileAdvances, creativeAdvanceAmounts, withCreativeAdvance } from "./payroll.mjs";
 import { creativeOwed } from "../lib/creative-work.mjs";
@@ -48,25 +49,26 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
   };
   if (!id) {
     requireOwner();
-    if (!/^[a-f0-9-]{36}$/.test(input.id ?? "")) fail(400, "Create a fresh assignment and try again.");
-    if (!TEAM.some(p => p.id === input.employeeId && p.id !== "owner") || !JSON.parse(env.TEAM_TOKEN_HASHES)[input.employeeId]) fail(400, "Choose an employee with an active dashboard account.");
-    const existing = await db.prepare("SELECT data FROM team_creative_assignments WHERE id = ?").bind(input.id).first();
-    if (existing) return { assignment: await withCreativeAdvance(db, JSON.parse(existing.data)), duplicate: true };
-    item = { id: input.id, employeeId: input.employeeId, ...terms(), status: "offered", version: 1,
-      createdAt: now, updatedAt: now, approvedAt: null, submissions: [], payments: [], history: [] };
-    event = "assigned";
+    return createCreativeOffers({ db, env, ctx, fail, input, terms: terms(), now });
   } else {
     const row = await db.prepare("SELECT data FROM team_creative_assignments WHERE id = ?").bind(id).first();
     if (!row) fail(404, "Creative assignment not found.");
     previous = JSON.parse(row.data);
     if (!isOwner && previous.employeeId !== user) fail(404, "Creative assignment not found.");
     if (!Number.isInteger(input.version) || input.version !== previous.version) fail(409, "This assignment changed. Refresh it and review the latest details before trying again.");
+    if (input.action === "add-people") {
+      requireOwner();
+      if (previous.entryType === "manual" || ["cancelled", "declined"].includes(previous.status)) fail(409, "Add people from an active or approved creative assignment.");
+      return createCreativeOffers({ db, env, ctx, fail, input, terms: terms(), source: previous, now });
+    }
     item = { ...previous, version: previous.version + 1, updatedAt: now };
     switch (input.action) {
       case "edit":
         requireOwner();
-        if (item.status !== "offered") fail(409, "Only unaccepted offers can be edited. Accepted terms stay with the assignment.");
-        Object.assign(item, terms()); event = "updated"; break;
+        if (item.entryType === "manual" || !["offered", "accepted", "revision", "submitted"].includes(item.status)) fail(409, "Only active creative work can be edited. Approved earnings stay unchanged.");
+        Object.assign(item, terms());
+        if (previous.status !== "offered") item.status = "offered";
+        event = "updated"; break;
       case "accept": case "decline":
         if (user !== item.employeeId) fail(403, "The assigned employee must respond to their offer.");
         if (item.status !== "offered") fail(409, "This offer already has a response.");

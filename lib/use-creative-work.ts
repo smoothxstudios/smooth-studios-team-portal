@@ -4,6 +4,7 @@ import { teamRequest } from "@/lib/team-api";
 import { useRefreshSource } from "@/components/dashboard-refresh";
 
 export type CreativeAssignment = {
+  groupId?: string;
   entryType?: "manual"; workCategory?: string; earnedAt?: string;
   id: string; employeeId: string; version: number; title: string; instructions: string; references: string[];
   dueAt: string; amountCents: number; status: "offered" | "accepted" | "submitted" | "revision" | "approved" | "declined" | "cancelled";
@@ -40,9 +41,10 @@ export function useCreativeWork(token: string) {
   const mutate = async (input: Record<string, unknown>, item?: CreativeAssignment, manual = false) => {
     requestId.current++;
     try {
-      const result = await teamRequest<{ assignment: CreativeAssignment }>(token, item ? `/creative-work/${item.id}` : manual ? "/creative-work/manual-pay" : "/creative-work", item ? { ...input, version: item.version } : input, item ? "PATCH" : "POST");
+      const result = await teamRequest<{ assignment: CreativeAssignment; assignments?: CreativeAssignment[] }>(token, item ? `/creative-work/${item.id}` : manual ? "/creative-work/manual-pay" : "/creative-work", item ? { ...input, version: item.version } : input, item ? "PATCH" : "POST");
       requestId.current++;
-      setItems(previous => [result.assignment, ...previous.filter(entry => entry.id !== result.assignment.id)]);
+      const updated = result.assignments ?? [result.assignment];
+      setItems(previous => [...updated, ...previous.filter(entry => !updated.some(item => item.id === entry.id))]);
       setError(""); setLoading(false); setLoaded(true);
       window.dispatchEvent(new Event("smooth-payroll-updated"));
       return result.assignment;

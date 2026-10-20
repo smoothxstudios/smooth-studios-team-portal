@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.40.2",
+  "currentVersion": "2.41.0",
   "releases": [
+    {
+      "id": "2026-10-19-creative-work-teams",
+      "version": "2.41.0",
+      "date": "2026-10-19",
+      "category": "Creative work",
+      "title": "Edit creative work and assign multiple people",
+      "changes": [
+        "Assign creative work to multiple people with clear pay per person and one shared card. Each person accepts, submits, earns, and receives payment separately.",
+        "Use Edit work to update an active assignment, or Add people to invite more teammates. Changes to accepted assignments require acceptance again; approved earnings stay protected."
+      ],
+      "employee": {
+        "title": "Updated creative assignments",
+        "changes": [
+          "Creative assignments keep your own acceptance, submission, and pay. If assignment terms change after you accept, review and accept the updated offer."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-19-always-start-home",
       "version": "2.40.2",
