@@ -1,3 +1,4 @@
+import { dashboardStorage } from './lib/dashboard-storage.mjs';
 import { spawn } from "node:child_process";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -69,7 +70,7 @@ for (let attempt = 0; attempt < 10; attempt++) {
   try {
     const health = await fetch(`${TEAM_API_URL}/health`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
     const status = health.ok && await health.json();
-    ready = Boolean(status?.ready && status.securityVersion === 1 && status.rateLimitReady && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 4 && status.creativeWorkVersion === 4 && status.studioReferenceVersion === 1 && status.payrollVersion === 1 && status.alertsVersion === 3 && status.calendarInvitationsVersion === 1 && status.calendarDeliveryVersion === 1 && status.calendarConnectionVersion === 2 && status.manualNoticesVersion === 1 && status.reminderTemplatesVersion === 1 && status.dashboardLayoutVersion === 1 && status.eventPlannerVersion === 2 && status.rentalStaffVersion === 1 && status.rentalTimeVersion === 1 && status.incrementalSyncVersion === 1 && status.payrollReviewVersion === 1 && status.manualPayVersion === 2 && status.backgroundSyncVersion === 2 && status.tempCheckVersion === 1 && status.pushReceiptVersion === 2 && status.backgroundSyncReady);
+    ready = Boolean(status?.ready && status.securityVersion === 1 && status.sessionVersion === 1 && status.dashboardSnapshotVersion === 1 && status.rateLimitReady && status?.pushReady && status.version === 1 && status.availabilityVersion === 1 && status.engagementVersion === 5 && status.notificationVersion === 4 && status.creativeWorkVersion === 4 && status.studioReferenceVersion === 1 && status.payrollVersion === 1 && status.alertsVersion === 3 && status.calendarInvitationsVersion === 1 && status.calendarDeliveryVersion === 1 && status.calendarConnectionVersion === 2 && status.manualNoticesVersion === 1 && status.reminderTemplatesVersion === 1 && status.dashboardLayoutVersion === 1 && status.eventPlannerVersion === 2 && status.rentalStaffVersion === 1 && status.rentalTimeVersion === 1 && status.incrementalSyncVersion === 1 && status.payrollReviewVersion === 1 && status.manualPayVersion === 2 && status.backgroundSyncVersion === 2 && status.tempCheckVersion === 1 && status.pushReceiptVersion === 2 && status.backgroundSyncReady);
   } catch { /* A transient deployment response is retried within this bound. */ }
   if (ready) break;
   if (attempt < 9) await new Promise(resolve => setTimeout(resolve, 2000));
@@ -85,3 +86,13 @@ const { publicKey } = await keyResponse.json();
 if (publicKey?.kty !== "RSA" || typeof publicKey.n !== "string" || typeof publicKey.e !== "string") throw new Error("Invalid secure import public key.");
 await mkdir(path.join(root, "public/data"), { recursive: true });
 await writeFile(path.join(root, "public/data/secure-import-key.json"), JSON.stringify({ publicKey: { kty: "RSA", n: publicKey.n, e: publicKey.e, alg: "RSA-OAEP-256", key_ops: ["encrypt"], ext: true } }) + "\n");
+
+// Seed encrypted snapshots before any frontend switches to authenticated reads.
+// Never print their contents; verify each import using the scoped machine key.
+for (const id of [...TEAM.map(person => person.id), 'team-settings']) {
+  let envelope;
+  try { envelope = JSON.parse(await readFile(path.join(root, `public/data/${id}.json`), 'utf8')); }
+  catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+  await dashboardStorage(passwords.owner, id, { envelope });
+}
+process.stdout.write('Authenticated encrypted dashboard storage is ready.\n');

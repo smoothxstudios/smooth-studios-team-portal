@@ -25,3 +25,18 @@ Scope: the studio team dashboard, its Cloudflare Worker API, tracked source, dep
 - The current sign-in architecture uses publicly downloadable, password-encrypted account snapshots and password-derived bearer tokens. Generated passwords use 18 random bytes. Offline password guessing cannot be stopped by API rate limits; strong unique passwords remain essential. Bearers do not have short session expirations; rotation is the revocation mechanism. Quick sign-in protects a local encrypted password with a device passkey rather than replacing API authentication.
 - Already downloaded data cannot be recalled by revoking access. Public Git history may retain earlier encrypted snapshots. Moving sensitive snapshots fully behind server authentication would be a separate authentication/data-delivery migration.
 - Hosting-account MFA, repository administrator access, historical secret exposure, Cloudflare account-wide rules, and the separate Production Dashboard/Content Vault were not audited. No claim is made that there has or has not been a past compromise.
+
+## Follow-up: session migration preparation (v2.42.0)
+
+Added random, hashed server sessions with a 30-minute renewal window, a 12-hour
+absolute lifetime, per-session sign-out revocation, and credential-change
+invalidation. Added account-scoped encrypted snapshot storage; the existing
+frontend remains compatible until the coordinated frontend cutover.
+
+Both remaining dependency roots have been addressed. The legacy Drizzle loader
+now uses esbuild 0.25.12. No upstream braces fix is published, so all consumers
+use the documented local 3.0.3-smooth.1 fork, which bounds parsed nesting and
+validates supplied AST depth before recursive traversal. Adversarial nesting,
+cyclic ASTs, normal glob patterns and TypeScript transforms are tested. A clean
+npm install and all 478 automated tests pass. The full dependency audit reports
+zero entries; this includes a locally maintained patch, not an upstream fix.

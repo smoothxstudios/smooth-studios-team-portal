@@ -1,3 +1,4 @@
+import { authenticate, sessionRoute, dashboardSnapshotRoute } from './sessions.mjs';
 import { tokenHash } from "../lib/team-auth.mjs";
 import { TEAM, localInstant as parseLocalInstant, addLocalDays, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
 import { deliverPush, flushAlerts, publicPushKey, pushDeliveryMessage, pushEndpoint } from "./push.mjs";
@@ -51,7 +52,7 @@ function futurePeriod(start, end) {
     fail(400, "Choose a future time within the next year, with an end after the start (up to 7 days).");
   }
 }
-async function body(request) {
+async function body(request, maxBytes = 256_000) {
   if (!request.headers.get("content-type")?.startsWith("application/json")) fail(415, "JSON is required.");
   const reader = request.body?.getReader();
   if (!reader) fail(400, "A request body is required.");
@@ -60,7 +61,7 @@ async function body(request) {
     const { value, done } = await reader.read();
     if (done) break;
     length += value.byteLength;
-    if (length > 256_000) { await reader.cancel(); fail(413, "This request is too large."); }
+    if (length > maxBytes) { await reader.cancel(); fail(413, "This request is too large."); }
     chunks.push(value);
   }
   try {
@@ -70,22 +71,6 @@ async function body(request) {
     if (!value || Array.isArray(value) || typeof value !== "object") throw new Error();
     return value;
   } catch { fail(400, "Invalid JSON request."); }
-}
-async function authenticate(request, env) {
-  if (!env.TEAM_TOKEN_HASHES) fail(503, "Team scheduling is not configured yet.");
-  const token = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9_-]{43})$/)?.[1];
-  if (!token) fail(401, "Unlock your dashboard to use team scheduling.");
-  const digest = await tokenHash(token);
-  const hashes = JSON.parse(env.TEAM_TOKEN_HASHES);
-  let found = null;
-  for (const id of [...users, "sync"]) {
-    const expected = hashes[id] ?? "";
-    let difference = expected.length ^ digest.length;
-    for (let i = 0; i < digest.length; i++) difference |= digest.charCodeAt(i) ^ (expected.charCodeAt(i) || 0);
-    if (!difference) found = id;
-  }
-  if (!found) fail(401, "Your scheduling session is invalid. Lock and unlock the dashboard again.");
-  return found;
 }
 const jsonRows = async (db, sql, ...args) => (await db.prepare(sql).bind(...args).all()).results.map(r => JSON.parse(r.data));
 async function snapshot(db) {
@@ -140,11 +125,15 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, securityVersion: 1, rateLimitReady: Boolean(env.API_RATE_LIMIT), pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
+    return { version: 1, ready, securityVersion: 1, sessionVersion: 1, dashboardSnapshotVersion: 1, rateLimitReady: Boolean(env.API_RATE_LIMIT), pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
-  const user = await authenticate(request, env);
+  const auth = await authenticate(request, env, fail), user = auth.user;
+  const session = await sessionRoute({ request, env, auth, fail });
+  if (session !== undefined) return session;
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
   else if (user === "sync") fail(403, "Sync access is restricted to synchronization endpoints.");
+  const dashboard = await dashboardSnapshotRoute({ request, db, user, body, fail });
+  if (dashboard !== undefined) return dashboard;
   if (request.method === "GET" && url.pathname === "/notifications/delivery") return notificationDeliveryRoute({request, db, env, user, fail});
   if (["/notifications", "/notifications/sent"].includes(url.pathname) || /^\/assignments\/[^/]+\/remind$/.test(url.pathname)) return manualNoticesRoute({ request, env, user, body, fail, ctx });
   if (url.pathname.startsWith("/calendar/")) return calendarAuthRoute({ request, env, user, body, fail });

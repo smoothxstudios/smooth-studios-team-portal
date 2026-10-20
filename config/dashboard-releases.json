@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.41.2",
+  "currentVersion": "2.42.0",
   "releases": [
+    {
+      "id": "2026-10-20-session-storage",
+      "version": "2.42.0",
+      "date": "2026-10-20",
+      "category": "Security",
+      "title": "Prepare expiring sign-in sessions",
+      "changes": [
+        "Added expiring, revocable server sessions and protected encrypted dashboard storage for the sign-in upgrade.",
+        "Replaced vulnerable development dependencies with a bounded local pattern-parser patch and an updated build dependency."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-20-security-review",
       "version": "2.41.2",
