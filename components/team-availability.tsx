@@ -1,4 +1,5 @@
 "use client";
+import { MoreOptions } from "@/components/dashboard/more-options";
 
 import { useState } from "react";
 import { CalendarCheck, ChevronDown, Clock3, Pencil, Plus, Trash2 } from "lucide-react";
@@ -32,7 +33,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
   const visible = (entry: TimeBlock | WorkPreference) => (filter === "all" || entry.userId === filter) && (showPast || upcoming(entry));
   const preferences = (schedule.workPreferences ?? []).filter(visible).sort((a, b) => a.startLocal.localeCompare(b.startLocal));
   const blocks = schedule.blocks.filter(visible).sort((a, b) => a.startLocal.localeCompare(b.startLocal));
-  const defaultUser = isOwner ? filter !== "all" && filter !== "owner" ? filter : "akiva" : userId;
+  const defaultUser = isOwner ? "" : userId;
 
   function selectPerson(personId: string) {
     setFilter(personId);
@@ -97,16 +98,16 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
           if (await mutate(form.id ? `/work-preferences/${form.id}` : "/work-preferences", { userId: form.userId, startLocal, endLocal, allDay: form.allDay, note: form.note, repeatUntil: form.weekly ? form.repeatUntil : null }, form.id ? "PATCH" : "POST")) { if (isOwner) { if (filter !== "all") setFilter(form.userId); setExpandedPerson(form.userId); setShowAllPreferences(false); setShowAllBlocks(false); } setOpen(false); }
         } catch (caught) { setFormError(caught instanceof Error ? caught.message : "Check the selected date and hours."); }
       }}>
-        {isOwner && <label>Team member<select disabled={Boolean(form.id)} value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })}>{TEAM.filter(p => p.id !== "owner").map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
+        {isOwner && <label>Team member<select aria-label="Team member" required disabled={Boolean(form.id)} value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })}><option value="" disabled>Choose a person</option>{TEAM.filter(p => p.id !== "owner").map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
         <label>Day<Input required type="date" value={form.day} onChange={e => setForm({ ...form, day: e.target.value })} /></label>
         <label className="schedule-check"><input type="checkbox" checked={form.allDay} onChange={e => setForm({ ...form, allDay: e.target.checked })} />Full day — any time that day</label>
         {!form.allDay && <><div className="schedule-form-pair"><label>From<Input required type="time" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} /></label><label>Until<Input required type="time" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} /></label></div>{form.endTime < form.startTime && <p className="schedule-small">Ends the following day.</p>}</>}
-        <label className="schedule-check"><input type="checkbox" checked={form.weekly} onChange={e => setForm({ ...form, weekly: e.target.checked })} />Repeat every week on this weekday</label>
+        <MoreOptions defaultOpen={Boolean(form.id && (form.weekly || form.note))}><label className="schedule-check"><input type="checkbox" checked={form.weekly} onChange={e => setForm({ ...form, weekly: e.target.checked })} />Repeat every week on this weekday</label>
         {form.weekly && <label>Repeat through<Input required type="date" min={form.day || undefined} max={form.day ? addLocalDays(`${form.day}T00:00`, 364).slice(0, 10) : undefined} value={form.repeatUntil} onChange={e => setForm({ ...form, repeatUntil: e.target.value })} /></label>}
-        <label>Note (optional)<Input maxLength={120} placeholder="Open to extra rentals, prefer an afternoon shift…" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></label>
+        <label>Note (optional)<Input maxLength={120} placeholder="Open to extra rentals, prefer an afternoon shift…" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></label></MoreOptions>
         {(formError || error) && <p className="schedule-error" role="alert">{formError || error}</p>}
-        <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={disabled}>{busy ? "Saving…" : "Save preference"}</Button></DialogFooter>
+        <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={disabled}>{busy ? "Saving…" : error || formError ? "Try again" : "Save preference"}</Button></DialogFooter>
       </form></DialogContent></Dialog>
-    <Dialog open={Boolean(remove)} onOpenChange={value => { if (!busy && !value) setRemove(null); }}><DialogContent closeDisabled={busy} className="schedule-modal"><DialogHeader><DialogTitle>Remove availability entry?</DialogTitle><DialogDescription>Remove {remove?.label}? Existing assignments will stay in place.</DialogDescription></DialogHeader>{error && <p className="schedule-error" role="alert">{error}</p>}<DialogFooter><Button disabled={busy} variant="outline" onClick={() => setRemove(null)}>Keep entry</Button><Button disabled={disabled} onClick={async () => { if (remove && await mutate(remove.path, {}, "DELETE")) setRemove(null); }}>Remove entry</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(remove)} onOpenChange={value => { if (!busy && !value) setRemove(null); }}><DialogContent closeDisabled={busy} className="schedule-modal"><DialogHeader><DialogTitle>Remove availability entry?</DialogTitle><DialogDescription>Remove {remove?.label}? Existing assignments will stay in place.</DialogDescription></DialogHeader>{error && <p className="schedule-error" role="alert">{error}</p>}<DialogFooter><Button disabled={busy} variant="outline" onClick={() => setRemove(null)}>Keep entry</Button><Button disabled={disabled} onClick={async () => { if (remove && await mutate(remove.path, {}, "DELETE")) setRemove(null); }}>{busy ? "Removing…" : "Remove entry"}</Button></DialogFooter></DialogContent></Dialog>
   </>;
 }

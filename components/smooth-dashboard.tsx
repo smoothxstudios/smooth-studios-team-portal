@@ -1,4 +1,6 @@
 "use client";
+import { ActionFeedback } from "@/components/dashboard/action-feedback";
+import { CreativeActionList } from "@/components/dashboard/daily-actions";
 import { OwnerWeeklyHours } from "@/components/dashboard/owner-weekly-hours";
 import { AdvanceReview } from "@/components/dashboard/advance-review";
 import { OwnerHomeLayout } from "@/components/dashboard/owner-home-layout";
@@ -12,7 +14,7 @@ import { DashboardVersionFooter } from "@/components/dashboard-version-footer";
 import { CategoryRevenue,OwnerFinancialSummary,PeriodTotals } from "@/components/dashboard/financial-summary";
 import { LoginScreen } from "@/components/dashboard/login-screen";
 import { CloseMobileMenu,DashboardNavigation,EMPLOYEE_NAV_ITEMS,MobileMenuButton,NAV_ITEMS,SettingsNavigation } from "@/components/dashboard/navigation";
-import { OwnerAttention,OwnerUpcoming } from "@/components/dashboard/owner-overview";
+import { OwnerAttention } from "@/components/dashboard/owner-overview";
 import { PaymentOverrideForm,StripeMatchForm } from "@/components/dashboard/payment-forms";
 import { PayoutPage } from "@/components/dashboard/payout-page";
 import { RentalTable } from "@/components/dashboard/rental-table";
@@ -107,6 +109,8 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
     refreshCurrent: arrival => setToolbarRefresh(previous => ({ id: (previous?.id ?? 0) + 1, arrival })),
   });
   useEffect(() => () => { toolbarScroll.current?.cancel(); }, []);
+  const openCreative = (id?: string) => { setFocusedAlert(id ? { target: "creative", id } : null); setView("creative"); };
+  const openAppointment = (id: string) => { const target = rentalAlertTargetId(id); setFocusedAlert(target ? { target: "scheduling", id: target } : null); setView("scheduling"); };
   const openChecklist = () => navigate("checklists");
   const alerts = useAlerts(schedulingToken, view === "alerts");
   const payroll = usePayroll(schedulingToken, payload.payroll);
@@ -309,6 +313,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
 
   return (
     <SidebarProvider>
+      <ActionFeedback />
       <EmployeeEngagementProvider key={payload.user.id} token={schedulingToken} enabled={!isOwner} homeActive={view === "overview"}>
       {isOwner && <TeamAccountSetup open={teamSetupOpen} onOpenChange={setTeamSetupOpen} employees={payload.employees} busy={teamSetupBusy} onSubmit={prepareTeamSetup} enabled={Boolean(payload.workflowAccess)} />}
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
@@ -332,9 +337,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
         <div className="dashboard-refresh-body">
         <div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
           {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} action={isOwner ? <div className="alerts-owner-actions"><NotificationDelivery token={schedulingToken}/><TeamNotifications token={schedulingToken} employees={payload.employees} /></div> : undefined} />}
-          {!isOwner && view === "overview" && <EmployeeEngagementBar />}
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Other work and pay totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
-          {view === "overview" && !isOwner && <CreativeWorkPreview state={creative} isOwner={false} onOpen={() => setView("creative")} />}
           {view === "payouts" && payroll.error && <p className="schedule-warning" role="status">{payroll.error}</p>}
           {view === "payouts" && isOwner && <AdvanceReview token={schedulingToken} payroll={payroll.state} employees={payload.employees} rentals={rentals} onSync={openCalendarSync} onFixPayment={id => { setPaymentReviewRentalId(id); setPaymentOverrideOpen(true); }} onReviewed={payroll.updateReviewSummary} onOpenSource={(kind, id) => {
             const target = kind === "rental" ? "scheduling" : "creative";
@@ -345,12 +348,12 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           {view === "settings" && <DashboardSettings token={schedulingToken} profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} dark={dark} onThemeChange={setDark} onSync={isOwner ? openCalendarSync : undefined} lastSynced={`${formatDate(payload.generatedAt, true)} · ${formatTime(payload.generatedAt)}`} />}
           {view === "checklists" && <StudioInfoPage token={schedulingToken} isOwner={isOwner} userId={payload.user.id} section="checklists" />}
           {view === "creative" && <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} focusLoading={alertWorkLoading} focusId={focusedAlert?.target === "creative" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} />}
-          {view === "overview" && !isOwner && <TeamSchedulingPage onChecklist={openChecklist} token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ rentals: visibleRentals, owed: metrics.owed, advance, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide"), onChecklist: openChecklist }} />}
+          {view === "overview" && !isOwner && <TeamSchedulingPage onChecklist={openChecklist} token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ work: <CreativeActionList state={creative} isOwner={false} onOpen={openCreative} />, extras: <EmployeeEngagementBar />, rentals: visibleRentals, owed: metrics.owed, advance, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide"), onChecklist: openChecklist }} />}
           {view === "overview" && isOwner && (
             <OwnerHomeLayout token={schedulingToken} sections={{
-              upcoming: <OwnerUpcoming rentals={upcoming} onSchedule={() => setView("scheduling")} />,
-              attention: <OwnerAttention reviewCount={reviewRentals.length} unmatchedCount={payload.stripeSummary?.unmatchedPaymentCount ?? payload.unmatchedStripePayments?.length ?? 0} stripeConnected={stripeConnected} onReview={reviewPayments} onMatch={() => openStripeMatch()} onPayouts={() => setView("payouts")} />,
-              finances: <OwnerFinancialSummary rentals={visibleRentals} creative={creative} upcomingCount={upcoming.length} totalOwed={metrics.owed} onSchedule={() => setView("scheduling")} onPayouts={() => setView("payouts")} />,
+              upcoming: <TeamSchedulingPage token={schedulingToken} userId={payload.user.id} isOwner ownerHome={{ onSchedule: () => setView("scheduling") }} onPayment={id => { setPaymentReviewRentalId(id); setPaymentOverrideOpen(true); }} />,
+              attention: <CreativeActionList state={creative} isOwner onOpen={openCreative}><OwnerAttention reviewCount={reviewRentals.length} unmatchedCount={payload.stripeSummary?.unmatchedPaymentCount ?? payload.unmatchedStripePayments?.length ?? 0} stripeConnected={stripeConnected} onReview={reviewPayments} onMatch={() => openStripeMatch()} onPayouts={() => setView("payouts")} /></CreativeActionList>,
+              finances: <details className="home-finances"><summary>Financial summary<ChevronDown size={18} /></summary><OwnerFinancialSummary rentals={visibleRentals} creative={creative} upcomingCount={upcoming.length} totalOwed={metrics.owed} onSchedule={() => setView("scheduling")} onPayouts={() => setView("payouts")} /></details>,
               hours: <OwnerWeeklyHours employees={payload.employees} rentals={rentals} token={schedulingToken} />,
               creative: <CreativeWorkPreview state={creative} isOwner onOpen={() => setView("creative")} />,
               reports: <details className="owner-reports">
@@ -397,7 +400,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
                 </Select>
                 {(categoryFilter !== "all" || paymentFilter !== "all") && <Button variant="ghost" onClick={() => { setCategoryFilter("all"); setPaymentFilter("all"); }}>Clear filters</Button>}
             </div>
-            {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the next Calendar sync, scheduled every 5 minutes." : "No appointments match the selected filters."} title="No appointments found" />}
+            {filteredRentals.length ? <RentalTable onOpen={openAppointment} employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the next Calendar sync, scheduled every 5 minutes." : "No appointments match the selected filters."} title="No appointments found" />}
           </article>}
           {view === "team" && isOwner && <Tabs defaultValue="people" className="owner-team-tabs">
             <TabsList aria-label="Team sections"><TabsTrigger value="people">People</TabsTrigger><TabsTrigger value="engagement">Check-ins &amp; rewards</TabsTrigger></TabsList>
@@ -413,7 +416,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           </>}
           {view === "guide" && <StudioGuidePage isOwner={isOwner} draftPassword={sessionPassword} teamToken={schedulingToken} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
           {view === "planner" && isOwner && <EventPlanner token={schedulingToken} onSchedule={() => setView("scheduling")} onAvailability={() => setView("availability")} />}
-          {(view === "scheduling" || view === "availability") && <TeamSchedulingPage onChecklist={openChecklist} focusId={focusedAlert?.target === "scheduling" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} availabilityOnly={view === "availability"} onAvailability={() => setView("availability")} isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
+          {(view === "scheduling" || view === "availability") && <TeamSchedulingPage onPayment={isOwner ? id => { setPaymentReviewRentalId(id); setPaymentOverrideOpen(true); } : undefined} onChecklist={openChecklist} focusId={focusedAlert?.target === "scheduling" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} availabilityOnly={view === "availability"} onAvailability={() => setView("availability")} isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable onOpen={openAppointment} employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
         </div>
         <DashboardVersionFooter viewer={isOwner ? "owner" : "employee"} />
         </div>
@@ -421,7 +424,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
       <MobileToolbar isOwner={isOwner} view={view} unread={alerts.unreadCount} onNavigate={navigateToolbar} />
       {isOwner && (
         <>
-          <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={open => { setPaymentOverrideOpen(open); if (!open) setPaymentReviewRentalId(""); }} open={paymentOverrideOpen} initialEventId={paymentReviewRentalId} reviewRentals={reviewRentals} />
+          <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={open => { setPaymentOverrideOpen(open); if (!open) setPaymentReviewRentalId(""); }} open={paymentOverrideOpen} initialEventId={paymentReviewRentalId} reviewRentals={paymentReviewRentalId ? rentals.filter(rental => rental.id === paymentReviewRentalId) : reviewRentals} />
           <StripeMatchForm initialPaymentId={stripeMatchPaymentId} onContinue={openWorkflow} onOpenChange={setStripeMatchOpen} open={stripeMatchOpen} payments={payload.unmatchedStripePayments ?? []} rentals={rentals} />
           <GithubWorkflowDialog access={payload.workflowAccess} onOpenChange={setWorkflowOpen} open={workflowOpen} request={workflowRequest} />
         </>

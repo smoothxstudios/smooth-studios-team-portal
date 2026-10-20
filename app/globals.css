@@ -2258,3 +2258,84 @@ button { cursor: pointer; }
 .creative-editor .creative-people input { width: 20px; height: 20px; min-height: 20px; accent-color: var(--primary); flex: 0 0 auto; }
 .creative-team-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
 .creative-card .creative-person { flex-wrap: wrap; text-align: right; }
+
+/* Shared daily work, appointment panels, and form interactions. */
+.daily-action-list { padding: 22px; }
+.daily-action-list > section + section { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 18px; }
+.daily-action-list h3, .daily-decision-heading { font-size: 14px; font-weight: 650; margin-bottom: 8px; }
+.daily-action-list h3 > span { margin-left: 6px; color: var(--muted-foreground); }
+.daily-action-row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 15px 0; text-align: left; border-bottom: 1px solid var(--border); min-height: 64px; }
+.daily-action-row:last-child { border-bottom: 0; }
+.daily-action-row > svg { flex-shrink: 0; color: var(--muted-foreground); }
+.daily-action-row:focus-visible, .form-more-options > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: 6px; }
+.daily-action-time { flex: 0 0 75px; font-size: 14px; font-weight: 650; }
+.daily-action-time small { display: block; font-size: 12px; font-weight: 400; color: var(--muted-foreground); margin-top: 4px; }
+.daily-action-copy { display: grid; gap: 5px; min-width: 0; flex: 1; }
+.daily-action-copy strong { font-size: 15px; overflow-wrap: anywhere; }
+.daily-action-copy small, .daily-empty { font-size: 13px; line-height: 1.5; color: var(--muted-foreground); }
+.daily-next-step { font-size: 13px; color: var(--primary); font-weight: 600; }
+.daily-people { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.daily-people .schedule-person { font-size: 12px; }
+.daily-action-list .owner-attention { padding-top: 16px; margin-top: 12px; border-top: 1px solid var(--border); }
+.daily-action-list .owner-attention-empty { padding: 12px 0; }
+.home-finances { border: 1px solid var(--border); background: var(--card); border-radius: 16px; }
+.home-finances > summary { display: flex; align-items: center; justify-content: space-between; padding: 20px 22px; cursor: pointer; font-weight: 650; list-style: none; }
+.home-finances > summary::-webkit-details-marker, .form-more-options > summary::-webkit-details-marker { display: none; }
+.home-finances[open] > summary > svg, .form-more-options[open] > summary > svg { transform: rotate(180deg); }
+.home-finances > :not(summary) { margin: 0 18px 18px; }
+.employee-next-action { display: grid; justify-items: start; gap: 12px; }
+.employee-next-action h3 { font-size: 22px; font-weight: 650; }
+.employee-next-action p { font-size: 14px; color: var(--muted-foreground); }
+.form-more-options { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); width: 100%; }
+.form-more-options > summary { display: flex; justify-content: space-between; align-items: center; min-height: 48px; list-style: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+.form-more-options > div { display: grid; gap: 16px; padding: 2px 0 16px; }
+.form-more-options label { display: grid; gap: 7px; }
+.form-more-options .schedule-check, .form-more-options .planner-check { display: flex; }
+.action-feedback-region { position: fixed; bottom: calc(94px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); z-index: 100; pointer-events: none; }
+.action-feedback { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 99px; padding: 8px 14px; background: var(--card); box-shadow: 0 4px 20px #0002; font-size: 14px; font-weight: 600; }
+.action-feedback > button { pointer-events: auto; display: grid; place-items: center; min-width: 44px; min-height: 44px; margin: -8px -10px -8px 0; }
+[data-slot="dialog-content"] > .modal-exit { transform: translateY(var(--dialog-scroll-y, 0px)); }
+[data-slot="dialog-content"] [data-slot="dialog-footer"] { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+[data-slot="dialog-content"] [data-slot="dialog-footer"] > button { min-height: 44px; }
+.appointment-dialog { width: calc(100vw - 24px); max-width: 660px; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+.appointment-detail { display: grid; gap: 22px; min-width: 0; }
+.appointment-detail > header h2 { font-size: 22px; font-weight: 650; }
+.appointment-detail > header p { margin-top: 6px; color: var(--muted-foreground); font-size: 14px; }
+.appointment-detail > section { padding-top: 18px; border-top: 1px solid var(--border); }
+.appointment-detail h3 { font-size: 15px; font-weight: 650; margin-bottom: 10px; }
+.appointment-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.appointment-section-heading h3 { margin: 0; }
+.appointment-section-heading > span { font-size: 12px; color: var(--muted-foreground); }
+.appointment-balance { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 0; }
+.appointment-balance dt { font-size: 12px; color: var(--muted-foreground); }
+.appointment-balance dd { font-size: 20px; font-weight: 650; margin-top: 6px; }
+.appointment-people { padding: 0; margin: 0; list-style: none; }
+.appointment-people li { display: flex; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.appointment-people li > span:first-child { flex: 1; display: grid; gap: 5px; }
+.appointment-people li small { font-size: 12px; color: var(--muted-foreground); }
+.appointment-offers .schedule-offer { border: 0; border-radius: 0; padding: 16px 0; background: transparent; border-bottom: 1px solid var(--border); }
+.appointment-history { margin-top: 12px; font-size: 13px; }
+.appointment-history summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.appointment-history > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; }
+.appointment-checklist fieldset { margin-top: 16px; }
+.appointment-checklist legend { font-size: 12px; font-weight: 650; color: var(--muted-foreground); }
+.appointment-checklist label { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.appointment-checklist input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--primary); }
+@media (max-width: 640px) {
+  .daily-action-list { padding: 18px; }
+  .daily-action-list .panel-heading h2, .employee-section-heading h2 { font-size: 19px; }
+  .daily-action-row { gap: 10px; }
+  .daily-action-time { flex-basis: 65px; font-size: 13px; }
+  .appointment-dialog { padding: 22px 18px; }
+  .schedule-actions [data-slot="button"], .appointment-section-heading [data-slot="button"] { min-height: 44px; }
+}
+.daily-action-list > .panel-heading { padding: 0; align-items: center; margin-bottom: 18px; gap: 10px; }
+.daily-action-list > .panel-heading h2 { font-size: 18px; }
+.daily-action-time { flex-basis: 80px; white-space: nowrap; }
+.appointment-checklist label > span > small { display: block; margin-top: 4px; font-size: 11px; color: var(--muted-foreground); }
+.appointment-checklist small .schedule-person { font-size: inherit; display: inline-flex; }
+@media (max-width: 640px) { .daily-action-time { flex-basis: 74px; } }
+.daily-action-list .owner-attention-empty { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 10px 0; }
+.daily-action-list .owner-attention-empty > p { display: none; }
+.daily-action-list .owner-attention-empty > span { width: 30px; height: 30px; flex-shrink: 0; margin: 0; }
+.daily-action-list .owner-attention-empty > strong { margin: 0; font-size: 13px; text-align: left; }

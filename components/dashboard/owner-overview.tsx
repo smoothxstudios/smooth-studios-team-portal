@@ -18,8 +18,8 @@ export function OwnerAttention({ reviewCount, unmatchedCount, stripeConnected, o
   onReview: () => void; onMatch: () => void; onPayouts: () => void;
 }) {
   return (
-    <article className="panel owner-attention">
-      <div className="panel-heading"><h2>Needs attention</h2></div>
+    <div className="owner-attention">
+      {(reviewCount > 0 || unmatchedCount > 0) && <h3 className="daily-decision-heading">Payments</h3>}
       <div className="owner-attention-list">
         {reviewCount > 0 && <button className="owner-attention-item" onClick={onReview}>
           <span className="owner-action-icon"><ReceiptText size={19} /></span>
@@ -37,7 +37,7 @@ export function OwnerAttention({ reviewCount, unmatchedCount, stripeConnected, o
         </div>}
       </div>
       <button className="owner-panel-link" onClick={onPayouts}>Manage team payouts <ArrowRight size={16} /></button>
-    </article>
+    </div>
   );
 }
 

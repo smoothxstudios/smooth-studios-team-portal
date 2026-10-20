@@ -1,4 +1,6 @@
 "use client";
+import { PersonLabel } from "@/components/dashboard/person-label";
+import { MoreOptions } from "@/components/dashboard/more-options";
 
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Check, ClipboardList, Plus, Search } from "lucide-react";
@@ -101,7 +103,7 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople }: {
     {item.history.some(entry => entry.note) && <section><h3>Feedback</h3>{[...item.history].reverse().filter(entry => entry.note).map(entry => <div key={entry.id} className="creative-submission"><strong>{entry.event} · {date(entry.at)}</strong><p className="creative-prose">{entry.note}</p></div>)}</section>}
     {item.payments.length > 0 && <section><h3>Payment history</h3>{item.payments.map(payment => <p key={payment.id} className="creative-payment-line"><strong>{dollars(payment.amountCents)}</strong><span>{item.entryType === "manual" && "recordedAt" in payment ? workDate(payment.paidAt) : date(payment.paidAt)}{payment.method ? ` · ${payment.method}` : ""}</span></p>)}</section>}
     {!action && <div className="creative-actions">
-      {!isOwner && item.status === "offered" && <><Button disabled={busy} onClick={() => void act({ action: "accept" }, item)}><Check size={17} />Accept assignment</Button><Button variant="outline" disabled={busy} onClick={() => show("decline")}>Decline</Button></>}
+      {!isOwner && item.status === "offered" && <><Button disabled={busy} onClick={() => void act({ action: "accept" }, item)}><Check size={17} />{busy ? "Saving…" : "Accept assignment"}</Button><Button variant="outline" disabled={busy} onClick={() => show("decline")}>Decline</Button></>}
       {!isOwner && ["accepted", "revision"].includes(item.status) && <Button disabled={busy} onClick={() => show("submit")}>Submit work</Button>}
       {isOwner && item.status === "submitted" && <><Button disabled={busy} onClick={() => show("approve")}><Check size={17} />Approve work</Button><Button variant="outline" disabled={busy} onClick={() => show("revise")}>Request changes</Button></>}
       {isOwner && item.status === "approved" && owed > 0 && <Button disabled={busy} onClick={() => show("pay")}>Record payout</Button>}
@@ -118,7 +120,7 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople }: {
       {action === "decline" && <p>Smooth will see that you declined this offer.</p>}
       {action === "pay" && <><p>Record money you’ve already sent to {name(item.employeeId)}. This updates the payment record; it doesn’t transfer money.</p><label>Amount paid (USD)<Input required inputMode="decimal" value={pay} onChange={event => setPay(event.target.value)} /></label><label>Method or reference · optional<Input maxLength={80} placeholder="Apple Pay, cash, transfer…" value={method} onChange={event => setMethod(event.target.value)} /></label></>}
       {validation && <p className="login-error" role="alert">{validation}</p>}
-      <div className="creative-actions"><Button disabled={busy} type="submit">{busy ? "Saving…" : ({ submit: "Send for review", approve: "Approve & add earnings", revise: "Send back for changes", pay: "Save payment record", cancel: "Cancel assignment", decline: "Decline offer" }[action])}</Button><Button disabled={busy} type="button" variant="outline" onClick={() => setAction("")}>Back</Button></div>
+      <div className="creative-actions"><Button disabled={busy} type="submit">{busy ? "Saving…" : error ? "Try again" : ({ submit: "Send for review", approve: "Approve & add earnings", revise: "Send back for changes", pay: "Save payment record", cancel: "Cancel assignment", decline: "Decline offer" }[action])}</Button><Button disabled={busy} type="button" variant="outline" onClick={() => setAction("")}>Back</Button></div>
     </form>}
     {error && <p className="login-error" role="alert">{error}</p>}
     <details className="creative-history"><summary>Activity history</summary>{[...item.history].reverse().map(entry => <p key={entry.id}>{name(entry.by)} · {entry.event}<small>{date(entry.at)}</small></p>)}</details>
@@ -145,15 +147,18 @@ function WorkEditor({ editor, employees, state, onClose }: { editor: { id: strin
   };
   return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{adding ? "Add people to creative work" : item ? "Edit creative work" : "Assign creative work"}</DialogTitle><DialogDescription>{item && !adding ? `Editing ${name(item.employeeId)}’s assignment. Changes to accepted work require them to accept again.` : "Choose people for this work. Each person receives the fixed pay shown below after their work is approved."}</DialogDescription></DialogHeader>
     <form className="creative-editor" onSubmit={submit}>
-      {item && !adding ? <p className="creative-hint">Assigned to {name(item.employeeId)}</p> : <fieldset className="creative-people"><legend>{adding ? "Add to this work" : "Assign to"}</legend>{activeEmployees.map(employee => <label key={employee.id}><input type="checkbox" checked={employeeIds.includes(employee.id)} onChange={event => setEmployeeIds(current => event.target.checked ? [...current, employee.id] : current.filter(id => id !== employee.id))} /><span>{employee.name}</span></label>)}{!activeEmployees.length && <p>Everyone with an active account is already assigned.</p>}</fieldset>}
+      {item && !adding ? <p className="creative-hint">Assigned to {name(item.employeeId)}</p> : <fieldset className="creative-people"><legend>{adding ? "Add to this work" : "Assign to"}</legend>{activeEmployees.map(employee => <label key={employee.id}><input type="checkbox" checked={employeeIds.includes(employee.id)} onChange={event => setEmployeeIds(current => event.target.checked ? [...current, employee.id] : current.filter(id => id !== employee.id))} /><PersonLabel id={employee.id} /></label>)}{!activeEmployees.length && <p>Everyone with an active account is already assigned.</p>}</fieldset>}
 
       <label>Assignment title<Input required maxLength={160} value={title} onChange={event => setTitle(event.target.value)} placeholder="Edit a recap video, retouch a photo set…" /></label>
-      <label>Brief & deliverables · optional<Textarea maxLength={8000} rows={5} value={instructions} onChange={event => setInstructions(event.target.value)} placeholder="Add instructions or deliverable details if needed." /></label>
+
       <div className="creative-form-row"><label>Deadline<Input required type="datetime-local" value={due} onChange={event => setDue(event.target.value)} /></label><label>Pay per person (USD)<Input required inputMode="decimal" value={pay} onChange={event => setPay(event.target.value)} placeholder="0.00" /></label></div>
+      <MoreOptions defaultOpen={Boolean(item && (instructions || references))}>
+      <label>Brief & deliverables · optional<Textarea maxLength={8000} rows={5} value={instructions} onChange={event => setInstructions(event.target.value)} placeholder="Add instructions or deliverable details if needed." /></label>
       <label>Reference links · optional, one per line<Textarea maxLength={20500} value={references} onChange={event => setReferences(event.target.value)} placeholder="https://…" /></label>
+      </MoreOptions>
       <p className="creative-hint">{adding ? "Existing assignments stay unchanged. " : ""}{employeeIds.length} {employeeIds.length === 1 ? "person" : "people"} · {dollars((moneyInputCents(pay) ?? 0) * employeeIds.length)} total agreed pay. Each person accepts, submits, and earns their own pay after approval.</p>
       {error && <p className="login-error" role="alert">{error}</p>}
-      <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy || !employeeIds.length} type="submit">{busy ? "Saving…" : adding ? "Add people" : item ? "Save changes" : "Assign work"}</Button></DialogFooter>
+      <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy || !employeeIds.length} type="submit">{busy ? "Saving…" : error ? "Try again" : adding ? "Add people" : item ? "Save changes" : "Assign work"}</Button></DialogFooter>
     </form>
   </DialogContent></Dialog>;
 }

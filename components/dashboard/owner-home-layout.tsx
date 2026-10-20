@@ -5,15 +5,15 @@ import { ArrowDown, ArrowUp, GripVertical, RotateCcw, SlidersHorizontal, X } fro
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useRefreshSource } from "@/components/dashboard-refresh";
-import { DEFAULT_DASHBOARD_ORDER, validDashboardOrder } from "@/lib/dashboard-layout.mjs";
+import { DEFAULT_DASHBOARD_ORDER, validDashboardOrder, actionFocusedHomeOrder } from "@/lib/dashboard-layout.mjs";
 import { dashboardDragStarted, dashboardDropPosition, moveDashboardSection } from "@/lib/owner-layout-editor.mjs";
 import { teamRequest } from "@/lib/team-api";
 
 export type DashboardSectionId = "upcoming" | "attention" | "finances" | "hours" | "creative" | "reports";
 type Layout = { revision: number; order: DashboardSectionId[] };
 type Drag = { id: DashboardSectionId; pointerId: number; startX: number; startY: number; y: number; offset: number; active: boolean; frame: number; capture: HTMLOListElement };
-const sectionLabels: Record<DashboardSectionId, string> = { upcoming: "Coming up", attention: "Needs attention", finances: "Financial summary", hours: "Team hours", creative: "Creative work", reports: "Financial reports" };
-const defaultOrder = () => [...DEFAULT_DASHBOARD_ORDER] as DashboardSectionId[];
+const sectionLabels: Record<DashboardSectionId, string> = { upcoming: "Today’s action list", attention: "Needs your decision", finances: "Financial summary", hours: "Team hours", creative: "Creative work", reports: "Financial reports" };
+const defaultOrder = () => actionFocusedHomeOrder([...DEFAULT_DASHBOARD_ORDER]) as DashboardSectionId[];
 const conflictMessage = "The Home layout changed on another device. Refresh before saving your changes.";
 let lastConfirmedLayout: { token: string; layout: Layout } | null = null;
 const cachedLayout = (token: string) => lastConfirmedLayout?.token === token ? lastConfirmedLayout.layout : null;
@@ -46,7 +46,7 @@ export function OwnerHomeLayout({ token, sections }: { token: string; sections: 
       const result = await teamRequest<Layout>(token, "/dashboard-layout");
       if (!Number.isSafeInteger(result.revision) || result.revision < 0 || !validDashboardOrder(result.order)) throw new Error("Invalid Home layout.");
       if (id !== sequence.current) return false;
-      const next = { revision: result.revision, order: [...result.order] };
+      const next = { revision: result.revision, order: result.revision === 0 ? defaultOrder() : [...result.order] };
       lastConfirmedLayout = { token, layout: next };
       setSaved(next); setFresh(true); setLoadError("");
       if (replaceDraft) { stopDrag(); updateDraft([...next.order]); setDraftRevision(next.revision); setSaveError(""); setConflict(false); setAnnouncement("Saved layout loaded."); }

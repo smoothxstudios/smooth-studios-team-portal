@@ -46,7 +46,7 @@ export function PaymentOverrideForm({
     if (initialized.current) return;
     const resetTimer = window.setTimeout(() => {
       initialized.current = true;
-      setEventId(reviewRentals.some(rental => rental.id === initialEventId) ? initialEventId! : reviewRentals[0]?.id ?? "");
+      setEventId(initialEventId ? (reviewRentals.some(rental => rental.id === initialEventId) ? initialEventId : "") : reviewRentals[0]?.id ?? "");
       setPaidStatus("true");
     }, 0);
     return () => window.clearTimeout(resetTimer);
@@ -84,13 +84,14 @@ export function PaymentOverrideForm({
         <DialogHeader>
           <p className="eyebrow">Payment review</p>
           <DialogTitle>Update customer payment</DialogTitle>
-          <DialogDescription>Only completed appointments with an unresolved balance appear here.</DialogDescription>
+          <DialogDescription>Review the selected appointment and confirm any payment you have received.</DialogDescription>
         </DialogHeader>
         {reviewRentals.length ? (
           <>
             <div className="workflow-form-field">
               <label htmlFor="payment-event">Appointment needing review</label>
               <select id="payment-event" onChange={(event) => setEventId(event.target.value)} value={eventId}>
+                {!eventId && <option value="" disabled>Choose an appointment</option>}
                 {reviewRentals.map((rental) => (
                   <option key={rental.id} value={rental.id}>
                     {formatDate(rental.start, true)} · {rental.customer} · {dollars(rental.priceCents, true)}
@@ -115,7 +116,7 @@ export function PaymentOverrideForm({
             )}
           </>
         ) : (
-          <EmptyState copy="Every completed appointment currently has its full payment recorded." title="No payment review needed" />
+          <EmptyState copy={initialEventId ? "This appointment is not in the latest published payment records. Refresh after the next sync, then open this appointment again." : "Every completed appointment currently has its full payment recorded."} title={initialEventId ? "Payment record not available yet" : "No payment review needed"} />
         )}
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)} variant="outline">{selected ? "Cancel" : "Close"}</Button>

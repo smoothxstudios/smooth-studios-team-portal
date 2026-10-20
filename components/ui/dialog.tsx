@@ -53,6 +53,7 @@ function DialogContent({
   showCloseButton = true,
   closeDisabled = false,
   onOpenAutoFocus,
+  onScroll,
   id: suppliedId,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
@@ -71,6 +72,7 @@ function DialogContent({
           className
         )}
         {...props}
+        onScroll={event => { event.currentTarget.style.setProperty("--dialog-scroll-y", `${event.currentTarget.scrollTop}px`); onScroll?.(event); }}
         id={id}
         data-has-close={showCloseButton || undefined}
         onOpenAutoFocus={(event) => {

@@ -41,7 +41,7 @@ try{
  await dialog.getByRole('button',{name:'Assign work',exact:true}).click();await dialog.waitFor({state:'hidden'});
  assert.equal(await page.locator('.creative-card').count(),1);assert.match(await page.locator('.creative-card').innerText(),/2 people/);
  await page.locator('.creative-card').click();await page.getByRole('button',{name:'Edit work',exact:true}).click();
- dialog=page.getByRole('dialog');await dialog.getByLabel('Brief & deliverables · optional',{exact:true}).fill('Updated work instructions');await dialog.getByRole('button',{name:'Save changes',exact:true}).click();await dialog.waitFor({state:'hidden'});
+ dialog=page.getByRole('dialog');await dialog.getByText('More options',{exact:true}).click();await dialog.getByLabel('Brief & deliverables · optional',{exact:true}).fill('Updated work instructions');await dialog.getByRole('button',{name:'Save changes',exact:true}).click();await dialog.waitFor({state:'hidden'});
  await page.locator('.creative-card').click();await page.getByRole('button',{name:'Add people',exact:true}).click();dialog=page.getByRole('dialog');
  assert.equal(await dialog.getByRole('checkbox').count(),1);await dialog.getByLabel('Akiva',{exact:true}).check();await dialog.getByRole('button',{name:'Add people',exact:true}).click();await dialog.waitFor({state:'hidden'});
  assert.equal(await page.locator('.creative-card').count(),1);assert.match(await page.locator('.creative-card').innerText(),/3 people/);assert.match(await page.locator('.creative-card').innerText(),/150.00/);

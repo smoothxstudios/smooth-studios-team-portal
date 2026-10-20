@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 import { RentalDescription } from "@/components/rental-description";
 
 import {
@@ -75,14 +76,14 @@ export function PaymentAmount({ rental, showDetails }: { rental: Rental; showDet
   return <div className="payment-amount"><strong>{dollars(rental.priceCents, true)}</strong>{showDetails && <span className={`payment-detail payment-detail-${tone}`}>{detail}</span>}</div>;
 }
 
-export function RentalTable({ rentals, employeeId }: { rentals: Rental[]; employeeId?: string }) {
+export function RentalTable({ rentals, employeeId, onOpen }: { rentals: Rental[]; employeeId?: string; onOpen?: (id: string) => void }) {
   return (
     <Table className="rental-table" role="table" aria-label="Appointments">
       <TableHeader role="rowgroup"><TableRow role="row"><TableHead role="columnheader">Appointment</TableHead><TableHead role="columnheader">Category</TableHead><TableHead role="columnheader">Date & time</TableHead><TableHead role="columnheader">{employeeId ? "Price" : "Price / recorded payment"}</TableHead><TableHead role="columnheader">{employeeId ? "Your earnings" : "Assigned team"}</TableHead><TableHead role="columnheader">Status</TableHead></TableRow></TableHeader>
       <TableBody role="rowgroup">
         {rentals.map((rental) => (
           <TableRow key={rental.id} role="row">
-            <TableCell className="rental-name-cell" role="cell"><div className="rental-name"><strong>{rental.customer}</strong><span>{rental.title}</span>{rental.rentalDetails && <details className="rental-details-toggle"><summary>Rental details</summary><RentalDescription details={rental.rentalDetails} /></details>}</div></TableCell>
+            <TableCell className="rental-name-cell" role="cell"><div className="rental-name"><strong>{rental.customer}</strong><span>{rental.title}</span>{onOpen ? <Button variant="ghost" onClick={() => onOpen(rental.id)}>Open appointment</Button> : rental.rentalDetails && <details className="rental-details-toggle"><summary>Rental details</summary><RentalDescription details={rental.rentalDetails} /></details>}</div></TableCell>
             <TableCell className="rental-category-cell" role="cell"><CategoryBadge rental={rental} /></TableCell>
             <TableCell className="rental-date-cell" data-label="Date & time" role="cell"><div className="rental-date"><strong>{formatDate(rental.start, true)}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div></TableCell>
             <TableCell className="money-cell" data-label={employeeId ? "Price" : "Price / payment"} role="cell"><PaymentAmount rental={rental} showDetails={!employeeId} /></TableCell>

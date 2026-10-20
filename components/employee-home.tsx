@@ -1,77 +1,35 @@
 "use client";
-import { RentalDescription } from "@/components/rental-description";
-
 import type { ReactNode } from "react";
-import { ArrowRight, Banknote, BookOpen, CalendarDays, Check, ChevronDown, Plus } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { employeeHomeWork } from "@/lib/employee-home.mjs";
-import { categorizeAppointment } from "@/lib/appointment-categories.mjs";
-import { STUDIO_ZONE } from "@/lib/team-schedule.mjs";
 import { calendarInvitationLabel } from "@/lib/calendar-invitations.mjs";
-import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
+import { formatDate, formatTime, dollars } from "@/lib/dashboard-presentation";
 import type { Rental, AdvanceBalance } from "@/lib/dashboard-types";
 import type { TeamAssignment, TeamSchedule } from "@/lib/team-api";
 
 export type EmployeeHomeOptions = {
-  rentals: Rental[];
-  owed: number;
-  advance?: AdvanceBalance;
-  onSchedule: () => void;
-  onAvailability: () => void;
-  onEarnings: () => void;
-  onGuide: () => void;
-  onChecklist?: () => void;
+  rentals: Rental[]; owed: number; advance?: AdvanceBalance; work?: ReactNode; extras?: ReactNode;
+  onSchedule: () => void; onAvailability: () => void; onEarnings: () => void; onGuide: () => void; onChecklist?: () => void;
 };
 
-const date = (value: string) => new Date(value).toLocaleDateString("en-US", { timeZone: STUDIO_ZONE, weekday: "short", month: "short", day: "numeric" });
-const time = (value: string) => new Date(value).toLocaleTimeString("en-US", { timeZone: STUDIO_ZONE, hour: "numeric", minute: "2-digit" });
-
-export function EmployeeHome({ userId, schedule, loading, options, onBlockTime, renderOffer }: {
-  userId: string;
-  schedule: TeamSchedule | null;
-  loading: boolean;
-  options: EmployeeHomeOptions;
-  onBlockTime: () => void;
-  renderOffer: (assignment: TeamAssignment) => ReactNode;
+export function EmployeeHome({ userId, schedule, loading, options, onBlockTime, renderOffer, onOpenRental }: {
+  userId: string; schedule: TeamSchedule | null; loading: boolean; options: EmployeeHomeOptions;
+  onBlockTime: () => void; renderOffer: (assignment: TeamAssignment) => ReactNode; onOpenRental: (id: string) => void;
 }) {
   const { offers, updates, calendarInvitations, upcoming } = employeeHomeWork(userId, schedule, options.rentals);
+  const next = upcoming[0];
   return <div className="employee-home">
-    {offers.length > 0 && <section className="panel employee-attention" aria-labelledby="employee-offers-heading">
-      <div className="employee-section-heading"><div><p className="eyebrow">Needs your response</p><h2 id="employee-offers-heading">{offers.length === 1 ? "You have an assignment offer" : `${offers.length} assignment offers`}</h2></div></div>
-      <div className="schedule-offers">{offers.map(renderOffer)}</div>
-    </section>}
-
-    {calendarInvitations.length > 0 && <section className="panel employee-home-next" aria-labelledby="employee-calendar-invitations-heading">
-      <div className="employee-section-heading"><div><h2 id="employee-calendar-invitations-heading">Calendar invitations</h2><p>Respond in Google Calendar.</p></div><Button variant="ghost" onClick={options.onSchedule}>View schedule <ArrowRight size={16} /></Button></div>
-      <div className="employee-work-list">{calendarInvitations.slice(0, 3).map(item => <details className="employee-work" key={item.id}>
-        <summary><div className="employee-work-date"><strong>{date(item.start)}</strong><span>{time(item.start)}–{time(item.end)}</span></div><div className="employee-work-title"><h3>{item.title}</h3>{item.customer && <p>{item.customer}</p>}</div><span className="schedule-status pending">{calendarInvitationLabel(item.calendarStatus)}</span><ChevronDown className="employee-work-chevron" size={18} /></summary>
-        <div className="employee-work-details"><p>Open this invitation in Google Calendar to accept or decline.</p>{/studio.*rental|rental.*studio/i.test(item.title) && <RentalDescription details={item.rentalDetails} />}</div>
-      </details>)}</div>
-    </section>}
-
-    {updates.length > 0 && <section className="employee-updates" aria-label="Schedule updates">
-      {updates.map(item => <div className="schedule-notice" key={item.id}><CalendarDays size={18} /><div><strong>Offer cancelled · {item.title}</strong><p>{date(item.start)} · {time(item.start)}. {item.note || "Smooth cancelled this dashboard offer."}{item.appointmentId && schedule?.appointments.some(a => a.id === item.appointmentId && a.acceptedEmployeeIds.includes(userId)) ? " You still have an accepted Calendar invitation; check with Smooth." : ""}</p></div></div>)}
-    </section>}
-
-    {(loading || upcoming.length > 0 || (offers.length === 0 && calendarInvitations.length === 0)) && <section className="panel employee-home-next" aria-labelledby="employee-next-heading">
-      <div className="employee-section-heading"><div><h2 id="employee-next-heading">Next assignments</h2></div><Button variant="ghost" onClick={options.onSchedule}>View schedule <ArrowRight size={16} /></Button></div>
-      {loading ? <p className="employee-empty" role="status">Checking your assignments…</p> : upcoming.length ? <div className="employee-work-list">{upcoming.slice(0, 3).map(item => {
-        const category = item.appointmentId ? categorizeAppointment(item.title).label : "Assignment";
-        return <details className="employee-work" key={item.id}>
-          <summary><div className="employee-work-date"><strong>{date(item.start)}</strong><span>{time(item.start)}–{time(item.end)}{date(item.start) !== date(item.end) ? ` · ends ${date(item.end)}` : ""}</span></div>
-            <div className="employee-work-title"><span>{category}</span><h3>{item.title}</h3>{item.customer && <p>{item.customer}</p>}</div>
-            <span className={`schedule-status ${schedule ? "accepted" : ""}`}><Check size={13} />{Date.parse(item.start) <= Date.now() ? "In progress" : item.status}</span><ChevronDown className="employee-work-chevron" size={18} />
-          </summary>
-          <div className="employee-work-details"><CalendarAssignmentStatus delivery={item.calendarSync} />{item.appointmentId && /studio.*rental|rental.*studio/i.test(item.title) && <RentalDescription details={item.rentalDetails} />}<h4>Preparation & instructions</h4><p>{item.instructions || "No additional instructions have been added for this assignment."}</p>{item.note && <p className="schedule-notice">{item.note}</p>}{options.onChecklist && item.appointmentId && /studio.*rental|rental.*studio/i.test(item.title) && <Button variant="outline" onClick={() => options.onChecklist?.()}>Rental checklist</Button>}<Button variant="outline" onClick={options.onGuide}><BookOpen size={16} />Studio guidelines</Button></div>
-        </details>;
-      })}</div> : <div className="employee-empty"><CalendarDays size={28} /><h3>{schedule ? "You’re all caught up" : "No upcoming work in the last sync"}</h3><p>{schedule ? "Your next assignment will appear here. Keep your availability up to date so Smooth can schedule you." : "Check Schedule for new offers and your latest availability."}</p></div>}
-    </section>}
-
-    <section className="panel employee-pay" aria-label={options.advance?.remainingCents ? "Advance remaining" : "Pay owed"}><div className="employee-pay-label"><Banknote size={21} /><div><h2>{options.advance?.remainingCents ? "Advance remaining" : "Pay owed"}</h2><p>{options.advance?.remainingCents ? "Earned work reduces this balance" : "Earned and awaiting payout"}</p></div></div><strong>{((options.advance?.remainingCents || options.owed) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}</strong><Button variant="ghost" onClick={options.onEarnings}>View earnings <ArrowRight size={16} /></Button></section>
-
-    <nav className="employee-shortcuts" aria-label="Employee shortcuts">
-      <button className="panel employee-shortcut" onClick={options.onAvailability ?? (schedule ? onBlockTime : options.onSchedule)}><span className="employee-shortcut-icon"><Plus size={22} /></span><span><strong>Availability</strong><small>Choose work days or block time</small></span><ArrowRight size={18} /></button>
-      <button className="panel employee-shortcut" onClick={options.onGuide}><span className="employee-shortcut-icon"><BookOpen size={22} /></span><span><strong>Studio guidelines</strong><small>Find studio answers and policies</small></span><ArrowRight size={18} /></button>
-    </nav>
+    <section className="panel employee-home-next" aria-labelledby="employee-next-heading">
+      <div className="employee-section-heading"><h2 id="employee-next-heading">{next && Date.parse(next.start) <= Date.now() ? "Happening now" : "Your next assignment"}</h2><Button variant="ghost" onClick={options.onSchedule}>Schedule<ArrowRight size={16} /></Button></div>
+      {loading && !schedule ? <p role="status">Checking your assignments…</p> : next ? <div className="employee-next-action"><p>{formatDate(next.start)} · {formatTime(next.start)}–{formatTime(next.end)}</p><h3>{next.customer || next.title}</h3>{next.customer && <p>{next.title}</p>}{!schedule && <p className="schedule-warning">From the last sync. Open Schedule to confirm current details.</p>}<Button onClick={() => next.appointmentId ? onOpenRental(next.appointmentId) : options.onSchedule()}>{next.appointmentId ? "Open rental & checklist" : "View assignment"}</Button>{upcoming.length > 1 && <Button variant="ghost" onClick={options.onSchedule}>{upcoming.length - 1} more upcoming</Button>}</div> : <p className="daily-empty">{offers.length ? "Accept an offer below to confirm your next assignment." : schedule ? "No confirmed work coming up." : "Current assignments couldn’t load. Try again above."}</p>}
+    </section>
+    {offers.length > 0 && <section className="panel employee-attention" aria-labelledby="employee-offers-heading"><div className="employee-section-heading"><h2 id="employee-offers-heading">Needs your response <span className="schedule-count">{offers.length}</span></h2></div><div className="schedule-offers">{offers.slice(0, 3).map(renderOffer)}</div>{offers.length > 3 && <Button variant="ghost" onClick={options.onSchedule}>View all {offers.length} offers</Button>}</section>}
+    {options.work}
+    {calendarInvitations.length > 0 && <section className="panel daily-action-list"><div className="panel-heading"><h2>Calendar invitations</h2></div>{calendarInvitations.slice(0, 3).map(item => <button className="daily-action-row" key={item.id} onClick={() => onOpenRental(item.id)}><span className="daily-action-copy"><strong>{item.customer || item.title}</strong><small>{formatDate(item.start)} · {formatTime(item.start)}</small><span className="daily-next-step">{calendarInvitationLabel(item.calendarStatus)} · view invitation</span></span><ArrowRight size={18} /></button>)}</section>}
+    {updates.length > 0 && <details className="home-finances employee-updates"><summary>Schedule updates ({updates.length})<ChevronDown size={18} /></summary>{updates.map(item => <p key={item.id}><strong>Offer cancelled · {item.title}</strong><br />{formatDate(item.start)} · {formatTime(item.start)}. {item.note || "Smooth cancelled this dashboard offer."}</p>)}</details>}
+    <details className="home-finances"><summary>Earnings<ChevronDown size={18} /></summary><div className="employee-pay"><div><h3>{options.advance?.remainingCents ? "Advance remaining" : "Pay owed"}</h3><p>{dollars(options.advance?.remainingCents || options.owed)}</p></div><Button variant="ghost" onClick={options.onEarnings}>View earnings<ArrowRight size={16} /></Button></div></details>
+    <nav className="employee-shortcuts" aria-label="Employee shortcuts"><button className="panel employee-shortcut" onClick={options.onAvailability ?? (schedule ? onBlockTime : options.onSchedule)}><Plus size={20} /><span><strong>Update availability</strong></span><ArrowRight size={18} /></button><button className="panel employee-shortcut" onClick={options.onGuide}><BookOpen size={20} /><span><strong>Studio guidelines</strong></span><ArrowRight size={18} /></button></nav>
+    {options.extras}
   </div>;
 }

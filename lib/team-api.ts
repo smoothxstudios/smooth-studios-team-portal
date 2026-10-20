@@ -12,6 +12,12 @@ export type PushTestResult = { accepted: boolean; expired: boolean; status: numb
 export type GuidelineQuestionRequest = { id: string; askedBy: string; question: string; status: "open" | "answered" | "dismissed"; createdAt: string };
 
 export async function teamRequest<T>(token: string, path: string, data?: unknown, method?: string): Promise<T> {
+  const actionMethod = method ?? (data === undefined ? "GET" : "POST");
+  const visibleWrite = typeof window !== "undefined" && actionMethod !== "GET" && /^\/(assignments|rental-staff|rental-checklists|blocks|work-preferences|creative-work|event-planner|dashboard-layout|studio-reference|engagement\/(rewards|reset)|notifications\/send)(\/|$)/.test(path);
+  const actionId = visibleWrite ? crypto.randomUUID() : "";
+  const feedback = (phase: string) => { if (visibleWrite) window.dispatchEvent(new CustomEvent("smooth-action-feedback", { detail: { id: actionId, phase } })); };
+  feedback("saving");
+  try {
   const response = await fetch(`${TEAM_API_URL}${path}`, {
     method: method ?? (data === undefined ? "GET" : "POST"), cache: "no-store", redirect: "error",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -20,7 +26,13 @@ export async function teamRequest<T>(token: string, path: string, data?: unknown
   let result;
   try { result = await response.json(); } catch { throw new Error("Team scheduling is not available yet. Please try again later."); }
   if (!response.ok) throw new Error(result.error || `The scheduling request failed (${response.status}).`);
+  feedback("saved");
   return result as T;
+  } catch (error) {
+    feedback("error");
+    if (error instanceof TypeError || (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name))) throw new Error("Couldn’t confirm the request. Check your connection, then try again.");
+    throw error;
+  }
 }
 
 export async function teamWorker() {
