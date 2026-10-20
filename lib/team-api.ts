@@ -98,3 +98,5 @@ export async function disableTeamPush(token: string) {
   try { await teamRequest(token, "/push/device", { endpoint: subscription.endpoint }, "DELETE"); }
   finally { await subscription.unsubscribe(); }
 }
+
+export type TeamHoursSchedule = { appointments: Pick<TeamAppointment, "id" | "start" | "end" | "acceptedEmployeeIds">[]; assignments: TeamAssignment[] };

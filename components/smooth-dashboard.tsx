@@ -1,4 +1,6 @@
 "use client";
+import { HistoryGate } from "@/components/dashboard/history-gate";
+import { expandHomeLedger } from "@/lib/dashboard-history.mjs";
 import { OwnerWeeklyHours } from "@/components/dashboard/owner-weekly-hours";
 import { AdvanceReview } from "@/components/dashboard/advance-review";
 import { OwnerHomeLayout } from "@/components/dashboard/owner-home-layout";
@@ -64,7 +66,7 @@ import { recognizedRevenue } from "@/lib/owner-finances.mjs";
 import { applyRentalAdvances } from "@/lib/payroll-advances.mjs";
 import { rememberProfile } from "@/lib/quick-sign-in.mjs";
 import { MAX_GUIDELINE_UPDATE_BYTES,createGuidePatch } from "@/lib/studio-guidelines.mjs";
-import { attachTeamSession, closeTeamSession, openTeamSession, sessionFetch, SESSION_ENDED_EVENT } from "@/lib/team-session.mjs";
+import { attachTeamSession, closeTeamSession, openDashboardSession, sessionFetch, SESSION_ENDED_EVENT } from "@/lib/team-session.mjs";
 import { disableTeamPush } from "@/lib/team-api";
 import { teamToken } from "@/lib/team-auth.mjs";
 import { TEAM,studioLocal } from "@/lib/team-schedule.mjs";
@@ -92,8 +94,9 @@ XAxis,
 YAxis
 } from "recharts";
 
-function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; onRefresh: () => Promise<boolean>; sessionPassword: string; schedulingToken: string }) {
+function DashboardView({ payload, dark, setDark, onLogout, onRefresh, onLoadHistory, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; onRefresh: () => Promise<boolean>; onLoadHistory: () => Promise<boolean>; sessionPassword: string; schedulingToken: string }) {
   useRefreshSource(onRefresh);
+  const [reportsOpen, setReportsOpen] = useState(false);
   const [view, setView] = useState<ViewKey>("overview");
   const [toolbarRefresh, setToolbarRefresh] = useState<{ id: number; arrival: Promise<boolean> } | null>(null);
   const [quietRefresh, setQuietRefresh] = useState(0);
@@ -354,13 +357,13 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
               finances: <OwnerFinancialSummary rentals={visibleRentals} creative={creative} upcomingCount={upcoming.length} totalOwed={metrics.owed} onSchedule={() => setView("scheduling")} onPayouts={() => setView("payouts")} />,
               hours: <OwnerWeeklyHours employees={payload.employees} rentals={rentals} token={schedulingToken} />,
               creative: <CreativeWorkPreview state={creative} isOwner onOpen={() => setView("creative")} />,
-              reports: <details className="owner-reports">
+              reports: <details className="owner-reports" onToggle={event => setReportsOpen(event.currentTarget.open)}>
                 <summary>
                   <span className="owner-reports-icon"><BarChart3 size={21} /></span>
                   <span className="owner-reports-copy"><strong>Financial reports</strong><small>Revenue, Stripe, and category breakdowns</small></span>
                   <span className="owner-reports-toggle"><span className="reports-show">Show reports</span><span className="reports-hide">Hide reports</span><ChevronDown size={18} /></span>
                 </summary>
-                <div className="owner-reports-content">
+                {reportsOpen && <HistoryGate deferred={payload.history?.deferred} load={onLoadHistory}><div className="owner-reports-content">
                   <PeriodTotals creative={creative.items} rentals={visibleRentals} />
                   <article className="panel trend-panel">
                     <div className="panel-heading"><h2>Revenue &amp; payroll</h2><div className="chart-legend"><span className="legend-red" />Revenue<span className="legend-dark" />Payroll</div></div>
@@ -368,12 +371,12 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
                   </article>
                   <StripeMoneyFlow onMatch={openStripeMatch} summary={payload.stripeSummary} unmatchedPayments={payload.unmatchedStripePayments ?? []} />
                   <CategoryRevenue rentals={visibleRentals} />
-                </div>
+                </div></HistoryGate>}
               </details>,
             }} />
           )}
 
-          {view === "rentals" && isOwner && <article className="panel page-panel">
+          {view === "rentals" && isOwner && <HistoryGate deferred={payload.history?.deferred} load={onLoadHistory}><article className="panel page-panel">
             <div className="panel-heading page-heading">
               <div><h2>All appointments</h2><p>{filteredRentals.length} appointment{filteredRentals.length === 1 ? "" : "s"}{categoryFilter !== "all" || paymentFilter !== "all" ? " match your filters" : " in your records"}</p></div>
               {reviewRentals.length > 0 && <Button onClick={openPaymentOverride} size="sm" variant="outline"><ReceiptText size={15} /> Record payment received</Button>}
@@ -399,22 +402,22 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
                 {(categoryFilter !== "all" || paymentFilter !== "all") && <Button variant="ghost" onClick={() => { setCategoryFilter("all"); setPaymentFilter("all"); }}>Clear filters</Button>}
             </div>
             {filteredRentals.length ? <RentalTable employeeId={employeeId} rentals={filteredRentals} /> : <EmptyState copy={categoryFilter === "all" && paymentFilter === "all" ? "Accepted appointments will appear after the next Calendar sync, scheduled every 5 minutes." : "No appointments match the selected filters."} title="No appointments found" />}
-          </article>}
+          </article></HistoryGate>}
           {view === "team" && isOwner && <Tabs defaultValue="people" className="owner-team-tabs">
             <TabsList aria-label="Team sections"><TabsTrigger value="people">People</TabsTrigger><TabsTrigger value="engagement">Check-ins &amp; rewards</TabsTrigger></TabsList>
-            <TabsContent value="people"><TeamPage token={schedulingToken} payroll={payroll.state} employees={payload.employees} rentals={rentals} creative={creative.items} onSetup={() => setTeamSetupOpen(true)} /></TabsContent>
+            <TabsContent value="people"><HistoryGate deferred={payload.history?.deferred} load={onLoadHistory}><TeamPage token={schedulingToken} payroll={payroll.state} employees={payload.employees} rentals={rentals} creative={creative.items} onSetup={() => setTeamSetupOpen(true)} /></HistoryGate></TabsContent>
             <TabsContent value="engagement"><TeamEngagementReview token={schedulingToken} /></TabsContent>
           </Tabs>}
-          {view === "payouts" && <>
+          {view === "payouts" && <HistoryGate deferred={payload.history?.deferred} load={onLoadHistory}>
             {!isOwner && <div className="employee-earnings-heading"><div><h2>My earnings</h2><p>Appointment, training, and other work earnings by year.</p></div><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
             <PayoutPage addPay={isOwner ? <AddPay token={schedulingToken} employees={payload.employees} state={creative} /> : undefined} creative={creative.items} payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
             <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} earningsOnly focusLoading={alertWorkLoading} focusId={focusedAlert?.target === "payouts" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} year={isOwner ? undefined : earningsYear} />
             {!isOwner && earningsYear === currentYear && <PeriodTotals creative={creative.items} employeeId={employeeId} rentals={visibleRentals} />}
             {!isOwner && employeeEarnings.rentals.length > 0 && <article className="panel employee-earnings-details"><div className="panel-heading"><div><h2>Earnings by appointment</h2><p>Upcoming amounts are estimates. Custom assignments are listed in Schedule.</p></div></div><RentalTable employeeId={employeeId} rentals={employeeEarnings.rentals} /></article>}
-          </>}
+          </HistoryGate>}
           {view === "guide" && <StudioGuidePage isOwner={isOwner} draftPassword={sessionPassword} teamToken={schedulingToken} onPublish={publishStudioGuide} rulebook={payload.rulebook} />}
           {view === "planner" && isOwner && <EventPlanner token={schedulingToken} onSchedule={() => setView("scheduling")} onAvailability={() => setView("availability")} />}
-          {(view === "scheduling" || view === "availability") && <TeamSchedulingPage onChecklist={openChecklist} focusId={focusedAlert?.target === "scheduling" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} availabilityOnly={view === "availability"} onAvailability={() => setView("availability")} isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
+          {(view === "scheduling" || view === "availability") && <TeamSchedulingPage onChecklist={openChecklist} focusId={focusedAlert?.target === "scheduling" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} availabilityOnly={view === "availability"} onAvailability={() => setView("availability")} isOwner={isOwner} token={schedulingToken} userId={payload.user.id} calendarSync={payload.calendarAssignmentSync} pastContent={!isOwner ? <HistoryGate deferred={payload.history?.deferred} load={onLoadHistory}><article className="panel"><div className="panel-heading"><div><h2>Past appointments</h2><p>Completed appointments and their payment status.</p></div></div>{pastRentals.length ? <RentalTable employeeId={employeeId} rentals={pastRentals} /> : <EmptyState title="No past appointments yet" copy="Your completed appointments will appear here after syncing." />}</article></HistoryGate> : undefined} onSetup={isOwner ? () => openWorkflow({ workflowId: "deploy-team-api.yml", title: "Activate team scheduling", description: "Deploy the scheduling backend to your existing Cloudflare Worker, prepare its database, and sync Calendar appointments and rental team notes.", actionLabel: "Deploy and activate", details: [{ label: "Worker", value: "smooth-studios-team-api" }, { label: "Database", value: "smooth-studios-team-db" }, { label: "Credentials", value: "Existing GitHub Actions secrets" }] }) : undefined} />}
         </div>
         <DashboardVersionFooter viewer={isOwner ? "owner" : "employee"} />
         </div>
@@ -422,8 +425,8 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
       <MobileToolbar isOwner={isOwner} view={view} unread={alerts.unreadCount} onNavigate={navigateToolbar} />
       {isOwner && (
         <>
-          <PaymentOverrideForm onContinue={openWorkflow} onOpenChange={open => { setPaymentOverrideOpen(open); if (!open) setPaymentReviewRentalId(""); }} open={paymentOverrideOpen} initialEventId={paymentReviewRentalId} reviewRentals={reviewRentals} />
-          <StripeMatchForm initialPaymentId={stripeMatchPaymentId} onContinue={openWorkflow} onOpenChange={setStripeMatchOpen} open={stripeMatchOpen} payments={payload.unmatchedStripePayments ?? []} rentals={rentals} />
+          {paymentOverrideOpen && <HistoryGate deferred={payload.history?.deferred} load={onLoadHistory} onCancel={() => setPaymentOverrideOpen(false)}><PaymentOverrideForm onContinue={openWorkflow} onOpenChange={open => { setPaymentOverrideOpen(open); if (!open) setPaymentReviewRentalId(""); }} open={paymentOverrideOpen} initialEventId={paymentReviewRentalId} reviewRentals={reviewRentals} /></HistoryGate>}
+          {stripeMatchOpen && <HistoryGate deferred={payload.history?.deferred} load={onLoadHistory} onCancel={() => setStripeMatchOpen(false)}><StripeMatchForm initialPaymentId={stripeMatchPaymentId} onContinue={openWorkflow} onOpenChange={setStripeMatchOpen} open={stripeMatchOpen} payments={payload.unmatchedStripePayments ?? []} rentals={rentals} /></HistoryGate>}
           <GithubWorkflowDialog access={payload.workflowAccess} onOpenChange={setWorkflowOpen} open={workflowOpen} request={workflowRequest} />
         </>
       )}
@@ -441,7 +444,8 @@ export function SmoothDashboard() {
   const [schedulingToken, setSchedulingToken] = useState("");
   const [signInNotice, setSignInNotice] = useState("");
   const sessionEpoch = useRef(0);
-  const snapshotReader = useRef<(() => Promise<boolean>) | null>(null);
+  const snapshotReader = useRef<ReturnType<typeof createDashboardSnapshotReader> | null>(null);
+  const loadHistory = useCallback(() => snapshotReader.current?.loadHistory() ?? Promise.resolve(false), []);
   const refreshSnapshot = useCallback(() => snapshotReader.current?.() ?? Promise.resolve(false), []);
   const signedIn = Boolean(payload);
   const lockSession = useCallback(() => {
@@ -508,13 +512,19 @@ export function SmoothDashboard() {
   const unlock = async (profile: AccessProfile, password: string) => {
     setSignInNotice("");
     const epoch = ++sessionEpoch.current;
-    const token = await openTeamSession(await teamToken(password, profile.id), profile.id);
+    const { token, dashboard } = await openDashboardSession(await teamToken(password, profile.id), profile.id);
+    let initialTag = dashboard?.etag ?? null;
     let envelope: EncryptedEnvelope, unlocked: DashboardPayload;
     try {
-      const response = await sessionFetch(token, "/dashboard");
-      if (!response.ok) throw new Error("Dashboard data is unavailable. Please try again.");
-      envelope = await response.json() as EncryptedEnvelope;
-      unlocked = await decryptDashboard(envelope, password);
+      if (dashboard?.envelope) envelope = dashboard.envelope;
+      else {
+        // Compatible with the previous server during a rolling deployment.
+        const response = await sessionFetch(token, "/dashboard");
+        if (!response.ok) throw new Error("Dashboard data is unavailable. Please try again.");
+        envelope = await response.json() as EncryptedEnvelope;
+        initialTag = response.headers.get("etag");
+      }
+      unlocked = expandHomeLedger(await decryptDashboard(envelope, password));
       if (unlocked.user.id !== profile.id || unlocked.role !== profile.role) throw new Error("Invalid dashboard payload");
     } catch (error) { void closeTeamSession(token).catch(() => {}); throw error; }
     if (epoch !== sessionEpoch.current) { void closeTeamSession(token).catch(() => {}); return; }
@@ -522,8 +532,8 @@ export function SmoothDashboard() {
       profile: { id: profile.id, role: profile.role }, password,
       decrypt: decryptDashboard, isCurrent: () => epoch === sessionEpoch.current, onSnapshot: setPayload,
       canApply: () => !dashboardHasOpenEditor(),
-      fetcher: (_url: RequestInfo | URL, options?: RequestInit) => sessionFetch(token, "/dashboard", options),
-    }, unlocked, envelope);
+      fetcher: (url: RequestInfo | URL, options?: RequestInit) => { const target = new URL(String(url)); return sessionFetch(token, target.pathname + target.search, options); },
+    }, unlocked, envelope, initialTag);
     setSchedulingToken(token);
     setSessionPassword(password);
     rememberProfile(profile.id);
@@ -533,7 +543,7 @@ export function SmoothDashboard() {
   };
 
   if (!payload) return <LoginScreen onUnlock={unlock} profiles={profiles} notice={signInNotice} />;
-  return <DashboardRefreshProvider><DashboardView dark={dark} onRefresh={refreshSnapshot} onLogout={() => {
+  return <DashboardRefreshProvider><DashboardView dark={dark} onLoadHistory={loadHistory} onRefresh={refreshSnapshot} onLogout={() => {
     const token = schedulingToken;
     setSignInNotice(""); lockSession();
     void disableTeamPush(token).catch(() => {});

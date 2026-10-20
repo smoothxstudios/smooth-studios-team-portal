@@ -125,7 +125,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, securityVersion: 2, sessionVersion: 1, dashboardSnapshotVersion: 1, rateLimitReady: Boolean(env.API_RATE_LIMIT), pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
+    return { version: 1, ready, securityVersion: 2, sessionVersion: 1, dashboardSnapshotVersion: 2, rateLimitReady: Boolean(env.API_RATE_LIMIT), pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
   const auth = await authenticate(request, env, fail), user = auth.user;
   const session = await sessionRoute({ request, env, auth, fail });
@@ -219,6 +219,7 @@ async function route(request, env, ctx) {
 
   if (request.method === "GET" && url.pathname === "/schedule") {
     const s = await snapshot(db), isOwner = user === "owner";
+    const home = url.searchParams.get("view") === "home", hours = url.searchParams.get("view") === "hours";
     const calendarRows = (await db.prepare(`SELECT q.assignment_id, q.status, q.result, q.updated_at FROM calendar_assignment_outbox q
       JOIN team_assignments a ON a.id = q.assignment_id WHERE ? = 'owner' OR a.employee_id = ?`).bind(user, user).all()).results;
     const assignments = s.assignments.filter(a => isOwner || a.employeeId === user).map(assignment => {
@@ -242,12 +243,13 @@ async function route(request, env, ctx) {
       ? await jsonRows(db, "SELECT data FROM team_work_preferences")
       : await jsonRows(db, "SELECT data FROM team_work_preferences WHERE user_id = ?", user);
     return { revision: s.state.revision, syncedAt: s.state.synced_at, availabilityVersion: 1, workPreferences,
-      appointments: s.appointments.map(a => withoutRemovedRentalStaff(a, assignments, s.state.synced_at)).filter(a => isOwner || ids.has(a.id) || a.acceptedEmployeeIds.includes(user) ||
-          a.calendarInvitations?.some(invitation => invitation.employeeId === user && invitation.status !== "declined"))
+      appointments: s.appointments.map(a => withoutRemovedRentalStaff(a, assignments, s.state.synced_at)).filter(a => (!home || Date.parse(a.end) > Date.now()) && (isOwner || ids.has(a.id) || a.acceptedEmployeeIds.includes(user) ||
+          a.calendarInvitations?.some(invitation => invitation.employeeId === user && invitation.status !== "declined")))
         .map(a => isOwner ? a : { ...a, fullyPaid: undefined, paidOnlineCents: undefined,
           acceptedEmployeeIds: a.acceptedEmployeeIds.filter(id => id === user),
-          calendarInvitations: (a.calendarInvitations ?? []).filter(invitation => invitation.employeeId === user) }),
-      blocks: s.blocks.filter(b => isOwner || b.userId === user), assignments,
+          calendarInvitations: (a.calendarInvitations ?? []).filter(invitation => invitation.employeeId === user) })
+        .map(a => hours ? { id: a.id, start: a.start, end: a.end, acceptedEmployeeIds: a.acceptedEmployeeIds } : a),
+      blocks: s.blocks.filter(b => isOwner || b.userId === user), assignments: home ? assignments.filter(a => Date.parse(a.end) > Date.now()) : assignments,
       devices: Object.fromEntries(devices.filter(d => isOwner || d.user_id === user).map(d => [d.user_id, d.count])),
       pushPublicKey: env.VAPID_JWK ? publicPushKey(JSON.parse(env.VAPID_JWK)) : null,
     };
@@ -622,7 +624,7 @@ const worker = {
     if (origin && !origins.has(origin)) return new Response(JSON.stringify({ error: "Origin not allowed." }), { status: 403, headers });
     if (origin) headers["access-control-allow-origin"] = origin;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...headers,
-      "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type", "access-control-max-age": "600" } });
+      "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type, If-None-Match", "access-control-max-age": "600" } });
     try {
       // Cloudflare supplies the connecting IP. One shared budget across paths
       // prevents rotating URLs or bearer guesses from bypassing the throttle.

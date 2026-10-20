@@ -14,6 +14,7 @@ function envelope(id){const salt=crypto.randomBytes(16),iv=crypto.randomBytes(12
 const f=await fixture();delete f.env.VAPID_JWK;
 for(const id of ['owner','jordyn'])f.DB.sqlite.prepare('INSERT INTO team_notification_events(id,user_id,kind,payload,due_at) VALUES(?,?,?,?,?)').run('synthetic-'+id,id,'notice',JSON.stringify({title:'Synthetic availability reminder',body:'Review availability.',target:'availability'}),Date.now());
 const tokens=Object.fromEntries(await Promise.all(profiles.map(async p=>[await teamToken(password(p.id),p.id),p.id]))),envelopes={owner:envelope('owner'),jordyn:envelope('jordyn')};
+for(const [id,envelope] of Object.entries(envelopes)) f.DB.sqlite.prepare('INSERT INTO dashboard_snapshots(user_id,envelope,published_at) VALUES(?,?,?)').run(id,JSON.stringify(envelope),Date.now());
 const server=spawn('python',['-m','http.server','3098','--bind','127.0.0.1','--directory',root+'/out'],{stdio:'ignore'});let browser;
 try{
  browser=await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? {executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE} : {}),headless:true,args:['--no-sandbox','--disable-gpu','--disable-software-rasterizer','--disable-dev-shm-usage','--no-zygote']});

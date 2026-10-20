@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readTeamSettings, teamPasswords } from "./lib/team-settings.mjs";
-import { decryptPayload, encryptPayload, normalizeRulebook } from "./lib/dashboard-data.mjs";
+import { decryptPayload, encryptDashboard, normalizeRulebook } from "./lib/dashboard-data.mjs";
 import { applyGuidePatch, MAX_GUIDELINE_UPDATE_BYTES } from "../lib/studio-guidelines.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -39,8 +39,8 @@ for (const id of profiles) {
   const payload = id === "owner" ? ownerPayload : decryptPayload(await dashboardStorage(passwords.owner, id), passwords[id]);
   payload.generatedAt = new Date().toISOString();
   payload.rulebook = rulebook;
-  outputs.push({ id, envelope: encryptPayload(payload, passwords[id]) });
+  outputs.push({ id, ...encryptDashboard(payload, passwords[id]) });
 }
 
-for (const { id, envelope } of outputs) await dashboardStorage(passwords.owner, id, { envelope });
+for (const { id, ...bundle } of outputs) await dashboardStorage(passwords.owner, id, bundle);
 process.stdout.write(`Updated the encrypted Studio Guidelines for ${profiles.length} dashboards with ${rulebook.entries.length} guidelines.\n`);

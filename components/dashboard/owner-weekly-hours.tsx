@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRefreshSource } from "@/components/dashboard-refresh";
-import { teamRequest, type TeamSchedule } from "@/lib/team-api";
+import { teamRequest, type TeamHoursSchedule } from "@/lib/team-api";
 import { weeklyTeamHours } from "@/lib/team-summary.mjs";
 import { teamAccent } from "@/lib/dashboard-presentation";
 import { localInstant } from "@/lib/team-schedule.mjs";
@@ -11,7 +11,7 @@ import type { Employee, Rental } from "@/lib/dashboard-types";
 const weekDate = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
 
 export function OwnerWeeklyHours({ employees, rentals, token }: { employees: Employee[]; rentals: Rental[]; token: string }) {
-  const [schedule, setSchedule] = useState<TeamSchedule | null>(null);
+  const [schedule, setSchedule] = useState<TeamHoursSchedule | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now);
@@ -19,7 +19,7 @@ export function OwnerWeeklyHours({ employees, rentals, token }: { employees: Emp
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
     const id = ++sequence.current;
-    try { const next = await teamRequest<TeamSchedule>(token, "/schedule"); if (id === sequence.current) { setSchedule(next); setNow(Date.now()); setError(""); } return true; }
+    try { const next = await teamRequest<TeamHoursSchedule>(token, "/schedule?view=hours"); if (id === sequence.current) { setSchedule(next); setNow(Date.now()); setError(""); } return true; }
     catch { if (id === sequence.current) setError("Live hours could not update. Showing the last available schedule."); return false; }
     finally { if (id === sequence.current) setLoading(false); }
   }, [token]);

@@ -57,9 +57,9 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
 
   const load = useCallback(async () => {
     const version = ++requestVersion.current;
-    const result = await teamRequest<TeamSchedule>(token, "/schedule");
+    const result = await teamRequest<TeamSchedule>(token, isHome ? "/schedule?view=home" : "/schedule");
     if (version === requestVersion.current) { setSchedule(result); setNeedsRefresh(false); }
-  }, [token]);
+  }, [token, isHome]);
   useEffect(() => {
     let disposed = false;
     async function refresh() {
@@ -71,7 +71,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
         if (disposed) return;
         setEnabled(ready);
         if (ready) {
-          const result = await teamRequest<TeamSchedule>(token, "/schedule");
+          const result = await teamRequest<TeamSchedule>(token, isHome ? "/schedule?view=home" : "/schedule");
           if (!disposed && version === requestVersion.current) { setSchedule(result); setError(""); setNeedsRefresh(false); }
           // Keep already-enabled devices current without showing controls here.
           if (!availabilityOnly) {
@@ -97,7 +97,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       const result = await saveScheduleMutation({
         path, method, data, revision: schedule.revision, userId, isOwner,
         write: (revision: number) => teamRequest<{ notification?: string; removedAssignment?: TeamAssignment }>(token, path, { ...data, revision }, method),
-        refresh: () => teamRequest<TeamSchedule>(token, "/schedule"),
+        refresh: () => teamRequest<TeamSchedule>(token, isHome ? "/schedule?view=home" : "/schedule"),
         onRefresh: (fresh: TeamSchedule) => { setSchedule(fresh); setNeedsRefresh(false); },
       });
       setNeedsRefresh(true);

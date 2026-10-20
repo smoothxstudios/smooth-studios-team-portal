@@ -37,6 +37,8 @@ export async function sessionRoute({request, env, auth, fail}) {
   if (path !== '/auth/session') return undefined;
   if (request.method === 'POST') {
     if (!auth.credential || auth.user === 'sync') fail(403, 'Sign in with your dashboard account.');
+    const bootstrap = new URL(request.url).searchParams.get('dashboard') === 'home'
+      ? await readSnapshot(db, auth.user, 'home', null, fail) : null;
     const token = `ss1.${base64url(crypto.getRandomValues(new Uint8Array(32)))}`;
     const digest = await tokenHash(token), expiresAt = now + SESSION_IDLE_MS, absoluteExpiresAt = now + SESSION_MAX_MS;
     await db.batch([
@@ -45,7 +47,8 @@ export async function sessionRoute({request, env, auth, fail}) {
         .bind(digest, auth.user, auth.digest, now, expiresAt, absoluteExpiresAt),
       db.prepare('DELETE FROM dashboard_sessions WHERE user_id = ? AND token_hash NOT IN (SELECT token_hash FROM dashboard_sessions WHERE user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 10)').bind(auth.user, auth.user),
     ]);
-    return { token, expiresAt, absoluteExpiresAt, userId: auth.user };
+    return { token, expiresAt, absoluteExpiresAt, userId: auth.user,
+      ...(bootstrap ? { dashboard: { envelope: JSON.parse(bootstrap.envelope), etag: bootstrap.etag } } : {}) };
   }
   if (!auth.session) fail(403, 'A signed-in session is required.');
   if (request.method === 'DELETE') {
@@ -62,27 +65,45 @@ export async function sessionRoute({request, env, auth, fail}) {
   fail(405, 'Method not allowed.');
 }
 
+const snapshotTag = (id, view, time) => `"dashboard-${id}-${view}-${time}"`;
+async function readSnapshot(db, id, view, match, fail) {
+  if (match) {
+    const version = await db.prepare('SELECT published_at FROM dashboard_snapshots WHERE user_id = ?').bind(id).first();
+    if (version && match === snapshotTag(id, view, version.published_at)) return { unchanged: true, etag: match };
+  }
+  const column = view === 'home' ? 'COALESCE(home_envelope, envelope)' : 'envelope';
+  const row = await db.prepare(`SELECT ${column} AS envelope, published_at FROM dashboard_snapshots WHERE user_id = ?`).bind(id).first();
+  if (!row) fail(404, 'Dashboard data is not available yet. Please try again shortly.');
+  return { envelope: row.envelope, etag: snapshotTag(id, view, row.published_at) };
+}
+function validEnvelope(e) {
+  return e?.version === 1 && e?.algorithm === 'AES-GCM' && e?.kdf === 'PBKDF2-SHA256' &&
+    e.iterations === 310000 && /^[A-Za-z0-9+/]{22}==$/.test(e.salt || '') && /^[A-Za-z0-9+/]{16}$/.test(e.iv || '') &&
+    typeof e.ciphertext === 'string' && e.ciphertext.length >= 24 && e.ciphertext.length <= 1_900_000 && /^[A-Za-z0-9+/]+={0,2}$/.test(e.ciphertext);
+}
+function serializeEnvelope(e) {
+  return JSON.stringify({ version: e.version, algorithm: e.algorithm, kdf: e.kdf, iterations: e.iterations, salt: e.salt, iv: e.iv, ciphertext: e.ciphertext });
+}
 export async function dashboardSnapshotRoute({request, db, user, body, fail}) {
   const url = new URL(request.url), machine = url.pathname === '/sync/dashboard';
+  const view = !machine && url.searchParams.get('view') === 'home' ? 'home' : 'full';
   if (!machine && url.pathname !== '/dashboard') return undefined;
   const id = machine ? url.searchParams.get('id') : user;
   if (![...users, 'team-settings'].includes(id) || (!machine && id === 'team-settings')) fail(400, 'Choose a dashboard account.');
   if (request.method === 'GET') {
-    const row = await db.prepare('SELECT envelope FROM dashboard_snapshots WHERE user_id = ?').bind(id).first();
-    if (!row) fail(404, 'Dashboard data is not available yet. Please try again shortly.');
-    return JSON.parse(row.envelope);
+    const snapshot = await readSnapshot(db, id, view, request.headers.get('if-none-match'), fail);
+    return new Response(snapshot.unchanged ? null : snapshot.envelope, { status: snapshot.unchanged ? 304 : 200,
+      headers: { 'content-type': 'application/json', etag: snapshot.etag, 'access-control-expose-headers': 'ETag' } });
   }
   if (machine && request.method === 'PUT') {
-    const input = await body(request, 1_900_000), e = input.envelope;
-    if (e?.version !== 1 || e?.algorithm !== 'AES-GCM' || e?.kdf !== 'PBKDF2-SHA256' ||
-        e.iterations !== 310000 || !/^[A-Za-z0-9+/]{22}==$/.test(e.salt || '') || !/^[A-Za-z0-9+/]{16}$/.test(e.iv || '') || typeof e.ciphertext !== 'string' ||
-        !/^[A-Za-z0-9+/]+={0,2}$/.test(e.ciphertext) || e.ciphertext.length < 24 || !Number.isSafeInteger(input.publishedAt) || input.publishedAt > Date.now() + 60_000 || input.publishedAt < 1) {
-      fail(400, 'Invalid encrypted dashboard.');
-    }
-    const envelope = JSON.stringify({ version: e.version, algorithm: e.algorithm, kdf: e.kdf, iterations: e.iterations, salt: e.salt, iv: e.iv, ciphertext: e.ciphertext });
-    const result = await db.prepare(`INSERT INTO dashboard_snapshots (user_id, envelope, published_at) VALUES (?, ?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET envelope = excluded.envelope, published_at = excluded.published_at
-      WHERE excluded.published_at > dashboard_snapshots.published_at`).bind(id, envelope, input.publishedAt).run();
+    const input = await body(request, 3_800_000);
+    if (!validEnvelope(input.envelope) || (input.homeEnvelope !== undefined && !validEnvelope(input.homeEnvelope)) ||
+        !Number.isSafeInteger(input.publishedAt) || input.publishedAt > Date.now() + 60_000 || input.publishedAt < 1) fail(400, 'Invalid encrypted dashboard.');
+    // The two projections are published atomically. Legacy writers clear Home
+    // so it safely falls back to the newly written full snapshot.
+    const result = await db.prepare(`INSERT INTO dashboard_snapshots (user_id, envelope, home_envelope, published_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET envelope = excluded.envelope, home_envelope = excluded.home_envelope, published_at = excluded.published_at
+      WHERE excluded.published_at > dashboard_snapshots.published_at`).bind(id, serializeEnvelope(input.envelope), input.homeEnvelope ? serializeEnvelope(input.homeEnvelope) : null, input.publishedAt).run();
     return { saved: Boolean(result.meta.changes) };
   }
   fail(405, 'Method not allowed.');

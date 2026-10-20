@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.42.1",
+  "currentVersion": "2.42.2",
   "releases": [
+    {
+      "id": "2026-10-20-faster-dashboard",
+      "version": "2.42.2",
+      "date": "2026-10-20",
+      "category": "Dashboard",
+      "title": "Lighter loading and coordinated refreshes",
+      "changes": [
+        "Sign-in includes the initial Home data in one response. Unchanged background checks no longer download the dashboard again.",
+        "Home loads recent appointment details and a compact financial ledger. Full appointment, payout, and report history loads when opened, preserving all totals and previous weeks.",
+        "Overlapping reads share one request per account. Saves invalidate pending shared reads so the next refresh retrieves fresh information."
+      ],
+      "employee": {
+        "title": "Lighter dashboard loading",
+        "changes": [
+          "Sign-in and background refresh use fewer requests and less data. Earlier appointment and earnings details load when you open them."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-20-private-session-sign-in",
       "version": "2.42.1",
