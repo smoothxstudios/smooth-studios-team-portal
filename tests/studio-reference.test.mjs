@@ -157,22 +157,3 @@ test('checklist writes reject a concurrent staffing change within the same sync 
   assert.equal(result.status,409);
   assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) n FROM rental_checklists').get().n,0);
 });
-
-test('explicitly removed rental staff immediately lose checklist read and write access', async t => {
-  const f=await setup();t.after(()=>f.close());
-  await f.call('owner','/studio-reference',{...content(),revision:0},'PATCH');
-  await importCalendar(f,[rental]);
-  const checklist=(await f.call('jordyn','/rental-checklists')).data.rentals[0];
-  const removed={id:'removed-staff',employeeId:'jordyn',appointmentId:rental.id,start:rental.start,end:rental.end,status:'cancelled',removeCalendarGuest:true,createdAt:new Date().toISOString()};
-  f.DB.sqlite.prepare('INSERT INTO team_assignments(id,employee_id,data) VALUES(?,?,?)').run(removed.id,removed.employeeId,JSON.stringify(removed));
-  assert.deepEqual((await f.call('jordyn','/rental-checklists')).data.rentals,[]);
-  assert.equal((await f.call('jordyn',`/rental-checklists/${checklist.checklistId}`,{action:'note',note:'Should be denied',version:0},'PATCH')).status,404);
-});
-
-test('employee checklist responses exclude other people’s Calendar responses', async t => {
-  const f=await setup();t.after(()=>f.close());
-  await importCalendar(f,[{...rental,acceptedEmployeeIds:['jordyn','rayne'],calendarInvitations:[{employeeId:'jordyn',status:'accepted'},{employeeId:'rayne',status:'accepted'}]}]);
-  const result=(await f.call('jordyn','/rental-checklists')).data.rentals[0];
-  assert.deepEqual(result.acceptedEmployeeIds,['jordyn']);
-  assert.deepEqual(result.calendarInvitations,[{employeeId:'jordyn',status:'accepted'}]);
-});

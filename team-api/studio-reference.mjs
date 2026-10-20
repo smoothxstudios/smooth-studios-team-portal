@@ -1,5 +1,4 @@
 import { tokenHash, unbase64url } from "../lib/team-auth.mjs";
-import { withoutRemovedRentalStaff } from "../lib/rental-staff.mjs";
 import { studioInfoEntries } from "../lib/studio-reference.mjs";
 
 const isRental = appointment => /studio.*rental|rental.*studio/i.test(appointment.title);
@@ -59,18 +58,13 @@ export async function studioReferenceRoute({ request, db, user, env, body, fail 
     return { saved: true };
   }
   if (url.pathname === "/rental-checklists" || url.pathname.startsWith("/rental-checklists/")) {
-    const state = await db.prepare("SELECT generation, revision, synced_at FROM team_state WHERE id = 1").first();
+    const state = await db.prepare("SELECT generation, revision FROM team_state WHERE id = 1").first();
     const appointments = (await db.prepare("SELECT data FROM team_appointments WHERE generation = ?").bind(state.generation).all()).results.map(row => JSON.parse(row.data)).filter(isRental);
-    const assignments = isOwner ? [] : (await db.prepare(`SELECT a.data, q.status, q.result, q.updated_at FROM team_assignments a
-      LEFT JOIN calendar_assignment_outbox q ON q.assignment_id = a.id WHERE a.employee_id = ?`).bind(user).all()).results.map(row => {
-        const item = JSON.parse(row.data);
-        let result = {}; try { result = JSON.parse(row.result ?? '{}'); } catch { /* Retain removal until verified. */ }
-        return { ...item, calendarSync: { status: row.status, code: result.code, checkedAt: row.updated_at } };
-      });
-    const allowed = appointments.map(appointment => withoutRemovedRentalStaff(appointment, assignments, state.synced_at)).filter(appointment => isOwner || appointment.acceptedEmployeeIds.includes(user) || assignments.some(item =>
+    const assignments = isOwner ? [] : (await db.prepare("SELECT data FROM team_assignments WHERE employee_id = ?").bind(user).all()).results.map(row => JSON.parse(row.data));
+    const allowed = appointments.filter(appointment => isOwner || appointment.acceptedEmployeeIds.includes(user) || assignments.some(item =>
       item.appointmentId === appointment.id && item.status === "accepted" && item.start === appointment.start && item.end === appointment.end));
     const rentals = await Promise.all(allowed.map(async appointment => ({ ...appointment,
-      ...(isOwner ? {} : { fullyPaid: undefined, paidOnlineCents: undefined, acceptedEmployeeIds: appointment.acceptedEmployeeIds.filter(id => id === user), calendarInvitations: (appointment.calendarInvitations ?? []).filter(item => item.employeeId === user) }),
+      ...(isOwner ? {} : { fullyPaid: undefined, paidOnlineCents: undefined }),
       checklistId: await tokenHash(`${appointment.id}|${appointment.start}|${appointment.end}`) })));
     if (request.method === "GET" && url.pathname === "/rental-checklists") {
       const saved = (await db.prepare("SELECT id, data, version FROM rental_checklists WHERE appointment_id IN (SELECT value FROM json_each(?))")

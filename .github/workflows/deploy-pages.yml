@@ -17,6 +17,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ !contains(github.event.head_commit.message, '[restore-v2.41.1]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -1,4 +1,4 @@
-import { sessionFetch } from "@/lib/team-session.mjs";
+import { TEAM_API_URL } from "@/lib/team-schedule.mjs";
 import { unbase64url } from "@/lib/team-auth.mjs";
 
 export type TimeBlock = { id: string; userId: string; reason: string; startLocal: string; endLocal: string; repeatUntil: string | null; createdAt: string };
@@ -12,7 +12,7 @@ export type PushTestResult = { accepted: boolean; expired: boolean; status: numb
 export type GuidelineQuestionRequest = { id: string; askedBy: string; question: string; status: "open" | "answered" | "dismissed"; createdAt: string };
 
 export async function teamRequest<T>(token: string, path: string, data?: unknown, method?: string): Promise<T> {
-  const response = await sessionFetch(token, path, {
+  const response = await fetch(`${TEAM_API_URL}${path}`, {
     method: method ?? (data === undefined ? "GET" : "POST"), cache: "no-store", redirect: "error",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     ...(data === undefined ? {} : { body: JSON.stringify(data) }), signal: AbortSignal.timeout(20_000),
@@ -98,5 +98,3 @@ export async function disableTeamPush(token: string) {
   try { await teamRequest(token, "/push/device", { endpoint: subscription.endpoint }, "DELETE"); }
   finally { await subscription.unsubscribe(); }
 }
-
-export type TeamHoursSchedule = { appointments: Pick<TeamAppointment, "id" | "start" | "end" | "acceptedEmployeeIds">[]; assignments: TeamAssignment[] };

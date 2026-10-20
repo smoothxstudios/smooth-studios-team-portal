@@ -1,4 +1,3 @@
-import { testSessionToken } from "./helpers/session-token.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
@@ -9,7 +8,7 @@ import { teamToken, tokenHash } from "../lib/team-auth.mjs";
 import { TEMP_CHECK_MIN_MS, TEMP_CHECK_MAX_MS, QUIZ_INTERVAL_MS, MOODS, QUIZ_TIERS, nextEngagementPrompt, starProgress } from "../lib/team-engagement.mjs";
 import { dailyQuestion, employeeQuestionCandidates, publicQuestion, QUESTION_BANK, QUESTION_BANKS } from "../team-api/creative-questions.mjs";
 
-const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql", "0009_push_notifications.sql", "0027_temp_check_pacing.sql", "0032_dashboard_sessions.sql", "0016_smoothstar_500_points.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
+const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql", "0009_push_notifications.sql", "0027_temp_check_pacing.sql", "0016_smoothstar_500_points.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
 const tokens = Object.fromEntries(await Promise.all([...TEAM.map(p => p.id), "sync"].map(async id => [id, await teamToken(`synthetic-engagement-test-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(Object.entries(tokens).map(async ([id, token]) => [id, await tokenHash(token)])));
 const now = Date.parse("2026-10-15T17:00:00Z"), today = "2026-10-15";
@@ -36,9 +35,8 @@ class D1 {
 function fixture(beforeStarMigration) {
   const DB = new D1(beforeStarMigration), env = { DB, TEAM_TOKEN_HASHES: JSON.stringify(hashes) }, alerts = [];
   const call = async (user, path = "/engagement", data, method = data ? "POST" : "GET") => {
-    const bearer = await testSessionToken(env, tokens[user] ?? user, user === "sync");
     const response = await worker.fetch(new Request(`https://api.example.invalid${path}`, {
-      method, headers: { "content-type": "application/json", origin: "https://dashboard.smoothstudios.co", ...(user ? { authorization: `Bearer ${bearer}` } : {}) },
+      method, headers: { "content-type": "application/json", origin: "https://dashboard.smoothstudios.co", ...(user ? { authorization: `Bearer ${tokens[user] ?? user}` } : {}) },
       ...(data ? { body: JSON.stringify(data) } : {}),
     }), env, { waitUntil: promise => alerts.push(promise) });
     return { status: response.status, data: await response.json() };
@@ -173,8 +171,7 @@ test("random difficulty is persisted across refreshes and simultaneous devices",
 
 test("all employees receive different prompts even when the same tiers unlock simultaneously", async () => {
   const f = fixture(), people = TEAM.filter(p => p.id !== "owner").map(p => p.id), prompts = new Set();
-  const originalRandom = crypto.getRandomValues.bind(crypto);
-  const random = mock.method(crypto, "getRandomValues", values => values instanceof Uint32Array ? values.fill(0) : originalRandom(values));
+  const random = mock.method(crypto, "getRandomValues", values => values.fill(0));
   try {
     for (let slot = 0; slot < 3; slot++) {
       mock.timers.setTime(now + slot * QUIZ_INTERVAL_MS);
@@ -229,8 +226,7 @@ test("already answered questions without offers are excluded from new reservatio
   const f = fixture(), q = employeeQuestionCandidates(today, "easy", "jordyn")[0];
   const snapshot = JSON.stringify({ day: today, tier: "easy", createdAt: new Date(now).toISOString(), question: publicQuestion(q), points: 5, correct: true });
   f.DB.sqlite.prepare("INSERT INTO team_quiz_attempts (user_id, day, tier, correct, points, created_at, data) VALUES ('rayne', ?, 'easy', 1, 5, ?, ?)").run(today, now, snapshot);
-  const originalRandom = crypto.getRandomValues.bind(crypto);
-  const random = mock.method(crypto, "getRandomValues", values => values instanceof Uint32Array ? values.fill(0) : originalRandom(values));
+  const random = mock.method(crypto, "getRandomValues", values => values.fill(0));
   try {
     const state = (await f.call("jordyn")).data;
     assert.equal(current(state).question.tier, "easy");

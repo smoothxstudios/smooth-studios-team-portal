@@ -50,6 +50,5 @@ const payloads = buildDashboardPayloads({
   source: "sample",
   ownerWorkflowToken: process.env.DASHBOARD_GITHUB_TOKEN?.trim(),
 });
-await writeEncryptedDashboards({ payloads, passwords, outputDirectory: path.join(root, "public/data"), config,
-  publish: (id, envelope) => writeFile(path.join(privateDirectory, `${id}.json`), JSON.stringify(envelope), { mode: 0o600 }) });
+await writeEncryptedDashboards({ payloads, passwords, outputDirectory: path.join(root, "public/data"), config });
 process.stdout.write(`Encrypted dashboards created. Private credentials: ${credentialsPath}\n`);

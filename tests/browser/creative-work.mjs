@@ -1,4 +1,3 @@
-import worker from '../../team-api/worker.mjs';
 // Run after build:github-pages with Playwright installed; all external requests use synthetic fixtures.
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -14,7 +13,6 @@ function envelope(id){const salt=crypto.randomBytes(16),iv=crypto.randomBytes(12
 const f=await fixture();delete f.env.VAPID_JWK;
 for(const id of ['owner','jordyn'])f.DB.sqlite.prepare('INSERT INTO team_notification_events(id,user_id,kind,payload,due_at) VALUES(?,?,?,?,?)').run('synthetic-'+id,id,'notice',JSON.stringify({title:'Synthetic availability reminder',body:'Review availability.',target:'availability'}),Date.now());
 const tokens=Object.fromEntries(await Promise.all(profiles.map(async p=>[await teamToken(password(p.id),p.id),p.id]))),envelopes={owner:envelope('owner'),jordyn:envelope('jordyn')};
-for(const [id,envelope] of Object.entries(envelopes)) f.DB.sqlite.prepare('INSERT INTO dashboard_snapshots(user_id,envelope,published_at) VALUES(?,?,?)').run(id,JSON.stringify(envelope),Date.now());
 const server=spawn('python',['-m','http.server','3098','--bind','127.0.0.1','--directory',root+'/out'],{stdio:'ignore'});let browser;
 try{
  browser=await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? {executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE} : {}),headless:true,args:['--no-sandbox','--disable-gpu','--disable-software-rasterizer','--disable-dev-shm-usage','--no-zygote']});
@@ -22,12 +20,7 @@ try{
  await context.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
  await context.route('**/data/*.json*',async route=>{const file=new URL(route.request().url()).pathname.split('/').pop();await route.fulfill({json:file==='access.json'?{profiles}:file==='team-api.json'?{version:1,enabled:true}:envelopes[file.slice(0,-5)]||{}});});
  await context.route('https://smooth-studios-team-api.smoothxstudios.workers.dev/**',async route=>{const req=route.request(),url=new URL(req.url()),path=url.pathname,user=tokens[req.headers().authorization?.slice(7)];let json,status=200;
- if(path==='/auth/session') {
-   const result=await worker.fetch(new Request(req.url(),{method:req.method(),headers:{authorization:req.headers().authorization,'content-type':'application/json'},...(req.postData()?{body:req.postData()}: {})}),f.env,{waitUntil(){}});
-   json=await result.json();status=result.status;if(json.token)tokens[json.token]=user;
- }
- else if(path==='/dashboard') {json=envelopes[user];if(!json){status=401;json={error:'Sign in again'};}}
- else if(path.startsWith('/alerts') || path.startsWith('/creative-work')){if(req.method()!=='GET')await new Promise(r=>setTimeout(r,800));const result=await f.call(user,path+url.search,req.postData()?req.postDataJSON():undefined,req.method());status=result.status;json=result.data;}
+ if(path.startsWith('/alerts') || path.startsWith('/creative-work')){if(req.method()!=='GET')await new Promise(r=>setTimeout(r,800));const result=await f.call(user,path+url.search,req.postData()?req.postDataJSON():undefined,req.method());status=result.status;json=result.data;}
  else if(path==='/schedule')json={revision:1,syncedAt:stamp,appointments:[],blocks:[],assignments:[],workPreferences:[],devices:{},pushPublicKey:null};
  else if(path==='/event-planner')json={revision:0,events:[],guests:[],availability:[]};
  else if(path==='/creative-work')json={assignments:[]};else if(path==='/payroll')json={version:1,syncedAt:stamp,balances:[],allocations:[],reviewCount:0};

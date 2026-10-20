@@ -114,7 +114,6 @@ export type PayrollReview = {
 };
 
 export type DashboardPayload = {
-  history?: { deferred: boolean; rentalCount: number; unmatchedCount: number };
   payroll?: PayrollState;
   version: 1;
   source: "sample" | "google-calendar";

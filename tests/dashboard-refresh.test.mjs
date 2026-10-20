@@ -60,7 +60,7 @@ test('refresh cache-busts the encrypted snapshot, validates the account, and upd
     fetcher: async (nextUrl, nextOptions) => { url = nextUrl; options = nextOptions; return new Response('{}'); },
     onSnapshot: next => { applied = next; },
   }));
-  assert.equal(url, 'https://smooth-studios-team-api.smoothxstudios.workers.dev/dashboard');
+  assert.match(url, /^\.\/data\/example\.json\?v=\d+$/);
   assert.equal(options.cache, 'no-store'); assert.ok(options.signal);
   assert.equal(applied, snapshot);
 });
@@ -156,39 +156,4 @@ test('quiet checks run every thirty seconds, pause hidden/offline, resume once, 
   stop(); assert.equal(cleared, true); clock += 60_000;
   timer(); win.dispatchEvent(new Event('focus')); win.dispatchEvent(new Event('online')); doc.dispatchEvent(new Event('visibilitychange'));
   await flush(); assert.equal(reads, 5);
-});
-
-test('conditional refresh skips decrypting and history upgrades at the same publication time', async () => {
-  const initial = { ...snapshot, generatedAt: '2026-10-20T12:00:00Z', history: { deferred: true } };
-  const calls = []; let decrypts = 0, applied;
-  const reader = createDashboardSnapshotReader(request({
-    fetcher: async (url, options) => {
-      calls.push([url, options.headers?.['if-none-match']]);
-      if (url.endsWith('?view=home')) return new Response(null, { status: 304 });
-      return Response.json({ full: true }, { headers: { etag: 'full-tag' } });
-    },
-    decrypt: async () => { decrypts++; return { ...initial, history: undefined }; },
-    onSnapshot: next => { applied = next; },
-  }), initial, { home: true }, 'home-tag');
-  await reader(); assert.equal(decrypts, 0); assert.equal(applied, undefined);
-  assert.equal(await reader.loadHistory(), true); assert.equal(decrypts, 1); assert.equal(applied.history, undefined);
-  assert.deepEqual(calls.map(([url, tag]) => [new URL(url).pathname + new URL(url).search, tag]), [['/dashboard?view=home', 'home-tag'], ['/dashboard', undefined]]);
-  await reader(); assert.equal(calls.at(-1)[1], 'full-tag');
-});
-
-test('history waits for an in-flight Home update, retries failure, and cannot restore a logged-out account', async () => {
-  const initial = { ...snapshot, generatedAt: '2026-10-20T12:00:00Z', history: { deferred: true } };
-  const wait = deferred(); let current = true, failure = true, applied = [];
-  const reader = createDashboardSnapshotReader(request({
-    isCurrent: () => current,
-    fetcher: async url => {
-      if (url.endsWith('?view=home')) { await wait.promise; return new Response(null, { status: 304 }); }
-      if (failure) throw new Error('Offline');
-      current = false; return Response.json({ full: true });
-    },
-    decrypt: async () => ({ ...initial, history: undefined }), onSnapshot: next => applied.push(next),
-  }), initial, { home: true }, 'home-tag');
-  const background = reader(), history = reader.loadHistory();
-  wait.resolve(); await background; await assert.rejects(history, /Offline/);
-  failure = false; assert.equal(await reader.loadHistory(), false); assert.equal(applied.length, 0);
 });

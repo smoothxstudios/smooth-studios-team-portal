@@ -3,30 +3,12 @@
   "main": "worker.mjs",
   "compatibility_date": "2026-09-09",
   "workers_dev": true,
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "smooth-studios-team-db",
-      "database_id": "5daed702-803e-41c7-85c0-7517b6df0180",
-      "migrations_dir": "migrations"
-    }
-  ],
-  "triggers": {
-    "crons": [
-      "*/5 * * * *"
-    ]
-  },
-  "observability": {
-    "enabled": false
-  },
-  "ratelimits": [
-    {
-      "name": "API_RATE_LIMIT",
-      "namespace_id": "2026102001",
-      "simple": {
-        "limit": 600,
-        "period": 60
-      }
-    }
-  ]
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "smooth-studios-team-db",
+    "database_id": "5daed702-803e-41c7-85c0-7517b6df0180",
+    "migrations_dir": "migrations"
+  }],
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "observability": { "enabled": false }
 }

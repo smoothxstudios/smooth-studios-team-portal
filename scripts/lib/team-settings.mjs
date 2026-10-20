@@ -1,4 +1,5 @@
-import { dashboardStorage } from "./dashboard-storage.mjs";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { decryptPayload } from "./dashboard-data.mjs";
 
 export function validateTeamSettings(value, config) {
@@ -21,12 +22,12 @@ export function validateTeamSettings(value, config) {
   return { version: 1, employees };
 }
 
-export async function readTeamSettings(_root, config, ownerPassword) {
+export async function readTeamSettings(root, config, ownerPassword) {
   try {
-    const envelope = await dashboardStorage(ownerPassword, "team-settings");
-    if (!envelope) throw new Error("Private team settings are missing from server storage.");
+    const envelope = JSON.parse(await readFile(path.join(root, "public/data/team-settings.json"), "utf8"));
     return validateTeamSettings(decryptPayload(envelope, ownerPassword), config);
   } catch (error) {
+    if (error.code === "ENOENT") return { version: 1, employees: {} };
     throw new Error("Private team settings could not be opened. Existing account credentials were not replaced.", { cause: error });
   }
 }

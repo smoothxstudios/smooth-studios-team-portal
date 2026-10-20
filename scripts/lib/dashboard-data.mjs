@@ -1,5 +1,3 @@
-import { homeDashboard } from '../../lib/dashboard-history.mjs';
-import { dashboardStorage } from './dashboard-storage.mjs';
 import { createCipheriv, createDecipheriv, createHash, pbkdf2Sync, randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -453,11 +451,7 @@ export function decryptPayload(envelope, password) {
   return JSON.parse(plaintext.toString("utf8"));
 }
 
-export function encryptDashboard(payload, password) {
-  return { envelope: encryptPayload(payload, password), homeEnvelope: encryptPayload(homeDashboard(payload), password) };
-}
-
-export async function writeEncryptedDashboards({ payloads, passwords, outputDirectory, config, publish }) {
+export async function writeEncryptedDashboards({ payloads, passwords, outputDirectory, config }) {
   await mkdir(outputDirectory, { recursive: true });
   const profiles = [
     { id: "owner", label: "Smooth", role: "owner" },
@@ -466,9 +460,8 @@ export async function writeEncryptedDashboards({ payloads, passwords, outputDire
   for (const profile of profiles) {
     const password = passwords[profile.id];
     if (!password || password.length < 16) throw new Error(`Missing strong password for ${profile.id}`);
-    const bundle = encryptDashboard(payloads[profile.id], password);
-    if (publish) await publish(profile.id, bundle.envelope);
-    else await dashboardStorage(passwords.owner, profile.id, bundle);
+    const envelope = encryptPayload(payloads[profile.id], password);
+    await writeFile(path.join(outputDirectory, `${profile.id}.json`), `${JSON.stringify(envelope)}\n`, "utf8");
   }
   await writeFile(path.join(outputDirectory, "access.json"), `${JSON.stringify({ version: 1, profiles }, null, 2)}\n`, "utf8");
 }

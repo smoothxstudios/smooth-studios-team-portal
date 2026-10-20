@@ -1,6 +1,23 @@
 {
-  "currentVersion": "2.42.2",
+  "currentVersion": "2.41.1",
   "releases": [
+    {
+      "id": "2026-10-20-restore-2-41-1",
+      "version": "2.41.1",
+      "date": "2026-10-20",
+      "category": "Dashboard",
+      "title": "Restored v2.41.1",
+      "changes": [
+        "Restored the v2.41.1 dashboard, including its previous sign-in and loading behavior. Current studio records and team accounts are preserved."
+      ],
+      "employee": {
+        "title": "Dashboard version restored",
+        "changes": [
+          "The dashboard has returned to v2.41.1. Reload the page and sign in again."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-20-faster-dashboard",
       "version": "2.42.2",

@@ -45,13 +45,11 @@ test("activation publishes separately encrypted accounts without leaking private
     const configured = { ...config, employees: resolveEmployees(config, settings, passwords, environment) };
     const payloads = buildDashboardPayloads({ calendarEvents: [], config: configured, ledger: { employees: {} }, overrides: {}, source: "sample" });
     payloads.owner.teamAccess = { dacari: { password: passwords.dacari } };
-    const stored = new Map();
-    await writeEncryptedDashboards({ payloads, passwords, config: configured, outputDirectory: output, publish: async (id, envelope) => stored.set(id, envelope) });
+    await writeEncryptedDashboards({ payloads, passwords, config: configured, outputDirectory: output });
     const access = JSON.parse(await readFile(path.join(output, "access.json"), "utf8"));
     assert.equal(access.profiles.length, 8);
     assert.equal(JSON.stringify(access).includes("example.invalid"), false);
-    const envelope = stored.get("dacari");
-    await assert.rejects(readFile(path.join(output, "dacari.json")), { code: "ENOENT" });
+    const envelope = JSON.parse(await readFile(path.join(output, "dacari.json"), "utf8"));
     assert.equal(JSON.stringify(envelope).includes(passwords.dacari), false);
     const own = decryptPayload(envelope, passwords.dacari);
     assert.deepEqual(own.employees.map(e => e.id), ["dacari"]);
