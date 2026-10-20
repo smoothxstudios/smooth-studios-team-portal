@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.43.0",
+  "currentVersion": "2.44.0",
   "releases": [
+    {
+      "id": "2026-10-20-apple-calendar",
+      "version": "2.44.0",
+      "date": "2026-10-20",
+      "category": "Scheduling",
+      "title": "Apple Calendar subscriptions",
+      "changes": [
+        "Appointment details and Settings now offer an Apple Calendar subscription. Each employee sees their assigned rentals and scheduled work; Smooth can subscribe to studio appointments.",
+        "Time and detail changes use the same event, and removed appointments leave the subscription when Apple refreshes. Pending work is labeled clearly; accepting or declining still happens in the dashboard.",
+        "Subscription links are private, read-only, and can be turned off in Settings. Apple controls refresh timing, so updates may be delayed."
+      ],
+      "employee": {
+        "title": "See your work in Apple Calendar",
+        "changes": [
+          "Open an appointment → Apple Calendar, or use Settings → Apple Calendar → Set up Apple Calendar. Open Apple Calendar and confirm the subscription once.",
+          "Your assigned work stays updated when Apple refreshes. Keep accepting or declining offers in the dashboard. Turn off sync in Settings when needed."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-20-daily-actions",
       "version": "2.43.0",

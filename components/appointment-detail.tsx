@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { RentalDescription } from "@/components/rental-description";
 import { PersonLabel } from "@/components/dashboard/person-label";
 import { ScheduleConfirmation } from "@/components/schedule-confirmation";
+import { AppleCalendarSettings } from "@/components/apple-calendar-settings";
 import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
 import { teamRequest, type TeamAssignment, type TeamAppointment } from "@/lib/team-api";
 import type { WorkEntry } from "@/lib/schedule-calendar-types";
@@ -60,6 +61,7 @@ export function AppointmentDetail({ item, token, userId, isOwner, busy, renderAs
   const previous = item.assignments.filter(offer => !["pending", "accepted"].includes(offer.status));
   return <div className="appointment-detail">
     <header><h2>{item.customer || item.title}</h2>{item.customer && <p>{item.title}</p>}<p>{formatDate(item.start)} · {formatTime(item.start)}–{formatTime(item.end)}{formatDate(item.start) !== formatDate(item.end) ? ` · ends ${formatDate(item.end)}` : ""}</p></header>
+    <AppleCalendarSettings key={userId} token={token} isOwner={isOwner} compact />
     <div className="schedule-dialog-feedback">{feedback}</div>
     {appointment && <section><h3>Rental details</h3><RentalDescription details={appointment.rentalDetails} showHeading={false} />
       <dl className="appointment-balance"><div><dt>Rental price</dt><dd>{dollars(appointment.priceCents, true)}</dd></div><div><dt>{isOwner ? balance!.label : "Customer balance"}</dt><dd>{!isOwner ? "Confirm with Smooth" : balance!.remaining === null ? "Unconfirmed" : dollars(balance!.remaining, true)}</dd></div></dl>

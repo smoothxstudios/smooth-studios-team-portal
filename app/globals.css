@@ -2339,3 +2339,15 @@ button { cursor: pointer; }
 .daily-action-list .owner-attention-empty > p { display: none; }
 .daily-action-list .owner-attention-empty > span { width: 30px; height: 30px; flex-shrink: 0; margin: 0; }
 .daily-action-list .owner-attention-empty > strong { margin: 0; font-size: 13px; text-align: left; }
+
+/* Personal Apple Calendar subscription controls. */
+.apple-calendar-content { display: grid; gap: 12px; min-width: 0; margin-top: 14px; }
+.apple-calendar-content > p, .apple-calendar-help p { margin: 0; line-height: 1.5; }
+.apple-calendar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.apple-calendar-open { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; border-radius: 10px; background: var(--foreground); color: var(--background); font-size: 14px; font-weight: 600; text-decoration: none; }
+.apple-calendar-open:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.apple-calendar button, .apple-calendar-help summary { min-height: 44px; }
+.apple-calendar-help summary { display: flex; align-items: center; cursor: pointer; font-size: 14px; font-weight: 600; }
+.apple-calendar-help p { font-size: 13px; margin: 10px 0; }
+.apple-calendar-url { display: block; width: 100%; min-width: 0; min-height: 44px; padding: 10px; font-size: 16px; border: 1px solid var(--border); border-radius: 8px; }
+.apple-calendar-confirm { margin-top: 8px; }

@@ -19,7 +19,8 @@ import { calendarAuthRoute } from "./calendar-auth.mjs";
 import { calendarQueueStatement, calendarDurationImportStatement, flushCalendarAssignments } from "./calendar-delivery.mjs";
 import { calendarTimeChange, recoverDurationCancellation, LEGACY_PAST_NOTE } from "./calendar-time-changes.mjs";
 import { manualNoticesRoute } from "./manual-notices.mjs";
-import { withoutRemovedRentalStaff } from "../lib/rental-staff.mjs";
+import { calendarAssignments, visibleAppointments } from "./schedule-access.mjs";
+import { appleCalendarRoute, appleCalendarFeed } from "./apple-calendar.mjs";
 import { calendarRecord, calendarKey, recordManifest, verifyDelta, recordBatches } from "../lib/sync-records.mjs";
 import { trackImport, cleanImports } from "./sync-storage.mjs";
 
@@ -127,6 +128,7 @@ function approveConflict(period) {
 
 async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
+  if (url.pathname.startsWith("/calendar/apple/feed/")) return appleCalendarFeed({ request, env, snapshot, fail });
   if (request.method === "POST" && url.pathname === "/push/receipt") return pushReceiptRoute({request, db, body, fail});
   if (request.method === "GET" && ["/calendar/oauth/start", "/calendar/oauth/callback"].includes(url.pathname)) {
     const result = await calendarAuthRoute({ request, env, user: null, body, fail });
@@ -140,13 +142,14 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, appleCalendarVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
   else if (user === "sync") fail(403, "Sync access is restricted to synchronization endpoints.");
   if (request.method === "GET" && url.pathname === "/notifications/delivery") return notificationDeliveryRoute({request, db, env, user, fail});
   if (["/notifications", "/notifications/sent"].includes(url.pathname) || /^\/assignments\/[^/]+\/remind$/.test(url.pathname)) return manualNoticesRoute({ request, env, user, body, fail, ctx });
+  if (url.pathname === "/calendar/apple") return appleCalendarRoute({ request, env, user, fail });
   if (url.pathname.startsWith("/calendar/")) return calendarAuthRoute({ request, env, user, body, fail });
   if (request.method === "POST" && url.pathname === "/sync/calendar/configuration") {
     const input = await body(request);
@@ -230,34 +233,13 @@ async function route(request, env, ctx) {
 
   if (request.method === "GET" && url.pathname === "/schedule") {
     const s = await snapshot(db), isOwner = user === "owner";
-    const calendarRows = (await db.prepare(`SELECT q.assignment_id, q.status, q.result, q.updated_at FROM calendar_assignment_outbox q
-      JOIN team_assignments a ON a.id = q.assignment_id WHERE ? = 'owner' OR a.employee_id = ?`).bind(user, user).all()).results;
-    const assignments = s.assignments.filter(a => isOwner || a.employeeId === user).map(assignment => {
-      const row = calendarRows.find(item => item.assignment_id === assignment.id);
-      if (!row) return assignment;
-      let result = {}; try { result = JSON.parse(row.result ?? "{}"); } catch { /* Keep a safe pending status. */ }
-      let deliveryStatus = row.status;
-      // A later Calendar import wins over an older outbound confirmation.
-      if (row.status === "synced" && Date.parse(s.state.synced_at) > row.updated_at && !["invitation_removed", "person_removed", "no_calendar_invitation"].includes(result.code)) {
-        const invitation = s.appointments.find(appointment => appointment.id === assignment.appointmentId)?.calendarInvitations?.find(item => item.employeeId === assignment.employeeId);
-        result.googleStatus = invitation?.status;
-        if (!invitation && assignment.status !== "cancelled") { deliveryStatus = "needs_review"; result.code = "invitation_missing"; }
-      }
-      return { ...assignment, calendarSync: { status: deliveryStatus, checkedAt: row.updated_at,
-        ...(typeof result.code === "string" ? { code: result.code } : {}),
-        ...(["accepted", "declined", "needsAction", "tentative", "removed"].includes(result.googleStatus) ? { googleStatus: result.googleStatus } : {}) } };
-    });
-    const ids = new Set(assignments.filter(active).map(a => a.appointmentId));
+    const assignments = await calendarAssignments(db, s, user);
     const devices = (await db.prepare("SELECT user_id, COUNT(*) AS count FROM team_devices GROUP BY user_id").all()).results;
     const workPreferences = user === "owner"
       ? await jsonRows(db, "SELECT data FROM team_work_preferences")
       : await jsonRows(db, "SELECT data FROM team_work_preferences WHERE user_id = ?", user);
     return { revision: s.state.revision, syncedAt: s.state.synced_at, availabilityVersion: 1, workPreferences,
-      appointments: s.appointments.map(a => withoutRemovedRentalStaff(a, assignments, s.state.synced_at)).filter(a => isOwner || ids.has(a.id) || a.acceptedEmployeeIds.includes(user) ||
-          a.calendarInvitations?.some(invitation => invitation.employeeId === user && invitation.status !== "declined"))
-        .map(a => isOwner ? a : { ...a, fullyPaid: undefined, paidOnlineCents: undefined,
-          acceptedEmployeeIds: a.acceptedEmployeeIds.filter(id => id === user),
-          calendarInvitations: (a.calendarInvitations ?? []).filter(invitation => invitation.employeeId === user) }),
+      appointments: visibleAppointments(s, assignments, user),
       blocks: s.blocks.filter(b => isOwner || b.userId === user), assignments,
       devices: Object.fromEntries(devices.filter(d => isOwner || d.user_id === user).map(d => [d.user_id, d.count])),
       pushPublicKey: env.VAPID_JWK ? publicPushKey(JSON.parse(env.VAPID_JWK)) : null,
