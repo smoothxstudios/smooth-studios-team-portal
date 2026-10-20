@@ -1,3 +1,4 @@
+import { testSessionToken } from "./helpers/session-token.mjs";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
@@ -42,8 +43,9 @@ function fixture() {
   const env = { DB, TEAM_TOKEN_HASHES: JSON.stringify(hashes) };
   const pending = [];
   const call = async (user, path, data, method = data === undefined ? "GET" : "POST", extraHeaders = {}) => {
+    const bearer = await testSessionToken(env, tokens[user] ?? user, user === "sync");
     const response = await worker.fetch(new Request(`https://api.example.invalid${path}`, {
-      method, headers: { ...(user ? { authorization: `Bearer ${tokens[user] ?? user}` } : {}),
+      method, headers: { ...(user ? { authorization: `Bearer ${bearer}` } : {}),
         "content-type": "application/json", origin: "https://smoothxstudios.github.io", ...extraHeaders },
       ...(data === undefined ? {} : { body: JSON.stringify(data) }),
     }), env, { waitUntil: p => pending.push(p) });

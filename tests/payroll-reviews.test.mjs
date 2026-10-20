@@ -27,6 +27,7 @@ const read = async f => { const result = await f.call('owner', '/payroll/reviews
 
 test('advance review identifies the person, rental, current earning and saved credit without writes', async t => {
   const f = await setup(t); credit(f, 'rental-a', 2500); rental(f, 'rental-a', 1500); appointment(f, 'rental-a');
+  await f.call('owner', '/identity'); // Establish authentication before checking domain writes.
   const before = f.DB.sqlite.prepare('SELECT total_changes() AS n').get().n;
   const [item] = await read(f);
   assert.equal(item.employeeId, 'akiva'); assert.equal(item.title, 'Studio A Rental'); assert.equal(item.customer, 'Synthetic Customer');

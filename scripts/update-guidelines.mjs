@@ -1,4 +1,5 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { dashboardStorage } from './lib/dashboard-storage.mjs';
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,18 +31,16 @@ try {
 }
 const serializedGuide = JSON.stringify(submitted);
 if (Buffer.byteLength(serializedGuide, "utf8") > MAX_GUIDELINE_UPDATE_BYTES) throw new Error("A Studio Guidelines update must be 40 KB or smaller");
-const ownerPayload = decryptPayload(await readJson("public/data/owner.json"), passwords.owner);
+const ownerPayload = decryptPayload(await dashboardStorage(passwords.owner, "owner"), passwords.owner);
 const rulebook = normalizeRulebook(submitted.mode === "patch" ? applyGuidePatch(ownerPayload.rulebook, submitted) : submitted, { updatedAt: new Date().toISOString() });
 
 const outputs = [];
 for (const id of profiles) {
-  const relativePath = `public/data/${id}.json`;
-  const payload = id === "owner" ? ownerPayload : decryptPayload(await readJson(relativePath), passwords[id]);
+  const payload = id === "owner" ? ownerPayload : decryptPayload(await dashboardStorage(passwords.owner, id), passwords[id]);
+  payload.generatedAt = new Date().toISOString();
   payload.rulebook = rulebook;
-  outputs.push({ relativePath, envelope: encryptPayload(payload, passwords[id]) });
+  outputs.push({ id, envelope: encryptPayload(payload, passwords[id]) });
 }
 
-await Promise.all(outputs.map(({ relativePath, envelope }) =>
-  writeFile(path.join(root, relativePath), `${JSON.stringify(envelope)}\n`, "utf8"),
-));
+for (const { id, envelope } of outputs) await dashboardStorage(passwords.owner, id, { envelope });
 process.stdout.write(`Updated the encrypted Studio Guidelines for ${profiles.length} dashboards with ${rulebook.entries.length} guidelines.\n`);

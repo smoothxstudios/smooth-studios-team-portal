@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.42.0",
+  "currentVersion": "2.42.1",
   "releases": [
+    {
+      "id": "2026-10-20-private-session-sign-in",
+      "version": "2.42.1",
+      "date": "2026-10-20",
+      "category": "Security",
+      "title": "Protected sign-in and private dashboard data",
+      "changes": [
+        "Dashboard sign-in now uses expiring sessions that renew while the app is open. Sign out revokes that session, and account password changes invalidate existing sessions.",
+        "Private dashboard snapshots and account settings load through authenticated storage. Background sync publishes encrypted updates directly to the API instead of public website files.",
+        "Password and quick sign-in still open Home. An ended session returns to sign-in with a clear message."
+      ],
+      "employee": {
+        "title": "Secure sign-in sessions",
+        "changes": [
+          "Keep using your password or quick sign-in. If your session expires, sign in again to return to Home. Sign out when you finish on a shared device."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-20-session-storage",
       "version": "2.42.0",

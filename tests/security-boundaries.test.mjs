@@ -1,3 +1,4 @@
+import { testSessionToken } from './helpers/session-token.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../team-api/worker.mjs';
@@ -17,7 +18,7 @@ test('owner APIs enforce roles independently of hidden navigation and supplied i
 });
 test('untrusted browser origins and malformed JSON cannot reach authenticated operations',async t=>{
  const f=await fixture();t.after(()=>f.close());
- const authorization='Bearer '+await teamToken('synthetic-notification-tests-owner','owner');
+ const authorization='Bearer '+await testSessionToken(f.env,await teamToken('synthetic-notification-tests-owner','owner'));
  const call=(origin,body,headers={})=>worker.fetch(new Request('https://api.example.invalid/studio-reference',{method:'PATCH',headers:{origin,authorization,'content-type':'application/json',...headers},body}),f.env,{waitUntil(){}});
  assert.equal((await call('https://attacker.invalid','{}')).status,403);
  assert.equal((await call('https://dashboard.smoothstudios.co','null')).status,400);

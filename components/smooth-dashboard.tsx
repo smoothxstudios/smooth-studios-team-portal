@@ -64,6 +64,7 @@ import { recognizedRevenue } from "@/lib/owner-finances.mjs";
 import { applyRentalAdvances } from "@/lib/payroll-advances.mjs";
 import { rememberProfile } from "@/lib/quick-sign-in.mjs";
 import { MAX_GUIDELINE_UPDATE_BYTES,createGuidePatch } from "@/lib/studio-guidelines.mjs";
+import { attachTeamSession, closeTeamSession, openTeamSession, sessionFetch, SESSION_ENDED_EVENT } from "@/lib/team-session.mjs";
 import { disableTeamPush } from "@/lib/team-api";
 import { teamToken } from "@/lib/team-auth.mjs";
 import { TEAM,studioLocal } from "@/lib/team-schedule.mjs";
@@ -438,10 +439,24 @@ export function SmoothDashboard() {
   const [dark, setDark] = useState(false);
   const [sessionPassword, setSessionPassword] = useState("");
   const [schedulingToken, setSchedulingToken] = useState("");
+  const [signInNotice, setSignInNotice] = useState("");
   const sessionEpoch = useRef(0);
   const snapshotReader = useRef<(() => Promise<boolean>) | null>(null);
   const refreshSnapshot = useCallback(() => snapshotReader.current?.() ?? Promise.resolve(false), []);
   const signedIn = Boolean(payload);
+  const lockSession = useCallback(() => {
+    sessionEpoch.current++; snapshotReader.current = null;
+    setPayload(null); setSessionPassword(""); setSchedulingToken("");
+  }, []);
+  useEffect(() => {
+    if (!schedulingToken) return;
+    const expired = (event: Event) => {
+      if ((event as CustomEvent).detail?.token === schedulingToken) { setSignInNotice("Your session ended. Sign in again to continue."); lockSession(); }
+    };
+    window.addEventListener(SESSION_ENDED_EVENT, expired);
+    const detach = attachTeamSession(schedulingToken);
+    return () => { detach(); window.removeEventListener(SESSION_ENDED_EVENT, expired); };
+  }, [schedulingToken, lockSession]);
   useEffect(() => {
     if (signedIn) {
       if ("serviceWorker" in navigator) void navigator.serviceWorker.getRegistration(new URL("./", window.location.href).href).then(registration => registration?.update()).catch(() => {});
@@ -491,18 +506,23 @@ export function SmoothDashboard() {
   }, [dark]);
 
   const unlock = async (profile: AccessProfile, password: string) => {
+    setSignInNotice("");
     const epoch = ++sessionEpoch.current;
-    const response = await fetch(`./data/${encodeURIComponent(profile.id)}.json?v=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error("Dashboard data is unavailable");
-    const envelope = await response.json() as EncryptedEnvelope;
-    const unlocked = await decryptDashboard(envelope, password);
-    if (unlocked.user.id !== profile.id || unlocked.role !== profile.role) throw new Error("Invalid dashboard payload");
-    const token = await teamToken(password, profile.id);
-    if (epoch !== sessionEpoch.current) return;
+    const token = await openTeamSession(await teamToken(password, profile.id), profile.id);
+    let envelope: EncryptedEnvelope, unlocked: DashboardPayload;
+    try {
+      const response = await sessionFetch(token, "/dashboard");
+      if (!response.ok) throw new Error("Dashboard data is unavailable. Please try again.");
+      envelope = await response.json() as EncryptedEnvelope;
+      unlocked = await decryptDashboard(envelope, password);
+      if (unlocked.user.id !== profile.id || unlocked.role !== profile.role) throw new Error("Invalid dashboard payload");
+    } catch (error) { void closeTeamSession(token).catch(() => {}); throw error; }
+    if (epoch !== sessionEpoch.current) { void closeTeamSession(token).catch(() => {}); return; }
     snapshotReader.current = createDashboardSnapshotReader({
       profile: { id: profile.id, role: profile.role }, password,
       decrypt: decryptDashboard, isCurrent: () => epoch === sessionEpoch.current, onSnapshot: setPayload,
       canApply: () => !dashboardHasOpenEditor(),
+      fetcher: (_url: RequestInfo | URL, options?: RequestInit) => sessionFetch(token, "/dashboard", options),
     }, unlocked, envelope);
     setSchedulingToken(token);
     setSessionPassword(password);
@@ -512,6 +532,11 @@ export function SmoothDashboard() {
     setPayload(unlocked);
   };
 
-  if (!payload) return <LoginScreen onUnlock={unlock} profiles={profiles} />;
-  return <DashboardRefreshProvider><DashboardView dark={dark} onRefresh={refreshSnapshot} onLogout={() => { sessionEpoch.current++; snapshotReader.current = null; void disableTeamPush(schedulingToken).catch(() => {}); setPayload(null); setSessionPassword(""); setSchedulingToken(""); }} payload={payload} sessionPassword={sessionPassword} schedulingToken={schedulingToken} setDark={setDark} /></DashboardRefreshProvider>;
+  if (!payload) return <LoginScreen onUnlock={unlock} profiles={profiles} notice={signInNotice} />;
+  return <DashboardRefreshProvider><DashboardView dark={dark} onRefresh={refreshSnapshot} onLogout={() => {
+    const token = schedulingToken;
+    setSignInNotice(""); lockSession();
+    void disableTeamPush(token).catch(() => {});
+    void closeTeamSession(token).catch(() => {});
+  }} payload={payload} sessionPassword={sessionPassword} schedulingToken={schedulingToken} setDark={setDark} /></DashboardRefreshProvider>;
 }

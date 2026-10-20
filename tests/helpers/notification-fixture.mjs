@@ -1,3 +1,4 @@
+import { testSessionToken } from "./session-token.mjs";
 import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { createECDH, hkdfSync, createDecipheriv } from "node:crypto";
@@ -30,8 +31,9 @@ export async function fixture() {
   const vapid = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
   const env = { DB, TEAM_TOKEN_HASHES: JSON.stringify(hashes), VAPID_JWK: JSON.stringify(await crypto.subtle.exportKey("jwk", vapid.privateKey)) };
   const call = async (user, path = "/engagement", data, method = data === undefined ? "GET" : "POST") => {
+    const bearer = await testSessionToken(env, tokens[user] ?? user, user === "sync");
     const response = await worker.fetch(new Request(`https://api.example.invalid${path}`, {
-      method, headers: { "content-type": "application/json", authorization: `Bearer ${tokens[user]}`, origin: "https://dashboard.smoothstudios.co" },
+      method, headers: { "content-type": "application/json", authorization: `Bearer ${bearer}`, origin: "https://dashboard.smoothstudios.co" },
       ...(data === undefined ? {} : { body: JSON.stringify(data) }),
     }), env, { waitUntil: promise => pending.push(promise) });
     return { status: response.status, data: await response.json() };

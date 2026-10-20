@@ -19,7 +19,7 @@ Users
 } from "lucide-react";
 import { useEffect,useState } from "react";
 
-export function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[]; onUnlock: (profile: AccessProfile, password: string) => Promise<void> }) {
+export function LoginScreen({ profiles, onUnlock, notice }: { notice?: string; profiles: AccessProfile[]; onUnlock: (profile: AccessProfile, password: string) => Promise<void> }) {
   const [selection, setSelection] = useState<{ id: string; quickReady: boolean } | null>(null);
   const [usePassword, setUsePassword] = useState(false);
   const selectedId = selection?.id ?? profiles[0]?.id ?? "owner";
@@ -74,6 +74,7 @@ export function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[];
           <p className="eyebrow">Dashboard</p>
           <h1>Sign in</h1>
         </div>
+        {notice && <p className="login-preparing" role="status">{notice}</p>}
         {!selection ? <p className="login-preparing" role="status">Preparing sign-in…</p> : quickReady && !usePassword ? <><div className="quick-login"><Button disabled={loading} onClick={quickUnlock}><Fingerprint size={20} />{loading ? "Opening…" : `Continue as ${profile?.label ?? selectedId}`}</Button></div>
           {error && <div className="quick-sign-in-recovery"><p className="login-error" role="alert">{error}</p><Button variant="outline" disabled={loading} onClick={() => { setUsePassword(true); setPassword(""); setShowPassword(false); setError(""); }}>Use password</Button></div>}
           <button className="login-account-switch" disabled={loading} onClick={() => { setUsePassword(true); setPassword(""); setShowPassword(false); setError(""); }}>Sign in to another account</button>

@@ -1,4 +1,5 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { dashboardStorage } from './lib/dashboard-storage.mjs';
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { decryptPayload, encryptPayload } from "./lib/dashboard-data.mjs";
@@ -17,5 +18,5 @@ for (const id of Object.keys(incoming.employees)) {
 }
 const settings = validateTeamSettings({ version: 1, employees: { ...existing.employees, ...incoming.employees } }, config);
 resolveEmployees(config, settings, teamPasswords(config, settings));
-await writeFile(path.join(root, "public/data/team-settings.json"), `${JSON.stringify(encryptPayload(settings, ownerPassword))}\n`);
+await dashboardStorage(ownerPassword, "team-settings", { envelope: encryptPayload(settings, ownerPassword) });
 process.stdout.write(`Prepared ${Object.keys(incoming.employees).length} private employee accounts.\n`);

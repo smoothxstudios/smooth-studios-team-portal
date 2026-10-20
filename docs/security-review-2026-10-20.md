@@ -19,11 +19,11 @@ Scope: the studio team dashboard, its Cloudflare Worker API, tracked source, dep
 - Tracked-file scan found no matches for private-key PEM material, GitHub tokens, live Stripe keys, or Google API keys. This limited pattern scan does not prove that all possible secret formats or repository history are clean.
 - Generated GitHub Pages output has no source map files. Public account data is encrypted. Database access occurs through authenticated server routes, not browser database credentials. SQL reviewed uses bound input parameters. User-provided creative/reference links require HTTPS; normal UI text is React-escaped.
 
-## Remaining limitations
+## Limitations after the follow-up migration
 
-- Twelve development-only audit entries remain: eight high-severity entries trace to the braces nested-pattern denial-of-service advisory (the current braces release is still affected); four moderate entries trace to an older esbuild dependency used by Drizzle's legacy loader. These are not in the production dependency audit or the static deployed frontend. Avoid exposing development servers or processing untrusted project/build patterns. Do not downgrade framework tooling merely to satisfy npm's suggested resolution. Recheck when upstream fixes are available.
-- The current sign-in architecture uses publicly downloadable, password-encrypted account snapshots and password-derived bearer tokens. Generated passwords use 18 random bytes. Offline password guessing cannot be stopped by API rate limits; strong unique passwords remain essential. Bearers do not have short session expirations; rotation is the revocation mechanism. Quick sign-in protects a local encrypted password with a device passkey rather than replacing API authentication.
-- Already downloaded data cannot be recalled by revoking access. Public Git history may retain earlier encrypted snapshots. Moving sensitive snapshots fully behind server authentication would be a separate authentication/data-delivery migration.
+- Earlier encrypted snapshots may remain in public Git history or caches; already downloaded data cannot be recalled. Current account snapshots and account settings are no longer public website files or new repository commits.
+- Password-derived login proofs remain password-equivalent credentials, scoped to session creation and the separate Content Vault identity-only integration. The application uses random expiring session tokens for private data and actions. The separate machine synchronization key remains long-lived and restricted to `/sync/*`.
+- The local braces fork needs maintenance until upstream supplies a patched release. A zero-entry npm audit does not independently certify a local fork; its bounded parser/walker behavior is covered by explicit regression tests.
 - Hosting-account MFA, repository administrator access, historical secret exposure, Cloudflare account-wide rules, and the separate Production Dashboard/Content Vault were not audited. No claim is made that there has or has not been a past compromise.
 
 ## Follow-up: session migration preparation (v2.42.0)
@@ -40,3 +40,13 @@ validates supplied AST depth before recursive traversal. Adversarial nesting,
 cyclic ASTs, normal glob patterns and TypeScript transforms are tested. A clean
 npm install and all 478 automated tests pass. The full dependency audit reports
 zero entries; this includes a locally maintained patch, not an upstream fix.
+
+## Completed migration (v2.42.1)
+
+- Password and quick sign-in now exchange a proof for a random memory-only session. Protected API reads/writes reject the former long-lived dashboard bearer. Sessions renew while the app is visible, expire after 30 minutes without renewal, and cannot outlive 12 hours. Logout deletes the server session; credential changes invalidate existing sessions.
+- The frontend clears private data and password/session state on session expiry or a server rejection, with a sign-in message. Delayed responses cannot restore an expired or switched account. Renewal requests are shared; expiry never silently reuses the password to sign in.
+- Encrypted account snapshots and team settings are stored in D1. Calendar sync, Studio Guide publication and account activation use authenticated machine routes. Public snapshot files are removed; both builds reject their reintroduction. Missing private guide/settings data fails closed rather than replacing it with empty configuration.
+- A compatible backend was deployed and seeded before the frontend cutover. Deployment verification performs read-only sign-ins for active accounts, checks account isolation and renewal, then logs out and confirms revocation. These checks never send staff alerts or change payouts.
+- 481 automated tests pass, covering server and browser-session behavior, scoped credentials, stale imports, encrypted storage, concurrent renewal, revocation, cross-account isolation and dependency guards. A synthetic mobile browser flow verifies private data loading, expiry, account switching and logout. Existing creative-work and alerts browser flows are also checked with session sign-in.
+- The full dependency audit reports zero findings after a clean install. Removed upstream-only development tooling from the local fork so it cannot bring unused legacy test/build dependencies into the application.
+- Targeted lint of new security modules passes. The existing dashboard component still has unrelated React purity/effect lint findings at its time calculations and team-setup effect; the production TypeScript build remains the release gate.

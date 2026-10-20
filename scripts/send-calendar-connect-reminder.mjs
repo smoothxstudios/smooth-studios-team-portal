@@ -1,3 +1,4 @@
+import { openTeamSession, closeTeamSession } from '../lib/team-session.mjs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,12 +45,15 @@ export async function verifyReminder(query) {
 /** Send through the owner API so history, idempotence and push use one path. */
 export async function sendReminder(send = fetch, { password } = {}) {
   if (typeof password !== 'string' || password.length < 16) throw new Error('The existing owner dashboard credential is required.');
-  const token = await teamToken(password, 'owner');
+  let token;
+  try { token = await openTeamSession(await teamToken(password, 'owner'), 'owner', send); }
+  catch { throw new Error('The Calendar reminder sign-in could not complete.'); }
   let response;
   try { response = await send(`${TEAM_API_URL}/notifications`, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ id: batchId, recipientIds: recipients, title, body: message, target: 'settings' }) }); }
   catch { throw new Error('The Calendar reminder request could not complete.'); }
+  finally { await closeTeamSession(token, send).catch(() => {}); }
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result.sent !== true || result.id !== batchId || result.recipientCount !== 3) {
     throw new Error(`The Calendar reminder could not be verified (HTTP ${response.status}).`);

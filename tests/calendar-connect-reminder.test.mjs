@@ -24,11 +24,20 @@ function seed(f) {
 
 test('the fixed reminder uses the authenticated owner API with exactly three recipients and one stable batch ID', async () => {
   const calls = [], password = 'synthetic-owner-password-only';
-  const send = async (url, options) => { calls.push({ url, options }); return new Response(JSON.stringify({ sent: true, id: batchId, recipientCount: 3, notification: 'Queued' }), { status: 200 }); };
+  const token='ss1.'+'a'.repeat(43), sessionCalls=[];
+  const send = async (url, options) => {
+    if (url.endsWith('/auth/session')) {
+      sessionCalls.push({url,options});
+      return Response.json(options.method==='DELETE'?{signedOut:true}:{token,userId:'owner',expiresAt:Date.now()+1800000,absoluteExpiresAt:Date.now()+43200000});
+    }
+    calls.push({url,options});return Response.json({sent:true,id:batchId,recipientCount:3});
+  };
   const result = await sendReminder(send, { password });
   assert.deepEqual(result, { sent: true, id: batchId, recipientCount: 3 });
   assert.equal(calls[0].url, 'https://smooth-studios-team-api.smoothxstudios.workers.dev/notifications');
-  assert.equal(calls[0].options.headers.authorization, `Bearer ${await teamToken(password, 'owner')}`);
+  assert.equal(calls[0].options.headers.authorization, `Bearer ${token}`);
+  assert.equal(sessionCalls[0].options.headers.authorization, `Bearer ${await teamToken(password, 'owner')}`);
+  assert.equal(sessionCalls[1].options.method, 'DELETE');
   assert.equal(calls[0].options.redirect, 'error');
   assert.deepEqual(JSON.parse(calls[0].options.body), { id: batchId, recipientIds: ['rayne', 'jordyn', 'akiva'], title: 'Connect your Google Calendar', body: expectedBody, target: 'settings' });
   assert.doesNotMatch(calls[0].options.body, /synthetic-owner-password/);
@@ -99,9 +108,9 @@ test('the Cloudflare adapter sends bound JSON and never returns credentials or p
 test('send failures expose no owner credential or provider error body', async () => {
   const password = 'synthetic-owner-password-only';
   await assert.rejects(sendReminder(async () => new Response(JSON.stringify({ error: 'PRIVATE PROVIDER ERROR' }), { status: 401 }), { password }),
-    { message: 'The Calendar reminder could not be verified (HTTP 401).' });
+    { message: 'The Calendar reminder sign-in could not complete.' });
   await assert.rejects(sendReminder(async () => { throw new Error(`PRIVATE PROVIDER ERROR ${password}`); }, { password }),
-    { message: 'The Calendar reminder request could not complete.' });
+    { message: 'The Calendar reminder sign-in could not complete.' });
   await assert.rejects(sendReminder(async () => { throw new Error('Must not send'); }, {}),
     { message: 'The existing owner dashboard credential is required.' });
 });

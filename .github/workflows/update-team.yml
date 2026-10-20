@@ -44,14 +44,6 @@ jobs:
           EMPLOYEE_EMAIL_JORDYN: ${{ secrets.EMPLOYEE_EMAIL_JORDYN }}
           EMPLOYEE_EMAIL_RAYNE: ${{ secrets.EMPLOYEE_EMAIL_RAYNE }}
         run: node scripts/update-team.mjs
-      - name: Save encrypted account settings
-        run: |
-          git config user.name "smooth-studios-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add public/data/team-settings.json
-          git diff --cached --quiet || git commit -m "team: save encrypted employee account settings"
-          git pull --rebase origin main
-          git push origin HEAD:main
       - name: Deploy existing Worker and migrate its bound D1 database
         env:
           DASHBOARD_GITHUB_TOKEN: ${{ secrets.DASHBOARD_GITHUB_TOKEN }}
@@ -77,6 +69,13 @@ jobs:
           DASHBOARD_PASSWORD_RAYNE: ${{ secrets.DASHBOARD_PASSWORD_RAYNE }}
           DASHBOARD_GITHUB_TOKEN: ${{ secrets.DASHBOARD_GITHUB_TOKEN }}
         run: npm run sync:calendar
+      - name: Verify private sign-in, account isolation and sign-out
+        env:
+          DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}
+          DASHBOARD_PASSWORD_AKIVA: ${{ secrets.DASHBOARD_PASSWORD_AKIVA }}
+          DASHBOARD_PASSWORD_JORDYN: ${{ secrets.DASHBOARD_PASSWORD_JORDYN }}
+          DASHBOARD_PASSWORD_RAYNE: ${{ secrets.DASHBOARD_PASSWORD_RAYNE }}
+        run: node scripts/verify-dashboard-auth.mjs
       - name: Save encrypted data and activation flag
         run: |
           git config user.name "smooth-studios-bot"

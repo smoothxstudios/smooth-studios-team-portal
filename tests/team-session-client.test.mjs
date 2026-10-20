@@ -1,0 +1,40 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import worker from '../team-api/worker.mjs';
+import { fixture } from './helpers/notification-fixture.mjs';
+import { teamToken } from '../lib/team-auth.mjs';
+import { openTeamSession, maintainTeamSession, sessionFetch, closeTeamSession, SESSION_ENDED_EVENT } from '../lib/team-session.mjs';
+
+test('client exchanges credentials once, shares renewal, clears revoked sessions and does not reauthenticate silently',async t=>{
+  const f=await fixture();t.after(()=>f.close());delete f.env.VAPID_JWK;
+  const now=Date.now();t.mock.timers.enable({apis:['Date'],now});
+  const calls=[], ended=[], win=new EventTarget();
+  const previous=globalThis.window;globalThis.window=win;t.after(()=>{globalThis.window=previous;});
+  win.addEventListener(SESSION_ENDED_EVENT,event=>ended.push(event.detail.token));
+  const fetcher=async(url,options)=>{calls.push({path:new URL(url).pathname,method:options.method||'GET',token:options.headers.authorization});return worker.fetch(new Request(url,options),f.env,{waitUntil(){}});};
+  const proof=await teamToken('synthetic-notification-tests-jordyn','jordyn');
+  const token=await openTeamSession(proof,'jordyn',fetcher);
+  assert.equal((await (await sessionFetch(token,'/identity',{},fetcher)).json()).user.id,'jordyn');
+  t.mock.timers.setTime(now+25*60_000);
+  await Promise.all(Array.from({length:5},()=>maintainTeamSession(token,fetcher)));
+  assert.equal(calls.filter(c=>c.method==='PATCH').length,1);
+  assert.equal(calls.filter(c=>c.token===`Bearer ${proof}`).length,1);
+  f.DB.sqlite.prepare('DELETE FROM dashboard_sessions').run();
+  assert.equal((await sessionFetch(token,'/identity',{},fetcher)).status,401);
+  assert.deepEqual(ended,[token]);
+  await assert.rejects(sessionFetch(token,'/identity',{},fetcher),/session ended/);
+  assert.equal(calls.filter(c=>c.method==='POST').length,1);
+});
+test('client expiration and explicit sign-out prevent subsequent data reads',async t=>{
+  const f=await fixture();t.after(()=>f.close());const now=Date.now();t.mock.timers.enable({apis:['Date'],now});
+  let reads=0;
+  const fetcher=(url,options)=>{if(new URL(url).pathname==='/identity')reads++;return worker.fetch(new Request(url,options),f.env,{waitUntil(){}});};
+  const proof=await teamToken('synthetic-notification-tests-owner','owner');
+  const token=await openTeamSession(proof,'owner',fetcher);
+  t.mock.timers.setTime(now+30*60_000);
+  await assert.rejects(sessionFetch(token,'/identity',{},fetcher),/session ended/);assert.equal(reads,0);
+  const second=await openTeamSession(proof,'owner',fetcher);
+  await closeTeamSession(second,fetcher);
+  await assert.rejects(sessionFetch(second,'/identity',{},fetcher),/session ended/);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM dashboard_sessions').get().n,0);
+});

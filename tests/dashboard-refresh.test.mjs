@@ -60,7 +60,7 @@ test('refresh cache-busts the encrypted snapshot, validates the account, and upd
     fetcher: async (nextUrl, nextOptions) => { url = nextUrl; options = nextOptions; return new Response('{}'); },
     onSnapshot: next => { applied = next; },
   }));
-  assert.match(url, /^\.\/data\/example\.json\?v=\d+$/);
+  assert.equal(url, 'https://smooth-studios-team-api.smoothxstudios.workers.dev/dashboard');
   assert.equal(options.cache, 'no-store'); assert.ok(options.signal);
   assert.equal(applied, snapshot);
 });

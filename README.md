@@ -18,11 +18,11 @@ A GitHub-hosted dashboard for Smooth Studios appointments, studio revenue, and e
 
 ## Privacy model
 
-GitHub Pages serves static files, so it cannot protect Calendar data with a traditional server session. This project therefore encrypts each dashboard separately with AES-256-GCM before publication. Password keys are derived in the browser with PBKDF2-SHA256 (310,000 iterations). Only encrypted appointment payloads are placed in `public/data`.
+GitHub Pages serves only the app shell and public account labels. Account snapshots and account settings are encrypted with AES-256-GCM (PBKDF2-SHA256, 310,000 iterations), stored in the existing Worker database, and fetched through authenticated routes. They must not be placed in `public/data` or committed as new repository files. Build checks reject private snapshot files.
 
-Use a private repository whenever the GitHub account plan permits private-repository Pages. If Pages requires a public repository, the deployed data remains encrypted and employee emails are still kept in GitHub Secrets, but source code and the public login screen remain visible.
+Password-derived proofs are used only to create a random server session and for the separate Content Vault identity-only contract. Dashboard API calls use memory-only session bearers: a 30-minute renewal window, a 12-hour absolute lifetime, server revocation on sign-out, and invalidation when credentials change. Machine sync credentials remain restricted to `/sync/*`. Quick sign-in still unlocks the locally encrypted password using a device passkey.
 
-Never commit plaintext `.private/` files, Google credentials, Calendar IDs, employee email addresses, or dashboard passwords. New employee emails, individual passwords, and pay setup are stored in owner-encrypted `public/data/team-settings.json`; only Smooth’s encrypted dashboard includes passwords for private handoff. Every new employee still receives a separately encrypted dashboard.
+Never commit plaintext `.private/` files, Google credentials, Calendar IDs, employee email addresses, or dashboard passwords. New employee account settings are owner-encrypted in private API storage. Only Smooth’s encrypted dashboard includes passwords for private handoff. Older encrypted repository history and previously downloaded data cannot be recalled by this migration.
 
 The owner workflow token is encrypted only inside Smooth's dashboard payload. It is never included in an employee payload or the public access-profile file. Treat the owner dashboard password as an administrative credential and rotate the token on its expiration date.
 
@@ -74,7 +74,7 @@ Create `smoothxstudios/smooth-studios-team-portal` as a private repository and p
 | `DASHBOARD_PASSWORD_RAYNE` | Generated Rayne password |
 | `DASHBOARD_GITHUB_TOKEN` | Fine-grained token limited to this repository with Actions read/write permission |
 
-The existing Cloudflare five-minute cron dispatches the Calendar workflow when the last import is at least two minutes old. A D1 lease prevents duplicate dispatches and checks for active imports or backend deployments; GitHub’s schedule remains a fallback. The workflow refreshes the encrypted payloads and rental team notes, commits the encrypted data, and deploys the updated GitHub Page. The server trigger avoids GitHub’s delayed scheduled starts; workflow execution still takes time. Visible dashboards check for published snapshots every 30 seconds while preserving open forms and scroll position. The dashboard shows the actual last sync time, and **Sync now** remains available.
+The existing Cloudflare five-minute cron dispatches the Calendar workflow when the last import is at least two minutes old. A D1 lease prevents duplicate dispatches and checks for active imports or backend deployments; GitHub’s schedule remains a fallback. The workflow refreshes the encrypted payloads and rental team notes, uploads encrypted snapshots to the authenticated API, commits only public profile metadata and the existing payout ledger when changed, and deploys the app shell. The server trigger avoids GitHub’s delayed scheduled starts; workflow execution still takes time. Visible dashboards check for published snapshots every 30 seconds while preserving open forms and scroll position. The dashboard shows the actual last sync time, and **Sync now** remains available.
 
 Each `EMPLOYEE_EMAIL_*` secret accepts one address or multiple comma-separated addresses. Addresses are matched case-insensitively and duplicate entries are ignored. Keep every address in GitHub Secrets rather than committing it to the repository.
 

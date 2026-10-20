@@ -64,3 +64,10 @@ test('encrypted dashboard storage isolates accounts, rejects rollback and preser
   const large={...own,ciphertext:'A'.repeat(1_200_000)};
   assert.equal((await f.request(sync,'/sync/dashboard?id=owner','PUT',{envelope:large,publishedAt:now+1})).status,200);
 });
+test('credential proofs are accepted only for session creation and the identity integration',async t=>{
+  const f=await setup(t), proof=await teamToken('synthetic-notification-tests-owner','owner');
+  for(const [path,method] of [['/schedule','GET'],['/dashboard','GET'],['/alerts','GET'],['/notifications','POST'],['/payroll','GET']])assert.equal((await f.request(proof,path,method)).status,401);
+  assert.equal((await f.request(proof,'/identity')).status,200);
+  assert.equal((await f.request(proof,'/identity/team')).status,200);
+  const session=await f.signIn('owner');assert.equal((await f.request(session.token,'/identity')).status,200);
+});

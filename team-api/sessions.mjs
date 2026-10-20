@@ -27,6 +27,8 @@ export async function authenticate(request, env, fail) {
   if (!user) return expired(fail);
   // Credential proofs bootstrap sessions and retain the separate Content Vault
   // identity contract. Machine synchronization is restricted by the route guard.
+  const path = new URL(request.url).pathname;
+  if (user !== 'sync' && path !== '/auth/session' && !['/identity', '/identity/team'].includes(path)) return expired(fail);
   return { user, digest, credential: true };
 }
 
@@ -73,7 +75,7 @@ export async function dashboardSnapshotRoute({request, db, user, body, fail}) {
   if (machine && request.method === 'PUT') {
     const input = await body(request, 1_900_000), e = input.envelope;
     if (e?.version !== 1 || e?.algorithm !== 'AES-GCM' || e?.kdf !== 'PBKDF2-SHA256' ||
-        e.iterations !== 310000 || typeof e.salt !== 'string' || typeof e.iv !== 'string' || typeof e.ciphertext !== 'string' ||
+        e.iterations !== 310000 || !/^[A-Za-z0-9+/]{22}==$/.test(e.salt || '') || !/^[A-Za-z0-9+/]{16}$/.test(e.iv || '') || typeof e.ciphertext !== 'string' ||
         !/^[A-Za-z0-9+/]+={0,2}$/.test(e.ciphertext) || e.ciphertext.length < 24 || !Number.isSafeInteger(input.publishedAt) || input.publishedAt > Date.now() + 60_000 || input.publishedAt < 1) {
       fail(400, 'Invalid encrypted dashboard.');
     }

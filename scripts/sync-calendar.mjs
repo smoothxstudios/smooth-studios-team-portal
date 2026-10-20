@@ -1,3 +1,4 @@
+import { dashboardStorage } from './lib/dashboard-storage.mjs';
 import { createSign } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -76,7 +77,8 @@ const serviceAccount = JSON.parse(requiredEnvironment("GOOGLE_SERVICE_ACCOUNT_JS
 const calendarId = requiredEnvironment(config.calendarIdEnvironmentVariable);
 let rulebook;
 try {
-  const existingOwnerEnvelope = await readJson("public/data/owner.json");
+  const existingOwnerEnvelope = await dashboardStorage(passwords.owner, "owner");
+  if (!existingOwnerEnvelope) throw new Error("The stored Studio Guide is unavailable.");
   rulebook = decryptPayload(existingOwnerEnvelope, passwords.owner).rulebook;
 } catch (error) {
   if (error?.code !== "ENOENT") {
