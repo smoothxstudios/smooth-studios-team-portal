@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
-import { Miniflare, createFetchMock } from 'miniflare';
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
 const API = 'https://smooth-studios-team-api.smoothxstudios.workers.dev';
 const CALLBACK = `${API}/calendar/oauth/callback`;
@@ -31,11 +31,23 @@ test('native Worker fetch completes OAuth and invitation delivery with network a
         return result instanceof Response ? result : Response.json(result);
       }};
     ` } });
-  const fetchMock = createFetchMock(); fetchMock.disableNetConnect();
-  const mf = new Miniflare({ modules: true, script: bundle.outputFiles[0].text,
+  const interceptors = [];
+  const fetchMock = {
+    get(origin) { return { intercept({path,method='GET'}) { return { reply(status,data) {
+      interceptors.push({url:origin+path,method,status,data});
+    } }; } }; },
+    async fetch(request) {
+      const index=interceptors.findIndex(item=>item.url===request.url && item.method===request.method);
+      assert.notEqual(index,-1,'Unexpected outbound request: '+request.method+' '+request.url);
+      const [item]=interceptors.splice(index,1);
+      return Response.json(item.data,{status:item.status});
+    },
+    assertNoPendingInterceptors() { assert.equal(interceptors.length,0); }
+  };
+  const mf = new Miniflare(convertV4MiniflareOptions({ modules: true, script: bundle.outputFiles[0].text,
     // Pinned to the bundled local runtime's supported date; production keeps its own date.
-    compatibilityDate: '2026-05-22', d1Databases: ['DB'], fetchMock,
-    bindings: { CALENDAR_CONNECTION_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url') } });
+    compatibilityDate: '2026-05-22', d1Databases: ['DB'], outboundService: request => fetchMock.fetch(request),
+    bindings: { CALENDAR_CONNECTION_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url') } }));
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
   const schema = await readFile(new URL('../team-api/migrations/0021_google_calendar_connections.sql', import.meta.url), 'utf8');

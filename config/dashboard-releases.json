@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.41.1",
+  "currentVersion": "2.41.2",
   "releases": [
+    {
+      "id": "2026-10-20-security-review",
+      "version": "2.41.2",
+      "date": "2026-10-20",
+      "category": "Security",
+      "title": "Stronger access checks and request protection",
+      "changes": [
+        "Rental checklist access ends as soon as a person is removed, including while Calendar is catching up. Employee checklist data excludes other people’s Calendar responses.",
+        "Updated dependencies and added request throttling, with expanded tests for restricted actions and invalid requests."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-20-planner-self-selection",
       "version": "2.41.1",
