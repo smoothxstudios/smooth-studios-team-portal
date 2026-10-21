@@ -25,10 +25,6 @@ async function summary(db, user) {
 async function history(db, user) {
   return (await db.prepare("SELECT data FROM team_quiz_attempts WHERE user_id = ? AND reset_at IS NULL ORDER BY day DESC, created_at DESC, tier ASC LIMIT 42").bind(user).all()).results.map(row => JSON.parse(row.data));
 }
-async function rewardHistory(db, user) {
-  return (await db.prepare("SELECT id, kind, amount, reason, created_at FROM team_reward_changes WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 40").bind(user).all()).results
-    .map(row => ({ id: row.id, kind: row.kind, amount: row.amount, reason: row.reason, createdAt: new Date(row.created_at).toISOString() }));
-}
 async function todayAttempts(db, user, day) {
   return (await db.prepare("SELECT data FROM team_quiz_attempts WHERE user_id = ? AND day = ? AND reset_at IS NULL ORDER BY created_at, tier").bind(user, day).all()).results.map(row => JSON.parse(row.data));
 }
@@ -113,17 +109,23 @@ async function teamState(db, env, now) {
   const day = studioLocal(now).slice(0, 10), active = JSON.parse(env.TEAM_TOKEN_HASHES);
   const people = TEAM.filter(p => p.id !== "owner" && active[p.id]);
   await preserveLegacyAttempts(db, people.map(p => p.id));
-  const [offers, states, resets] = await Promise.all([
+  const [offers, states, resets, rewardRows, moodRows] = await Promise.all([
     db.prepare("SELECT user_id, tier, data FROM team_quiz_offers WHERE day = ? ORDER BY slot").bind(day).all(),
     db.prepare("SELECT user_id, mood_revision FROM team_engagement_state").all(),
     db.prepare(`SELECT * FROM (SELECT id, user_id, kind, tier, reason, points_removed, created_at,
       ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC, id DESC) AS rank FROM team_engagement_resets) WHERE rank <= 20`).all(),
+    db.prepare(`SELECT * FROM (SELECT id, user_id, kind, amount, reason, created_at,
+      ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC, id DESC) AS rank FROM team_reward_changes)
+      WHERE rank <= 40 ORDER BY user_id, rank`).all(),
+    db.prepare(`SELECT * FROM (SELECT id, user_id, mood, created_at,
+      ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC, id DESC) AS rank FROM team_mood_checkins WHERE reset_at IS NULL)
+      WHERE rank <= 10 ORDER BY user_id, rank`).all(),
   ]);
   const members = await Promise.all(people.map(async person => {
-    const [stats, recent, rewards, moods] = await Promise.all([summary(db, person.id), history(db, person.id), rewardHistory(db, person.id),
-      db.prepare("SELECT id, mood, created_at FROM team_mood_checkins WHERE user_id = ? AND reset_at IS NULL ORDER BY created_at DESC LIMIT 10").bind(person.id).all()]);
+    const [stats, recent] = await Promise.all([summary(db, person.id), history(db, person.id)]);
+    const rewards = rewardRows.results.filter(row => row.user_id === person.id).map(row => ({ id: row.id, kind: row.kind, amount: row.amount, reason: row.reason, createdAt: new Date(row.created_at).toISOString() }));
     return { userId: person.id, name: person.name, color: person.color, summary: stats, history: recent, rewards,
-      moods: moods.results.map(moodRow), today: recent.filter(item => item.day === day),
+      moods: moodRows.results.filter(row => row.user_id === person.id).map(moodRow), today: recent.filter(item => item.day === day),
       moodRevision: states.results.find(row => row.user_id === person.id)?.mood_revision ?? 0,
       todayQuiz: [
         ...offers.results.filter(row => row.user_id === person.id).map(row => ({ question: publicQuestion(JSON.parse(row.data)),

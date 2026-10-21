@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { decryptPayload } from "./dashboard-data.mjs";
+import { invitationEmails as parseInvitationEmails } from "../../lib/team-email-addresses.mjs";
 
 export function validateTeamSettings(value, config) {
   if (value?.version !== 1 || !value.employees || typeof value.employees !== "object" || Array.isArray(value.employees)) throw new Error("Invalid team account settings.");
@@ -9,15 +10,16 @@ export function validateTeamSettings(value, config) {
   const passwords = new Set();
   for (const [id, entry] of Object.entries(value.employees)) {
     if (!config.employees.some(e => e.id === id && e.onboarding)) throw new Error("Only new employee accounts can be configured here.");
-    const email = typeof entry?.email === "string" ? entry.email.trim().toLowerCase() : "";
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254 || emails.has(email)) throw new Error("Enter a distinct valid email for each team member.");
+    const addresses = parseInvitationEmails(entry?.email);
+    if (!addresses.length || addresses.some(email => emails.has(email))) throw new Error("Each email address must belong to one team member.");
+    const email = addresses.join(", ");
     if (typeof entry.password !== "string" || entry.password.length < 20 || entry.password.length > 160 || passwords.has(entry.password)) throw new Error("Each team member needs a distinct strong password.");
     const pay = entry.compensation;
     if (!pay || !["hourly", "commission", "pending"].includes(pay.type)) throw new Error("Choose a pay setup for each team member.");
     if (pay.type === "hourly" && (!Number.isSafeInteger(pay.hourlyCents) || pay.hourlyCents < 100 || pay.hourlyCents > 100000)) throw new Error("Check the hourly rate.");
     if (pay.type === "commission" && (!Number.isFinite(pay.rate) || pay.rate <= 0 || pay.rate > 1)) throw new Error("Check the percentage rate.");
     employees[id] = { email, password: entry.password, compensation: pay.type === "hourly" ? { type: "hourly", hourlyCents: pay.hourlyCents } : pay.type === "commission" ? { type: "commission", rate: pay.rate } : { type: "pending" } };
-    emails.add(email); passwords.add(entry.password);
+    addresses.forEach(address => emails.add(address)); passwords.add(entry.password);
   }
   return { version: 1, employees };
 }
@@ -48,7 +50,7 @@ export function resolveEmployees(config, settings, passwords, environment = proc
   return config.employees.map(employee => {
     const saved = settings.employees[employee.id];
     const rawEmail = environment[employee.emailEnvironmentVariable] || saved?.email || "";
-    const invitationEmails = [...new Set(rawEmail.split(/[,;\r\n]+/).map(email => email.trim().toLowerCase()).filter(Boolean))];
+    const invitationEmails = parseInvitationEmails(rawEmail);
     if (!invitationEmails.length && !employee.onboarding) throw new Error(`Missing required environment variable: ${employee.emailEnvironmentVariable}`);
     if (invitationEmails.some(email => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || usedEmails.has(email))) throw new Error("Employee invitation emails must be valid and belong to one employee.");
     invitationEmails.forEach(email => usedEmails.add(email));

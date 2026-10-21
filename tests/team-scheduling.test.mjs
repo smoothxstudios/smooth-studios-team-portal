@@ -463,7 +463,7 @@ test("assignment warns when employee has no notification devices; sync diagnosti
 
 test("new employees can accept only their own rental assignments", async () => {
   const f = fixture(); await f.importCalendar();
-  for (const id of ["dacari", "sorayia", "amia", "terrill"]) {
+  for (const id of ["dacari", "sorayia", "amia", "terrill", "carlos", "armani"]) {
     const item = await offer(f, id);
     assert.equal((await f.call(id, `/assignments/${item.id}`, { revision: (await f.snapshot()).revision, status: "accepted" })).status, 200);
     const own = await f.snapshot(id);

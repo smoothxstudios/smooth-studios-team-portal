@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Employee } from "@/lib/dashboard-types";
+import { invitationEmails } from "@/lib/team-email-addresses.mjs";
 
 type PaySetup = { type: "hourly" | "commission" | "pending"; hourlyCents?: number; rate?: number };
 export type NewTeamSettings = { version: 1; employees: Record<string, { email: string; password: string; compensation: PaySetup }> };
@@ -36,14 +37,15 @@ export function TeamAccountSetup({ open, onOpenChange, employees, busy, enabled,
       const settings: NewTeamSettings = { version: 1, employees: {} };
       const emails = new Set();
       for (const row of rows) {
-        const email = row.email.trim().toLowerCase();
-        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || emails.has(email)) throw new Error("Enter a distinct email for each person.");
+        const addresses: string[] = invitationEmails(row.email);
+        if (!addresses.length || addresses.some(email => emails.has(email))) throw new Error("Each email address must belong to one person.");
+        const email = addresses.join(", ");
         const rate = Number(row.rate);
         if (row.payType !== "pending" && (!Number.isFinite(rate) || rate <= 0 || rate > (row.payType === "commission" ? 100 : 1000))) throw new Error(`Check ${row.name}’s pay rate.`);
         settings.employees[row.id] = { email, password: row.password, compensation: row.payType === "hourly"
           ? { type: "hourly", hourlyCents: Math.round(rate * 100) }
           : row.payType === "commission" ? { type: "commission", rate: rate / 100 } : { type: "pending" } };
-        emails.add(email);
+        addresses.forEach(address => emails.add(address));
       }
       await onSubmit(settings);
     } catch (error) { setError(error instanceof Error ? error.message : "Could not prepare these accounts."); }
@@ -52,7 +54,8 @@ export function TeamAccountSetup({ open, onOpenChange, employees, busy, enabled,
     <DialogHeader><DialogTitle>Set up new team accounts</DialogTitle><DialogDescription>Check each email and choose their pay setup. Each person gets a private password you can copy from their team card after activation.</DialogDescription></DialogHeader>
     <form onSubmit={submit}>
       {rows.map(row => <fieldset className="team-account-fields" key={row.id} disabled={busy}><legend>{row.name}</legend>
-        <label>Email<input type="email" autoComplete="off" required value={row.email} onChange={event => change(row.id, { email: event.target.value })} /></label>
+        <label>Email addresses<input type="email" multiple autoComplete="off" required aria-describedby={`emails-help-${row.id}`} value={row.email} onChange={event => change(row.id, { email: event.target.value })} /></label>
+        <p className="schedule-small" id={`emails-help-${row.id}`}>Separate addresses with commas. The first is the default for invitations; all addresses match this person’s Calendar assignments.</p>
         <div className="schedule-form-pair"><label>Pay setup<select value={row.payType} onChange={event => change(row.id, { payType: event.target.value as Row["payType"] })}>
           <option value="pending">Set pay rate later</option><option value="hourly">Hourly · studio rentals</option><option value="commission">Percentage of appointment price</option>
         </select></label>{row.payType !== "pending" && <label>{row.payType === "hourly" ? "Dollars per rental hour" : "Percentage"}<input type="number" min="0.01" max={row.payType === "commission" ? "100" : "1000"} step="0.01" inputMode="decimal" required value={row.rate} onChange={event => change(row.id, { rate: event.target.value })} /></label>}</div>

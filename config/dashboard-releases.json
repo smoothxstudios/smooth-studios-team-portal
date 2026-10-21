@@ -1,6 +1,19 @@
 {
-  "currentVersion": "2.44.0",
+  "currentVersion": "2.44.1",
   "releases": [
+    {
+      "id": "2026-10-21-team-email-addresses",
+      "version": "2.44.1",
+      "date": "2026-10-21",
+      "category": "Team",
+      "title": "Multiple email addresses for one team account",
+      "changes": [
+        "New employee setup accepts multiple email addresses for one person. Calendar invitations to any saved address match the same employee, with one login and one earnings record.",
+        "The first address is the default for invitations; a connected Google address takes priority. Setup checks that addresses are valid and do not belong to another team member.",
+        "Reduced database queries when reviewing team check-ins and adjusting SmoothStars so those controls keep working as the team grows."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-20-apple-calendar",
       "version": "2.44.0",

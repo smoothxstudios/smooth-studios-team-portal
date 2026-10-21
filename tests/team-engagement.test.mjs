@@ -59,6 +59,25 @@ async function offered(f, user, correct = true) {
 }
 const adjustment = (amount = 10, extra = {}) => ({ requestId: crypto.randomUUID(), userId: "jordyn", kind: "points", amount, ...extra });
 const reportMember = (data, id = "jordyn") => data.members.find(p => p.userId === id);
+
+test("team history keeps per-person limits and order within the larger roster query budget", async () => {
+  const f = fixture();
+  for (const user of ["carlos", "armani"]) {
+    for (let i = 0; i < 45; i++) f.DB.sqlite.prepare("INSERT INTO team_reward_changes (id, user_id, kind, amount, reason, actor, created_at) VALUES (?, ?, 'points', 1, 'Fixture', 'owner', ?)").run(`${user}-reward-${i}`, user, now + i);
+    for (let i = 0; i < 12; i++) f.DB.sqlite.prepare("INSERT INTO team_mood_checkins (id, user_id, mood, created_at, reset_at) VALUES (?, ?, 'happy', ?, ?)").run(`${user}-mood-${i}`, user, now + i, i === 11 ? now + 12 : null);
+  }
+  f.DB.queries = 0;
+  const result = await f.call("owner", "/engagement/team");
+  assert.equal(result.status, 200);
+  assert.ok(f.DB.queries <= 50);
+  for (const user of ["carlos", "armani"]) {
+    const person = reportMember(result.data, user);
+    assert.deepEqual(person.rewards.map(r => r.id), Array.from({ length: 40 }, (_, i) => `${user}-reward-${44 - i}`));
+    assert.deepEqual(person.moods.map(m => m.id), Array.from({ length: 10 }, (_, i) => `${user}-mood-${10 - i}`));
+  }
+  assert.deepEqual(reportMember(result.data).rewards, []);
+});
+
 async function resetInput(f, kind = "question", user = "jordyn", tier) {
   const report = (await f.call("owner", "/engagement/team")).data, member = reportMember(report, user);
   const question = tier ? member.todayQuiz.find(item => item.question.tier === tier) : member.todayQuiz.at(-1);

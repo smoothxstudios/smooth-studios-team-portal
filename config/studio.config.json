@@ -76,6 +76,26 @@
       "compensation": {
         "type": "pending"
       }
+    },
+    {
+      "id": "carlos",
+      "name": "Carlos",
+      "emailEnvironmentVariable": "EMPLOYEE_EMAIL_CARLOS",
+      "accent": "rgb(3, 105, 161)",
+      "onboarding": true,
+      "compensation": {
+        "type": "pending"
+      }
+    },
+    {
+      "id": "armani",
+      "name": "Armani",
+      "emailEnvironmentVariable": "EMPLOYEE_EMAIL_ARMANI",
+      "accent": "rgb(77, 124, 15)",
+      "onboarding": true,
+      "compensation": {
+        "type": "pending"
+      }
     }
   ]
 }
