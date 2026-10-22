@@ -10,14 +10,16 @@ import { DashboardHelp } from "@/components/dashboard-help";
 import { StudioInfoPage } from "@/components/studio-info";
 import { AppleCalendarSettings } from "@/components/apple-calendar-settings";
 import { CalendarSettings } from "@/components/calendar-settings";
-import type { AccessProfile } from "@/lib/dashboard-types";
+import { TeamLoginSettings } from "@/components/team-login-settings";
+import type { AccessProfile, DashboardPayload, Employee } from "@/lib/dashboard-types";
 
 export type SettingsTab = "preferences" | "reference" | "help";
 
-export function DashboardSettings({ token, profile, password, dark, onThemeChange, onSync, lastSynced, initialTab = "preferences" }: {
+export function DashboardSettings({ token, profile, password, dark, onThemeChange, onSync, lastSynced, employees = [], teamAccess, initialTab = "preferences" }: {
   token: string; profile: AccessProfile; password: string; dark: boolean;
   onThemeChange: (value: boolean) => void; initialTab?: SettingsTab;
   onSync?: () => void; lastSynced?: string;
+  employees?: Employee[]; teamAccess?: DashboardPayload["teamAccess"];
 }) {
   return <Tabs defaultValue={initialTab} className="dashboard-settings">
     <TabsList className="settings-tabs" aria-label="Settings sections">
@@ -26,6 +28,7 @@ export function DashboardSettings({ token, profile, password, dark, onThemeChang
       <TabsTrigger value="help"><CircleHelp size={17} /><span>Help</span></TabsTrigger>
     </TabsList>
     <TabsContent value="preferences" className="settings-preferences">
+      {profile.role === "owner" && <TeamLoginSettings employees={employees} access={teamAccess} />}
       {profile.role === "owner" && onSync && <section className="settings-card settings-sync"><div className="settings-card-heading"><RefreshCw size={23} /><div><h2>Data sync</h2>{lastSynced && <p>Updated {lastSynced}</p>}</div></div><Button variant="outline" onClick={onSync}><RefreshCw size={17} />Sync now</Button></section>}
       <CalendarSettings token={token} isOwner={profile.role === "owner"} />
       <AppleCalendarSettings key={profile.id} token={token} isOwner={profile.role === "owner"} />

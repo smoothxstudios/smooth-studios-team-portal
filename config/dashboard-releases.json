@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.44.1",
+  "currentVersion": "2.44.2",
   "releases": [
+    {
+      "id": "2026-10-21-team-login-access",
+      "version": "2.44.2",
+      "date": "2026-10-21",
+      "category": "Team",
+      "title": "Retrieve activated team logins",
+      "changes": [
+        "Smooth can view or copy existing team login details in Settings → Preferences → Team logins. Choose a person first; passwords stay hidden until revealed and are hidden again when the panel closes."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-21-team-email-addresses",
       "version": "2.44.1",

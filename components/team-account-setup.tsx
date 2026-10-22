@@ -51,7 +51,7 @@ export function TeamAccountSetup({ open, onOpenChange, employees, busy, enabled,
     } catch (error) { setError(error instanceof Error ? error.message : "Could not prepare these accounts."); }
   };
   return <Dialog open={open} onOpenChange={value => { if (!busy) onOpenChange(value); }}><DialogContent className="schedule-modal team-account-setup">
-    <DialogHeader><DialogTitle>Set up new team accounts</DialogTitle><DialogDescription>Check each email and choose their pay setup. Each person gets a private password you can copy from their team card after activation.</DialogDescription></DialogHeader>
+    <DialogHeader><DialogTitle>Set up new team accounts</DialogTitle><DialogDescription>Check each email and choose their pay setup. Each person gets a private password you can view in Settings → Team logins after activation.</DialogDescription></DialogHeader>
     <form onSubmit={submit}>
       {rows.map(row => <fieldset className="team-account-fields" key={row.id} disabled={busy}><legend>{row.name}</legend>
         <label>Email addresses<input type="email" multiple autoComplete="off" required aria-describedby={`emails-help-${row.id}`} value={row.email} onChange={event => change(row.id, { email: event.target.value })} /></label>
