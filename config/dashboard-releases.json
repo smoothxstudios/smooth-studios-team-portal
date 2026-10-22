@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.44.2",
+  "currentVersion": "2.44.3",
   "releases": [
+    {
+      "id": "2026-10-22-planner-date-time",
+      "version": "2.44.3",
+      "date": "2026-10-22",
+      "category": "Scheduling",
+      "title": "Clearer overnight event entry",
+      "changes": [
+        "Event, crew coverage, and availability forms use separate Date and Time fields to avoid combined date-picker errors. Overnight events can end on the following day and stay listed under their starting day.",
+        "An optional end needs both a date and a time once entered. Leave both blank when the end is unknown."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-21-team-login-access",
       "version": "2.44.2",

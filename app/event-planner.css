@@ -163,3 +163,10 @@
 .planner-form label.planner-candidate-main { display:flex;gap:12px;align-items:flex-start;flex:1 1 100%;min-width:0;font-weight:400;cursor:pointer; }
 .planner-candidate-main>span { display:grid;gap:3px;flex:1;min-width:0;overflow-wrap:anywhere; }
 .planner-candidate>button { margin-left:32px;min-height:44px; }
+
+/* Separate date and time controls avoid combined picker validation failures. */
+.planner-datetime { min-width:0;margin:0;padding:0;border:0; }
+.planner-datetime legend { margin-bottom:8px;padding:0;font-size:13px;font-weight:600; }
+.planner-datetime-fields { display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:8px; }
+.planner-form .planner-datetime-fields label { min-width:0;font-size:12px!important;color:var(--muted-foreground); }
+.planner-datetime input { min-width:0;width:100%;color:var(--foreground); }

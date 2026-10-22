@@ -10,6 +10,22 @@ const plan = extra => validatePlan({...emptyPlan(), events:[event()],...extra});
 async function setup(t) { const f = await fixture(); t.after(()=>f.close()); return f; }
 const save = (f, p, revision=0) => f.call('owner','/event-planner',{...p,revision},'PUT');
 
+test('late-night entry keeps its next-day end and rejects incomplete optional ends', async t => {
+  const f = await setup(t);
+  const p = plan({ events: [event({ startLocal: '2026-10-21T23:00', endLocal: '2026-10-22T02:00', crewNeeded: 3 })] });
+  assert.equal((await save(f, p)).status, 200);
+  const saved = (await f.call('owner', '/event-planner')).data.events[0];
+  assert.equal(saved.startLocal, '2026-10-21T23:00');
+  assert.equal(saved.endLocal, '2026-10-22T02:00');
+  assert.equal(plannerStartsOnDay(saved, '2026-10-21'), true);
+  assert.equal(plannerStartsOnDay(saved, '2026-10-22'), false);
+  assert.equal(Date.parse(localInstant(saved.endLocal)) - Date.parse(localInstant(saved.startLocal)), 3 * 3600000);
+  for (const endLocal of ['2026-10-22T', 'T02:00', '2026-10-21T02:00']) {
+    assert.equal((await save(f, { ...p, events: [{ ...saved, endLocal }] }, 1)).status, 400);
+  }
+  assert.equal((await f.call('owner', '/event-planner')).data.events[0].endLocal, saved.endLocal);
+});
+
 test('overnight blocks are enforced and shorter coverage can fit before midnight', () => {
   const p=plan({availability:[available('rayne')]}), e=p.events[0];
   const schedule={blocks:[{id:'block',userId:'rayne',startLocal:'2026-10-24T00:00',endLocal:'2026-10-25T00:00',reason:'Unavailable Saturday'}]};
