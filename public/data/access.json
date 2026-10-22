@@ -40,6 +40,16 @@
       "id": "terrill",
       "label": "Terrill",
       "role": "employee"
+    },
+    {
+      "id": "carlos",
+      "label": "Carlos",
+      "role": "employee"
+    },
+    {
+      "id": "armani",
+      "label": "Armani",
+      "role": "employee"
     }
   ]
 }
