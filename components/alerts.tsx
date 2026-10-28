@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { attachScrollTapGuard } from "@/lib/scroll-tap-guard.mjs";
-import { alertBody, groupAlerts } from "@/lib/alert-presentation.mjs";
+import { alertBody, alertPerson, alertTimestamp, chronologicalAlerts, groupAlerts } from "@/lib/alert-presentation.mjs";
 import { Bell, Banknote, CalendarDays, Check, CheckCheck, Mail, ChevronDown, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -35,10 +35,13 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
   const page = useRef<HTMLElement>(null);
   const bulkMenu = useRef<HTMLDivElement>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [view, setView] = useState("time");
   const [notice, setNotice] = useState<DashboardAlert | null>(null);
   useEffect(() => { if (page.current) return attachScrollTapGuard(page.current); }, []);
   useEffect(() => { if (bulkOpen && bulkMenu.current) return attachScrollTapGuard(bulkMenu.current); }, [bulkOpen]);
-  const groups = isOwner ? groupAlerts(state.alerts) : [{ id: "all", person: null, alerts: state.alerts }];
+  const grouped = isOwner && view === "grouped";
+  const ordered = chronologicalAlerts(state.alerts);
+  const groups = grouped ? groupAlerts(ordered) : [{ id: "all", person: null, alerts: ordered }];
   const open = async (alert: DashboardAlert) => {
     if (alert.kind === "notice" && alert.target === "alerts") setNotice(alert);
     else onOpen(alert);
@@ -51,6 +54,7 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
         <button aria-pressed={state.filter === "all"} disabled={state.busy} onClick={() => state.chooseFilter("all")}>All</button>
         <button aria-pressed={state.filter === "unread"} disabled={state.busy} onClick={() => state.chooseFilter("unread")}>Unread <UnreadBadge count={state.unreadCount} /></button>
       </div>
+      {isOwner && <label className="alerts-view">View <select aria-label="Alert order" value={view} onChange={event => setView(event.target.value)}><option value="time">Newest first</option><option value="grouped">Grouped by person</option></select></label>}
       <DropdownMenu open={bulkOpen} onOpenChange={setBulkOpen}>
         <DropdownMenuTrigger asChild onPointerDown={event => event.preventDefault()}><Button variant="ghost" disabled={state.busy || state.loading || !state.throughSequence} onClick={() => setBulkOpen(value => !value)}>Mark all <ChevronDown size={15} aria-hidden="true" /></Button></DropdownMenuTrigger>
         <DropdownMenuContent ref={bulkMenu} className="alert-actions-menu" align="end" collisionPadding={8}>
@@ -63,17 +67,18 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
     {state.deletion && <div className="alerts-undo" role="status"><span>Alert deleted</span><button type="button" disabled={state.busy} onClick={() => void state.undoDelete()} aria-label={`Undo deletion: ${state.deletion.alert.title}`}>Undo</button></div>}
     {state.loading && !state.alerts.length ? <p className="alerts-empty" role="status">Loading alerts…</p> : !state.alerts.length && !state.error ?
       <div className="alerts-empty"><Bell size={28} /><h3>{state.filter === "unread" ? "You’re all caught up" : "No alerts yet"}</h3><p>{state.filter === "unread" ? "Switch to All to see your notification history." : "New assignment updates and quiz reminders will appear here, even with push turned off."}</p></div> : null}
-    {groups.filter(group => group.alerts.length).map(group => <section className="alerts-person-group" key={group.id} aria-label={isOwner ? `${group.person?.name ?? "Other"} alerts` : "Alert history"}>
-      {isOwner && <header className="person-section-heading"><span className="employee-avatar" style={{ background: group.person?.color ?? "#64748b" }}>{group.person?.name.slice(0, 1) ?? "•"}</span><h3>{group.person?.name ?? "Other updates"}</h3><small>{group.alerts.length} alert{group.alerts.length === 1 ? "" : "s"}</small></header>}
+    {groups.filter(group => group.alerts.length).map(group => <section className="alerts-person-group" key={group.id} aria-label={grouped ? `${group.person?.name ?? "Other"} alerts` : "Alert history, newest first"}>
+      {grouped && <header className="person-section-heading"><span className="employee-avatar" style={{ background: group.person?.color ?? "#64748b" }}>{group.person?.name.slice(0, 1) ?? "•"}</span><h3>{group.person?.name ?? "Other updates"}</h3><small>{group.alerts.length} alert{group.alerts.length === 1 ? "" : "s"}</small></header>}
       <ul className="alerts-list">
       {group.alerts.map((alert: DashboardAlert) => {
         const Icon = alert.kind === "notice" ? Bell : alert.target === "quiz" ? Sparkles : alert.target === "creative" ? ClipboardList : alert.target === "payouts" ? Banknote : CalendarDays;
         const expired = alert.expiresAt !== null && alert.expiresAt <= Date.now();
+        const person = isOwner && !grouped ? alertPerson(alert) : null;
         return <li key={alert.id} className={`alert-card${alert.readAt ? "" : " is-unread"}`}>
           <button type="button" className="alert-open" disabled={state.busy} onClick={() => void open(alert)} aria-label={`${alert.title}. ${alert.target === "settings" ? "Open Settings" : alert.target === "alerts" ? "Read notification" : alert.target === "quiz" ? "Open Daily Quiz" : alert.target === "availability" ? "View availability" : "View details"}`}>
             <span className="alert-content"><span className="alert-title"><Icon className="alert-kind-icon" size={15} aria-hidden="true" /><strong>{alert.title}</strong><ArrowUpRight className="alert-open-arrow" size={14} aria-hidden="true" /></span>
               <span className="alert-preview">{alertBody(alert.body) || "Open this alert for details."}</span>
-              <span className="alert-meta"><time dateTime={new Date(alert.createdAt).toISOString()}>{stamp.format(alert.createdAt)}</time><span className="alert-status" data-unread={!alert.readAt}>{alert.readAt ? "Read" : "Unread"}{expired ? " · Earlier reminder" : ""}</span></span>
+              <span className="alert-meta"><time dateTime={new Date(alert.createdAt).toISOString()} title={stamp.format(alert.createdAt)}>{alertTimestamp(alert.createdAt)}</time>{person && <span>{person.name}</span>}<span className="alert-status" data-unread={!alert.readAt}>{alert.readAt ? "Read" : "Unread"}{expired ? " · Earlier reminder" : ""}</span></span>
             </span>
           </button>
           <div className="alert-row-actions">

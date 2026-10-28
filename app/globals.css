@@ -1797,6 +1797,9 @@ button { cursor: pointer; }
 .alerts-heading h2 { margin: 0 0 6px; font-size: 23px; letter-spacing: -.035em; }
 .alerts-heading p, .alert-content > p, .alerts-empty p { margin: 0; color: var(--muted-foreground); line-height: 1.6; font-size: 14px; }
 .alerts-controls { flex-wrap: wrap; margin-bottom: 18px; }
+.alerts-view { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-foreground); }
+.alerts-view select { min-height: 44px; max-width: 190px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--foreground); font: inherit; }
+.alert-meta time { font-size: 12px; font-weight: 600; }
 .alerts-undo { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin-bottom: 12px; padding: 0 6px 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--muted-foreground); font-size: 12px; }
 .alerts-undo > button { min-width: 44px; min-height: 44px; padding: 8px; color: var(--foreground); font-weight: 650; border-radius: 8px; }
 .alerts-filters { display: inline-flex; padding: 4px; gap: 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
