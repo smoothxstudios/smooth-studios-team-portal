@@ -1,6 +1,19 @@
 {
-  "currentVersion": "2.44.3",
+  "currentVersion": "2.45.0",
   "releases": [
+    {
+      "id": "2026-10-28-pay-availability",
+      "version": "2.45.0",
+      "date": "2026-10-28",
+      "category": "Dashboard",
+      "title": "Editable pay and easier staffing",
+      "changes": [
+        "Edit manual pay descriptions, dates, amounts, and notes while preserving payments and advance credit. Entries group by person and date with search and Paid/Owed filters.",
+        "See daily availability together. Rental suggestions prioritize preferred hours and exclude conflicts and existing invitations; you choose and send offers.",
+        "Rental checklists remain under Resources and are removed from appointment details."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-10-22-planner-date-time",
       "version": "2.44.3",

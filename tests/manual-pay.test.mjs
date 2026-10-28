@@ -6,6 +6,16 @@ import { creativeEarnings, creativeOwed, creativePaid, creativeEarningDate } fro
 const input = extra => ({id: crypto.randomUUID(), employeeId: 'jordyn', category: 'training', workDate: '2025-09-12', amountCents: 8000, paymentStatus: 'owed', ...extra});
 async function setup(t) { const f = await fixture(); delete f.env.VAPID_JWK; t.after(() => f.close()); return f; }
 const add = (f, data) => f.call('owner', '/creative-work/manual-pay', data);
+test('manual edits preserve payments, reject stale writes and stay owner-only', async t => {
+ const f=await setup(t);const original=(await add(f,input({paymentStatus:'paid',paidDate:'2025-09-13'}))).data.assignment;
+ const change={action:'edit-manual',version:original.version,title:'Training correction',workDate:'2025-09-14',amountCents:9000,note:'Updated note'};
+ assert.equal((await f.call('jordyn',`/creative-work/${original.id}`,change,'PATCH')).status,403);
+ assert.equal((await f.call('owner',`/creative-work/${original.id}`,{...change,amountCents:7000},'PATCH')).status,409);
+ const saved=await f.call('owner',`/creative-work/${original.id}`,change,'PATCH');assert.equal(saved.status,200);
+ assert.deepEqual(saved.data.assignment.payments,original.payments);assert.equal(creativeOwed(saved.data.assignment),1000);
+ assert.equal(saved.data.assignment.title,'Training correction');assert.equal(saved.data.assignment.history.at(-1).event,'pay edited');
+ assert.equal((await f.call('owner',`/creative-work/${original.id}`,change,'PATCH')).status,409);
+});
 const act = (f, user, item, action, extra = {}) => f.call(user, `/creative-work/${item.id}`, {action, version: item.version, ...extra}, 'PATCH');
 test('only the owner can add pay; each employee can read only their own entries', async t => {
   const f = await setup(t);

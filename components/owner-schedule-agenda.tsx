@@ -3,6 +3,7 @@ import { CalendarAssignmentStatus } from "@/components/calendar-assignment-statu
 import { rentalStaffRemovals } from "@/lib/rental-staff.mjs";
 import { ScheduleConfirmation } from "@/components/schedule-confirmation";
 import { RentalDescription } from "@/components/rental-description";
+import { RentalSuggestions } from "@/components/rental-suggestions";
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AlertTriangle, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Plus, Search, UserMinus, X } from "lucide-react";
@@ -105,6 +106,7 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
         <span className={`agenda-status ${item.status}`}>{item.status === "unassigned" ? "Unassigned" : item.status === "pending" ? "Pending response" : <><Check size={14} aria-hidden="true" />Confirmed</>}</span>
       </div>
       <div className="agenda-work-title"><h4>{item.customer || item.title}</h4>{item.customer && <p>{item.title}</p>}{!item.appointment && <small>Assignment</small>}</div>
+      {item.appointment && !item.confirmations.length && Date.parse(item.start) > now && <RentalSuggestions period={item.appointment} schedule={schedule} />}
       <div className="agenda-staff">
         {item.confirmations.length > 0 && <ul className="agenda-guests" aria-label="Employee confirmations">{item.confirmations.map(person => <Confirmation person={person} key={person.employeeId} busy={busy} onRemove={item.appointment && Date.parse(item.start) > now ? () => setRemoving({ appointmentId: item.appointment!.id, employeeId: person.employeeId }) : undefined} />)}</ul>}
         {conflicts.length > 0 && <div className="agenda-conflict"><AlertTriangle size={15} aria-hidden="true" />Time conflict · {conflicts.map(offer => name(offer.employeeId)).join(", ")}</div>}
@@ -112,7 +114,6 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
       {removal && <ScheduleConfirmation label="Remove person from rental"><p>Remove {name(removal.employeeId)} from this rental? Their app offers will be cancelled and their Google Calendar invitation will be removed when connected.</p>{feedback}<div className="schedule-actions"><Button variant="outline" disabled={busy} onClick={() => setRemoving(null)}>Cancel</Button><Button variant="destructive" disabled={busy} aria-busy={busy} onClick={async () => { if (item.appointment && await onRemovePerson(item.appointment, removal.employeeId)) setRemoving(null); }}>{busy ? "Removing…" : "Remove person"}</Button></div></ScheduleConfirmation>}
       {removals.filter(offer => offer.calendarSync?.code !== "person_removed").map(offer => <div className="rental-removal-status" role="status" key={offer.id}><span>{name(offer.employeeId)} removed in app · Calendar removal</span><CalendarAssignmentStatus delivery={offer.calendarSync ?? { status: "pending", checkedAt: 0 }} /></div>)}
       <div className="agenda-work-actions">
-        {onChecklist && item.appointment && /studio.*rental|rental.*studio/i.test(item.title) && <Button variant="outline" onClick={() => onOpenWork(item)}>Rental checklist</Button>}
         {item.appointment && Date.parse(item.start) > now && <Button disabled={busy} variant={item.status === "unassigned" ? "default" : "outline"} onClick={() => assign(item.appointment!.id)}><Plus size={15} />{item.status === "unassigned" ? "Assign person" : "Add person"}</Button>}
         <Button variant="outline" onClick={() => onOpenWork(item)}>Open appointment</Button>
       </div>

@@ -239,6 +239,7 @@ async function route(request, env, ctx) {
       ? await jsonRows(db, "SELECT data FROM team_work_preferences")
       : await jsonRows(db, "SELECT data FROM team_work_preferences WHERE user_id = ?", user);
     return { revision: s.state.revision, syncedAt: s.state.synced_at, availabilityVersion: 1, workPreferences,
+      ...(isOwner ? { activeEmployeeIds: Object.keys(JSON.parse(env.TEAM_TOKEN_HASHES)).filter(id => id !== "owner" && id !== "sync") } : {}),
       appointments: visibleAppointments(s, assignments, user),
       blocks: s.blocks.filter(b => isOwner || b.userId === user), assignments,
       devices: Object.fromEntries(devices.filter(d => isOwner || d.user_id === user).map(d => [d.user_id, d.count])),

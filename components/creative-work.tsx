@@ -1,8 +1,9 @@
 "use client";
 import { PersonLabel } from "@/components/dashboard/person-label";
+import { ManualPayEditor } from "@/components/manual-pay-editor";
 import { MoreOptions } from "@/components/dashboard/more-options";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ArrowUpRight, Check, ClipboardList, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,11 +45,11 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
   const workItems = earningsOnly ? state.items : state.items.filter(item => item.entryType !== "manual");
   const summary = creativeEarnings(workItems, year);
   const visible = (earningsOnly ? summary.items : workItems).filter(item => {
-    if (earningsOnly) return item.status === "approved";
+    if (earningsOnly) return item.status === "approved" && (person === "all" || item.employeeId === person) && `${item.title} ${item.instructions} ${name(item.employeeId)}`.toLowerCase().includes(search.toLowerCase()) && (filter !== "paid" && filter !== "owed" || (filter === "owed" ? creativeOwed(item) > 0 : creativeOwed(item) === 0));
     return (person === "all" || item.employeeId === person) &&
       (filter === "all" || (filter === "active" ? openStatuses.includes(item.status) : filter === "closed" ? ["declined", "cancelled"].includes(item.status) : item.status === filter)) &&
       `${item.title} ${item.instructions} ${name(item.employeeId)}`.toLowerCase().includes(search.toLowerCase());
-  }).sort((a, b) => earningsOnly ? creativeEarningDate(b).localeCompare(creativeEarningDate(a)) : a.dueAt.localeCompare(b.dueAt));
+  }).sort((a, b) => earningsOnly ? (isOwner ? name(a.employeeId).localeCompare(name(b.employeeId)) : 0) || creativeEarningDate(b).localeCompare(creativeEarningDate(a)) : a.dueAt.localeCompare(b.dueAt));
   const cards: CreativeAssignment[][] = [];
   for (const item of visible) {
     const group = isOwner && !earningsOnly ? cards.find(entries => (entries[0].groupId ?? entries[0].id) === (item.groupId ?? item.id)) : undefined;
@@ -64,15 +65,16 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
   return <section className={`creative-work${earningsOnly ? " creative-work-earnings panel" : ""}`}>
     <div className="creative-heading"><div><h2>{earningsOnly ? "Other work & payments" : "Creative work"}</h2><p>{earningsOnly ? "Training, onboarding, and approved creative work are included in the totals above." : isOwner ? "Assign a deliverable, review the submission, and approve its pay." : "Your briefs, deadlines, submissions, and agreed pay."}</p></div><div className="creative-toolbar-buttons">{isOwner && !earningsOnly && <Button onClick={() => { setEditor({ id: crypto.randomUUID() }); setError(""); }}><Plus size={17} />Assign work</Button>}</div></div>
     {state.error && <p className="creative-notice" role="alert">{state.loaded ? "Showing the last loaded creative work. " : "Creative work totals are unavailable. "}{state.error}</p>}
+    {earningsOnly && <div className="creative-filters"><Input aria-label="Search pay entries" placeholder="Search pay entries" value={search} onChange={e => setSearch(e.target.value)} />{isOwner && <select aria-label="Pay for person" value={person} onChange={e => setPerson(e.target.value)}><option value="all">Everyone</option>{employees.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}<select aria-label="Payment status" value={filter} onChange={e => setFilter(e.target.value)}><option value="active">All payments</option><option value="owed">Owed</option><option value="paid">Paid</option></select></div>}
     {!earningsOnly && <>
       <div className="creative-totals"><div><span>Awaiting review</span><strong>{state.items.filter(item => item.status === "submitted").length}</strong></div><div><span>Approved · unpaid</span><strong>{dollars(summary.metrics.owed)}</strong></div><div><span>Paid</span><strong>{dollars(summary.metrics.paid)}</strong></div></div>
       <div className="creative-filters"><label className="creative-search"><Search size={17} /><span className="sr-only">Search creative work</span><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search assignments" /></label><label><span className="sr-only">Assignment status</span><select value={filter} onChange={event => setFilter(event.target.value)}><option value="active">Active work</option><option value="submitted">Awaiting review</option><option value="approved">Approved & paid</option><option value="closed">Declined & cancelled</option><option value="all">All work</option></select></label>{isOwner && <label><span className="sr-only">Employee</span><select value={person} onChange={event => setPerson(event.target.value)}><option value="all">Everyone</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></label>}</div>
     </>}
-    {state.loading ? <p role="status">Loading creative work…</p> : <div className="creative-grid">{cards.map(group => { const item = group[0]; return <button className="creative-card" key={item.id} onClick={() => { setSelected(item.id); setError(""); }}>
+    {state.loading ? <p role="status">Loading creative work…</p> : <div className="creative-grid">{cards.map((group,index) => { const item = group[0]; return <Fragment key={item.id}>{earningsOnly && isOwner && (index === 0 || cards[index-1][0].employeeId !== item.employeeId) && <h3 className="pay-person-heading">{name(item.employeeId)}</h3>}<button className="creative-card" onClick={() => { setSelected(item.id); setError(""); }}>
       <div className="creative-card-top"><span className={`creative-status is-${item.status}`}>{group.length > 1 ? `${group.length} people` : status(item)}</span>{isOwner && <span className="creative-person"><i style={{ background: teamAccent(item.employeeId) }} />{group.map(person => name(person.employeeId)).join(", ")}</span>}</div>
       <h3>{item.title}</h3><p className={!earningsOnly && openStatuses.includes(item.status) && Date.parse(item.dueAt) < now ? "creative-overdue" : ""}>{earningsOnly ? `${item.entryType === "manual" ? "Worked" : "Approved"} ${item.entryType === "manual" ? workDate(creativeEarningDate(item)) : date(creativeEarningDate(item))}` : `Due ${date(item.dueAt)}`}</p>
       <div className="creative-card-bottom"><strong>{dollars(group.reduce((sum, person) => sum + person.amountCents, 0))}{group.length > 1 && " total"}</strong><span>{group.length > 1 ? "Review each person" : item.status === "approved" ? creativeOwed(item) ? `${dollars(creativeOwed(item))} owed` : "Paid in full" : "Earned after approval"}<ArrowUpRight size={16} /></span></div>
-    </button>; })}</div>}
+    </button></Fragment>; })}</div>}
     {!state.loading && !state.error && !visible.length && <div className="creative-empty"><ClipboardList size={26} /><h3>{earningsOnly ? "No additional pay recorded" : workItems.length ? "No assignments match" : "No creative assignments yet"}</h3><p>{earningsOnly ? "Training, onboarding, other pay, and approved creative assignments appear here." : isOwner ? "Create work such as an edit, photo selection, design, or social post." : "Smooth’s creative assignments will appear here with a brief, deadline, and agreed pay."}</p></div>}
     <Dialog open={Boolean(focusId || selectedItem)} onOpenChange={open => { if (!open && !busy) { setSelected(null); onCloseFocus?.(); } }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{selectedItem?.title ?? "Creative assignment"}</DialogTitle><DialogDescription>{selectedItem ? `${name(selectedItem.employeeId)} · ${status(selectedItem)} · ${selectedItem.entryType === "manual" ? "Worked" : "Due"} ${selectedItem.entryType === "manual" ? workDate(selectedItem.dueAt) : date(selectedItem.dueAt)}` : "Review the current assignment details."}</DialogDescription></DialogHeader>
       {!selectedItem && <p role="status">{state.loading || focusLoading ? "Loading assignment…" : state.error || "This assignment is no longer available to this account."}</p>}
@@ -96,6 +98,7 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople }: {
     if (await act(input, item)) { setAction(""); setNote(""); setLinks(""); }
   };
   return <div className="creative-details">
+    {isOwner && item.entryType === "manual" && <ManualPayEditor key={item.id} item={item} busy={busy} act={act} />}
     <div className="creative-totals"><div><span>{item.entryType === "manual" ? "Recorded pay" : "Agreed pay"}</span><strong>{dollars(item.amountCents)}</strong></div><div><span>Paid</span><strong>{dollars(paid)}</strong></div><div><span>{item.status === "approved" ? "Owed" : "After approval"}</span><strong>{dollars(item.status === "approved" ? owed : openStatuses.includes(item.status) ? item.amountCents : 0)}</strong></div></div>
     {Boolean(item.advanceAppliedCents) && <p className="creative-hint">{dollars(item.advanceAppliedCents!)} of these earnings is covered by the advance.</p>}
     {(item.instructions || item.references.length > 0) && <section><h3>{item.instructions ? item.entryType === "manual" ? "Notes" : "Brief" : "References"}</h3>{item.instructions && <p className="creative-prose">{item.instructions}</p>}{item.references.length > 0 && <WorkLinks links={item.references} />}</section>}

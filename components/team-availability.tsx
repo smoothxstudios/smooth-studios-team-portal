@@ -1,5 +1,6 @@
 "use client";
 import { MoreOptions } from "@/components/dashboard/more-options";
+import { AvailabilityOverview } from "@/components/availability-overview";
 
 import { useState } from "react";
 import { CalendarCheck, ChevronDown, Clock3, Pencil, Plus, Trash2 } from "lucide-react";
@@ -60,6 +61,8 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
       {!isOwner && <p className="schedule-small">Visible to you and Smooth.</p>}
       {isOwner && <label className="schedule-filter">Team member<select value={filter} onChange={e => selectPerson(e.target.value)}><option value="all">Everyone</option>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
     </div>
+    {isOwner && <AvailabilityOverview schedule={schedule} filter={filter} />}
+    <details open={!isOwner || filter !== "all"}><summary>Manage preferences and blocked time</summary>
     <div className="availability-people">{(isOwner ? TEAM.filter(person => filter === "all" || person.id === filter) : [{ id: userId, name: name(userId), color: "" }]).map(person => {
       const personPreferences = preferences.filter(entry => entry.userId === person.id);
       const personBlocks = blocks.filter(entry => entry.userId === person.id);
@@ -82,7 +85,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
     </div>
       </div>}
       </section>;
-    })}</div>
+    })}</div></details>
     <label className="availability-past-toggle"><input type="checkbox" checked={showPast} onChange={e => setShowPast(e.target.checked)} />Include past entries</label>
     <p className="schedule-small">No preference means no preference recorded. Existing assignments stay in place when availability changes; contact Smooth if you need an assignment changed.</p>
     </section>

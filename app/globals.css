@@ -1373,6 +1373,17 @@ button { cursor: pointer; }
 .team-account-setup { max-height: calc(100dvh - 32px); overflow-y: auto; }
 .team-account-fields { border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 16px 0; min-width: 0; }
 .team-account-fields legend { font-weight: 700; padding: 0 6px; }
+.pay-person-heading { grid-column: 1 / -1; padding: 16px 0 4px; border-bottom: 1px solid var(--border); }
+.rental-suggestions { display: grid; gap: 8px; margin: 12px 0; }
+.suggestion-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.suggestion-row span { display: grid; gap: 4px; }
+.suggestion-row small { color: var(--muted-foreground); }
+.availability-overview { margin: 16px 0; }
+.availability-overview-row { display: grid; grid-template-columns: 100px repeat(3, 1fr); gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.availability-overview-row span { font-size: 12px; color: var(--muted-foreground); }
+.availability-overview-row p { font-size: 14px; margin-top: 4px; }
+.availability-overview input { min-height: 44px; max-width: 170px; font-size: 16px; background: var(--card); color: var(--foreground); }
+@media (max-width: 640px) { .availability-overview-row { grid-template-columns: 1fr 1fr; } .availability-overview-row > strong { grid-column: 1 / -1; } .availability-overview-row > div:last-child { grid-column: 1 / -1; } .suggestion-row { flex-wrap: wrap; } }
 .team-login-settings label { display: grid; gap: 8px; min-width: 0; }
 .team-login-settings input, .team-login-settings select { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--foreground); font-size: 16px; }
 .team-account-fields label { display: grid; gap: 6px; margin: 8px 0; }

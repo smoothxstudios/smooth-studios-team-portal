@@ -1,5 +1,5 @@
 import { createCreativeOffers } from "./creative-offers.mjs";
-import { TEAM, localInstant } from "../lib/team-schedule.mjs";
+import { TEAM, localInstant, studioLocal } from "../lib/team-schedule.mjs";
 import { reconcileAdvances, creativeAdvanceAmounts, withCreativeAdvance } from "./payroll.mjs";
 import { creativeOwed } from "../lib/creative-work.mjs";
 import { notificationText } from "./notification-content.mjs";
@@ -63,6 +63,21 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
     }
     item = { ...previous, version: previous.version + 1, updatedAt: now };
     switch (input.action) {
+      case "edit-manual": {
+        requireOwner();
+        if (item.entryType !== "manual" || item.status !== "approved") fail(409, "Only manual pay entries can be edited here.");
+        const workDate = text(input.workDate, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(workDate) || workDate > studioLocal(now).slice(0, 10)) fail(400, "Choose a valid work date today or earlier.");
+        let earnedAt;
+        try { earnedAt = localInstant(`${workDate}T00:00`); } catch { fail(400, "Choose a valid work date."); }
+        const amountCents = amount(input.amountCents);
+        await reconcileAdvances(db);
+        const allocated = (await withCreativeAdvance(db, item)).advanceAppliedCents ?? 0;
+        if (amountCents < allocated + item.payments.reduce((sum, p) => sum + p.amountCents, 0)) fail(409, "The amount cannot be lower than recorded payments and advance credit already applied.");
+        item.history = [...item.history, { id: crypto.randomUUID(), event: "previous pay details", by: user, at: now, note: JSON.stringify({ title: item.title, amountCents: item.amountCents, earnedAt: item.earnedAt, notes: item.instructions }) }];
+        Object.assign(item, { title: text(input.title, 160), instructions: text(input.note ?? "", 4000, false), amountCents, earnedAt, dueAt: earnedAt });
+        event = "pay edited"; break;
+      }
       case "edit":
         requireOwner();
         if (item.entryType === "manual" || !["offered", "accepted", "revision", "submitted"].includes(item.status)) fail(409, "Only active creative work can be edited. Approved earnings stay unchanged.");
@@ -114,14 +129,14 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
   // payouts, submissions or alerts. D1 batches run transactionally.
   const write = previous
     ? db.prepare(`UPDATE team_creative_assignments SET data = ?, version = ?, mutation = ? WHERE id = ? AND version = ?
-        AND (? != 'pay' OR COALESCE((SELECT SUM(amount_cents) FROM payroll_advance_allocations WHERE source_kind = 'creative' AND source_id = team_creative_assignments.id),0) + ? <= ?)`)
+        AND (? NOT IN ('pay', 'edit-manual') OR COALESCE((SELECT SUM(amount_cents) FROM payroll_advance_allocations WHERE source_kind = 'creative' AND source_id = team_creative_assignments.id),0) + ? <= ?)`)
       .bind(JSON.stringify(item), item.version, mutation, item.id, previous.version, input.action, item.payments.reduce((sum, payment) => sum + payment.amountCents, 0), item.amountCents)
     : db.prepare("INSERT OR IGNORE INTO team_creative_assignments (id, employee_id, version, mutation, data) VALUES (?, ?, ?, ?, ?)")
       .bind(item.id, item.employeeId, item.version, mutation, JSON.stringify(item));
   const name = TEAM.find(p => p.id === item.employeeId).name;
   const recipient = isOwner ? item.employeeId : "owner";
   const title = isOwner ? ({ assigned: "New creative assignment", updated: "Creative assignment updated", approved: "Creative work approved", cancelled: "Creative assignment cancelled", "changes requested": "Changes requested", "payment recorded": "Creative payout recorded" }[event]) : `${name} ${event} creative work`;
-  const notification = JSON.stringify({ title: item.entryType === "manual" ? "Payment recorded" : title, body: `${notificationText(item.title, 160)}. ${item.entryType === "manual" ? "View the payment in Earnings." : "Open Creative Work to see the details."}`, target: item.entryType === "manual" ? "payouts" : "creative", targetId: item.id, personId: item.employeeId });
+  const notification = JSON.stringify({ title: item.entryType === "manual" ? (event === "pay edited" ? "Pay updated" : "Payment recorded") : title, body: `${notificationText(item.title, 160)}. ${item.entryType === "manual" ? "View the payment in Earnings." : "Open Creative Work to see the details."}`, target: item.entryType === "manual" ? "payouts" : "creative", targetId: item.id, personId: item.employeeId });
   const result = await db.batch([write,
     db.prepare(`INSERT INTO team_notification_events (id, user_id, kind, payload, due_at)
       SELECT ?, ?, 'creative', ?, ? WHERE EXISTS (SELECT 1 FROM team_creative_assignments WHERE id = ? AND mutation = ?)`)

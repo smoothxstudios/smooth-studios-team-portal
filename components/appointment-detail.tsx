@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Check, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RentalDescription } from "@/components/rental-description";
@@ -8,45 +8,12 @@ import { PersonLabel } from "@/components/dashboard/person-label";
 import { ScheduleConfirmation } from "@/components/schedule-confirmation";
 import { AppleCalendarSettings } from "@/components/apple-calendar-settings";
 import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
-import { teamRequest, type TeamAssignment, type TeamAppointment } from "@/lib/team-api";
+import { type TeamAssignment, type TeamAppointment } from "@/lib/team-api";
 import type { WorkEntry } from "@/lib/schedule-calendar-types";
 import { assignmentResponseLabel } from "@/lib/calendar-invitations.mjs";
 import { appointmentBalance } from "@/lib/daily-actions.mjs";
 import { formatDate, formatTime, dollars } from "@/lib/dashboard-presentation";
 
-type Step = { id: string; phase: string; label: string };
-type Progress = { version: number; checked: Record<string, { by: string; at: string }>; note: string };
-type ChecklistRental = { id: string; checklistId: string; progress: Progress };
-function AppointmentChecklist({ token, appointmentId }: { token: string; userId: string; appointmentId: string }) {
-  const [steps, setSteps] = useState<Step[] | null>(null), [rental, setRental] = useState<ChecklistRental | null>(null);
-  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [retry, setRetry] = useState<{ id: string; checked: boolean } | null>(null);
-  const saving = useRef(false);
-  const load = useCallback(async () => {
-    const result = await teamRequest<{ template: Step[]; rentals: ChecklistRental[] }>(token, "/rental-checklists");
-    const current = result.rentals.find(item => item.id === appointmentId) ?? null;
-    setSteps(result.template); setRental(current); return current;
-  }, [token, appointmentId]);
-  const reload = async () => { setBusy(true); try { await load(); setError(""); } catch { setError("Checklist couldn’t load. Check your connection and try again."); } finally { setBusy(false); } };
-  useEffect(() => { let active = true; void load().catch(() => { if (active) setError("Checklist couldn’t load. Check your connection and try again."); }); return () => { active = false; }; }, [load]);
-  const save = async (id: string, checked: boolean, refreshing = false) => {
-    if (saving.current) return;
-    saving.current = true; setBusy(true); setError("");
-    try {
-      const current = refreshing ? await load() : rental;
-      if (!current) throw new Error("Accept this rental before updating its checklist.");
-      if (Boolean(current.progress.checked[id]) !== checked) {
-        const result = await teamRequest<{ progress: Progress }>(token, `/rental-checklists/${current.checklistId}`, { action: "check", itemId: id, checked, version: current.progress.version }, "PATCH");
-        setRental({ ...current, progress: result.progress });
-      }
-      setRetry(null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "The step could not be saved."); setRetry({ id, checked }); }
-    finally { saving.current = false; setBusy(false); }
-  };
-  return <section className="appointment-checklist"><div className="appointment-section-heading"><h3>Rental checklist</h3>{steps && <span role="status">{busy ? "Saving…" : `${steps.filter(step => rental?.progress.checked[step.id]).length}/${steps.length} done`}</span>}</div><p className="schedule-small">{rental ? "Shared with the crew for this rental. Each check is saved." : "Accept the rental to update its shared checklist."}</p>
-    {error && <p role="alert">{error} <Button disabled={busy} variant="outline" onClick={() => retry ? void save(retry.id, retry.checked, true) : void reload()}>Try again</Button></p>}
-    {!steps && !error ? <p role="status">Loading checklist…</p> : steps && [...new Set(steps.map(step => step.phase))].map(phase => <fieldset key={phase}><legend>{phase}</legend>{steps.filter(step => step.phase === phase).map(step => <label key={step.id}><input type="checkbox" disabled={busy || !rental || Boolean(retry)} checked={Boolean(rental?.progress.checked[step.id])} onChange={event => void save(step.id, event.target.checked)} /><span>{step.label}{rental?.progress.checked[step.id] && <small>Completed by <PersonLabel id={rental.progress.checked[step.id].by} /></small>}</span></label>)}</fieldset>)}
-  </section>;
-}
 
 export function AppointmentDetail({ item, token, userId, isOwner, busy, renderAssignment, onAssign, onRemovePerson, onPayment, feedback }: {
   item: WorkEntry; token: string; userId: string; isOwner: boolean; busy: boolean;
@@ -74,6 +41,5 @@ export function AppointmentDetail({ item, token, userId, isOwner, busy, renderAs
       <div className="appointment-offers">{live.map(offer => renderAssignment(offer, true))}</div>
       {previous.length > 0 && <details className="appointment-history"><summary>Previous responses ({previous.length})</summary>{previous.map(offer => <div key={offer.id}><PersonLabel id={offer.employeeId} /><span className={`schedule-status ${offer.status}`}>{offer.status === "cancelled" ? "Offer cancelled" : "Declined"}</span><CalendarAssignmentStatus delivery={offer.calendarSync} /></div>)}</details>}
     </section>
-    {appointment && /rental/i.test(item.title) && <AppointmentChecklist key={`${userId}:${appointment.id}:${item.confirmations.find(person => person.employeeId === userId)?.appStatus ?? "calendar"}`} token={token} userId={userId} appointmentId={appointment.id} />}
   </div>;
 }
