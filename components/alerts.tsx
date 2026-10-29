@@ -78,7 +78,7 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
           <button type="button" className="alert-open" disabled={state.busy} onClick={() => void open(alert)} aria-label={`${alert.title}. ${alert.target === "settings" ? "Open Settings" : alert.target === "alerts" ? "Read notification" : alert.target === "quiz" ? "Open Daily Quiz" : alert.target === "availability" ? "View availability" : "View details"}`}>
             <span className="alert-content"><span className="alert-title"><Icon className="alert-kind-icon" size={15} aria-hidden="true" /><strong>{alert.title}</strong><ArrowUpRight className="alert-open-arrow" size={14} aria-hidden="true" /></span>
               <span className="alert-preview">{alertBody(alert.body) || "Open this alert for details."}</span>
-              <span className="alert-meta"><time dateTime={new Date(alert.createdAt).toISOString()} title={stamp.format(alert.createdAt)}>{alertTimestamp(alert.createdAt)}</time>{person && <span>{person.name}</span>}<span className="alert-status" data-unread={!alert.readAt}>{alert.readAt ? "Read" : "Unread"}{expired ? " · Earlier reminder" : ""}</span></span>
+              <span className="alert-meta"><time dateTime={new Date(alert.createdAt).toISOString()} title={stamp.format(alert.createdAt)}>{alertTimestamp(alert.createdAt)}</time>{person && <span className="alert-person"><span className="alert-person-dot" style={{ background: person.color }} aria-hidden="true" />{person.name}</span>}<span className="alert-status" data-unread={!alert.readAt}>{alert.readAt ? "Read" : "Unread"}{expired ? " · Earlier reminder" : ""}</span></span>
             </span>
           </button>
           <div className="alert-row-actions">
