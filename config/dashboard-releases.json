@@ -1,6 +1,16 @@
 {
-  "currentVersion": "2.45.3",
+  "currentVersion": "2.45.4",
   "releases": [
+    {
+      "id": "2026-10-29-employee-earnings-card",
+      "version": "2.45.4",
+      "date": "2026-10-29",
+      "category": "Dashboard",
+      "title": "Compact employee earnings card",
+      "changes": ["Replaced the oversized collapsible Earnings section on employee Home with a compact card that emphasizes the current pay owed or advance remaining.", "The entire card opens the full Earnings page in one tap, with a clearer action and mobile spacing. Earnings calculations and payout status are unchanged."],
+      "employee": { "title": "Your earnings at a glance", "changes": ["Home now shows pay owed or advance remaining in a compact card. Tap anywhere on it to open the full Earnings page."] },
+      "commits": []
+    },
     {
       "id": "2026-10-29-employee-rental-setup",
       "version": "2.45.3",

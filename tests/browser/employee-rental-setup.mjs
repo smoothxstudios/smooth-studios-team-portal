@@ -39,6 +39,10 @@ try{
  await page.locator('.employee-next-action .rental-description').waitFor();
  assert.match(await page.locator('.employee-next-action').innerText(),/Blue/);
  assert.match(await page.locator('.employee-next-action').innerText(),/Two strobes/);
+ const earningsCard=page.locator('.employee-earnings-card');
+ await earningsCard.waitFor();
+ assert.match(await earningsCard.innerText(),/Earnings[\s\S]*View earnings[\s\S]*Pay owed/);
+ assert.ok((await earningsCard.boundingBox()).height < 180,'Earnings card should remain compact on mobile');
  for(const width of [320,390,768]){
  await page.setViewportSize({width,height:844});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
