@@ -8,6 +8,16 @@ const assignment = { id: "offer-1", appointmentId: appointment.id, employeeId: "
 const snapshot = { ...appointment, paidOnlineCents: 5000, fullyPaid: true, assignedEmployeeIds: ["jordyn"], employeePayouts: { jordyn: { amountCents: 2000, paid: false } } };
 const schedule = { appointments: [appointment], assignments: [assignment], blocks: [], revision: 1 };
 
+test("employee Home retains setup details for Calendar, app acceptance, and offline snapshots", () => {
+  const rentalDetails = 'Backdrop color:\nBlue\n\nEquipment needed:\nTwo strobes';
+  const detailed = { ...appointment, rentalDetails };
+  for (const assignments of [[], [assignment]]) {
+    const result = employeeHomeWork('jordyn', { ...schedule, appointments: [detailed], assignments }, [], now);
+    assert.equal(result.upcoming[0].rentalDetails, rentalDetails);
+  }
+  assert.equal(employeeHomeWork('jordyn', null, [{ ...snapshot, rentalDetails }], now).upcoming[0].rentalDetails, rentalDetails);
+});
+
 test("home deduplicates Calendar acceptance and portal work while retaining instructions", () => {
   const work = employeeHomeWork("jordyn", schedule, [snapshot], now);
   assert.equal(work.upcoming.length, 1);

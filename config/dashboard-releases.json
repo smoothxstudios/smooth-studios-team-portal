@@ -1,6 +1,16 @@
 {
-  "currentVersion": "2.45.2",
+  "currentVersion": "2.45.3",
   "releases": [
+    {
+      "id": "2026-10-29-employee-rental-setup",
+      "version": "2.45.3",
+      "date": "2026-10-29",
+      "category": "Scheduling",
+      "title": "Rental setup on employee Home",
+      "changes": ["Employee Home shows available backdrop, shoot, and equipment details plus assignment instructions directly on the next rental card.", "Corrected mobile card padding and renamed the action View rental details. Missing setup information is explicitly flagged."],
+      "employee": { "title": "Your rental setup at a glance", "changes": ["See available backdrop, shoot, equipment, and preparation instructions on Home. View rental details opens the full appointment.", "The rental card has proper mobile spacing and flags missing setup details."] },
+      "commits": []
+    },
     {
       "id": "2026-10-29-alert-hierarchy",
       "version": "2.45.2",

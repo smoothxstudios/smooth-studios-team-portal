@@ -2303,7 +2303,11 @@ button { cursor: pointer; }
 .home-finances > summary::-webkit-details-marker, .form-more-options > summary::-webkit-details-marker { display: none; }
 .home-finances[open] > summary > svg, .form-more-options[open] > summary > svg { transform: rotate(180deg); }
 .home-finances > :not(summary) { margin: 0 18px 18px; }
-.employee-next-action { display: grid; justify-items: start; gap: 12px; }
+.employee-next-action { display: grid; justify-items: start; gap: 12px; min-width: 0; padding: 0 24px 24px; overflow-wrap: anywhere; }
+.employee-next-action > button { max-width: 100%; height: auto; white-space: normal; }
+.employee-next-action .rental-description { width: 100%; min-width: 0; margin: 0; }
+.employee-next-action .rental-description-fields { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 767px) { .employee-next-action { padding: 0 16px 20px; } }
 .employee-next-action h3 { font-size: 22px; font-weight: 650; }
 .employee-next-action p { font-size: 14px; color: var(--muted-foreground); }
 .form-more-options { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); width: 100%; }

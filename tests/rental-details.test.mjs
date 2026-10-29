@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { rentalDetails } from '../lib/rental-details.mjs';
+import { rentalDetails, rentalSetupDetails } from '../lib/rental-details.mjs';
 import { fixture } from './helpers/notification-fixture.mjs';
 const description = `[Smooth Studios rental team]\nAkiva — Accepted\n[/Smooth Studios rental team]\nCalendar: Smooth Studios\nName: Client\nPhone: PRIVATE_PHONE\nEmail: PRIVATE_EMAIL\nPrice: $100\nPaid Online: $100\nStudio Rental Form\n====\nWhat type of photoshoot are you doing?:\nBirthday portraits\nBackdrop colors: Blue &amp; white\nEquipment needed:\nTwo strobes\nSoftbox\nEmail: PRIVATE_EMAIL\nBooking link: https://example.invalid/private\nAcuityID=PRIVATE_ID`;
+test('Home setup shows backdrop, shoot and equipment without repeating contact and billing fields', () => {
+  const setup = rentalSetupDetails(rentalDetails(description));
+  assert.match(setup, /Birthday portraits/);
+  assert.match(setup, /Backdrop colors:\nBlue & white/);
+  assert.match(setup, /Equipment needed:\nTwo strobes\nSoftbox/);
+  assert.doesNotMatch(setup, /PRIVATE_|Paid Online|Price:|Calendar:|Name:|Studio Rental Form/);
+  assert.equal(rentalSetupDetails(undefined), '');
+});
 test('booking descriptions include contact, price and form answers while stripping admin links and team notes', () => {
   const details = rentalDetails(description);
   assert.match(details, /Birthday portraits/); assert.match(details, /Blue & white/); assert.match(details, /Two strobes\nSoftbox/);
