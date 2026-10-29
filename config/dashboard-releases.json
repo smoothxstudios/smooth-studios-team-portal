@@ -1,6 +1,23 @@
 {
-  "currentVersion": "2.45.5",
+  "currentVersion": "2.45.6",
   "releases": [
+    {
+      "id": "2026-10-29-update-history-mobile-layout",
+      "version": "2.45.6",
+      "date": "2026-10-29",
+      "category": "Interface",
+      "title": "Readable update history on mobile",
+      "changes": [
+        "Fixed the search controls overlapping the What changed heading on small screens. The heading and Close button stay visible while the controls and update history scroll beneath them."
+      ],
+      "employee": {
+        "title": "Clearer update history",
+        "changes": [
+          "The What changed heading no longer overlaps search on mobile. Scroll the controls and updates while the heading and Close button stay visible."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-29-studio-room-rental-details",
       "version": "2.45.5",

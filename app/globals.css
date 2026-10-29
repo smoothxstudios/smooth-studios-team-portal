@@ -640,8 +640,9 @@ button { cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .dashboard-version-link:hover { color: var(--foreground); } }
 .dashboard-version-compact { justify-content: center; margin-top: 20px; padding: 16px 0 0; font-size: 11px; }
 .dashboard-version-compact .dashboard-version-meta { justify-content: center; }
-.dashboard-release-dialog { display: flex; flex-direction: column; gap: 16px; width: min(760px, calc(100vw - 24px)); max-width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); padding: 24px; border-radius: 20px; }
-.dashboard-release-dialog [data-slot="dialog-header"] { text-align: left; padding-right: 28px; }
+.dashboard-release-dialog { display: flex; flex-direction: column; gap: 16px; width: min(760px, calc(100vw - 24px)); max-width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); padding: 24px; border-radius: 20px; overflow: hidden; }
+.dashboard-release-dialog [data-slot="dialog-header"] { flex: 0 0 auto; text-align: left; padding-right: 28px; }
+.dashboard-release-body { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; align-content: start; gap: 16px; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 5px; }
 .dashboard-release-dialog > [data-slot="dialog-close"] { display: grid; place-items: center; width: 44px; height: 44px; top: 8px; right: 8px; }
 .dashboard-release-dialog [data-slot="dialog-title"] { font-size: 25px; line-height: 1.2; letter-spacing: -.03em; }
 .dashboard-release-dialog [data-slot="dialog-description"] { line-height: 1.6; }
@@ -654,7 +655,7 @@ button { cursor: pointer; }
 .dashboard-release-count { margin: 0; font-size: 12px; color: var(--muted-foreground); }
 .dashboard-release-owner-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted-foreground); }
 .dashboard-release-owner-tools button { min-height: 44px; white-space: normal; }
-.dashboard-release-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 5px; }
+.dashboard-release-list { min-width: 0; }
 .dashboard-release-entry { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
 .dashboard-release-entry.is-current { border-left: 3px solid var(--primary); }
 .dashboard-release-entry summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 64px; padding: 16px; cursor: pointer; list-style: none; }
@@ -662,7 +663,7 @@ button { cursor: pointer; }
 .dashboard-release-entry summary > div { min-width: 0; }
 .dashboard-release-entry summary > svg { flex-shrink: 0; color: var(--muted-foreground); transition: transform .15s ease; }
 .dashboard-release-entry[open] summary > svg { transform: rotate(180deg); }
-.dashboard-release-entry summary:focus-visible, .dashboard-release-list:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: 10px; }
+.dashboard-release-entry summary:focus-visible, .dashboard-release-body:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: 10px; }
 .dashboard-release-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--muted-foreground); font-size: 11px; }
 .dashboard-release-entry h3 { margin: 0 0 7px; font-size: 16px; line-height: 1.45; font-weight: 650; overflow-wrap: anywhere; }
 .dashboard-release-entry ul { margin: 0; padding: 0 20px 18px 34px; list-style: disc; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
@@ -674,6 +675,7 @@ button { cursor: pointer; }
 @media (max-width: 540px) {
   .dashboard-version-footer:not(.dashboard-version-compact) { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
   .dashboard-release-dialog { padding: 20px 16px; gap: 12px; }
+  .dashboard-release-body { gap: 12px; }
   .dashboard-release-filters { grid-template-columns: 1fr; }
   .dashboard-release-entry summary { padding: 13px; }
 }
