@@ -25,7 +25,9 @@ export function visibleAppointments(s, assignments, user) {
   return s.appointments.map(a => withoutRemovedRentalStaff(a, assignments, s.state.synced_at))
     .filter(a => user === "owner" || ids.has(a.id) || a.acceptedEmployeeIds.includes(user) ||
       a.calendarInvitations?.some(invitation => invitation.employeeId === user && invitation.status !== "declined"))
-    .map(a => user === "owner" ? a : { ...a, fullyPaid: undefined, paidOnlineCents: undefined,
+    // Visible bookings already contain the quoted price and filtered form.
+    // Keep customer payment totals so staff can see the remaining balance.
+    .map(a => user === "owner" ? a : { ...a,
       acceptedEmployeeIds: a.acceptedEmployeeIds.filter(id => id === user),
       calendarInvitations: (a.calendarInvitations ?? []).filter(invitation => invitation.employeeId === user) });
 }

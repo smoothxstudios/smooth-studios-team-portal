@@ -317,7 +317,9 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
     title,
     categoryId: category.id,
     category: category.label,
-    rentalDetails: category.id === "studio-rentals" ? rentalDetails(event.description) : "",
+    // Room-specific booking names must not lose their form answers just because
+    // reporting categories still use the older "Studio Rental" name.
+    rentalDetails: /\bstudio\b.*\brental\b|\brental\b.*\bstudio\b/i.test(title) ? rentalDetails(event.description) : "",
     customer: parsed.name ?? summaryCustomer(event.summary),
     start,
     end,

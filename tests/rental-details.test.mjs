@@ -2,7 +2,40 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { rentalDetails, rentalSetupDetails } from '../lib/rental-details.mjs';
 import { fixture } from './helpers/notification-fixture.mjs';
+import { normalizeCalendarEvent } from '../scripts/lib/dashboard-data.mjs';
+import { syncTeamSchedule } from '../scripts/lib/team-api.mjs';
+import { appointmentBalance } from '../lib/daily-actions.mjs';
 const description = `[Smooth Studios rental team]\nAkiva — Accepted\n[/Smooth Studios rental team]\nCalendar: Smooth Studios\nName: Client\nPhone: PRIVATE_PHONE\nEmail: PRIVATE_EMAIL\nPrice: $100\nPaid Online: $100\nStudio Rental Form\n====\nWhat type of photoshoot are you doing?:\nBirthday portraits\nBackdrop colors: Blue &amp; white\nEquipment needed:\nTwo strobes\nSoftbox\nEmail: PRIVATE_EMAIL\nBooking link: https://example.invalid/private\nAcuityID=PRIVATE_ID`;
+
+test('Studio A and B booking forms survive Calendar normalization, incremental sync and employee access', async t => {
+  const f = await fixture(); delete f.env.VAPID_JWK; t.after(() => f.close());
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const result = await f.call('sync', new URL(url).pathname, options.body ? JSON.parse(options.body) : undefined);
+    return Response.json(result.data, { status: result.status });
+  });
+  const config = { importStart: '2026-01-01', timeZone: 'America/New_York', commissionRate: 0.3,
+    employees: [{ id: 'rayne', email: 'rayne@example.invalid' }] };
+  const rentals = ['Studio Rental', 'Studio A Rental', 'Studio B Rental'].map((title, index) => normalizeCalendarEvent({
+    id: `studio-form-${index}`, summary: `Example Client: ${title} (Smooth Studios)`,
+    start: { dateTime: '2026-10-29T19:00:00-04:00' }, end: { dateTime: '2026-10-29T20:00:00-04:00' },
+    attendees: [{ email: 'rayne@example.invalid', responseStatus: 'accepted' }],
+    description: `[Smooth Studios rental team]\nRayne — Accepted in app\n[/Smooth Studios rental team]\nCalendar: Smooth Studios\nName: Example Client\nPrice: $50.00\nPaid Online: $50.00\n${title} Form\n================\nWhat type of photoshoot are you doing?: Organization Photoshoot\nWhat color backdrop do you need set up?: White\nDo you need any props or accessories for your shoot? (Leave blank if you don't):\nChange Appointment: https://example.invalid/PRIVATE\nAcuityID=PRIVATE_ID`,
+  }, config, { employees: {} }));
+  // Seed the old blank records to exercise the same incremental repair as production.
+  await syncTeamSchedule(rentals.map(rental => ({ ...rental, rentalDetails: '' })), 'synthetic-owner-password', null, new Date(Date.now() - 1000).toISOString());
+  await syncTeamSchedule(rentals, 'synthetic-owner-password', null, new Date().toISOString());
+  for (const role of ['owner', 'rayne']) {
+    const view = (await f.call(role, '/schedule')).data;
+    assert.equal(view.appointments.length, 3);
+    for (const appointment of view.appointments) {
+      assert.match(appointment.rentalDetails, /Organization Photoshoot/, appointment.title);
+      assert.match(appointment.rentalDetails, /What color backdrop do you need set up\?:\nWhite/);
+      assert.doesNotMatch(appointment.rentalDetails, /PRIVATE|Accepted in app|Change Appointment/);
+      assert.deepEqual(appointmentBalance(appointment), { label: 'Paid in full', remaining: 0 });
+    }
+  }
+  assert.equal((await f.call('jordyn', '/schedule')).data.appointments.length, 0);
+});
 test('Home setup shows backdrop, shoot and equipment without repeating contact and billing fields', () => {
   const setup = rentalSetupDetails(rentalDetails(description));
   assert.match(setup, /Birthday portraits/);

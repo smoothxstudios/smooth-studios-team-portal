@@ -31,7 +31,7 @@ export function AppointmentDetail({ item, token, userId, isOwner, busy, renderAs
     <AppleCalendarSettings key={userId} token={token} isOwner={isOwner} compact />
     <div className="schedule-dialog-feedback">{feedback}</div>
     {appointment && <section><h3>Rental details</h3><RentalDescription details={appointment.rentalDetails} showHeading={false} />
-      <dl className="appointment-balance"><div><dt>Rental price</dt><dd>{dollars(appointment.priceCents, true)}</dd></div><div><dt>{isOwner ? balance!.label : "Customer balance"}</dt><dd>{!isOwner ? "Confirm with Smooth" : balance!.remaining === null ? "Unconfirmed" : dollars(balance!.remaining, true)}</dd></div></dl>
+      <dl className="appointment-balance"><div><dt>Rental price</dt><dd>{dollars(appointment.priceCents, true)}</dd></div><div><dt>{balance!.label}</dt><dd>{balance!.remaining === null ? (isOwner ? "Unconfirmed" : "Confirm with Smooth") : dollars(balance!.remaining, true)}</dd></div></dl>
       {isOwner && onPayment && !appointment.fullyPaid && <Button variant="outline" onClick={() => onPayment(appointment.id)}>Review payment</Button>}
     </section>}
     <section><div className="appointment-section-heading"><h3>Assigned people</h3>{isOwner && appointment && Date.parse(item.start) > Date.now() && <Button disabled={busy} variant="outline" onClick={() => onAssign(appointment.id)}><Plus size={16} />{item.confirmations.length ? "Add person" : "Assign person"}</Button>}</div>

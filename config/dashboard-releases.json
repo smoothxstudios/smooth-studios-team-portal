@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.45.4",
+  "currentVersion": "2.45.5",
   "releases": [
+    {
+      "id": "2026-10-29-studio-room-rental-details",
+      "version": "2.45.5",
+      "date": "2026-10-29",
+      "category": "Scheduling",
+      "title": "Restore Studio A and B booking details",
+      "changes": [
+        "Studio A Rental and Studio B Rental now import their booking form answers, including backdrop, shoot type, and props. Existing bookings refresh with their next Calendar sync.",
+        "Assigned employees see the customer\u2019s paid status or remaining balance when available. Unconfirmed payments still require review.",
+        "Deployment checks compare live owner and employee booking details with the imported Calendar snapshot. Reporting categories and compensation calculations are unchanged."
+      ],
+      "employee": {
+        "title": "Rental details and customer balances",
+        "changes": [
+          "Studio A and Studio B bookings now show their available backdrop, shoot type, and setup answers.",
+          "Appointment details show Paid in full or Balance remaining when confirmed payment information is available."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-29-employee-earnings-card",
       "version": "2.45.4",

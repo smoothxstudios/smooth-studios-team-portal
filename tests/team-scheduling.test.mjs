@@ -296,13 +296,13 @@ test("removed calendar appointment cancels offer and prevents accepting it", asy
   assert.equal((await f.snapshot()).assignments[0].status, "cancelled");
   assert.equal((await f.call("jordyn", `/assignments/${item.id}`, { revision: (await f.snapshot()).revision, status: "accepted" })).status, 409);
 });
-test("Calendar snapshots strip payments, descriptions and contact information", async () => {
+test("Calendar snapshots keep customer totals but strip raw descriptions and private fields", async () => {
   const f = fixture(); await f.importCalendar([{ ...rental, email: "private@example.invalid", description: "PRIVATE", paidOnlineCents: 10000, acceptedEmployeeIds: ["jordyn", "rayne"] }]);
   const view = await f.snapshot("jordyn");
   assert.deepEqual(view.appointments[0].acceptedEmployeeIds, ["jordyn"]);
   assert.equal(view.appointments[0].email, undefined);
   assert.equal(view.appointments[0].description, undefined);
-  assert.equal(view.appointments[0].paidOnlineCents, undefined);
+  assert.equal(view.appointments[0].paidOnlineCents, 10000);
 });
 
 test("Calendar invitations sync privately, remain separate from app offers, and update without duplicates", async () => {
