@@ -2303,6 +2303,17 @@ button { cursor: pointer; }
 .home-finances > summary::-webkit-details-marker, .form-more-options > summary::-webkit-details-marker { display: none; }
 .home-finances[open] > summary > svg, .form-more-options[open] > summary > svg { transform: rotate(180deg); }
 .home-finances > :not(summary) { margin: 0 18px 18px; }
+/* Employee earnings: one compact navigation card, not a spacious accordion. */
+.employee-earnings-card { display: grid; gap: 12px; width: 100%; min-width: 0; padding: 20px 24px; color: var(--foreground); text-align: left; cursor: pointer; transition: background-color 160ms ease, border-color 160ms ease; }
+.employee-earnings-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.employee-earnings-card-top > strong { font-size: 17px; font-weight: 700; line-height: 1.3; letter-spacing: -.025em; }
+.employee-earnings-card-link { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; color: var(--primary); font-size: 13px; font-weight: 650; white-space: nowrap; }
+.employee-earnings-card-amount { display: grid; gap: 2px; min-width: 0; }
+.employee-earnings-card-amount > span { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.employee-earnings-card-amount > strong { font-size: clamp(26px, 3vw, 32px); line-height: 1.12; font-weight: 700; letter-spacing: -.04em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.employee-earnings-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .employee-earnings-card:hover { background: color-mix(in srgb, var(--primary) 3%, var(--card)); border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); } }
+@media (max-width: 700px) { .employee-earnings-card { padding: 18px 20px; } }
 .employee-next-action { display: grid; justify-items: start; gap: 12px; min-width: 0; padding: 0 24px 24px; overflow-wrap: anywhere; }
 .employee-next-action > button { max-width: 100%; height: auto; white-space: normal; }
 .employee-next-action .rental-description { width: 100%; min-width: 0; margin: 0; }
