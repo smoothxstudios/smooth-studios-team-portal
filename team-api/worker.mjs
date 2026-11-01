@@ -459,8 +459,8 @@ async function route(request, env, ctx) {
     if (repeatUntil) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(repeatUntil) || !Number.isFinite(Date.parse(`${repeatUntil}T12:00Z`)) || repeatUntil < startLocal.slice(0, 10) ||
           repeatUntil > addLocalDays(startLocal, 364).slice(0, 10) || new Date(`${repeatUntil}T12:00Z`).toISOString().slice(0, 10) !== repeatUntil ||
-          Date.parse(end) <= Date.parse(start) || Date.parse(end) - Date.parse(start) > 86400_000 ||
-          Date.parse(start) > Date.now() + 366 * 86400_000) fail(400, "Weekly blocks need an end date within one year and a duration of at most 24 hours.");
+          Date.parse(end) <= Date.parse(start) || Date.parse(`${endLocal}Z`) - Date.parse(`${startLocal}Z`) > 86400_000 ||
+          Date.parse(start) > Date.now() + 366 * 86400_000) fail(400, "Weekly blocks need an end date within one year and a duration of at most one local day.");
       let lastEnd = end;
       for (let d = 7; addLocalDays(startLocal, d).slice(0, 10) <= repeatUntil; d += 7) {
         localInstant(addLocalDays(startLocal, d)); lastEnd = localInstant(addLocalDays(endLocal, d));

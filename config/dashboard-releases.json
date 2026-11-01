@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.45.6",
+  "currentVersion": "2.45.7",
   "releases": [
+    {
+      "id": "2026-11-01-daylight-saving-availability",
+      "version": "2.45.7",
+      "date": "2026-11-01",
+      "category": "Scheduling",
+      "title": "Full-day availability across clock changes",
+      "changes": [
+        "Recurring full-day blocked time now accepts the extra hour when clocks fall back and keeps its local midnight boundaries when clocks spring forward.",
+        "Verified studio scheduling, calendar views, reporting periods, notifications, and calendar exports across daylight saving changes."
+      ],
+      "employee": {
+        "title": "Full-day blocks follow clock changes",
+        "changes": [
+          "Weekly full-day blocked time stays on the correct studio day, including days with 23 or 25 hours."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-10-29-update-history-mobile-layout",
       "version": "2.45.6",

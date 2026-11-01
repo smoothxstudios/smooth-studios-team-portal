@@ -79,6 +79,29 @@ test("Eastern recurring classes preserve local time across fall DST", () => {
   assert.throws(() => localInstant("2026-02-30T09:00"), /valid/);
   assert.equal(addLocalDays("2026-12-31T10:30", 1), "2027-01-01T10:30");
 });
+test("weekly full-day blocks accept 25-hour fall-back days and 23-hour spring days", async () => {
+  for (const [day, nextDay, repeatUntil, hours] of [
+    ["2026-11-01", "2026-11-02", "2026-11-08", 25],
+    ["2027-03-14", "2027-03-15", "2027-03-21", 23],
+  ]) {
+    const f = fixture();
+    const result = await f.call("jordyn", "/blocks", {
+      revision: (await f.snapshot()).revision, reason: "Full day unavailable",
+      startLocal: `${day}T00:00`, endLocal: `${nextDay}T00:00`, repeatUntil,
+    });
+    assert.equal(result.status, 200, JSON.stringify(result.data));
+    const saved = (await f.snapshot()).blocks[0];
+    const [first, second] = blockOccurrences(saved, `${day}T00:00Z`, `${repeatUntil}T23:59Z`);
+    assert.equal((Date.parse(first.end) - Date.parse(first.start)) / 3600000, hours);
+    assert.equal((Date.parse(second.end) - Date.parse(second.start)) / 3600000, 24);
+    assert.equal(assignmentConflicts("jordyn", { start: first.start, end: first.end }, [saved], [], []).length, 1);
+    const tooLong = await f.call("jordyn", "/blocks", {
+      revision: (await f.snapshot()).revision, reason: "Too long",
+      startLocal: `${day}T00:00`, endLocal: `${nextDay}T00:01`, repeatUntil,
+    });
+    assert.equal(tooLong.status, 400);
+  }
+});
 test("overlap checks allow back-to-back work and detect recurring blocks", () => {
   const period = { start: "2026-11-02T14:30:00Z", end: "2026-11-02T15:30:00Z" };
   assert.equal(assignmentConflicts("jordyn", period, [block], [], []).length, 1);
