@@ -283,14 +283,14 @@ test("custom assignments never enter rental payroll export", async () => {
   assert.equal((await f.call("rayne", `/assignments/${item.id}`, { revision: 2, status: "accepted" })).status, 200);
   assert.equal((await f.call("sync", "/sync/accepted")).data.assignments.length, 0);
 });
-test("started offers cannot be accepted or cancelled to rewrite historical earnings", async () => {
+test("ended unaccepted offers are shown cancelled and cannot be accepted to rewrite historical earnings", async () => {
   const f = fixture(); await f.importCalendar(); const item = await offer(f);
   mock.timers.setTime(Date.parse(rental.end) + 60_000);
   try {
     const revision = (await f.snapshot()).revision;
     assert.equal((await f.call("jordyn", `/assignments/${item.id}`, { revision, status: "accepted" })).status, 409);
     assert.equal((await f.call("owner", `/assignments/${item.id}`, { revision, status: "cancelled" })).status, 409);
-    assert.equal((await f.snapshot()).assignments[0].status, "pending");
+    assert.equal((await f.snapshot()).assignments[0].status, "cancelled");
   } finally { mock.timers.setTime(now); }
 });
 test("stale Calendar data stops new offers instead of claiming someone is available", async () => {

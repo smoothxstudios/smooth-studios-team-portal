@@ -1,3 +1,4 @@
+import { withAppointmentLifecycle, appointmentCancelled } from "../lib/appointment-lifecycle.mjs";
 import { withoutRemovedRentalStaff } from "../lib/rental-staff.mjs";
 
 // Shared by the authenticated schedule and read-only personal calendar feeds.
@@ -5,6 +6,8 @@ export async function calendarAssignments(db, s, user) {
   const rows = (await db.prepare(`SELECT q.assignment_id, q.status, q.result, q.updated_at FROM calendar_assignment_outbox q
     JOIN team_assignments a ON a.id = q.assignment_id WHERE ? = 'owner' OR a.employee_id = ?`).bind(user, user).all()).results;
   return s.assignments.filter(a => user === "owner" || a.employeeId === user).map(assignment => {
+    const appointment = s.appointments.find(item => item.id === assignment.appointmentId);
+    if (assignment.status === "pending" && appointment && appointmentCancelled(appointment, s.assignments)) return { ...assignment, status: "cancelled", note: "No team member accepted before the appointment ended." };
     const row = rows.find(item => item.assignment_id === assignment.id);
     if (!row) return assignment;
     let result = {}; try { result = JSON.parse(row.result ?? "{}"); } catch { /* Preserve pending status. */ }
@@ -23,7 +26,8 @@ export async function calendarAssignments(db, s, user) {
 export function visibleAppointments(s, assignments, user) {
   const ids = new Set(assignments.filter(a => ["pending", "accepted"].includes(a.status)).map(a => a.appointmentId));
   return s.appointments.map(a => withoutRemovedRentalStaff(a, assignments, s.state.synced_at))
-    .filter(a => user === "owner" || ids.has(a.id) || a.acceptedEmployeeIds.includes(user) ||
+    .map(a => withAppointmentLifecycle(a, assignments))
+    .filter(a => user === "owner" || a.teamRenterId === user || ids.has(a.id) || a.acceptedEmployeeIds.includes(user) ||
       a.calendarInvitations?.some(invitation => invitation.employeeId === user && invitation.status !== "declined"))
     // Visible bookings already contain the quoted price and filtered form.
     // Keep customer payment totals so staff can see the remaining balance.

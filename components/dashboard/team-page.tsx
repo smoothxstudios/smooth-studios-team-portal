@@ -18,6 +18,7 @@ export function TeamPage({ employees, rentals, creative, payroll, onSetup, token
     {token && <TeamNotifications token={token} employees={employees} />}
     <div className="team-page-grid">
       {employees.map((employee) => {
+        const account=payroll?.accounts?.find(item=>item.employeeId===employee.id);
         const advance = payroll?.balances.find(item => item.employeeId === employee.id);
         const assigned = rentals.filter((rental) => rental.assignedEmployeeIds.includes(employee.id));
         const creativePay = creativeEarnings(creative.filter(item => item.employeeId === employee.id)).metrics;
@@ -27,7 +28,7 @@ export function TeamPage({ employees, rentals, creative, payroll, onSetup, token
         return (
           <article className="panel employee-card" key={employee.id}>
             <div className="employee-card-head"><span className="employee-avatar large" style={{ background: teamAccent(employee.id, employee.accent) }}>{employee.name.slice(0, 1)}</span><div><h2>{employee.name}</h2><p title={employee.email}>{employee.email ?? (employee.onboarding ? "Account setup needed" : "")}</p></div></div>
-            <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>{advance?.remainingCents ? "Advance left" : "Still owed"}</span><strong>{dollars(advance?.remainingCents || owed, true)}</strong></div><div><span>Appointments</span><strong>{assigned.length}</strong></div></div>
+            <div className="employee-stats"><div><span>Earned</span><strong>{dollars(paid + owed)}</strong></div><div><span>{advance?.remainingCents ? "Advance left" : "Still owed"}</span><strong>{dollars(advance?.remainingCents || account?.payableCents || (account ? 0 : owed), true)}</strong></div><div><span>Appointments</span><strong>{assigned.length}</strong></div></div>
             <div className="employee-next"><CalendarDays size={14} /><span>Next accepted</span><strong>{next ? formatDate(next.start, true) : "None scheduled"}</strong></div>
             {employee.onboarding && !employee.accessReady && <Button className="team-setup-action" variant="outline" onClick={onSetup}>Set up private account</Button>}
           </article>

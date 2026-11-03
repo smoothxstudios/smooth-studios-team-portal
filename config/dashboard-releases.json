@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.45.7",
+  "currentVersion": "2.46.0",
   "releases": [
+    {
+      "id": "2026-11-02-payment-accounts",
+      "version": "2.46.0",
+      "date": "2026-11-02",
+      "category": "Payments",
+      "title": "Payment receipts and team rental balances",
+      "changes": [
+        "Record one reviewed payment covering earned appointments, training, onboarding, and approved creative work. Exact totals, rental deductions, payment receipts, and current account balances are saved together.",
+        "Repeated submissions do not duplicate payments. Changed balances require a fresh review. Payments update immediately without waiting for a website rebuild.",
+        "Completed appointments with no team acceptance are considered cancelled. Identified team rentals are self-served and their unpaid booking price reduces the renter’s account balance. Already received customer payments are not deducted twice."
+      ],
+      "employee": {
+        "title": "Clearer payment accounts",
+        "changes": [
+          "Earnings includes studio rental deductions and saved payment receipts. Unpaid rental balances carry forward when they exceed earned pay.",
+          "Appointments with no team acceptance are considered cancelled after the booking ends."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-11-01-daylight-saving-availability",
       "version": "2.45.7",

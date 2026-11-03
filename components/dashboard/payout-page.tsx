@@ -14,7 +14,7 @@ SelectItem,
 SelectTrigger,
 SelectValue,
 } from "@/components/ui/select";
-import { dollars,eligibleForPayout } from "@/lib/dashboard-presentation";
+import { dollars,eligibleForPayout,formatDate } from "@/lib/dashboard-presentation";
 import type { Employee,PayrollState,Rental } from "@/lib/dashboard-types";
 import {
 ArrowRight,
@@ -68,11 +68,13 @@ export function PayoutPage({
   return (
     <section className={`payout-layout${isOwner ? "" : " employee-payout-layout"}`}>
       {isOwner && <article className="panel team-payout-breakdown"><div className="panel-heading"><div><h2>Pay by team member</h2><p>Appointments, training, onboarding, and other earned pay</p></div>{addPay}</div>
-        <div className="team-payout-people">{teamEarnings(employees, rentals, creative).map(person => <section className="team-payout-person" key={person.id}>
+        <div className="team-payout-people">{teamEarnings(employees, rentals, creative).map(person => { const account=payroll?.accounts?.find(item=>item.employeeId===person.id); return <section className="team-payout-person" key={person.id}>
           <div className="person-section-heading"><span className="employee-avatar" style={{ background: teamAccent(person.id, person.accent) }}>{person.name.slice(0, 1)}</span><h3>{person.name}</h3></div>
-          <dl><div><dt>Amount owed</dt><dd>{dollars(person.owed, true)}</dd></div><div><dt>Total earned</dt><dd>{dollars(person.earned, true)}</dd></div><div><dt>Paid</dt><dd>{dollars(person.cashPaid, true)}</dd></div>{person.advanceApplied > 0 && <div className="team-payout-advance"><dt>Advance applied</dt><dd>{dollars(person.advanceApplied, true)}</dd></div>}</dl>
+          <dl><div><dt>Amount owed</dt><dd>{dollars(account?.payableCents ?? person.owed, true)}</dd></div><div><dt>Total earned</dt><dd>{dollars(person.earned, true)}</dd></div><div><dt>Paid</dt><dd>{dollars(person.cashPaid, true)}</dd></div>{person.advanceApplied > 0 && <div className="team-payout-advance"><dt>Advance applied</dt><dd>{dollars(person.advanceApplied, true)}</dd></div>}</dl>
           {person.missingRates > 0 && <p className="schedule-warning">Pay rate needed for {person.missingRates} appointment{person.missingRates === 1 ? "" : "s"}.</p>}
-        </section>)}</div>
+        {account && account.rentalBalanceCents>0 && <p>Studio rental balance: {dollars(account.rentalBalanceCents,true)}{account.carryForwardCents>0?` · ${dollars(account.carryForwardCents,true)} carries forward`:""}</p>}
+          <Button variant="outline" onClick={()=>{setPayoutEmployee(person.id);onContinue();}}>Record payment</Button>
+        </section>;})}</div>
       </article>}
       <article className="panel payout-chart-panel">
         <div className="panel-heading"><div>{isOwner && <p className="eyebrow">Weekly · monthly · yearly</p>}<h2>{isOwner ? "Team payouts" : "Earnings summary"}</h2></div></div>
@@ -91,28 +93,10 @@ export function PayoutPage({
           </ResponsiveContainer>
         </div> : <p className="employee-chart-empty">Your earnings chart will appear after an appointment is earned or creative work is approved.</p>}
       </article>
-      {isOwner && (
-        <article className="panel mark-paid-card">
-          <h2>Record appointment pay</h2>
-          <p>Choose who you paid and the last appointment date covered. Record creative work payouts in the section below.</p>
-          <div className="payout-control">
-            <label id="payout-employee-label">Employee selection</label>
-            <Select onValueChange={setPayoutEmployee} value={payoutEmployee}>
-              <SelectTrigger aria-labelledby="payout-employee-label" className="payout-employee-select"><SelectValue /></SelectTrigger>
-              <SelectContent position="popper">
-                <SelectItem value="all">All employees</SelectItem>
-                {employees.map((employee) => <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="payout-control">
-            <label htmlFor="paid-through">Mark paid through</label>
-            <input id="paid-through" max={studioLocal(Date.now()).slice(0, 10)} onChange={(event) => setPaidThrough(event.target.value)} type="date" value={paidThrough} />
-          </div>
-          <div className="workflow-scope"><ReceiptText size={16} /><span>{payoutScopeLabel} · {eligibleAppointments} eligible appointment{eligibleAppointments === 1 ? "" : "s"}</span></div>
-          <Button className="github-button" onClick={onContinue}>Review and mark paid <ArrowRight size={16} /></Button>
-        </article>
-      )}
+      <article className="panel payment-account-history"><div className="panel-heading"><h2>Payment history</h2></div>
+        {payroll?.paymentReceipts?.length ? payroll.paymentReceipts.map(receipt=><details className="payment-line-items" key={receipt.id}><summary>{isOwner?`${employees.find(p=>p.id===receipt.employeeId)?.name??receipt.employeeId} · `:""}{dollars(receipt.cashCents,true)} · {formatDate(receipt.recordedAt)}</summary><p>Work through {receipt.through} · {receipt.method||"Method not specified"}</p><p>{dollars(receipt.grossCents,true)} earnings settled · {dollars(receipt.deductionCents,true)} rental deductions</p>{receipt.note&&<p>{receipt.note}</p>}<small>Receipt {receipt.id.slice(0,8)}</small></details>) : <p>Payments recorded here will appear with a receipt and the work dates covered. Earlier payments remain included in the totals.</p>}
+      </article>
+      {(payroll?.rentalCharges?.length??0)>0 && <article className="panel payment-account-history"><div className="panel-heading"><h2>Team studio rentals</h2></div><p>The unpaid booking price reduces the account balance. Amounts already paid online are excluded.</p>{payroll!.rentalCharges!.map(charge=><div className="payment-charge" key={`${charge.employeeId}:${charge.rentalId}`}><strong>{isOwner?`${employees.find(p=>p.id===charge.employeeId)?.name??charge.employeeId} · `:""}{charge.title}</strong><span>{formatDate(charge.earnedAt)} · {dollars(charge.priceCents,true)} booking · {dollars(charge.paidOnlineCents,true)} already paid</span><span>{dollars(charge.appliedCents,true)} deducted · {dollars(charge.outstandingCents,true)} remaining</span>{charge.needsReview&&<p role="alert" className="schedule-warning">This rental changed after a deduction. Review the saved payment before recording more.</p>}</div>)}</article>}
     </section>
   );
 }

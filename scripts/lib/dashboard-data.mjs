@@ -1,3 +1,4 @@
+import { withAppointmentLifecycle } from "../../lib/appointment-lifecycle.mjs";
 import { createCipheriv, createDecipheriv, createHash, pbkdf2Sync, randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -304,8 +305,11 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
   const assignedEmployees = config.employees.filter(employee => acceptedIds.has(employee.id));
   const title = summaryRentalType(event.summary);
   const category = categorizeAppointment(title);
+  const renterMatches = config.employees.filter(employee => parsed.email && employeeInvitationEmails(employee).includes(normalizedEmail(parsed.email)));
+  const teamRenterId = /studio.*rental|rental.*studio/i.test(title) && renterMatches.length === 1 ? renterMatches[0].id : undefined;
+  const ownerAccepted = (event.attendees ?? []).some(guest => guest.responseStatus === 'accepted' && (guest.organizer === true || (config.owner?.email && normalizedEmail(guest.email) === normalizedEmail(config.owner?.email))));
   const employeePayouts = Object.fromEntries(
-    assignedEmployees.map((employee) => [
+    assignedEmployees.filter(employee => employee.id !== teamRenterId).map((employee) => [
       employee.id,
       calculateEmployeePayout({ employee, config, ledger, start, end, priceCents: parsed.priceCents, categoryId: category.id, fullyPaid }),
     ]),
@@ -313,6 +317,8 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
 
   return {
     id: event.id,
+    ...(teamRenterId ? { teamRenterId } : {}),
+    ...(ownerAccepted ? { ownerAccepted: true } : {}),
     stripeMatchKey: privateIdFingerprint(event.id),
     title,
     categoryId: category.id,
@@ -357,13 +363,14 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
       if (assignment.appointmentId !== rental.id ||
           Date.parse(assignment.start) !== Date.parse(rental.start) || Date.parse(assignment.end) !== Date.parse(rental.end) ||
           !config.employees.some(employee => employee.id === assignment.employeeId) ||
-          rental.assignedEmployeeIds.includes(assignment.employeeId)) continue;
+          rental.assignedEmployeeIds.includes(assignment.employeeId) || rental.teamRenterId === assignment.employeeId) continue;
       const id = assignment.employeeId;
       rental.assignedEmployeeIds.push(id);
       rental.employeePayouts[id] = calculateEmployeePayout({ employee: config.employees.find(employee => employee.id === id), config, ledger,
         start: rental.start, end: rental.end, priceCents: rental.priceCents, categoryId: rental.categoryId, fullyPaid: rental.fullyPaid });
     }
   }
+  for (const rental of rentals) Object.assign(rental, withAppointmentLifecycle(rental));
   const generatedAt = new Date().toISOString();
   const common = {
     version: 1,
@@ -398,7 +405,7 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
     config.employees.map((employee) => {
       const visibleEmployee = dashboardEmployee(employee);
       const filteredRentals = rentals
-        .filter((rental) => rental.assignedEmployeeIds.includes(employee.id))
+        .filter((rental) => rental.assignedEmployeeIds.includes(employee.id) || rental.teamRenterId === employee.id)
         .map((rental) => {
           const employeeRental = { ...rental };
           delete employeeRental.stripePayment;
@@ -408,7 +415,7 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
             ...employeeRental,
             assignedEmployeeIds: [employee.id],
             calendarInvitations: rental.calendarInvitations.filter(invitation => invitation.employeeId === employee.id),
-            employeePayouts: { [employee.id]: rental.employeePayouts[employee.id] },
+            employeePayouts: rental.employeePayouts[employee.id] ? { [employee.id]: rental.employeePayouts[employee.id] } : {},
           };
         });
       return [employee.id, { ...common, role: "employee", user: visibleEmployee, employees: [visibleEmployee], rentals: filteredRentals }];

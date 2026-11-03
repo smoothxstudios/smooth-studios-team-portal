@@ -1,3 +1,4 @@
+import { paymentAccounts, paymentRoute } from "./payroll-payments.mjs";
 import { TEAM } from "../lib/team-schedule.mjs";
 import { unbase64url } from "../lib/team-auth.mjs";
 import { payrollRecord, payrollKey, recordManifest, verifyDelta, recordBatches } from '../lib/sync-records.mjs';
@@ -69,7 +70,7 @@ async function payrollState(db, user) {
     // new available credit or settle a different earning with the same money.
     db.prepare(advanceReviewQuery).bind(employee, employee).all(),
   ]);
-  return { version: 1, syncedAt: state?.synced_at ?? null,
+  return { ...await paymentAccounts(db, user), version: 1, syncedAt: state?.synced_at ?? null,
     balances: balances.results.map(row => ({ employeeId: row.employee_id, totalCents: Number(row.total), appliedCents: Number(row.applied), remainingCents: Math.max(0, Number(row.total) - Number(row.applied)) })),
     allocations: allocations.results.map(row => ({ employeeId: row.employee_id, kind: row.source_kind, sourceId: row.source_id, amountCents: Number(row.amount), cashFloorCents: Number(row.floor) })),
     reviewCount: reviews.results.length,
@@ -80,6 +81,7 @@ async function payrollState(db, user) {
 export async function payrollRoute({ request, db, user, env, body, fail }) {
   const path = new URL(request.url).pathname;
   const isSync = user === 'sync';
+  if (path.startsWith('/payroll/payments')) { await reconcileAdvances(db); return paymentRoute({request, db, user, body, fail}); }
   if (path === '/payroll/reviews') {
     if (user !== 'owner') fail(403, 'Only Smooth can review advance discrepancies.');
     if (request.method !== 'GET') fail(405, 'Advance reviews are read-only.');

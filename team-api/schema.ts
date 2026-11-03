@@ -196,3 +196,14 @@ export const ownerPayWorkTypes = sqliteTable("owner_pay_work_types", {
   id: text("id").primaryKey(), label: text("label").notNull(),
   normalizedLabel: text("normalized_label").notNull().unique(), createdAt: text("created_at").notNull(),
 }, table => [check("pay_work_type_label_length", sql`length(${table.label}) BETWEEN 1 AND 60`)]);
+
+export const payrollReceipts = sqliteTable("payroll_receipts", {
+  id: text("id").primaryKey(),employeeId:text("employee_id").notNull(),requestKey:text("request_key").notNull(),mutation:text("mutation").notNull(),data:text("data").notNull(),createdAt:text("created_at").notNull(),
+}, table=>[index("payroll_receipts_employee").on(table.employeeId,table.createdAt)]);
+export const payrollRentalSettlements=sqliteTable("payroll_rental_settlements",{
+  employeeId:text("employee_id").notNull(),rentalId:text("rental_id").notNull(),settledCents:integer("settled_cents").notNull(),deductionCents:integer("deduction_cents").notNull().default(0),
+},table=>[primaryKey({columns:[table.employeeId,table.rentalId]})]);
+export const payrollRentalDeductions=sqliteTable("payroll_rental_deductions",{
+  employeeId:text("employee_id").notNull(),rentalId:text("rental_id").notNull(),amountCents:integer("amount_cents").notNull(),
+},table=>[primaryKey({columns:[table.employeeId,table.rentalId]})]);
+export const payrollAccountRevision=sqliteTable("payroll_account_revision",{id:integer("id").primaryKey(),revision:integer("revision").notNull().default(0)});

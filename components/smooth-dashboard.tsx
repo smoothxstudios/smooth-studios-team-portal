@@ -1,4 +1,5 @@
 "use client";
+import { RecordPaymentDialog } from "@/components/dashboard/record-payment";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { CreativeActionList } from "@/components/dashboard/daily-actions";
 import { OwnerWeeklyHours } from "@/components/dashboard/owner-weekly-hours";
@@ -161,7 +162,8 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [paidThrough, setPaidThrough] = useState(() => studioLocal(Date.now()).slice(0, 10));
-  const [payoutEmployee, setPayoutEmployee] = useState("all");
+  const [payoutEmployee, setPayoutEmployee] = useState("rayne");
+  const [paymentDialogOpen,setPaymentDialogOpen]=useState(false);
   const [paymentOverrideOpen, setPaymentOverrideOpen] = useState(false);
   const [paymentReviewRentalId, setPaymentReviewRentalId] = useState("");
   const [stripeMatchOpen, setStripeMatchOpen] = useState(false);
@@ -172,14 +174,15 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   const employeeId = isOwner ? undefined : payload.user.id;
   const rentals = useMemo(() => applyRentalAdvances(payload.rentals, payroll.state).sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime()), [payload.rentals, payroll.state]);
   const advance = payroll.state?.balances.find(item => item.employeeId === employeeId);
+  const account = payroll.state?.accounts?.find(item=>item.employeeId===employeeId);
   const visibleRentals = useMemo(() => employeeId ? rentals.filter((rental) => rental.assignedEmployeeIds.includes(employeeId)) : rentals, [employeeId, rentals]);
   const pastRentals = visibleRentals.filter(rental => Date.parse(rental.end) <= Date.now());
   const employeeEarnings = useMemo(() => {
     const rental = employeeEarningsForYear(visibleRentals, employeeId, earningsYear);
     const work = creativeEarnings(creative.items, earningsYear);
-    return { ...rental, metrics: { ...rental.metrics, paid: rental.metrics.paid + work.metrics.paid, owed: rental.metrics.owed + work.metrics.owed, projected: rental.metrics.projected + work.metrics.projected },
+    return { ...rental, metrics: { ...rental.metrics, paid: rental.metrics.paid + work.metrics.paid, owed: account?.payableCents ?? (rental.metrics.owed + work.metrics.owed), projected: rental.metrics.projected + work.metrics.projected },
       monthly: rental.monthly.map((month, index) => ({ ...month, paid: month.paid + work.monthly[index].paid, owed: month.owed + work.monthly[index].owed })) };
-  }, [visibleRentals, employeeId, earningsYear, creative.items]);
+  }, [visibleRentals, employeeId, earningsYear, creative.items, account]);
   const earningsYears = [...new Set([currentYear, ...visibleRentals.map(rental => Number(studioLocal(rental.start).slice(0, 4))), ...creative.items.map(item => Number(studioLocal(creativeEarningDate(item)).slice(0, 4)))])].sort((a, b) => b - a);
   const categoryOptions = useMemo(() => APPOINTMENT_CATEGORIES.filter((category) => visibleRentals.some((rental) => appointmentCategory(rental).id === category.id)), [visibleRentals]);
   const filteredRentals = useMemo(() => visibleRentals.filter((rental) =>
@@ -205,8 +208,8 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
         else if (state === "upcoming") projected += payout.amountCents;
       }
     }
-    return { revenue, owed: owed + creativeTotals.metrics.owed, paid: paid + creativeTotals.metrics.paid, projected: projected + creativeTotals.metrics.projected };
-  }, [employeeId, visibleRentals, creativeTotals]);
+    return { revenue, owed: payroll.state?.accounts ? payroll.state.accounts.filter(item=>!employeeId||item.employeeId===employeeId).reduce((sum,item)=>sum+item.payableCents,0) : owed + creativeTotals.metrics.owed, paid: paid + creativeTotals.metrics.paid, projected: projected + creativeTotals.metrics.projected };
+  }, [employeeId, visibleRentals, creativeTotals, payroll.state]);
 
   const monthly = useMemo(() => {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month) => ({ month, revenue: 0, payroll: 0, paid: 0, owed: 0 }));
@@ -243,25 +246,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
     window.setTimeout(() => setWorkflowOpen(true), 0);
   };
 
-  const openPayoutWorkflow = () => {
-    const selectedEmployee = payload.employees.find((employee) => employee.id === payoutEmployee);
-    const employeeLabel = selectedEmployee?.name ?? `All ${payload.employees.length} employees`;
-    const eligible = rentals.filter((rental) => eligibleForPayout(rental, paidThrough, payoutEmployee)).length;
-    openWorkflow({
-      workflowId: "mark-paid.yml",
-      title: "Mark employee earnings paid",
-      description: selectedEmployee
-        ? `This marks ${selectedEmployee.name}'s eligible earnings paid through the selected date and republishes the encrypted dashboards.`
-        : "This marks every eligible employee earning paid through the selected date and republishes the encrypted dashboards.",
-      actionLabel: "Mark earnings paid",
-      inputs: { paid_through: paidThrough, employee: payoutEmployee },
-      details: [
-        { label: "Paid through", value: paidThrough },
-        { label: "Employee selection", value: employeeLabel },
-        { label: "Eligible appointments", value: String(eligible) },
-      ],
-    });
-  };
+  const openPayoutWorkflow = () => setPaymentDialogOpen(true);
 
   const openCalendarSync = () => openWorkflow({
     workflowId: "calendar-sync.yml",
@@ -392,7 +377,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
                   <SelectTrigger aria-label="Filter appointments by payment status" className="category-select payment-select"><SelectValue placeholder="All payments" /></SelectTrigger>
                   <SelectContent position="popper">
                     <SelectItem value="all">All payments</SelectItem>
-                    <SelectItem value="paid">Fully paid</SelectItem>
+                    <SelectItem value="paid">Fully paid</SelectItem><SelectItem value="cancelled">Cancelled</SelectItem>
                     <SelectItem value="deposit">Upcoming deposits</SelectItem>
                     <SelectItem value="review">Needs payment review</SelectItem>
                     <SelectItem value="pending">Payment pending</SelectItem>
@@ -409,7 +394,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
           </Tabs>}
           {view === "payouts" && <>
             {!isOwner && <div className="employee-earnings-heading"><div><h2>My earnings</h2><p>Appointment, training, and other work earnings by year.</p></div><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
-            <PayoutPage addPay={isOwner ? <AddPay token={schedulingToken} employees={payload.employees} state={creative} /> : undefined} creative={creative.items} payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
+            <RecordPaymentDialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen} employeeId={payoutEmployee} employees={payload.employees} token={schedulingToken} onSaved={async()=>{await Promise.all([payroll.refresh(),creative.refresh()]);}} /><PayoutPage addPay={isOwner ? <AddPay token={schedulingToken} employees={payload.employees} state={creative} /> : undefined} creative={creative.items} payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
             <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} earningsOnly focusLoading={alertWorkLoading} focusId={focusedAlert?.target === "payouts" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} year={isOwner ? undefined : earningsYear} />
             {!isOwner && earningsYear === currentYear && <PeriodTotals creative={creative.items} employeeId={employeeId} rentals={visibleRentals} />}
             {!isOwner && employeeEarnings.rentals.length > 0 && <article className="panel employee-earnings-details"><div className="panel-heading"><div><h2>Earnings by appointment</h2><p>Upcoming amounts are estimates. Custom assignments are listed in Schedule.</p></div></div><RentalTable employeeId={employeeId} rentals={employeeEarnings.rentals} /></article>}

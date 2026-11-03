@@ -41,6 +41,7 @@ export function StatusBadge({ state }: { state: AppointmentStatus }) {
     deposit: "Deposit paid",
     review: "Review balance",
     "customer-paid": "Customer paid",
+    cancelled: "Cancelled · no approval",
   };
   return <span className={`status status-${state}`}><span />{labels[state]}</span>;
 }

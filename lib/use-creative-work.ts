@@ -11,7 +11,7 @@ export type CreativeAssignment = {
   advanceAppliedCents?: number;
   createdAt: string; updatedAt: string; approvedAt: string | null;
   submissions: { id: string; submittedAt: string; links: string[]; note: string }[];
-  payments: { id: string; amountCents: number; paidAt: string; method: string }[];
+  payments: { id: string; amountCents: number; cashCents?: number; rentalDeductionCents?: number; paidAt: string; method: string }[];
   history: { id: string; event: string; by: string; at: string; note?: string }[];
 };
 export type CreativeWorkState = ReturnType<typeof useCreativeWork>;

@@ -19,7 +19,7 @@ export async function syncPayroll(payloads, ownerPassword) {
     employeeId, rentalId: rental.id, amountCents: payout.amountCents,
     paidCents: payout.recordedPaidAmountCents ?? payout.paidAmountCents ?? (payout.paid ? payout.amountCents : 0),
     earnedAt: new Date(rental.end).toISOString(),
-    eligible: rental.fullyPaid && Date.parse(rental.end) <= Date.parse(asOf) && payout.compensationConfigured !== false,
+    eligible: !rental.cancelled && rental.fullyPaid && Date.parse(rental.end) <= Date.parse(asOf) && payout.compensationConfigured !== false,
   })));
   let payroll = await syncRecords({ request, prefix: '/sync/payroll', records: earnings, key: payrollKey,
     field: 'earnings', time: { asOf } });

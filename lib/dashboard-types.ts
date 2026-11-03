@@ -10,6 +10,7 @@ export type Employee = {
 };
 
 export type EmployeePayout = {
+  rentalDeductionCents?: number;
   amountCents: number;
   paidAmountCents?: number;
   recordedPaidAmountCents?: number;
@@ -75,6 +76,7 @@ export type StudioRulebook = {
 };
 
 export type Rental = {
+  cancelled?: boolean; cancellationReason?: string; teamRenterId?: string; ownerAccepted?: boolean;
   calendarInvitations?: { employeeId: string; status: "accepted" | "tentative" | "needsAction" | "declined" }[];
   rentalDetails?: string;
   id: string;
@@ -98,7 +100,15 @@ export type Rental = {
 };
 
 export type AdvanceBalance = { employeeId: string; totalCents: number; appliedCents: number; remainingCents: number };
+export type PayrollAccount = { employeeId:string; grossOwedCents:number; rentalBalanceCents:number; netCents:number; payableCents:number; carryForwardCents:number; reviewCount:number };
+export type PaymentReceipt = { id:string; employeeId:string; through:string; recordedAt:string; method:string; note:string; grossCents:number; deductionCents:number; cashCents:number; remainingPayableCents:number; carryForwardCents:number };
 export type PayrollState = {
+  accountRevision?: number;
+  accounts?: PayrollAccount[];
+  earnings?: {employeeId:string;kind:string;sourceId:string;outstandingCents:number}[];
+  rentalCharges?: {employeeId:string;rentalId:string;title:string;earnedAt:string;priceCents:number;paidOnlineCents:number;amountCents:number;appliedCents:number;outstandingCents:number;needsReview:boolean}[];
+  rentalPayments?: {employeeId:string;rentalId:string;recordedPaidAmountCents:number;rentalDeductionCents:number}[];
+  paymentReceipts?: PaymentReceipt[];
   version: 1; syncedAt: string | null; balances: AdvanceBalance[];
   allocations: { employeeId: string; kind: "rental" | "creative"; sourceId: string; amountCents: number; cashFloorCents: number }[];
   reviewCount: number;

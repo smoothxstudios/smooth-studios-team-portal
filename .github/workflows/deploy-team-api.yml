@@ -8,6 +8,7 @@ on:
       - "lib/team-*.mjs"
       - "lib/event-planner.mjs"
       - "lib/sync-records.mjs"
+      - "lib/appointment-lifecycle.mjs"
       - "scripts/lib/incremental-sync.mjs"
       - "scripts/deploy-team-api.mjs"
       - "scripts/import-studio-reference.mjs"
@@ -75,6 +76,10 @@ jobs:
           DASHBOARD_PASSWORD_RAYNE: ${{ secrets.DASHBOARD_PASSWORD_RAYNE }}
           DASHBOARD_GITHUB_TOKEN: ${{ secrets.DASHBOARD_GITHUB_TOKEN }}
         run: npm run sync:calendar
+      - name: Reconcile the previously recorded payment
+        env:
+          DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}
+        run: node scripts/reconcile-recorded-payment.mjs rayne 2026-11-02 81c81c1a-353c-4fc0-bb0b-c461ea95172a
       - name: Verify restored account data and scheduling access
         env:
           DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}

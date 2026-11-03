@@ -13,7 +13,7 @@ export function usePayroll(token: string, initial?: PayrollState) {
       const next = await teamRequest<PayrollState>(token, "/payroll");
       if (current === sequence.current) { setState(next); setError(""); }
       return true;
-    } catch { if (current === sequence.current) setError("Advance balances could not refresh. Showing the last synced balances."); return false; }
+    } catch { if (current === sequence.current) setError("Payment balances could not refresh. Showing the last synced balances."); return false; }
   }, [token]);
   useRefreshSource(refresh);
   const updateReviewSummary = useCallback((reviews: { employeeId: string }[]) => {

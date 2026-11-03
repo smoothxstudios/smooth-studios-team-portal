@@ -172,3 +172,9 @@ npm run lint
 ```
 
 The first import begins at January 1, 2026. Studio timezone, commission rate, display names, and secret-variable names are defined in `config/studio.config.json`.
+
+## Payment accounts
+
+Payouts → Record payment reads the current authenticated payroll ledger and includes completed appointment earnings, manual pay, and approved creative work. It previews exact cents, rental offsets, and the remaining balance; a confirmed save writes an atomic, idempotent receipt. Later imported earnings are not covered by that receipt. Paid rental values are overlaid from the live ledger so an older encrypted snapshot cannot reopen settled earnings.
+
+Team rentals match one exact configured booking email. The unpaid price, excluding received online payments, reduces that person’s account and carries forward if necessary. Consumed deductions remain auditable; a later removed, reassigned, or reduced charge is flagged for review. Appointments with no accepted staff after their end time are considered cancelled in the dashboard; recognized team rentals are self-served. Calendar source records and Stripe transactions are retained.

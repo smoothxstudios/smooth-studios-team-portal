@@ -1,3 +1,4 @@
+import { PayrollAccountConflict } from "./payroll-payments.mjs";
 import { tokenHash } from "../lib/team-auth.mjs";
 import { TEAM, localInstant as parseLocalInstant, addLocalDays, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
 import { deliverPush, flushAlerts, publicPushKey, pushDeliveryMessage, pushEndpoint } from "./push.mjs";
@@ -142,7 +143,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, appleCalendarVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, paymentReceiptsVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, appleCalendarVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -317,6 +318,8 @@ async function route(request, env, ctx) {
       return calendarRecord({ id: text(a.id, 300), title: text(a.title, 300), customer: text(a.customer, 200, false),
         start: new Date(a.start).toISOString(), end: new Date(a.end).toISOString(), priceCents: a.priceCents,
         fullyPaid: a.fullyPaid, paidOnlineCents: a.paidOnlineCents,
+        ...(a.teamRenterId ? { teamRenterId: person(a.teamRenterId, true) } : {}),
+        ...(a.ownerAccepted === true ? { ownerAccepted: true } : {}),
         rentalDetails: text(a.rentalDetails ?? "", 8000, false),
         acceptedEmployeeIds: [...new Set(a.acceptedEmployeeIds.map(p => person(p, true)))],
         calendarInvitations,
@@ -627,7 +630,7 @@ const worker = {
       return new Response(JSON.stringify(result), { headers });
     }
     catch (error) {
-      const status = error instanceof ApiError ? error.status : 500;
+      const status = error instanceof ApiError ? error.status : error instanceof PayrollAccountConflict ? 409 : 500;
       return new Response(JSON.stringify({ error: status === 500 ? "Scheduling is temporarily unavailable. Your change was not confirmed; refresh before retrying." : error.message }), { status, headers });
     }
   },

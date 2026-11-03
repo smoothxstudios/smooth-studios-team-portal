@@ -1,3 +1,4 @@
+import { appointmentCancelled } from "@/lib/appointment-lifecycle.mjs";
 import { categorizeAppointment } from "@/lib/appointment-categories.mjs";
 import type {
 AccessProfile,
@@ -20,9 +21,9 @@ export const MONEY_EXACT = new Intl.NumberFormat("en-US", { style: "currency", c
 
 export type ViewKey = "planner" | "alerts" | "overview" | "rentals" | "team" | "payouts" | "guide" | "checklists" | "scheduling" | "availability" | "creative" | "settings";
 
-export type RentalState = "upcoming" | "earned" | "paid" | "awaiting";
+export type RentalState = "cancelled" | "upcoming" | "earned" | "paid" | "awaiting";
 
-export type CustomerPaymentState = "paid" | "deposit" | "review" | "pending";
+export type CustomerPaymentState = "cancelled" | "paid" | "deposit" | "review" | "pending";
 
 export type AppointmentStatus = RentalState | "customer-paid" | "upcoming-paid" | "deposit" | "review";
 
@@ -61,6 +62,7 @@ export function durationLabel(rental: Rental) {
 }
 
 export function customerPaymentState(rental: Rental): CustomerPaymentState {
+  if (appointmentCancelled(rental)) return "cancelled";
   if (customerFullyPaid(rental)) return "paid";
   if (rental.stripePayment?.disputed) return "review";
   if (new Date(rental.end).getTime() <= Date.now()) return "review";
@@ -77,6 +79,7 @@ export function unpaidEarnings(payout?: EmployeePayout) {
 }
 
 export function rentalState(rental: Rental, employeeId?: string): RentalState {
+  if (appointmentCancelled(rental)) return "cancelled";
   const ended = new Date(rental.end).getTime() <= Date.now();
   if (!ended) return "upcoming";
   if (!customerFullyPaid(rental)) return "awaiting";
@@ -94,6 +97,7 @@ export function eligibleForPayout(rental: Rental, paidThrough: string, employeeS
 
 export function appointmentStatus(rental: Rental, employeeId?: string): AppointmentStatus {
   const paymentState = customerPaymentState(rental);
+  if (paymentState === "cancelled") return "cancelled";
   if (paymentState === "deposit") return "deposit";
   if (paymentState === "pending") return "awaiting";
   if (paymentState === "review") return "review";
