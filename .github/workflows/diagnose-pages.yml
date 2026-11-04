@@ -1,27 +1,36 @@
-name: Diagnose Pages publishing
+name: Recover stalled Pages publishing
 on:
   push:
     branches: [diagnostics/pages-publishing-20261104]
     paths: [".github/workflows/diagnose-pages.yml"]
-  workflow_dispatch:
 permissions:
-  actions: read
-  pages: read
+  actions: write
+  pages: write
   contents: read
 jobs:
-  inspect:
+  recover:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
       - uses: actions/github-script@v8
         with:
           script: |
-            const shas = ['79705d1700464bc39dd931e8daad1f8d2b5a6f4e', '6c7a4cc3b875622aa9191dba48bbfbd14976666e'];
-            for (const sha of shas) {
-              try {
-                const response = await github.request('GET /repos/{owner}/{repo}/pages/deployments/{id}', { ...context.repo, id: sha, request: { timeout: 15000 } });
-                core.info(JSON.stringify({ sha, deployment: response.data }));
-              } catch (error) { core.info(JSON.stringify({ sha, status: error.status, message: error.message })); }
+            const request = { timeout: 15000 };
+            for (const run_id of [41928176532, 41928176334]) {
+              const { data } = await github.rest.actions.getWorkflowRun({ ...context.repo, run_id, request });
+              if (data.status !== 'completed') {
+                await github.rest.actions.cancelWorkflowRun({ ...context.repo, run_id, request });
+                core.info('Cancelled superseded publishing attempt ' + run_id);
+              }
             }
-            const response = await github.rest.actions.listWorkflowRunsForRepo({ ...context.repo, branch: 'main', per_page: 100, request: { timeout: 15000 } });
-            core.info(JSON.stringify({ recentRuns: response.data.workflow_runs.length, failedRuns: response.data.workflow_runs.filter(r => r.status === 'completed' && ['failure','cancelled','timed_out'].includes(r.conclusion)).length }));
+            for (const id of ['6c7a4cc3b875622aa9191dba48bbfbd14976666e', '79705d1700464bc39dd931e8daad1f8d2b5a6f4e']) {
+              try {
+                const { data } = await github.request('GET /repos/{owner}/{repo}/pages/deployments/{id}', { ...context.repo, id, request });
+                if (data.status === 'succeed') { core.info(id + ' already published; preserved.'); continue; }
+                await github.request('POST /repos/{owner}/{repo}/pages/deployments/{id}/cancel', { ...context.repo, id, request });
+                core.info('Requested cleanup for stalled deployment ' + id);
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                core.info(id + ': no remaining deployment.');
+              }
+            }
