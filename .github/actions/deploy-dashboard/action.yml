@@ -23,7 +23,7 @@ runs:
       with:
         script: |
           const { recoverPages } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/lib/pages-recovery.mjs`);
-          await recoverPages({ github, context, core });
+          await recoverPages({ github, context, core, includeCurrent: true });
           await new Promise(resolve => setTimeout(resolve, 15000));
     - name: Retry dashboard publication
       id: retry

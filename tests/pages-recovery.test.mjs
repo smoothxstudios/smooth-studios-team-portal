@@ -29,6 +29,16 @@ test('an acknowledged cancellation must finish before publishing can resume', as
   assert.equal(f.waits.length, 2);
   assert.equal(f.calls.filter(c => c.route.startsWith('POST')).length, 1);
 });
+test('blank GitHub statuses still request orphan cancellation before the publish step verifies readiness', async () => {
+  const f = fixture({ states: ['', ''] });
+  assert.deepEqual(await f.run(), [sha]);
+  assert.equal(f.calls.filter(c => c.route.startsWith('POST')).length, 1);
+});
+test('first publication does not attempt to cancel its own not-yet-created deployment', async () => {
+  const f = fixture({ runs: [] });
+  await f.run();
+  assert.equal(f.calls.length, 0);
+});
 test('a cancellation that remains active is retried and fails visibly', async () => {
   const f = fixture({ states: ['updating_pages'] });
   await assert.rejects(f.run(), /cancellation has not finished/);
