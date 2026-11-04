@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.46.0",
+  "currentVersion": "2.46.1",
   "releases": [
+    {
+      "id": "2026-11-04-send-and-calendar-publishing",
+      "version": "2.46.1",
+      "date": "2026-11-04",
+      "category": "Fixes",
+      "title": "Shorter Send button and reliable calendar publishing",
+      "changes": [
+        "The notification composer uses a short Send button that fits comfortably on phones.",
+        "Dashboard publishing checks for unfinished deployments from failed runs, waits for cleanup, and retries a temporary failure once so a stuck deployment does not keep blocking calendar updates."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-11-02-payment-accounts",
       "version": "2.46.0",
