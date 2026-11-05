@@ -248,7 +248,7 @@ export function GithubWorkflowDialog({
   const statusCopy = stage === "validating" ? `Confirming this token belongs to ${access?.allowedLogin ?? "Smooth"}.`
     : stage === "dispatching" ? "GitHub is accepting the dashboard request."
       : stage === "queued" ? "GitHub has the request and is preparing the runner."
-        : "The update and dashboard deployment are in progress.";
+        : request?.workflowId === "calendar-sync.yml" ? "Calendar, payment, and assignment updates are in progress." : "The update and dashboard deployment are in progress.";
 
   return (
     <Dialog onOpenChange={close} open={open}>
@@ -294,7 +294,7 @@ export function GithubWorkflowDialog({
               <span className="workflow-dialog-icon success"><CheckCircle2 /></span>
               <p className="eyebrow">Complete</p>
               <DialogTitle>{request?.title} finished</DialogTitle>
-              <DialogDescription>The encrypted dashboard data and published portal have been updated. Reload and sign in again to view the latest information.</DialogDescription>
+              <DialogDescription>{request?.workflowId === "calendar-sync.yml" ? "Calendar and payment data have been updated. Your dashboard checks for new data automatically, or you can reload now." : "The encrypted dashboard data and published portal have been updated. Reload and sign in again to view the latest information."}</DialogDescription>
             </div>
             <DialogFooter>
               {run?.html_url && <Button asChild variant="outline"><a href={run.html_url} rel="noreferrer" target="_blank">View details <ExternalLink /></a></Button>}

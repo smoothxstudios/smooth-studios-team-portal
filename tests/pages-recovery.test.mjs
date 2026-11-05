@@ -73,8 +73,8 @@ test('missing deployments are ignored; authorization failures are not hidden', a
   assert.deepEqual(await fixture({ error: Object.assign(new Error('Missing'), { status: 404 }) }).run(), []);
   await assert.rejects(fixture({ error: Object.assign(new Error('Denied'), { status: 403 }) }).run(), /Denied/);
 });
-test('calendar and code publishing share recovery, data lock, and the configured domain base path', () => {
-  for (const name of ['calendar-sync', 'deploy-pages']) {
+test('code publishing retains recovery, data lock, and the configured domain base path', () => {
+  for (const name of ['deploy-pages']) {
     const workflow = yaml.load(readFileSync(new URL(`../.github/workflows/${name}.yml`, import.meta.url), 'utf8'));
     assert.equal(workflow.permissions.actions, 'read');
     assert.equal(workflow.permissions.contents, 'write', 'fresh publication commits require repository write access');
@@ -83,7 +83,7 @@ test('calendar and code publishing share recovery, data lock, and the configured
     const steps = workflow.jobs.deploy.steps;
     assert.equal(steps[0].uses, 'actions/checkout@v4');
     assert.equal(steps[1].uses, './.github/actions/deploy-dashboard');
-    const buildJob = name === 'calendar-sync' ? 'sync-and-build' : 'build';
+    const buildJob = 'build';
     assert.equal(steps[1].with['build-sha'], '${{ needs.' + buildJob + '.outputs.build_sha }}');
     assert.equal(workflow.jobs[buildJob].outputs.build_sha, '${{ steps.source.outputs.sha }}');
     const build = Object.values(workflow.jobs)[0].steps.find(step => step.run === 'npm run build:github-pages');
@@ -93,6 +93,22 @@ test('calendar and code publishing share recovery, data lock, and the configured
   const publish = action.runs.steps.find(step => step.id === 'publish');
   assert.equal(publish['continue-on-error'], undefined, 'exhausted attempts must fail the workflow');
   assert.match(publish.with.script, /publishPages/);
+});
+
+test('routine calendar sync saves encrypted data without any Pages build or deployment', () => {
+  const workflow = yaml.load(readFileSync(new URL('../.github/workflows/calendar-sync.yml', import.meta.url), 'utf8'));
+  assert.equal(workflow.on.schedule[0].cron, '*/5 * * * *');
+  assert.equal(workflow.permissions.contents, 'write');
+  assert.equal(workflow.permissions.pages, undefined);
+  assert.equal(workflow.permissions['id-token'], undefined);
+  assert.equal(workflow.concurrency.group, 'smooth-studios-data-writes');
+  assert.equal(workflow.concurrency['cancel-in-progress'], false);
+  assert.deepEqual(Object.keys(workflow.jobs), ['sync']);
+  const steps = workflow.jobs.sync.steps;
+  assert.equal(steps[0].with.ref, 'main');
+  assert.ok(steps.some(step => step.run === 'npm run sync:calendar'));
+  assert.ok(steps.some(step => /git push origin HEAD:main/.test(step.run || '')));
+  assert.ok(steps.every(step => !/build:github-pages|pages-artifact|deploy-dashboard|deploy-pages/.test(`${step.run || ''} ${step.uses || ''}`)));
 });
 
 test('recovery also releases the fresh deployment identity left by an interrupted run', async () => {

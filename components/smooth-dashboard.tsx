@@ -53,6 +53,7 @@ import { APPOINTMENT_CATEGORIES } from "@/lib/appointment-categories.mjs";
 import { rentalAlertTargetId } from "@/lib/alert-target.mjs";
 import { creativeEarningDate,creativeEarnings } from "@/lib/creative-work.mjs";
 import { decryptDashboard,encryptWorkflowPayload } from "@/lib/dashboard-crypto";
+import { readDashboardData } from "@/lib/dashboard-data-source.mjs";
 import type { PaymentFilter,ViewKey } from "@/lib/dashboard-presentation";
 import { FALLBACK_PROFILES,appointmentCategory,customerPaymentState,dollars,eligibleForPayout,formatDate,formatTime,paidEarnings,rentalState,teamAccent,unpaidEarnings } from "@/lib/dashboard-presentation";
 import { attachQuietSnapshotRefresh,createDashboardSnapshotReader,dashboardHasOpenEditor } from "@/lib/dashboard-refresh.mjs";
@@ -251,7 +252,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
   const openCalendarSync = () => openWorkflow({
     workflowId: "calendar-sync.yml",
     title: "Sync Calendar and Stripe",
-    description: "This imports the latest appointments and payment activity, reconciles their records, rebuilds every encrypted dashboard, and republishes the portal.",
+    description: "This refreshes appointments, payments, payroll, and team assignment notes.",
     actionLabel: "Start data sync",
     details: [
       { label: "Calendar", value: payload.calendarName },
@@ -452,11 +453,7 @@ export function SmoothDashboard() {
     const refreshProfiles = async () => {
       const request = ++latestRequest;
       try {
-        // GitHub Pages caches JSON for ten minutes. Account activation must
-        // appear immediately, including after logout and returning to a tab.
-        const response = await fetch(`./data/access.json?v=${Date.now()}`, { cache: "no-store", signal: controller.signal });
-        if (!response.ok) return;
-        const data = await response.json() as { profiles: AccessProfile[] };
+        const data = await readDashboardData("access.json", { signal: controller.signal }) as { profiles: AccessProfile[] };
         if (!controller.signal.aborted && request === latestRequest && Array.isArray(data.profiles) && data.profiles.length) setProfiles(data.profiles);
       } catch { /* Keep the current list when the connection is unavailable. */ }
     };
@@ -480,9 +477,7 @@ export function SmoothDashboard() {
 
   const unlock = async (profile: AccessProfile, password: string) => {
     const epoch = ++sessionEpoch.current;
-    const response = await fetch(`./data/${encodeURIComponent(profile.id)}.json?v=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error("Dashboard data is unavailable");
-    const envelope = await response.json() as EncryptedEnvelope;
+    const envelope = await readDashboardData(`${profile.id}.json`) as EncryptedEnvelope;
     const unlocked = await decryptDashboard(envelope, password);
     if (unlocked.user.id !== profile.id || unlocked.role !== profile.role) throw new Error("Invalid dashboard payload");
     const token = await teamToken(password, profile.id);

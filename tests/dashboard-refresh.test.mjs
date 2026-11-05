@@ -60,7 +60,7 @@ test('refresh cache-busts the encrypted snapshot, validates the account, and upd
     fetcher: async (nextUrl, nextOptions) => { url = nextUrl; options = nextOptions; return new Response('{}'); },
     onSnapshot: next => { applied = next; },
   }));
-  assert.match(url, /^\.\/data\/example\.json\?v=\d+$/);
+  assert.match(url, /^https:\/\/raw\.githubusercontent\.com\/smoothxstudios\/smooth-studios-team-portal\/main\/public\/data\/example\.json\?v=\d+$/);
   assert.equal(options.cache, 'no-store'); assert.ok(options.signal);
   assert.equal(applied, snapshot);
 });
@@ -116,7 +116,7 @@ test('a failed automatic read can retry, and a signed-out session cannot publish
   const pending = reader(); await started.promise;
   current = false; waiting.resolve();
   assert.equal(await pending, false); assert.equal(applied, 0);
-  assert.equal(await reader(), false); assert.equal(fetches, 2);
+  assert.equal(await reader(), false); assert.equal(fetches, 3, 'the failed read tries both data sources; signing out prevents any later read');
 });
 
 test('opening an editor during a fetch defers the update without losing it or resetting form data', async () => {

@@ -53,12 +53,12 @@ The service account only needs this dedicated Calendar. Once team scheduling is 
 
 ## GitHub repository setup
 
-Create `smoothxstudios/smooth-studios-team-portal` as a private repository and push this project to the `main` branch. Private-repository GitHub Pages requires a GitHub plan that supports it; the source can remain private even while Pages is left disabled. Then:
+Production uses the existing public `smoothxstudios/smooth-studios-team-portal` repository and its `main` branch. The browser reads the password-encrypted dashboard files through GitHub's raw-file host, so this data source requires public repository read access. Never put decrypted dashboards, passwords, or service credentials in public files. Preserve the existing repository visibility and GitHub Pages custom domain. For setup:
 
 1. Open **Settings → Pages** and choose **GitHub Actions** as the source.
 2. Open **Settings → Secrets and variables → Actions**.
 3. Add all secrets in the table below.
-4. Run **Sync Smooth Studios Calendar** once from the Actions tab.
+4. Run **Sync Smooth Studios Calendar** once from the Actions tab, then **Deploy dashboard to GitHub Pages** for the initial app release.
 
 | Secret | Value |
 |---|---|
@@ -74,7 +74,9 @@ Create `smoothxstudios/smooth-studios-team-portal` as a private repository and p
 | `DASHBOARD_PASSWORD_RAYNE` | Generated Rayne password |
 | `DASHBOARD_GITHUB_TOKEN` | Fine-grained token limited to this repository with Actions read/write permission |
 
-The existing Cloudflare five-minute cron dispatches the Calendar workflow when the last import is at least two minutes old. A D1 lease prevents duplicate dispatches and checks for active imports or backend deployments; GitHub’s schedule remains a fallback. The workflow refreshes the encrypted payloads and rental team notes, commits the encrypted data, and deploys the updated GitHub Page. The server trigger avoids GitHub’s delayed scheduled starts; workflow execution still takes time. Visible dashboards check for published snapshots every 30 seconds while preserving open forms and scroll position. The dashboard shows the actual last sync time, and **Sync now** remains available.
+The existing Cloudflare five-minute cron dispatches the Calendar workflow when the last import is at least two minutes old. A D1 lease prevents duplicate dispatches and checks for active imports or backend deployments; GitHub’s schedule remains a fallback. The workflow refreshes encrypted payloads and rental team notes, then commits the encrypted data. Routine Calendar syncs do not build or deploy the website. App releases still use the separate GitHub Pages workflow and the existing custom domain.
+
+Sign-in, profile selection, and background refresh read committed JSON through `lib/dashboard-data-source.mjs`, with a cache-busting URL and no credentials sent to the raw-file host. When that read fails, the published JSON is a fallback. Password decryption and account/role validation are unchanged; an older fallback cannot replace a newer signed-in snapshot. Visible dashboards check every 30 seconds while preserving open forms and scroll position. The dashboard shows the actual last sync time, and **Sync now** remains available. Devices with an already-open older app version need one reload to use this independent data path.
 
 Each `EMPLOYEE_EMAIL_*` secret accepts one address or multiple comma-separated addresses. Addresses are matched case-insensitively and duplicate entries are ignored. Keep every address in GitHub Secrets rather than committing it to the repository.
 

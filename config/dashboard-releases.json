@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.46.2",
+  "currentVersion": "2.46.3",
   "releases": [
+    {
+      "id": "2026-11-05-independent-calendar-updates",
+      "version": "2.46.3",
+      "date": "2026-11-05",
+      "category": "Fixes",
+      "title": "Calendar updates without waiting for an app release",
+      "changes": [
+        "Routine Calendar and payment imports now save data without rebuilding or publishing the website. A publishing timeout no longer blocks the normal sync workflow.",
+        "Sign-in and background refresh read the latest saved encrypted data, with the published copy available as a fallback. Older data cannot replace a newer signed-in snapshot."
+      ],
+      "employee": {
+        "title": "More reliable calendar updates",
+        "changes": [
+          "Your dashboard can load new Calendar data while an app release is delayed. Reload an already-open dashboard once to use the updated refresh."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-11-05-fresh-publishing-retries",
       "version": "2.46.2",
