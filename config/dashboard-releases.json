@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.46.3",
+  "currentVersion": "2.46.4",
   "releases": [
+    {
+      "id": "2026-11-05-payout-row-layout",
+      "version": "2.46.4",
+      "date": "2026-11-05",
+      "category": "Interface",
+      "title": "Clear rental deductions and consistent payout rows",
+      "changes": [
+        "Amount owed clearly shows that unpaid studio rentals have already been subtracted. Each affected row shows unpaid earnings, the rental deduction, and any rental balance carried forward.",
+        "Each team member’s totals and pay-rate notices stay grouped together. Record payment buttons align consistently on wide screens and fill the row below the details on phones."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-11-05-independent-calendar-updates",
       "version": "2.46.3",

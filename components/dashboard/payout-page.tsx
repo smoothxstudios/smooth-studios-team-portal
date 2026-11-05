@@ -68,13 +68,31 @@ export function PayoutPage({
   return (
     <section className={`payout-layout${isOwner ? "" : " employee-payout-layout"}`}>
       {isOwner && <article className="panel team-payout-breakdown"><div className="panel-heading"><div><h2>Pay by team member</h2><p>Appointments, training, onboarding, and other earned pay</p></div>{addPay}</div>
-        <div className="team-payout-people">{teamEarnings(employees, rentals, creative).map(person => { const account=payroll?.accounts?.find(item=>item.employeeId===person.id); return <section className="team-payout-person" key={person.id}>
-          <div className="person-section-heading"><span className="employee-avatar" style={{ background: teamAccent(person.id, person.accent) }}>{person.name.slice(0, 1)}</span><h3>{person.name}</h3></div>
-          <dl><div><dt>Amount owed</dt><dd>{dollars(account?.payableCents ?? person.owed, true)}</dd></div><div><dt>Total earned</dt><dd>{dollars(person.earned, true)}</dd></div><div><dt>Paid</dt><dd>{dollars(person.cashPaid, true)}</dd></div>{person.advanceApplied > 0 && <div className="team-payout-advance"><dt>Advance applied</dt><dd>{dollars(person.advanceApplied, true)}</dd></div>}</dl>
-          {person.missingRates > 0 && <p className="schedule-warning">Pay rate needed for {person.missingRates} appointment{person.missingRates === 1 ? "" : "s"}.</p>}
-        {account && account.rentalBalanceCents>0 && <p>Studio rental balance: {dollars(account.rentalBalanceCents,true)}{account.carryForwardCents>0?` · ${dollars(account.carryForwardCents,true)} carries forward`:""}</p>}
-          <Button variant="outline" onClick={()=>{setPayoutEmployee(person.id);onContinue();}}>Record payment</Button>
-        </section>;})}</div>
+        <div className="team-payout-people">{teamEarnings(employees, rentals, creative).map(person => {
+          const account = payroll?.accounts?.find(item => item.employeeId === person.id);
+          const rentalDeduction = account ? Math.min(account.grossOwedCents, account.rentalBalanceCents) : 0;
+          return <section className="team-payout-person" key={person.id}>
+            <div className="person-section-heading"><span className="employee-avatar" style={{ background: teamAccent(person.id, person.accent) }}>{person.name.slice(0, 1)}</span><h3>{person.name}</h3></div>
+            <div className="team-payout-details">
+              <dl>
+                <div><dt>Amount owed</dt><dd>{dollars(account?.payableCents ?? person.owed, true)}</dd></div>
+                <div><dt>Total earned</dt><dd>{dollars(person.earned, true)}</dd></div>
+                <div><dt>Paid</dt><dd>{dollars(person.cashPaid, true)}</dd></div>
+                {person.advanceApplied > 0 && <div className="team-payout-advance"><dt>Advance applied</dt><dd>{dollars(person.advanceApplied, true)}</dd></div>}
+              </dl>
+              {account && account.rentalBalanceCents > 0 && <div className="team-payout-rental-balance">
+                {rentalDeduction > 0 && <>
+                  <p><span>Unpaid earnings</span><strong>{dollars(account.grossOwedCents, true)}</strong></p>
+                  <p><span>Studio rental deduction</span><strong>−{dollars(rentalDeduction, true)}</strong></p>
+                  <small>Already included in Amount owed.</small>
+                </>}
+                {account.carryForwardCents > 0 && <p><span>Rental balance carried forward</span><strong>{dollars(account.carryForwardCents, true)}</strong></p>}
+              </div>}
+              {person.missingRates > 0 && <p className="schedule-warning">Pay rate needed for {person.missingRates} appointment{person.missingRates === 1 ? "" : "s"}.</p>}
+            </div>
+            <Button className="team-payout-record" variant="outline" aria-label={`Record payment for ${person.name}`} onClick={() => { setPayoutEmployee(person.id); onContinue(); }}>Record payment</Button>
+          </section>;
+        })}</div>
       </article>}
       <article className="panel payout-chart-panel">
         <div className="panel-heading"><div>{isOwner && <p className="eyebrow">Weekly · monthly · yearly</p>}<h2>{isOwner ? "Team payouts" : "Earnings summary"}</h2></div></div>
