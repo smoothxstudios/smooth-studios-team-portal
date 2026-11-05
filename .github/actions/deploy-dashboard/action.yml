@@ -1,9 +1,9 @@
 name: Deploy dashboard with Pages recovery
-description: Release orphaned deployments and retry a temporary publishing failure once.
+description: Release orphaned deployments and publish with a fresh identity for each bounded attempt.
 outputs:
   page_url:
     description: Published dashboard URL
-    value: ${{ steps.retry.outputs.page_url || steps.first.outputs.page_url }}
+    value: ${{ steps.publish.outputs.page_url }}
 runs:
   using: composite
   steps:
@@ -14,21 +14,12 @@ runs:
           const { recoverPages } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/lib/pages-recovery.mjs`);
           await recoverPages({ github, context, core });
     - name: Publish dashboard
-      id: first
-      continue-on-error: true
-      uses: actions/deploy-pages@v4
-    - name: Wait for failed deployment cleanup
-      if: ${{ steps.first.outcome == 'failure' }}
+      id: publish
       uses: actions/github-script@v8
       with:
         script: |
-          const { recoverPages } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/lib/pages-recovery.mjs`);
-          await recoverPages({ github, context, core, includeCurrent: true });
-          await new Promise(resolve => setTimeout(resolve, 15000));
-    - name: Retry dashboard publication
-      id: retry
-      if: ${{ steps.first.outcome == 'failure' }}
-      uses: actions/deploy-pages@v4
+          const { publishPages } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/lib/pages-publish.mjs`);
+          await publishPages({ github, context, core });
     - name: Release failed or cancelled deployment
       if: ${{ failure() || cancelled() }}
       uses: actions/github-script@v8

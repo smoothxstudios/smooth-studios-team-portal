@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import yaml from 'js-yaml';
 import { recoverPages } from '../scripts/lib/pages-recovery.mjs';
+import { pagesBuildVersion } from '../scripts/lib/pages-publish.mjs';
 
 const sha = 'a'.repeat(40);
 const context = { repo: { owner: 'fixture', repo: 'dashboard' }, runId: 2, sha: 'b'.repeat(40) };
@@ -86,7 +87,24 @@ test('calendar and code publishing share recovery, data lock, and the configured
     assert.equal(build.env.GITHUB_PAGES_BASE_PATH, '${{ steps.pages.outputs.base_path }}');
   }
   const action = yaml.load(readFileSync(new URL('../.github/actions/deploy-dashboard/action.yml', import.meta.url), 'utf8'));
-  const retry = action.runs.steps.find(step => step.id === 'retry');
-  assert.equal(retry['continue-on-error'], undefined, 'second failure must fail the workflow');
-  assert.match(retry.if, /first.outcome == 'failure'/);
+  const publish = action.runs.steps.find(step => step.id === 'publish');
+  assert.equal(publish['continue-on-error'], undefined, 'exhausted attempts must fail the workflow');
+  assert.match(publish.with.script, /publishPages/);
+});
+
+test('recovery also releases the fresh deployment identity left by an interrupted run', async () => {
+  const deploymentId = pagesBuildVersion({ sha, runId: 1, runAttempt: 2 }, 2);
+  const calls = [];
+  let cancelled = false;
+  const github = {
+    rest: { actions: { listWorkflowRunsForRepo: async () => ({ data: { workflow_runs: [{ ...failedRun, run_attempt: 2 }] } }) } },
+    request: async (route, args) => {
+      calls.push({ route, id: args.pages_deployment_id });
+      if (args.pages_deployment_id !== deploymentId) throw Object.assign(new Error('Missing'), { status: 404 });
+      if (route.startsWith('POST')) { cancelled = true; return { status: 204 }; }
+      return { data: { status: cancelled ? 'deployment_cancelled' : 'updating_pages' } };
+    },
+  };
+  assert.deepEqual(await recoverPages({ github, context, core: { info() {} }, wait: async () => {} }), [deploymentId]);
+  assert.equal(calls.filter(call => call.route.startsWith('POST')).length, 1);
 });

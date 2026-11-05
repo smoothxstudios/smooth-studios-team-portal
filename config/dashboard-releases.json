@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.46.1",
+  "currentVersion": "2.46.2",
   "releases": [
+    {
+      "id": "2026-11-05-fresh-publishing-retries",
+      "version": "2.46.2",
+      "date": "2026-11-05",
+      "category": "Fixes",
+      "title": "Recover from stalled dashboard publishing",
+      "changes": [
+        "A stalled publication now gets a fresh deployment attempt instead of reusing the cancelled attempt. Each attempt has a three-minute limit so stuck publishing holds up later updates for less time.",
+        "Retries wait for cancellation to finish, and publishing is marked successful only after GitHub confirms completion. Failed publications remain visible for review."
+      ],
+      "commits": []
+    },
     {
       "id": "2026-11-04-send-and-calendar-publishing",
       "version": "2.46.1",
