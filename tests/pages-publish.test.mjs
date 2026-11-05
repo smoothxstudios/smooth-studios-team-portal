@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pagesBuildVersion, publishPages, releasePagesDeployment } from '../scripts/lib/pages-publish.mjs';
+import { createPagesBuildCommit, pagesRecoveryRef, publishPages, releasePagesDeployment } from '../scripts/lib/pages-publish.mjs';
 
 const context = { repo: { owner: 'fixture', repo: 'dashboard' }, runId: 42, sha: 'a'.repeat(40) };
 function fixture({ states = [['succeed']], artifacts = [{ id: 7, name: 'github-pages', expired: false }], createError, cancelStates = ['deployment_cancelled'] } = {}) {
@@ -9,8 +9,25 @@ function fixture({ states = [['succeed']], artifacts = [{ id: 7, name: 'github-p
   let cancelling = false;
   const calls = [];
   const outputs = {};
+  const gitCalls = [];
+  const commits = new Map([[context.sha, { sha: context.sha, tree: { sha: 'd'.repeat(40) } }]]);
+  let ref;
   const github = {
-    rest: { actions: { listWorkflowRunArtifacts() {} } },
+    rest: {
+      actions: { listWorkflowRunArtifacts() {}, getWorkflowRun: async () => ({ data: { status: 'completed' } }) },
+      git: {
+        getRef: async () => { if (!ref) throw Object.assign(new Error('Missing'), { status: 404 }); return { data: { object: { sha: ref } } }; },
+        getCommit: async args => ({ data: commits.get(args.commit_sha) }),
+        createCommit: async args => {
+          gitCalls.push({ method: 'createCommit', ...args });
+          const sha = (commits.size === 1 ? 'b' : 'c').repeat(40);
+          commits.set(sha, { sha, message: args.message, tree: { sha: args.tree } });
+          return { data: { sha } };
+        },
+        createRef: async args => { gitCalls.push({ method: 'createRef', ...args }); ref = args.sha; },
+        updateRef: async args => { gitCalls.push({ method: 'updateRef', ...args }); ref = args.sha; },
+      },
+    },
     paginate: async () => artifacts,
     request: async (route, args) => {
       calls.push({ route, ...args });
@@ -29,7 +46,7 @@ function fixture({ states = [['succeed']], artifacts = [{ id: 7, name: 'github-p
   };
   const wait = async ms => { clock += ms; };
   return {
-    calls, outputs, github, wait,
+    calls, gitCalls, outputs, github, wait,
     run: options => publishPages({ github, context, core: { getIDToken: async () => 'fixture-oidc', info() {}, warning() {}, setOutput: (key, value) => { outputs[key] = value; } }, runAttempt: 1, wait, now: () => clock, timeout: 10000, ...options }),
   };
 }
@@ -43,6 +60,11 @@ test('a stalled deployment is cancelled and retried with the same artifact but a
   assert.equal(creates[0].artifact_id, creates[1].artifact_id);
   assert.notEqual(creates[0].pages_build_version, creates[1].pages_build_version);
   assert.notEqual(creates[0].pages_build_version, context.sha);
+  for (const call of f.gitCalls.filter(call => call.method === 'createCommit')) {
+    assert.equal(call.tree, 'd'.repeat(40), 'publication commits keep the exact built tree');
+    assert.deepEqual(call.parents, [context.sha]);
+  }
+  assert.ok(f.gitCalls.filter(call => call.ref).every(call => call.ref.endsWith(pagesRecoveryRef)), 'main is never changed');
   const cancelIndex = f.calls.findIndex(call => call.route.endsWith('/cancel'));
   const secondCreateIndex = f.calls.findIndex(call => call.pages_build_version === creates[1].pages_build_version);
   assert.ok(cancelIndex < secondCreateIndex);
@@ -91,11 +113,30 @@ test('missing, expired, and ambiguous artifacts fail before creating a deploymen
   }
 });
 
-test('workflow reruns and other workflows at the same commit use distinct deployment identities', () => {
-  const original = pagesBuildVersion(context, 1);
-  assert.notEqual(original, pagesBuildVersion({ ...context, runAttempt: 2 }, 1));
-  assert.notEqual(original, pagesBuildVersion({ ...context, runId: 43 }, 1));
-  assert.throws(() => pagesBuildVersion({ ...context, sha: '../invalid' }, 1), /valid workflow identity/);
+test('publication commits record their workflow and attempt for later recovery', async () => {
+  const f = fixture();
+  await createPagesBuildCommit({ github: f.github, context, buildSha: context.sha, runAttempt: 2, attempt: 1 });
+  assert.match(f.gitCalls[0].message, /workflow 42 attempt 2\.1 \[skip ci\]/);
+  await assert.rejects(createPagesBuildCommit({ github: f.github, context, buildSha: '../invalid', runAttempt: 1, attempt: 1 }), /valid workflow identity/);
+});
+
+test('a deployment finishing at the timeout boundary is confirmed instead of cancelled or reported as failed', async () => {
+  const f = fixture({ states: [['updating_pages', 'updating_pages', 'succeed']] });
+  assert.equal((await f.run()).attempt, 1);
+  assert.equal(f.calls.filter(call => call.route.endsWith('/cancel')).length, 0);
+  assert.equal(f.outputs.page_url, 'https://dashboard.example.test/');
+});
+
+test('unrelated changes and another running workflow protect the dedicated recovery branch', async () => {
+  for (const message of ['user change', 'chore: Pages publication for workflow 99 attempt 1.1 [skip ci]']) {
+    const f = fixture();
+    f.github.rest.git.getRef = async () => ({ data: { object: { sha: 'e'.repeat(40) } } });
+    f.github.rest.git.getCommit = async () => ({ data: { message } });
+    f.github.rest.actions.getWorkflowRun = async () => ({ data: { status: 'in_progress' } });
+    await assert.rejects(f.run(), /unrelated changes|Another workflow/);
+    assert.equal(f.gitCalls.length, 0);
+    assert.equal(f.calls.length, 0);
+  }
 });
 
 test('a missing deployment is already released but authorization errors remain visible', async () => {

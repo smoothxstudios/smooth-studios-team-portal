@@ -30,6 +30,8 @@ jobs:
   sync-and-build:
     if: ${{ !contains(github.event.head_commit.message, '[restore-v2.41.1]') }}
     runs-on: ubuntu-latest
+    outputs:
+      build_sha: ${{ steps.source.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,6 +65,9 @@ jobs:
           git diff --cached --quiet || git commit -m "data: refresh encrypted calendar dashboards"
           git pull --rebase origin main
           git push origin HEAD:main
+      - name: Record the source commit for publication
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - run: npm run build:github-pages
         env:
           GITHUB_PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
@@ -82,3 +87,5 @@ jobs:
       - name: Deploy refreshed dashboard
         id: deployment
         uses: ./.github/actions/deploy-dashboard
+        with:
+          build-sha: ${{ needs.sync-and-build.outputs.build_sha }}

@@ -1,5 +1,9 @@
 name: Deploy dashboard with Pages recovery
 description: Release orphaned deployments and publish with a fresh identity for each bounded attempt.
+inputs:
+  build-sha:
+    description: Source commit used to build the uploaded artifact
+    required: true
 outputs:
   page_url:
     description: Published dashboard URL
@@ -16,10 +20,12 @@ runs:
     - name: Publish dashboard
       id: publish
       uses: actions/github-script@v8
+      env:
+        PAGES_BUILD_SHA: ${{ inputs.build-sha }}
       with:
         script: |
           const { publishPages } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/lib/pages-publish.mjs`);
-          await publishPages({ github, context, core });
+          await publishPages({ github, context, core, buildSha: process.env.PAGES_BUILD_SHA });
     - name: Release failed or cancelled deployment
       if: ${{ failure() || cancelled() }}
       uses: actions/github-script@v8

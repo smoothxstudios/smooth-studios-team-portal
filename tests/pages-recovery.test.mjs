@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import yaml from 'js-yaml';
 import { recoverPages } from '../scripts/lib/pages-recovery.mjs';
-import { pagesBuildVersion } from '../scripts/lib/pages-publish.mjs';
 
 const sha = 'a'.repeat(40);
 const context = { repo: { owner: 'fixture', repo: 'dashboard' }, runId: 2, sha: 'b'.repeat(40) };
@@ -11,7 +10,7 @@ const failedRun = { id: 1, head_sha: sha, status: 'completed', conclusion: 'fail
 function fixture({ runs = [failedRun], states = ['updating_pages', 'updating_pages', 'deployment_cancelled'], ownerRuns = runs, error } = {}) {
   const calls = [];
   const github = {
-    rest: { actions: { listWorkflowRunsForRepo: async args => ({ data: { workflow_runs: args.head_sha ? ownerRuns : runs } }) } },
+    rest: { actions: { listWorkflowRunsForRepo: async args => ({ data: { workflow_runs: args.head_sha ? ownerRuns : runs } }) }, git: { getRef: async () => { throw Object.assign(new Error('Missing'), { status: 404 }); } } },
     request: async (route, args) => {
       calls.push({ route, sha: args.pages_deployment_id });
       if (error) throw error;
@@ -78,11 +77,15 @@ test('calendar and code publishing share recovery, data lock, and the configured
   for (const name of ['calendar-sync', 'deploy-pages']) {
     const workflow = yaml.load(readFileSync(new URL(`../.github/workflows/${name}.yml`, import.meta.url), 'utf8'));
     assert.equal(workflow.permissions.actions, 'read');
+    assert.equal(workflow.permissions.contents, 'write', 'fresh publication commits require repository write access');
     assert.equal(workflow.concurrency.group, 'smooth-studios-data-writes');
     assert.equal(workflow.concurrency['cancel-in-progress'], false);
     const steps = workflow.jobs.deploy.steps;
     assert.equal(steps[0].uses, 'actions/checkout@v4');
     assert.equal(steps[1].uses, './.github/actions/deploy-dashboard');
+    const buildJob = name === 'calendar-sync' ? 'sync-and-build' : 'build';
+    assert.equal(steps[1].with['build-sha'], '${{ needs.' + buildJob + '.outputs.build_sha }}');
+    assert.equal(workflow.jobs[buildJob].outputs.build_sha, '${{ steps.source.outputs.sha }}');
     const build = Object.values(workflow.jobs)[0].steps.find(step => step.run === 'npm run build:github-pages');
     assert.equal(build.env.GITHUB_PAGES_BASE_PATH, '${{ steps.pages.outputs.base_path }}');
   }
@@ -93,11 +96,20 @@ test('calendar and code publishing share recovery, data lock, and the configured
 });
 
 test('recovery also releases the fresh deployment identity left by an interrupted run', async () => {
-  const deploymentId = pagesBuildVersion({ sha, runId: 1, runAttempt: 2 }, 2);
+  const deploymentId = 'c'.repeat(40);
   const calls = [];
   let cancelled = false;
   const github = {
-    rest: { actions: { listWorkflowRunsForRepo: async () => ({ data: { workflow_runs: [{ ...failedRun, run_attempt: 2 }] } }) } },
+    rest: {
+      actions: {
+        listWorkflowRunsForRepo: async () => ({ data: { workflow_runs: [{ ...failedRun, run_attempt: 2 }] } }),
+        getWorkflowRun: async () => ({ data: failedRun }),
+      },
+      git: {
+        getRef: async () => ({ data: { object: { sha: deploymentId } } }),
+        getCommit: async () => ({ data: { sha: deploymentId, message: 'chore: Pages publication for workflow 1 attempt 2.2 [skip ci]' } }),
+      },
+    },
     request: async (route, args) => {
       calls.push({ route, id: args.pages_deployment_id });
       if (args.pages_deployment_id !== deploymentId) throw Object.assign(new Error('Missing'), { status: 404 });
