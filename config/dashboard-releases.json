@@ -1,6 +1,28 @@
 {
-  "currentVersion": "2.48.1",
+  "currentVersion": "2.48.2",
   "releases": [
+    {
+      "id": "2026-11-09-organized-settings",
+      "version": "2.48.2",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Organized Settings and clearer assignment offers",
+      "changes": [
+        "Settings starts with compact Personal, Studio, Connections, and Support groups instead of a long Preferences page.",
+        "Search for a setting, open just its controls, and return to the same place with the back button. Icon drafts and other local entries stay available while moving between settings.",
+        "Notifications and rental pay rates open directly. Connection controls load when needed, and Google Calendar returns to its connection result.",
+        "App offers now show the in-app response instructions even when the rental also has a Google invitation. Calendar sync is optional and appears separately.",
+        "Appointment details show each offered person once, with their response and actions together. The offer form is shorter, suggestions are optional, and saved messages no longer cover rental details."
+      ],
+      "employee": {
+        "title": "Simpler settings and clearer offers",
+        "changes": [
+          "Find your icon, appearance, notifications, and quick sign-in together under Personal. Calendars and support have their own groups.",
+          "Search settings and open only the controls you need. The back button keeps your place and your entries.",
+          "App offers direct you to accept or decline in the dashboard. Calendar sync details are separate, and duplicate people have been removed from appointment details."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-sidebar-handoff-greeting-shadow",
       "version": "2.48.1",

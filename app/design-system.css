@@ -271,16 +271,10 @@ button { touch-action: manipulation; }
 .employee-stats strong { font-size: 1.125rem; }
 
 /* Segmented choices and grouped planning tools. */
-.settings-tabs, .planner-mobile-switch, .calendar-view-switch, .agenda-view-switch { border: 0; padding: 4px; gap: 4px; border-radius: 16px; background: var(--secondary); }
-.settings-tabs [data-slot="tabs-trigger"], .planner-mobile-switch > button { min-height: 42px; border: 0; border-radius: 12px; font-weight: 600; }
-.settings-tabs [data-state="active"], .planner-mobile-switch > button[aria-pressed="true"] { background: var(--card); color: var(--foreground); box-shadow: 0 2px 5px #0000000d; }
-.settings-preferences { gap: 14px; }
+.planner-mobile-switch, .calendar-view-switch, .agenda-view-switch { border: 0; padding: 4px; gap: 4px; border-radius: 16px; background: var(--secondary); }
+.planner-mobile-switch > button { min-height: 42px; border: 0; border-radius: 12px; font-weight: 600; }
+.planner-mobile-switch > button[aria-pressed="true"] { background: var(--card); color: var(--foreground); box-shadow: 0 2px 5px #0000000d; }
 .settings-card { padding: 18px 20px; }
-.settings-appearance { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.settings-appearance h2 { margin: 0; }
-.settings-theme { gap: 10px; }
-.settings-theme > svg { display: none; }
-.settings-theme > span { font-size: .9375rem; }
 .planner-calendar { padding: 18px; }
 .planner-days { gap: 6px; }
 .planner-days > button { border-radius: 18px; border: 0; padding-block: 12px; }
@@ -322,7 +316,6 @@ button { touch-action: manipulation; }
   .panel-heading { padding: 16px 16px 10px; }
   .panel-heading h2 { font-size: 1.1875rem; }
   .team-payout-person { padding: 16px !important; }
-  .settings-appearance { flex-wrap: wrap; }
   .planner-calendar { padding: 14px; }
   .planner-days { gap: 3px; }
   .planner-days > button { padding-inline: 2px; border-radius: 15px; }
@@ -548,8 +541,7 @@ input::-webkit-datetime-edit { min-width: 0; padding: 0; }
 .settings-disclosure { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; list-style: none; cursor: pointer; }
 .settings-disclosure::-webkit-details-marker { display: none; }
 .settings-disclosure > span:first-child { display: inline-flex; align-items: center; gap: 10px; font-weight: 650; }
-.rental-pay-settings[open] > p { margin-top: 16px; }
-.rental-pay-settings ul { display: grid; gap: 12px; padding: 0; margin: 16px 0 0; list-style: none; width: 100%; }
+.rental-pay-settings ul { display: grid; gap: 12px; padding: 0; margin: 0; list-style: none; width: 100%; }
 .rental-pay-settings li { display: flex; align-items: center; gap: 10px; font-size: 14px; }
 .rental-pay-settings li > span:not(.person-avatar) { margin-left: auto; }
 .rental-pay-settings li > svg { color: #25825d; flex-shrink: 0; }
@@ -653,3 +645,61 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
   .alerts-controls .reminder-trigger.app-button[data-slot="button"] { padding: 0; }
   .alerts-filters > button { padding-inline: 8px; }
 }
+
+/* Settings starts with grouped rows; only the selected controls are shown. */
+.settings-organized { gap: 16px; width: 100%; }
+.settings-organized [hidden] { display: none !important; }
+.settings-index { min-width: 0; display: grid; gap: 24px; }
+.settings-search { display: flex; align-items: center; min-width: 0; gap: 10px; padding: 0 14px; min-height: 46px; border-radius: var(--app-control-radius, 14px); background: var(--secondary); color: var(--muted-foreground); }
+.settings-search > svg { flex: 0 0 auto; }
+.settings-search input { border: 0; border-radius: 0; padding: 10px 0; height: auto; min-width: 0; box-shadow: none; background: transparent; font-size: 16px; color: var(--foreground); outline: none; }
+.settings-search input:focus-visible { box-shadow: none; outline: none; }
+.settings-search:focus-within { outline: 2px solid var(--ring); outline-offset: 2px; }
+.settings-search button { display: grid; place-items: center; flex: 0 0 36px; min-height: 44px; border: 0; background: transparent; color: var(--muted-foreground); }
+.settings-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.settings-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 24px; }
+.settings-group { min-width: 0; }
+.settings-group > h2 { margin: 0 0 8px 16px; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--muted-foreground); }
+.settings-group-rows { overflow: hidden; border-radius: var(--app-card-radius); background: var(--card); box-shadow: var(--app-group-shadow); }
+.settings-row { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 12px 16px; border: 0; border-radius: 0; background: transparent; color: var(--foreground); text-align: left; font-size: 15px; font-weight: 500; line-height: 1.35; }
+.settings-row + .settings-row::before { content: ""; position: absolute; top: 0; left: 60px; right: 0; height: 1px; background: var(--border); opacity: .7; }
+.settings-row-icon, .settings-row > .person-avatar { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; font-size: 14px; }
+.settings-row-icon { background: var(--secondary); color: var(--muted-foreground); }
+.settings-row-copy { flex: 1; min-width: 0; display: grid; gap: 2px; overflow-wrap: anywhere; }
+.settings-row-copy small { color: var(--muted-foreground); font-size: 12px; font-weight: 400; }
+.settings-row-chevron { flex: 0 0 auto; color: var(--muted-foreground); opacity: .65; }
+.settings-link { cursor: pointer; transition: background-color 120ms ease-out; }
+.settings-link:active { background: var(--secondary); }
+.settings-link:focus-visible, .settings-search button:focus-visible { outline: 2px solid var(--ring); outline-offset: -3px; }
+.settings-toggle-row label { cursor: pointer; }
+.settings-empty { display: grid; justify-items: center; gap: 12px; padding: 28px 16px; color: var(--muted-foreground); }
+.settings-detail-nav { display: flex; align-items: center; }
+.settings-detail { min-width: 0; animation: settings-enter 150ms ease-out; }
+.settings-detail > .settings-card { width: 100%; }
+.settings-loading { color: var(--muted-foreground); padding: 20px; }
+.settings-notifications > div:not(.settings-card-heading), .rental-pay-settings > ul { width: 100%; min-width: 0; }
+@keyframes settings-enter { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: translateX(0); } }
+@media (hover: hover) and (pointer: fine) { .settings-link:hover { background: color-mix(in srgb, var(--secondary) 55%, var(--card)); } }
+@media (max-width: 680px) { .settings-groups { grid-template-columns: minmax(0, 1fr); gap: 22px; } }
+@media (prefers-reduced-motion: reduce) { .settings-detail { animation: none; } .settings-link { transition: none; } }
+
+/* An offer is one person, one response, and one set of actions. */
+.offer-person { display: inline-flex; align-items: center; gap: 10px; min-width: 0; font-size: 15px; }
+.offer-person .person-avatar { width: 32px; height: 32px; flex: 0 0 32px; font-size: 14px; }
+.offer-calendar-status { margin: 10px 0; color: var(--muted-foreground); font-size: 12px; }
+.offer-calendar-status > summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; gap: 6px; }
+.offer-calendar-status > summary::after { content: "⌄"; }
+.offer-calendar-status > summary::-webkit-details-marker { display: none; }
+.offer-calendar-status[open] > summary::after { transform: rotate(180deg); }
+.offer-calendar-status > p { margin-top: 6px; }
+.appointment-offers .schedule-offer:last-child { border-bottom: 0; padding-bottom: 0; }
+.appointment-offers .schedule-row { flex-wrap: wrap; }
+.offer-suggestions { border-top: 1px solid var(--border); }
+.offer-suggestions > summary { cursor: pointer; padding: 12px 0; font-size: 14px; font-weight: 600; }
+.offer-suggestions .rental-suggestions { margin: 0; }
+.offer-suggestions .rental-suggestions > h3 { display: none; }
+.assignment-dialog .suggestion-row { flex-wrap: nowrap; align-items: center; padding: 10px 0; }
+.assignment-dialog .suggestion-row > span { min-width: 0; }
+.assignment-dialog .suggestion-row > button { flex: 0 0 auto; font-size: 13px; }
+.assignment-dialog .schedule-notice { padding: 0; background: none; border: 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.5; }
+.app-task-sheet .schedule-dialog-feedback .schedule-success { padding: 12px 14px; font-size: 13px; line-height: 1.45; }

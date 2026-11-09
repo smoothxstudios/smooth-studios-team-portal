@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { agendaMatchesStatus, agendaOnDay, agendaWeek, buildScheduleAgenda } from "../lib/schedule-agenda.mjs";
 import { localInstant } from "../lib/team-schedule.mjs";
-import { assignmentResponseLabel } from "../lib/calendar-invitations.mjs";
+import { assignmentResponseLabel, appointmentResponsePrompt } from "../lib/calendar-invitations.mjs";
 
 const period = { start: localInstant("2026-10-16T14:00"), end: localInstant("2026-10-16T16:00") };
 const booking = { id: "rental-1", title: "Studio A Rental", customer: "Example Client", priceCents: 10000, ...period, acceptedEmployeeIds: [] };
@@ -120,4 +120,16 @@ test("Calendar invitations appear as pending with their Google response source a
     assert.equal(withApp.confirmations[0].calendarAccepted, false, "app acceptance never fabricates a Google RSVP");
     assert.equal(withApp.confirmations[0].calendarStatus, "needsAction");
   }
+});
+
+
+test("app offers never direct their recipient to Google Calendar to respond", () => {
+  const invited = { ...booking, calendarInvitations: [{ employeeId: "jordyn", status: "needsAction" }], acceptedEmployeeIds: ["akiva"] };
+  assert.equal(appointmentResponsePrompt(invited, [offer("a", "jordyn")], "jordyn"), "Open appointment to accept or decline in the app");
+  assert.equal(appointmentResponsePrompt(invited, [offer("a", "jordyn", "accepted")], "jordyn"), "Accepted in app");
+  assert.equal(appointmentResponsePrompt(invited, [offer("a", "akiva")], "jordyn"), "Google Calendar invitation · respond in Google Calendar");
+  assert.equal(appointmentResponsePrompt(invited, [offer("a", "jordyn", "cancelled")], "jordyn"), "Google Calendar invitation · respond in Google Calendar");
+  assert.equal(appointmentResponsePrompt(invited, [offer("a", "jordyn", "pending", "other-rental")], "jordyn"), "Google Calendar invitation · respond in Google Calendar");
+  assert.equal(appointmentResponsePrompt(invited, [], "akiva"), "Calendar accepted");
+  assert.equal(appointmentResponsePrompt(invited, [], "rayne"), "No active offer");
 });

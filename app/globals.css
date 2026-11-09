@@ -1597,14 +1597,7 @@ button { cursor: pointer; }
 .login-account-switch:disabled { opacity: .5; }
 .login-preparing { text-align: center; color: var(--muted-foreground); padding: 24px 0; }
 .dashboard-settings { display: grid; gap: 24px; max-width: 1050px; min-width: 0; }
-.settings-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); height: auto; width: 100%; padding: 5px; gap: 5px; border-radius: 14px; }
-.settings-tabs [role=tab] { min-height: 48px; height: auto; gap: 8px; padding: 10px 12px; border-radius: 10px; white-space: normal; text-align: center; }
-.settings-tabs [role=tab][data-state=active] { background: #c90000; color: #fff; font-weight: 700; box-shadow: 0 2px 5px rgb(0 0 0 / 12%); }
-.settings-tabs [role=tab]:focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; }
 .studio-access-notice { color: var(--muted-foreground); font-size: 13px; line-height: 1.5; margin-top: -10px; }
-.settings-tabs [role=tab] svg { flex: 0 0 auto; }
-.settings-preferences { display: grid; gap: 20px; }
-.dashboard-settings [role=tabpanel][hidden] { display: none; }
 .settings-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 26px; display: grid; justify-items: start; gap: 18px; }
 .settings-card h2 { font-size: 20px; font-weight: 650; }
 .settings-card p { font-size: 14px; line-height: 1.6; color: var(--muted-foreground); }
@@ -1613,13 +1606,9 @@ button { cursor: pointer; }
 .settings-card-heading p { margin-top: 6px; }
 .settings-card button:not([data-slot="switch"]) { max-width: 100%; white-space: normal; height: auto; min-height: 44px; }
 .settings-sync { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
-.settings-appearance { display: flex; align-items: center; justify-content: space-between; gap: 22px; }
-.settings-theme { display: flex; align-items: center; gap: 12px; font-size: 14px; flex-shrink: 0; }
 .rental-checklist h3 { display: flex; align-items: center; gap: 9px; }
 @media (max-width: 640px) {
-  .settings-tabs [role=tab] { flex-direction: column; gap: 6px; padding: 9px 5px; font-size: 12px; }
   .settings-card { padding: 20px; }
-  .settings-appearance { align-items: flex-start; flex-direction: column; }
 }
 .dashboard-release-version-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 9px; padding: 0 16px; }
 .dashboard-release-version-heading h4 { padding: 0; }
@@ -2240,7 +2229,7 @@ button { cursor: pointer; }
 .agenda-previous > summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
 @media (hover: hover) and (pointer: fine) { [data-slot="button"]:active:not(:disabled) { filter: brightness(.94); } }
 
-.schedule-dialog-feedback { position: sticky; top: 0; z-index: 2; background: var(--card); }
+.schedule-dialog-feedback { min-width: 0; }
 .schedule-dialog-feedback:empty { display: none; }
 
 .manual-pay-action { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

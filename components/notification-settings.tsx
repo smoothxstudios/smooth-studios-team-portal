@@ -54,8 +54,8 @@ export function NotificationSettings({ token, isOwner, schedule: suppliedSchedul
     }
     finally { setBusy(false); }
   }
-  return <details className="schedule-panel schedule-push" open={!isOwner}>
-    <summary className="notification-summary"><span><Bell size={18} />Notifications</span><small>{loading ? "Checking this device…" : enabled ? "On for this device" : "Set up alerts"}</small></summary>
+  return <section className="settings-card schedule-push settings-notifications">
+    <div className="settings-card-heading"><Bell size={23} aria-hidden="true" /><div><h2>Notifications</h2><p>{loading ? "Checking this device…" : enabled ? "On for this device" : "Off for this device"}</p></div></div>
     <div><p>{isOwner ? "Receive schedule changes and employee responses." : "Get alerts for rental and task offers, and when your next Daily Quiz question is ready."}</p>
       <p className="schedule-small">On iPhone: Safari → Share → Add to Home Screen. Open that icon, sign in, then enable notifications. Alerts stay on when you close the app. Logging out disables them on this device.</p>
       {!loading && !supported && <p className="schedule-warning">This browser session does not support push. Use the Home Screen app on iPhone or a supported browser.</p>}
@@ -69,14 +69,14 @@ export function NotificationSettings({ token, isOwner, schedule: suppliedSchedul
         {appleMobile ? <ol>
           <li>Open your phone’s Settings → Notifications → Smooth Studios and turn on Allow Notifications.</li>
           <li>If the app is missing or still blocked, delete the Smooth Studios Home Screen app and re-add it: open dashboard.smoothstudios.co in Safari → Share → Add to Home Screen. Keep Open as Web App on if shown.</li>
-          <li>Open the new icon, sign in, and return to Settings → Preferences → Notifications. Tap Enable on this device → Allow, then Send test.</li>
+          <li>Open the new icon, sign in, and return to Settings → Notifications. Tap Enable on this device → Allow, then Send test.</li>
         </ol> : <ol>
           <li>Open this website’s permissions in your browser settings and change Notifications to Allow. Check your device’s notification settings for the browser too.</li>
-          <li>Reload the dashboard, return to Settings → Preferences → Notifications, then choose Enable on this device and Send test.</li>
+          <li>Reload the dashboard, return to Settings → Notifications, then choose Enable on this device and Send test.</li>
         </ol>}
         <p className="notification-help-hint">Find the full steps in Settings → Help by searching “notifications not allowed”.</p>
       </>}
     </div>}
     {isOwner && schedule && <p className="schedule-small">Registered devices: {TEAM.map(person => `${person.name} ${schedule.devices[person.id] ?? 0}`).join(" · ")}. Focus mode and device settings can suppress alerts.</p>}
-  </details>;
+  </section>;
 }
