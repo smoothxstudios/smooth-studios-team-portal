@@ -1,6 +1,22 @@
 {
-  "currentVersion": "2.46.12",
+  "currentVersion": "2.46.13",
   "releases": [
+    {
+      "id": "2026-11-09-sidebar-touch-icon-color",
+      "version": "2.46.13",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Stable sidebar icon colors while scrolling",
+      "changes": [
+        "Scrolling over sidebar rows no longer leaves their icons gray. The current-page highlight and deliberate taps keep working."
+      ],
+      "employee": {
+        "title": "Sidebar icons keep their color",
+        "changes": [
+          "Scrolling through the sidebar no longer leaves an icon gray or looking disabled."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-home-checkin-footer",
       "version": "2.46.12",

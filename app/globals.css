@@ -606,7 +606,7 @@ button { cursor: pointer; }
 @media (hover: none), (pointer: coarse) {
   .studio-nav [data-slot="sidebar-menu-button"] { -webkit-tap-highlight-color: transparent; }
   .studio-nav [data-slot="sidebar-menu-button"]:not([data-active="true"]):is(:hover, :active) { color: var(--sidebar-foreground); background: transparent; }
-  .studio-nav [data-slot="sidebar-menu-button"]:not([data-active="true"]):is(:hover, :active) > svg:first-child { color: var(--muted-foreground); }
+  /* Keep the shared icon color when mobile Safari retains hover after a swipe. */
 }
 .sidebar-progress { margin: 0 12px 14px; }
 .studio-sidebar-footer { flex-shrink: 0; gap: 4px !important; padding: 10px 12px !important; border-top: 1px solid var(--sidebar-border); background: var(--sidebar); }
