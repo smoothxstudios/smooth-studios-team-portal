@@ -117,7 +117,7 @@ export function DashboardSettings({ token, profile, password, dark, onThemeChang
       {id === "profile" && <ProfileSettings userId={profile.id} name={profile.label} />}
       {id === "notifications" && <NotificationSettings token={token} isOwner={isOwner} />}
       {id === "signin" && <QuickSignInSettings profile={profile} password={password} />}
-      {id === "rates" && isOwner && <RentalPaySettings employees={employees} />}
+      {id === "rates" && isOwner && <RentalPaySettings employees={employees} token={token} active={current === "rates"} />}
       {id === "logins" && isOwner && <TeamLoginSettings employees={employees} access={teamAccess} />}
       {id === "google" && <CalendarSettings token={token} isOwner={isOwner} />}
       {id === "apple" && <AppleCalendarSettings token={token} isOwner={isOwner} />}

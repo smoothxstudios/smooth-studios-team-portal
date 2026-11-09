@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.48.3",
+  "currentVersion": "2.49.0",
   "releases": [
+    {
+      "id": "2026-11-09-edit-rental-pay-rates",
+      "version": "2.49.0",
+      "date": "2026-11-09",
+      "category": "Payments",
+      "title": "Edit rental pay rates in Settings",
+      "changes": [
+        "Smooth can edit each team member’s hourly rental rate or rental percentage in Settings → Rental pay rates.",
+        "Saved changes apply to rentals starting after the save. Earlier rental earnings and existing payments keep their previous rates. Other types of work are unchanged.",
+        "Rates save privately with a dated history, protect against conflicting edits, and feed into earnings on the next studio sync. Failed saves retain the entered rate for retry."
+      ]
+    },
     {
       "id": "2026-11-09-scheduling-refactor",
       "version": "2.48.3",

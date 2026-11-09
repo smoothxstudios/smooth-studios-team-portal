@@ -1,3 +1,4 @@
+import { rentalPayRatesRoute } from "./rental-pay-rates.mjs";
 import { teamProfilesRoute } from "./team-profiles.mjs";
 import { syncGuidelineQuiz } from "./guideline-quiz.mjs";
 import { PayrollAccountConflict } from "./payroll-payments.mjs";
@@ -145,7 +146,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, paymentReceiptsVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, appleCalendarVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
+    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, paymentReceiptsVersion: 1, rentalPayRatesVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, appleCalendarVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -181,6 +182,7 @@ async function route(request, env, ctx) {
   }
   if (url.pathname === "/alerts" || url.pathname.startsWith("/alerts/")) return alertsRoute({ request, db, user, body, fail });
   if (url.pathname === "/event-planner") return eventPlannerRoute({ request, db, user, body, fail, snapshot });
+  if (["/rental-pay-rates", "/sync/rental-pay-rates"].includes(url.pathname)) return rentalPayRatesRoute({ request, db, user, body, fail });
   if (url.pathname === "/team-profiles") return teamProfilesRoute({ request, db, user, body, fail });
   if (url.pathname === "/dashboard-layout") return dashboardLayoutRoute({ request, db, user, body, fail });
   if (url.pathname === "/payroll" || url.pathname.startsWith("/payroll/") || url.pathname.startsWith("/sync/payroll")) return payrollRoute({ request, db, user, env, body, fail });

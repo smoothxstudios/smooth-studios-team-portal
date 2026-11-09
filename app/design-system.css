@@ -541,10 +541,25 @@ input::-webkit-datetime-edit { min-width: 0; padding: 0; }
 .settings-disclosure { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; list-style: none; cursor: pointer; }
 .settings-disclosure::-webkit-details-marker { display: none; }
 .settings-disclosure > span:first-child { display: inline-flex; align-items: center; gap: 10px; font-weight: 650; }
-.rental-pay-settings ul { display: grid; gap: 12px; padding: 0; margin: 0; list-style: none; width: 100%; }
-.rental-pay-settings li { display: flex; align-items: center; gap: 10px; font-size: 14px; }
-.rental-pay-settings li > span:not(.person-avatar) { margin-left: auto; }
-.rental-pay-settings li > svg { color: #25825d; flex-shrink: 0; }
+.rental-pay-settings ul { display: grid; padding: 0; margin: 0; list-style: none; width: 100%; }
+.rental-pay-person { min-width: 0; padding: 14px 0; border-top: 1px solid var(--border); }
+.rental-pay-person:first-child { border-top: 0; padding-top: 0; }
+.rental-pay-person-row { display: flex; align-items: center; gap: 12px; }
+.rental-pay-person-copy { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.rental-pay-person-copy strong { font-size: 15px; }
+.rental-pay-person-copy > span { display: flex; align-items: center; gap: 5px; color: var(--muted-foreground); font-size: 13px; }
+.rental-pay-person-copy svg { color: #25825d; flex-shrink: 0; }
+.rental-pay-person-row > button { flex-shrink: 0; }
+.rental-pay-editor { display: grid; gap: 16px; margin-top: 18px; min-width: 0; }
+.rental-pay-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; }
+.rental-pay-fields label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; min-width: 0; }
+.rental-pay-fields input { width: 100%; min-width: 0; }
+.rental-pay-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.rental-pay-history { font-size: 13px; color: var(--muted-foreground); }
+.rental-pay-history summary { cursor: pointer; padding: 8px 0; }
+.rental-pay-history p { display: grid; gap: 2px; margin: 8px 0; font-size: 13px; }
+@media (max-width: 440px) { .rental-pay-fields { grid-template-columns: minmax(0, 1fr); } }
+
 .profile-icon-preview { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .profile-icon-preview > img, .profile-icon-preview > .person-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; font-size: 24px; }
 .profile-icon-actions, .profile-icon-options { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }

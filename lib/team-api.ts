@@ -16,7 +16,7 @@ export type GuidelineQuestionRequest = { id: string; askedBy: string; question: 
 
 async function performTeamRequest<T>(token: string, path: string, data?: unknown, method?: string): Promise<T> {
   const actionMethod = method ?? (data === undefined ? "GET" : "POST");
-  const visibleWrite = typeof window !== "undefined" && actionMethod !== "GET" && /^\/(assignments|rental-staff|rental-checklists|blocks|work-preferences|creative-work|event-planner|dashboard-layout|studio-reference|engagement\/(rewards|reset)|notifications\/send)(\/|$)/.test(path);
+  const visibleWrite = typeof window !== "undefined" && actionMethod !== "GET" && /^\/(assignments|rental-staff|rental-checklists|blocks|work-preferences|creative-work|event-planner|dashboard-layout|studio-reference|rental-pay-rates|engagement\/(rewards|reset)|notifications\/send)(\/|$)/.test(path);
   const actionId = visibleWrite ? crypto.randomUUID() : "";
   const feedback = (phase: string) => { if (visibleWrite) window.dispatchEvent(new CustomEvent("smooth-action-feedback", { detail: { id: actionId, phase } })); };
   feedback("saving");

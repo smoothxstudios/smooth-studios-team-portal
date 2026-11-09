@@ -1,3 +1,4 @@
+import { rentalPayAt } from "../../lib/rental-pay-rates.mjs";
 import { withAppointmentLifecycle } from "../../lib/appointment-lifecycle.mjs";
 import { createCipheriv, createDecipheriv, createHash, pbkdf2Sync, randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -114,10 +115,7 @@ function employeeInvitationEmails(employee) {
 }
 
 function dashboardEmployee(employee, config) {
-  const today = studioDate(Date.now(), config.timeZone);
-  const latestRate = [...(employee.commissionHistory ?? [])].filter(change => change.effectiveFrom <= today).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]?.rate;
-  const compensation = employee.compensation && employee.compensation.type !== "commission" ? employee.compensation
-    : { type: "commission", rate: latestRate ?? employee.commissionRate ?? employee.compensation?.rate ?? config.commissionRate };
+  const compensation = rentalPayAt(employee, config, Date.now());
   return { id: employee.id, name: employee.name, email: employee.email, accent: employee.accent, compensation,
     ...(employee.onboarding ? { onboarding: true, accessReady: employee.accessReady === true } : {}) };
 }

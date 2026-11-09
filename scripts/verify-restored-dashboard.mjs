@@ -1,7 +1,9 @@
+import { readRentalPayRates } from "./lib/rental-pay-rates.mjs";
+import { rentalPayAt } from "../lib/rental-pay-rates.mjs";
 // Read-only deployment checks. No alerts or assignments are sent.
 import { readFile } from 'node:fs/promises';
 import { decryptPayload } from './lib/dashboard-data.mjs';
-import { readTeamSettings, teamPasswords } from './lib/team-settings.mjs';
+import { readTeamSettings, resolveEmployees, teamPasswords } from './lib/team-settings.mjs';
 import { teamToken } from '../lib/team-auth.mjs';
 import { TEAM_API_URL } from '../lib/team-schedule.mjs';
 import { isStudioRentalTitle } from '../lib/appointment-categories.mjs';
@@ -13,16 +15,20 @@ const passwords = teamPasswords(config, settings);
 const { profiles } = JSON.parse(await readFile(new URL('../public/data/access.json', import.meta.url), 'utf8'));
 const ownerPayload = decryptPayload(JSON.parse(await readFile(new URL('../public/data/owner.json', import.meta.url), 'utf8')), passwords.owner);
 const expectedRentals = new Map(ownerPayload.rentals.map(rental => [rental.id, rental]));
-const hourlyHires = config.employees.filter(person => person.compensation?.type === 'hourly');
-let checkedHourlyRentals = 0;
-for (const person of hourlyHires) {
+const effectiveConfig = { ...config, employees: resolveEmployees(config, settings, passwords) };
+effectiveConfig.employees = await readRentalPayRates(effectiveConfig, passwords.owner);
+const ratePeople = effectiveConfig.employees;
+let checkedRateRentals = 0;
+for (const person of ratePeople) {
   const actual = ownerPayload.employees.find(employee => employee.id === person.id)?.compensation;
-  if (actual?.type !== 'hourly' || actual.hourlyCents !== person.compensation.hourlyCents) throw new Error('A confirmed hourly rental rate is missing from the synced dashboard.');
+  if (JSON.stringify(actual) !== JSON.stringify(rentalPayAt(person, effectiveConfig, ownerPayload.generatedAt))) throw new Error('A saved rental rate is missing from the synced dashboard.');
   for (const rental of ownerPayload.rentals.filter(rental => isStudioRentalTitle(rental.title) && rental.employeePayouts?.[person.id])) {
     const pay = rental.employeePayouts[person.id];
-    const expected = Math.round((Date.parse(rental.end) - Date.parse(rental.start)) / 3600000 * person.compensation.hourlyCents);
-    if (rental.categoryId !== 'studio-rentals' || !pay.compensationConfigured || pay.amountCents !== expected) throw new Error('A named studio rental is missing its confirmed hourly earnings.');
-    checkedHourlyRentals++;
+    const policy = rentalPayAt(person, effectiveConfig, rental.start);
+    if (policy.type === 'pending') continue;
+    const expected = policy.type === 'hourly' ? Math.round((Date.parse(rental.end) - Date.parse(rental.start)) / 3600000 * policy.hourlyCents) : Math.round(rental.priceCents * policy.rate);
+    if (rental.categoryId !== 'studio-rentals' || !pay.compensationConfigured || pay.amountCents !== expected) throw new Error('A named studio rental is missing its configured rental earnings.');
+    checkedRateRentals++;
   }
 }
 let checkedDetails = 0, checkedRoomRentals = 0;
@@ -57,6 +63,6 @@ for (const { id, role } of profiles) {
       schedule.appointments.some(item => item.acceptedEmployeeIds.some(person => person !== id)))) throw new Error('Restored schedule account isolation failed.');
 }
 console.log(`Verified encrypted sign-in data and live scheduling access for ${profiles.length} current accounts.`);
-console.log(`Verified team profile access and ${hourlyHires.length} confirmed hourly rental policies in the synced dashboard.`);
-console.log(`Verified duration-based hourly pay on ${checkedHourlyRentals} accepted rental assignments, including named Studio A/B rentals.`);
+console.log(`Verified team profile access and ${ratePeople.length} saved rental pay policies in the synced dashboard.`);
+console.log(`Verified rate-based rental pay on ${checkedRateRentals} accepted rental assignments, including named Studio A/B rentals.`);
 console.log(`Verified live booking details and customer balances on ${checkedDetails} visible rental records, including ${checkedRoomRentals} Studio A/B records across those accounts.`);

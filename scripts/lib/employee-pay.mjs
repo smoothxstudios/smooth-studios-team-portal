@@ -1,3 +1,4 @@
+import { rentalPayAt } from "../../lib/rental-pay-rates.mjs";
 // Rates follow the appointment's local start date, including imported UTC times.
 export function studioDate(value, timeZone = "America/New_York") {
   return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
@@ -37,10 +38,9 @@ export function markEmployeeThrough(record, through) {
 export function calculateEmployeePayout({ employee, config, ledger, start, end, priceCents, categoryId, fullyPaid, now = Date.now() }) {
   const startDate = studioDate(start, config.timeZone);
   const endDate = studioDate(end, config.timeZone);
-  const policy = employee.compensation;
-  let rate = employee.commissionRate ?? config.commissionRate;
+  const policy = rentalPayAt(employee, config, start, categoryId === "studio-rentals");
+  const rate = policy.type === "commission" ? policy.rate : 0;
   const changes = [...(employee.commissionHistory ?? [])].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
-  for (const change of changes) if (startDate >= change.effectiveFrom) rate = change.rate;
   const configured = policy?.type !== "pending" && (policy?.type !== "hourly" || categoryId === "studio-rentals");
   const amountCents = !configured ? 0 : policy?.type === "hourly"
     ? Math.round((Date.parse(end) - Date.parse(start)) / 3600000 * policy.hourlyCents)

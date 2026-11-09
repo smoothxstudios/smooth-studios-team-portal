@@ -6,6 +6,8 @@ on:
     paths:
       - "team-api/**"
       - "lib/team-*.mjs"
+      - "lib/rental-pay-rates.mjs"
+      - "scripts/lib/rental-pay-rates.mjs"
       - "lib/event-planner.mjs"
       - "lib/sync-records.mjs"
       - "lib/appointment-lifecycle.mjs"

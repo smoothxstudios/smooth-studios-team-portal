@@ -1,3 +1,4 @@
+import { syncRentalPayRates } from "./lib/rental-pay-rates.mjs";
 import { syncGuidelineQuiz } from "./lib/guideline-quiz-sync.mjs";
 import { createSign } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
@@ -94,6 +95,7 @@ try {
 } catch (error) {
   if (error?.code !== "ENOENT") throw error;
 }
+if (teamEnabled) config.employees = await syncRentalPayRates(config, passwords.owner);
 const accessToken = await googleAccessToken(serviceAccount, teamEnabled);
 const calendarReadAt = new Date().toISOString();
 const calendarEvents = await fetchCalendarEvents(calendarId, accessToken);
