@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.46.7",
+  "currentVersion": "2.46.8",
   "releases": [
+    {
+      "id": "2026-11-09-shared-apple-interface",
+      "version": "2.46.8",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "A consistent interface across the dashboard",
+      "changes": [
+        "Home, Schedule, Payouts, Event Planner, Settings, and shared controls use larger headings, grouped cards, quieter borders, and coordinated light and dark colors.",
+        "Phone sheets stay within the screen while their contents scroll. Pull the top handle down to dismiss, or release a short pull to return it to place. Reduced-motion preferences are respected.",
+        "The floating phone toolbar stays visible while scrolling. Appearance is the first section in Settings → Preferences."
+      ],
+      "employee": {
+        "title": "Clearer pages and steadier phone sheets",
+        "changes": [
+          "Shared pages, navigation, and controls have clearer typography and consistent light and dark styling.",
+          "Phone sheets stay within the screen and have a pull-to-close handle. The bottom toolbar stays available while scrolling."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-11-09-fluid-dashboard-controls",
       "version": "2.46.7",

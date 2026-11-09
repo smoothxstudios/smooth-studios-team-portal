@@ -5,12 +5,14 @@ import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { SheetHandle } from "@/components/ui/sheet-handle"
 import { Button } from "@/components/ui/button"
 
-function Dialog({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+const DialogActions = React.createContext({ close: () => {} })
+function Dialog({ open: controlled, defaultOpen = false, onOpenChange, ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  const [localOpen, setLocalOpen] = React.useState(defaultOpen)
+  const change = (next: boolean) => { if (controlled === undefined) setLocalOpen(next); onOpenChange?.(next) }
+  return <DialogActions.Provider value={{ close: () => change(false) }}><DialogPrimitive.Root data-slot="dialog" open={controlled ?? localOpen} onOpenChange={change} {...props} /></DialogActions.Provider>
 }
 
 function DialogTrigger({
@@ -62,16 +64,18 @@ function DialogContent({
   closeDisabled?: boolean
   presentation?: "dialog" | "sheet"
 }) {
+  const actions = React.useContext(DialogActions)
   const generatedId = React.useId()
   const id = suppliedId ?? generatedId
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
+      <div data-slot="dialog-viewport" data-presentation={presentation}>
       <DialogPrimitive.Content
         data-slot="dialog-content"
         data-presentation={presentation}
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          "relative grid w-full max-w-lg gap-4 rounded-lg border bg-background p-6 shadow-lg outline-none",
           className
         )}
         {...props}
@@ -88,6 +92,7 @@ function DialogContent({
           ;(heading ?? content)?.focus({ preventScroll: true })
         }}
       >
+        {presentation === "sheet" && <SheetHandle disabled={closeDisabled} onDismiss={actions.close} />}
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
@@ -100,6 +105,7 @@ function DialogContent({
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
+      </div>
     </DialogPortal>
   )
 }

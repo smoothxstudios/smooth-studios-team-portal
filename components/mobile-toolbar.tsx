@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } 
 import { Bell, CalendarDays, ClipboardList, House, Users, WalletCards } from "lucide-react";
 import { UnreadBadge } from "@/components/alerts";
 import { useSidebar } from "@/components/ui/sidebar";
-import { attachToolbarSlide, attachToolbarScroll, mobileToolbarItems } from "@/lib/mobile-toolbar.mjs";
+import { attachToolbarSlide, mobileToolbarItems } from "@/lib/mobile-toolbar.mjs";
 
 type ToolbarView = "overview" | "team" | "creative" | "scheduling" | "alerts" | "payouts";
 const icons = { home: House, team: Users, work: ClipboardList, schedule: CalendarDays, alerts: Bell, payouts: WalletCards };
@@ -64,8 +64,7 @@ export function MobileToolbar({ isOwner, view, unread, onNavigate }: { isOwner: 
       onPreview: preview => paint(preview?.position ?? active.current, Boolean(preview), Boolean(preview) || active.current >= 0),
       onSelect: choose,
     });
-    const detachScroll = attachToolbarScroll(bar);
-    return () => { detachSlide(); detachScroll(); cancelAnimationFrame(frame); };
+    return () => { detachSlide(); cancelAnimationFrame(frame); };
   }, [items, setOpenMobile]);
 
   return <nav ref={nav} className="mobile-toolbar" aria-label="Quick navigation">

@@ -125,16 +125,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -
 
 @keyframes app-reveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes app-picker-in { from { opacity: 0; transform: scale(.97) translateY(-3px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-@keyframes app-sheet-in { from { opacity: .6; transform: translateY(32px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes app-sheet-out { to { opacity: 0; transform: translateY(24px); } }
 @media (max-width: 640px) {
-  [data-slot="dialog-content"][data-presentation="sheet"] {
-    top: auto; bottom: max(8px, env(safe-area-inset-bottom, 0px)); left: 50%; translate: -50% 0; transform: none;
-    width: calc(100vw - 16px); max-width: none; max-height: calc(100dvh - max(20px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)));
-    border-radius: 26px;
-  }
-  [data-slot="dialog-content"][data-presentation="sheet"][data-state="open"] { animation: app-sheet-in 300ms var(--app-ease) both; }
-  [data-slot="dialog-content"][data-presentation="sheet"][data-state="closed"] { animation: app-sheet-out 180ms ease-in both; }
   [data-slot="dialog-content"].app-task-sheet > [data-slot="dialog-header"] { padding: 22px 64px 18px 20px; }
   .app-task-sheet [data-slot="dialog-header"] > [data-slot="dialog-title"] { font-size: 22px; }
   .app-task-sheet .app-sheet-scroll, .app-task-sheet .manual-pay-fields { padding: 20px; gap: 18px; }

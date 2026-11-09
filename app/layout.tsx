@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { dashboardBasePath } from "@/lib/site-path.mjs";
 import "./globals.css";
 import "./native-controls.css";
+import "./apple-system.css";
 
 const siteBasePath = dashboardBasePath();
 const studioLogoUrl = `${siteBasePath}/smooth-studios-logo.png`;

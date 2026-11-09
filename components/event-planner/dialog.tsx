@@ -13,7 +13,7 @@ export function PlannerDialog({ open, onClose, busy, title, description, wide = 
 }) {
     return <Dialog open={open} onOpenChange={value => { if (!busy && !value)
         onClose(); }}>
-    <DialogContent className={`schedule-modal${wide ? ' planner-modal' : ''}`} closeDisabled={busy}>
+    <DialogContent presentation="sheet" className={`schedule-modal${wide ? ' planner-modal' : ''}`} closeDisabled={busy}>
       <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>
       {children}
     </DialogContent>
