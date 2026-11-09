@@ -40,6 +40,7 @@ export function assignmentNotifications(item, event, recipients, options) {
       conflict: { title: "Time conflict approved", body: `${detail} Smooth approved the conflict. Tap to review your offer.` },
       rescheduled: { title: owner ? `${name}’s ${type} time changed` : `${type === "rental" ? "Rental" : "Task"} time changed`, body: `${detail} ${owner ? "A new acceptance is needed." : "Tap to accept the new time."}` },
       duration: { title: owner ? `${name}’s rental duration updated` : "Rental duration updated", body: `${detail} ${item.status === "accepted" ? "The existing acceptance is kept." : "The existing offer is still awaiting a response."}` },
+      same_day: { title: owner ? `${name}’s rental time updated` : "Rental time updated", body: `${detail} The rental is still on the same day. ${item.status === "accepted" ? "The existing acceptance is kept." : "The existing offer is still awaiting a response."}` },
       removed: { title: owner ? `${name}’s rental was cancelled` : "Rental removed from Calendar", body: `${detail} The assignment is cancelled.` },
       past: { title: "Changed rental needs review", body: `${name} · ${detail} The assignment was cancelled because the new time is in the past.` },
     }[event];

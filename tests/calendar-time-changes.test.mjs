@@ -37,10 +37,10 @@ test("duration changes keep accepted and pending responses before, during, and a
   assert.equal(calendarTimeChange(original, { ...appointment, end: "2026-10-17T14:00:00-04:00" }, now), null, "equivalent instants are unchanged");
 });
 
-test("actual start-time reschedules and removals retain their existing safeguards", () => {
+test("different-day reschedules and removals retain their existing safeguards", () => {
   const future = calendarTimeChange(original, { ...appointment, start: "2026-10-18T17:30:00Z", end: "2026-10-18T18:30:00Z" }, now);
   assert.equal(future.assignment.status, "pending"); assert.equal(future.event, "rescheduled");
-  const past = calendarTimeChange(original, { ...appointment, start: "2026-10-17T17:00:00Z" }, now);
+  const past = calendarTimeChange(original, { ...appointment, start: "2026-10-16T17:00:00Z", end: "2026-10-16T18:00:00Z" }, now);
   assert.equal(past.assignment.status, "cancelled"); assert.equal(past.event, "past");
   assert.equal(calendarTimeChange(original, undefined, now).event, "removed");
   for (const status of ["declined", "cancelled"]) assert.equal(calendarTimeChange({ ...original, status }, appointment, now), null);

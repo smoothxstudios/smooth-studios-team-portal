@@ -1,4 +1,4 @@
-import { STUDIO_ZONE, localInstant } from "../lib/team-schedule.mjs";
+import { STUDIO_ZONE, localInstant, studioLocal } from "../lib/team-schedule.mjs";
 import { assignmentNotifications } from "./notification-content.mjs";
 
 export const LEGACY_PAST_NOTE = "Time changed to a past appointment. Smooth must review it.";
@@ -8,7 +8,7 @@ const durationNote = status => status === "accepted"
   ? "Rental duration updated. Your acceptance is unchanged."
   : "Rental duration updated. This offer is still awaiting your response.";
 
-/** A duration correction is the same booking, even after it has started/ended. */
+/** Same-studio-day time edits keep the saved response, even after start/end. */
 export function calendarTimeChange(assignment, appointment, now = Date.now()) {
   if (!active(assignment) || !assignment.appointmentId) return null;
   let event, status, note;
@@ -17,6 +17,10 @@ export function calendarTimeChange(assignment, appointment, now = Date.now()) {
   } else if (same(assignment.start, appointment.start) && same(assignment.end, appointment.end)) return null;
   else if (same(assignment.start, appointment.start)) {
     event = "duration"; status = assignment.status; note = durationNote(status);
+  } else if (studioLocal(assignment.start).slice(0, 10) === studioLocal(appointment.start).slice(0, 10)) {
+    event = "same_day"; status = assignment.status;
+    note = status === "accepted" ? "Rental time updated on the same day. Your acceptance is unchanged."
+      : "Rental time updated on the same day. This offer is still awaiting your response.";
   } else {
     status = Date.parse(appointment.start) > now ? "pending" : "cancelled";
     event = status === "pending" ? "rescheduled" : "past";

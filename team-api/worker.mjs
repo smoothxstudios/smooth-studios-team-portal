@@ -17,7 +17,7 @@ import { payrollRoute } from "./payroll.mjs";
 import { studioReferenceRoute } from "./studio-reference.mjs";
 import { CALENDAR_INVITATION_STATUSES } from "../lib/calendar-invitations.mjs";
 import { calendarAuthRoute } from "./calendar-auth.mjs";
-import { calendarQueueStatement, calendarDurationImportStatement, flushCalendarAssignments } from "./calendar-delivery.mjs";
+import { calendarQueueStatement, calendarTimeImportStatement, flushCalendarAssignments } from "./calendar-delivery.mjs";
 import { calendarTimeChange, recoverDurationCancellation, LEGACY_PAST_NOTE } from "./calendar-time-changes.mjs";
 import { manualNoticesRoute } from "./manual-notices.mjs";
 import { calendarAssignments, visibleAppointments } from "./schedule-access.mjs";
@@ -374,7 +374,7 @@ async function route(request, env, ctx) {
       corrections.push(...recovered.correctedAlerts.map(alert => ({ ...alert,
         ...assignmentNotifications(recovered.assignment, "duration", [alert.userId])[0] })));
     }
-    const importedDuration = assignment => ["duration", "duration_recovered"].includes(assignment.calendarChange?.kind) && Date.parse(assignment.start) <= now;
+    const importedTimeChange = assignment => ["duration", "duration_recovered", "same_day"].includes(assignment.calendarChange?.kind) && Date.parse(assignment.start) <= now;
     await commit(db, s.state, mutation => [
       db.prepare(`UPDATE team_state SET generation = ?, synced_at = ? WHERE id = 1 AND ${guard}`)
         .bind(input.incremental === true ? s.state.generation : generation, calendarReadAt, mutation),
@@ -393,8 +393,8 @@ async function route(request, env, ctx) {
       db.prepare(`UPDATE team_assignments SET data = (SELECT value FROM json_each(?) WHERE json_extract(value, '$.id') = team_assignments.id)
         WHERE id IN (SELECT json_extract(value, '$.id') FROM json_each(?)) AND ${guard}`)
         .bind(JSON.stringify(changes), JSON.stringify(changes), mutation),
-      ...changes.filter(assignment => queuedIds.has(assignment.id)).map(assignment => importedDuration(assignment)
-        ? calendarDurationImportStatement(db, assignment, appointmentsById.get(assignment.appointmentId), mutation)
+      ...changes.filter(assignment => queuedIds.has(assignment.id)).map(assignment => importedTimeChange(assignment)
+        ? calendarTimeImportStatement(db, assignment, appointmentsById.get(assignment.appointmentId), mutation)
         : calendarQueueStatement(db, assignment, mutation)),
       ...corrections.map(alert => db.prepare(`UPDATE team_inbox SET title = ?, body = ? WHERE id = ? AND ${guard}`)
         .bind(alert.title, alert.body, alert.id, mutation)),
@@ -405,7 +405,7 @@ async function route(request, env, ctx) {
     if (input.incremental !== true) await db.prepare(`DELETE FROM team_appointments WHERE generation = ?
       AND generation != (SELECT generation FROM team_state WHERE id = 1)`).bind(s.state.generation).run();
     if (notifications.length) ctx.waitUntil(flushAlerts(env));
-    if (changes.some(assignment => queuedIds.has(assignment.id) && !importedDuration(assignment))) ctx.waitUntil(flushCalendarAssignments(env, { limit: 3 }));
+    if (changes.some(assignment => queuedIds.has(assignment.id) && !importedTimeChange(assignment))) ctx.waitUntil(flushCalendarAssignments(env, { limit: 3 }));
     return { synced: next.length, ...(syncStats ? { syncStats } : {}) };
   }
   if (["POST", "PATCH", "DELETE"].includes(request.method) &&

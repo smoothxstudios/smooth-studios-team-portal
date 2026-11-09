@@ -18,8 +18,8 @@ export function calendarQueueStatement(db, assignment, mutation) {
     .bind(assignment.id, crypto.randomUUID(), Date.now(), mutation);
 }
 
-/** Record an imported duration correction after start without replaying invites. */
-export function calendarDurationImportStatement(db, assignment, appointment, mutation) {
+/** Record an imported time correction after start without replaying invites. */
+export function calendarTimeImportStatement(db, assignment, appointment, mutation) {
   const invitation = appointment.calendarInvitations?.find(item => item.employeeId === assignment.employeeId);
   const result = invitation ? { code: "calendar_imported", googleStatus: invitation.status } : { code: "event_started" };
   return db.prepare(`UPDATE calendar_assignment_outbox SET version = ?, status = ?, result = ?,
