@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { attachScrollTapGuard } from "@/lib/scroll-tap-guard.mjs";
-import { alertBody, alertPerson, alertTimestamp, chronologicalAlerts, groupAlerts } from "@/lib/alert-presentation.mjs";
-import { Bell, Banknote, CalendarDays, Check, CheckCheck, Mail, ChevronDown, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
+import { alertBody, alertPerson, alertRelativeTime, chronologicalAlerts, groupAlerts } from "@/lib/alert-presentation.mjs";
+import { Bell, Banknote, CalendarDays, Check, CheckCheck, Mail, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -56,7 +56,7 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
       </div>
       {isOwner && <label className="alerts-view">View <select aria-label="Alert order" value={view} onChange={event => setView(event.target.value)}><option value="time">Newest first</option><option value="grouped">Grouped by person</option></select></label>}
       <DropdownMenu open={bulkOpen} onOpenChange={setBulkOpen}>
-        <DropdownMenuTrigger asChild onPointerDown={event => event.preventDefault()}><Button variant="ghost" disabled={state.busy || state.loading || !state.throughSequence} onClick={() => setBulkOpen(value => !value)}>Mark all <ChevronDown size={15} aria-hidden="true" /></Button></DropdownMenuTrigger>
+        <DropdownMenuTrigger asChild onPointerDown={event => event.preventDefault()}><Button variant="ghost" size="icon" aria-label="Inbox actions" disabled={state.busy || state.loading || !state.throughSequence} onClick={() => setBulkOpen(value => !value)}><MoreHorizontal size={20} aria-hidden="true" /></Button></DropdownMenuTrigger>
         <DropdownMenuContent ref={bulkMenu} className="alert-actions-menu" align="end" collisionPadding={8}>
           <DropdownMenuItem disabled={state.busy || !state.unreadCount} onSelect={() => void state.markRead()}><CheckCheck size={16} aria-hidden="true" />Read</DropdownMenuItem>
           <DropdownMenuItem disabled={state.busy || !state.throughSequence} onSelect={() => void state.markAllUnread()}><Mail size={16} aria-hidden="true" />Unread</DropdownMenuItem>
@@ -73,12 +73,17 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
       {group.alerts.map((alert: DashboardAlert) => {
         const Icon = alert.kind === "notice" ? Bell : alert.target === "quiz" ? Sparkles : alert.target === "creative" ? ClipboardList : alert.target === "payouts" ? Banknote : CalendarDays;
         const expired = alert.expiresAt !== null && alert.expiresAt <= Date.now();
-        const person = isOwner && !grouped ? alertPerson(alert) : null;
+        const person = isOwner ? alertPerson(alert) : null;
+        const source = person?.name ?? (alert.kind === "notice" ? "Smooth Studios" : alert.target === "payouts" ? "Payments" : alert.target === "creative" ? "Creative work" : alert.target === "quiz" ? "Daily Quiz" : "Studio update");
         return <li key={alert.id} className={`alert-card${alert.readAt ? "" : " is-unread"}`}>
           <button type="button" className="alert-open" disabled={state.busy} onClick={() => void open(alert)} aria-label={`${alert.title}. ${alert.target === "settings" ? "Open Settings" : alert.target === "alerts" ? "Read notification" : alert.target === "quiz" ? "Open Daily Quiz" : alert.target === "availability" ? "View availability" : "View details"}`}>
-            <span className="alert-content"><span className="alert-title"><Icon className="alert-kind-icon" size={15} aria-hidden="true" /><strong>{alert.title}</strong><ArrowUpRight className="alert-open-arrow" size={14} aria-hidden="true" /></span>
+            <span className="alert-avatar" style={person ? { color: person.color, background: `color-mix(in srgb, ${person.color} 12%, var(--card))` } : undefined} aria-hidden="true">{person ? person.name.slice(0, 1) : <Icon size={21} />}{!alert.readAt && <span className="alert-unread-dot" />}</span>
+            <span className="alert-content">
+              <span className="alert-activity-meta"><span className="alert-source">{source}</span><span aria-hidden="true">·</span><time dateTime={new Date(alert.createdAt).toISOString()} title={stamp.format(alert.createdAt)}>{alertRelativeTime(alert.createdAt)}</time></span>
+              <span className="alert-title"><strong>{alert.title}</strong></span>
               <span className="alert-preview">{alertBody(alert.body) || "Open this alert for details."}</span>
-              <span className="alert-meta"><time dateTime={new Date(alert.createdAt).toISOString()} title={stamp.format(alert.createdAt)}>{alertTimestamp(alert.createdAt)}</time>{person && <span className="alert-person"><span className="alert-person-dot" style={{ background: person.color }} aria-hidden="true" />{person.name}</span>}<span className="alert-status" data-unread={!alert.readAt}>{alert.readAt ? "Read" : "Unread"}{expired ? " · Earlier reminder" : ""}</span></span>
+              <span className="sr-only">{alert.readAt ? "Read" : "Unread"}. {stamp.format(alert.createdAt)}</span>
+              {expired && <span className="alert-earlier">Earlier reminder</span>}
             </span>
           </button>
           <div className="alert-row-actions">

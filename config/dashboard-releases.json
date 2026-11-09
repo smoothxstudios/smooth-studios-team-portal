@@ -1,6 +1,29 @@
 {
-  "currentVersion": "2.46.9",
+  "currentVersion": "2.46.10",
   "releases": [
+    {
+      "id": "2026-11-09-alerts-sidebar-payment-polish",
+      "version": "2.46.10",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Clearer alerts and smoother sidebar gestures",
+      "changes": [
+        "Alerts uses compact activity rows with person initials or update icons, clear timestamps, bold unread titles, and quieter controls. Existing filters, grouping, destinations, and inbox actions remain available.",
+        "The sidebar tracks your finger while swiping and settles on release. Reversing or cancelling a short drag returns it to place.",
+        "Schedule uses softer appointment cards and clearer circular date controls while preserving calendar views and time positions.",
+        "Add pay uses a compact action without the oversized pill or colored shadow. Record payment keeps its review sheet at a steady height while the current balance loads.",
+        "Event Planner is hidden from the sidebar by default. Enable it in Settings → Preferences → Sidebar on each device; existing plans are preserved.",
+        "Seasonal team members are excluded from automatic rental and event crew suggestions and remain available for deliberate manual assignments."
+      ],
+      "employee": {
+        "title": "Clearer alerts and smoother navigation",
+        "changes": [
+          "Alerts has compact activity rows, clear names and timestamps, and a small unread indicator. Your filters and inbox actions still work.",
+          "The sidebar follows your finger during a swipe, with a smooth release and support for cancelling the gesture."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-11-09-compact-spacing-scroll-navigation",
       "version": "2.46.9",

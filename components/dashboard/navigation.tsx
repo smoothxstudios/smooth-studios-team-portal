@@ -58,10 +58,10 @@ export const EMPLOYEE_NAV_ITEMS: NavigationItem[] = NAV_ITEMS.filter(item => !it
   group: item.key === "payouts" ? "work" : item.group,
 }));
 
-export function DashboardNavigation({ isOwner, accountId, view, onNavigate, unread }: { unread: number; isOwner: boolean; accountId: string; view: ViewKey; onNavigate: (view: ViewKey) => void }) {
+export function DashboardNavigation({ isOwner, accountId, view, onNavigate, unread, plannerEnabled = false }: { plannerEnabled?: boolean; unread: number; isOwner: boolean; accountId: string; view: ViewKey; onNavigate: (view: ViewKey) => void }) {
   const { isMobile, setOpenMobile } = useSidebar();
   const closeMobileMenu = () => { if (isMobile) setOpenMobile(false); };
-  const items = isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS;
+  const items = (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).filter(item => item.key !== "planner" || plannerEnabled);
   const groups: { key: NavigationGroup; label: string }[] = [
     { key: "home", label: "Start" },
     { key: "work", label: isOwner ? "Work" : "My work" },

@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import { flushSync } from "react-dom"
+import { createSidebarMotion } from "@/lib/sidebar-motion.mjs"
 import { cva, type VariantProps } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
 import { Slot } from "radix-ui"
@@ -168,7 +170,8 @@ function Sidebar({
 
   React.useEffect(() => {
     if (!isMobile || side !== "left" || collapsible === "none") return
-    return attachSidebarSwipe(document, () => setOpenMobile(true), () => setOpenMobile(false))
+    const motion = createSidebarMotion(document, (open: boolean) => flushSync(() => setOpenMobile(open)))
+    return attachSidebarSwipe(document, () => setOpenMobile(true), () => setOpenMobile(false), motion)
   }, [isMobile, side, collapsible, setOpenMobile])
 
   if (collapsible === "none") {
@@ -194,6 +197,7 @@ function Sidebar({
           data-slot="sidebar"
           data-mobile="true"
           overlayClassName="sidebar-backdrop"
+          onOpenAutoFocus={event => { if (document.documentElement.hasAttribute("data-sidebar-motion")) event.preventDefault() }}
           className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
           style={
             {

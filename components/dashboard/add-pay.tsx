@@ -20,7 +20,7 @@ export function AddPay({ employees, state, token }: { employees: Employee[]; sta
   const [id, setId] = useState<string | null>(null), [saved, setSaved] = useState(false);
   return <div className="manual-pay-action">
     {saved && <span role="status">Pay saved</span>}
-    <Button onClick={() => { setSaved(false); setId(crypto.randomUUID()); }}><Plus size={17} />Add pay</Button>
+    <Button variant="ghost" className="manual-pay-trigger" onClick={() => { setSaved(false); setId(crypto.randomUUID()); }}><Plus size={17} />Add pay</Button>
     {id && <AddPayForm id={id} employees={employees} state={state} token={token} onClose={() => setId(null)} onSaved={() => { setSaved(true); setId(null); }} />}
   </div>;
 }

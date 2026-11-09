@@ -98,6 +98,14 @@ YAxis
 function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPassword, schedulingToken }: { payload: DashboardPayload; dark: boolean; setDark: (value: boolean) => void; onLogout: () => void; onRefresh: () => Promise<boolean>; sessionPassword: string; schedulingToken: string }) {
   useRefreshSource(onRefresh);
   const [view, setView] = useState<ViewKey>("overview");
+  const [plannerEnabled, setPlannerEnabled] = useState(false);
+  const plannerPreferenceKey = `smooth:event-planner:${payload.user.id}`;
+  useEffect(() => { try { setPlannerEnabled(localStorage.getItem(plannerPreferenceKey) === "true"); } catch { setPlannerEnabled(false); } }, [plannerPreferenceKey]);
+  const changePlannerEnabled = (enabled: boolean) => {
+    setPlannerEnabled(enabled);
+    try { localStorage.setItem(plannerPreferenceKey, String(enabled)); } catch { /* Session preference still works. */ }
+    if (!enabled && view === "planner") setView("settings");
+  };
   const [toolbarRefresh, setToolbarRefresh] = useState<{ id: number; arrival: Promise<boolean> } | null>(null);
   const [quietRefresh, setQuietRefresh] = useState(0);
   const toolbarScroll = useRef<ReturnType<typeof scrollToolbarToTop> | null>(null);
@@ -305,7 +313,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
       <Sidebar className="dashboard-sidebar" collapsible="offcanvas">
         <SidebarHeader className="sidebar-brand"><CloseMobileMenu /><Logo compact /></SidebarHeader>
         <SidebarContent className="studio-sidebar-content">
-          <DashboardNavigation isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={navigate} unread={alerts.unreadCount} />
+          <DashboardNavigation plannerEnabled={plannerEnabled} isOwner={isOwner} accountId={payload.user.id} view={view} onNavigate={navigate} unread={alerts.unreadCount} />
           {!isOwner && <div className="sidebar-progress"><SmoothStarSidebar /></div>}
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
@@ -331,7 +339,7 @@ function DashboardView({ payload, dark, setDark, onLogout, onRefresh, sessionPas
             setFocusedAlert(focusId ? { target, id: focusId } : null); setView(focusId ? target : "rentals");
             if (kind === "creative") void creative.refresh();
           }} />}
-          {view === "settings" && <DashboardSettings employees={isOwner ? payload.employees : undefined} teamAccess={isOwner ? payload.teamAccess : undefined} token={schedulingToken} profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} dark={dark} onThemeChange={setDark} onSync={isOwner ? openCalendarSync : undefined} lastSynced={`${formatDate(payload.generatedAt, true)} · ${formatTime(payload.generatedAt)}`} />}
+          {view === "settings" && <DashboardSettings plannerEnabled={plannerEnabled} onPlannerChange={changePlannerEnabled} employees={isOwner ? payload.employees : undefined} teamAccess={isOwner ? payload.teamAccess : undefined} token={schedulingToken} profile={{ id: payload.user.id, label: displayName, role: payload.role }} password={sessionPassword} dark={dark} onThemeChange={setDark} onSync={isOwner ? openCalendarSync : undefined} lastSynced={`${formatDate(payload.generatedAt, true)} · ${formatTime(payload.generatedAt)}`} />}
           {view === "checklists" && <StudioInfoPage token={schedulingToken} isOwner={isOwner} userId={payload.user.id} section="checklists" />}
           {view === "creative" && <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} focusLoading={alertWorkLoading} focusId={focusedAlert?.target === "creative" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} />}
           {view === "overview" && !isOwner && <TeamSchedulingPage onChecklist={openChecklist} token={schedulingToken} userId={payload.user.id} isOwner={false} home={{ work: <CreativeActionList state={creative} isOwner={false} onOpen={openCreative} />, extras: <EmployeeEngagementBar />, rentals: visibleRentals, owed: metrics.owed, advance, onAvailability: () => setView("availability"), onSchedule: () => setView("scheduling"), onEarnings: () => setView("payouts"), onGuide: () => setView("guide"), onChecklist: openChecklist }} />}

@@ -17,7 +17,7 @@ class ElementFixture {
   }
 }
 
-function fixture({ sidebarOpen = false } = {}) {
+function fixture({ sidebarOpen = false, motion } = {}) {
   const doc = new EventTarget();
   doc.body = new ElementFixture();
   const wrapper = new ElementFixture(doc.body, { wrapper: true });
@@ -34,7 +34,7 @@ function fixture({ sidebarOpen = false } = {}) {
     getComputedStyle: element => ({ overflowX: element.overflowX }),
   };
   let opened = 0, closed = 0;
-  const cleanup = attachSidebarSwipe(doc, () => opened++, () => { closed++; doc.sidebar = null; });
+  const cleanup = attachSidebarSwipe(doc, () => opened++, () => { closed++; doc.sidebar = null; }, motion);
   const send = (type, x = 24, y = 200, at = 0, options = {}) => {
     const event = new Event(type, { cancelable: options.cancelable ?? true });
     const point = { identifier: options.id ?? 1, clientX: x, clientY: y };
@@ -248,4 +248,23 @@ test('interrupted close swipes leave the menu open and cleanup removes click sup
     assert.equal(f.click().defaultPrevented, false);
     assert.equal(f.closeSwipe().move.defaultPrevented, false);
   }
+});
+
+test('held motion follows every horizontal move, permits reversal and long holds, then settles on release', () => {
+ const calls=[];
+ const motion={begin:(open,at)=>{calls.push(['begin',open]);return null;},move:(dx)=>calls.push(['move',dx]),end:open=>calls.push(['end',open]),cancel:()=>calls.push(['cancel']),destroy:()=>{}};
+ const f=fixture({motion});
+ f.send('touchstart',24,200,0);f.send('touchmove',120,201,100);
+ assert.deepEqual(calls,[['begin',false],['move',96]]);
+ assert.equal(f.opened,0);
+ f.send('touchmove',40,220,1800);f.send('touchend',40,220,2000);
+ assert.deepEqual(calls.slice(-2),[['move',16],['end',false]]);
+ f.send('touchstart',24,200,2100);f.send('touchmove',180,201,2200);f.send('touchend',180,201,4000);
+ assert.deepEqual(calls.at(-1),['end',true]);f.cleanup();
+});
+test('a cancelled tracked gesture restores its starting state',()=>{
+ let cancelled=0;
+ const f=fixture({motion:{begin:()=>null,move:()=>{},end:()=>assert.fail('cancel must not commit'),cancel:()=>cancelled++,destroy:()=>{}}});
+ f.send('touchstart');f.send('touchmove',150,200,100);f.send('touchcancel',150,200,120);
+ assert.equal(cancelled,1);assert.equal(f.opened,0);f.cleanup();
 });
