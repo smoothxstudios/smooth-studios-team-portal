@@ -19,3 +19,12 @@ The owner wants a visible version and retrospective notes for every dashboard fi
 - Use actual page and button labels, plain “How do I…?” titles, short steps, and useful search aliases. Cover owner and employee workflows separately when their screens differ. Never include credentials, access codes, individual pay amounts, or private studio policies in this public source.
 - Keep owner instructions filtered out of employee search results and category lists. Retain natural-language, synonym, and typo matching when changing Help search.
 - Update Help to describe the resulting behavior, alongside the version notes required above. Routine data refreshes do not need new articles or dates.
+
+# Established interaction rules
+
+- Preserve the mobile toolbar order and hide-on-scroll behavior: longer downward travel hides it; upward scrolling, returning to the top, and keyboard focus reveal it. Do not make it permanently visible during a visual redesign.
+- Keep finger tracking direct while sliding tabs or dragging sheets; navigate only on release, allow cancellation, and do not tween while held.
+- Keep tap-current-tab smooth return-to-top and refresh, interruptible by touch or scroll. Switching tabs must open the destination immediately and refresh quietly without scrolling the old page.
+- Preserve edge-swipe sidebar gestures and pull-to-refresh. Background refreshes retain drafts, filters, and scroll position, and wait while editors are open.
+- Use quick press feedback, ease-out entrances, shorter exits, and restrained motion without bounce for routine controls. Honor reduced motion.
+- Keep content spacing compact and controls easy to tap. Apply bottom-toolbar clearance only to the signed-in layout; never to the sign-in footer or twice to the same page.

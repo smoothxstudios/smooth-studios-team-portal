@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.46.8",
+  "currentVersion": "2.46.9",
   "releases": [
+    {
+      "id": "2026-11-09-compact-spacing-scroll-navigation",
+      "version": "2.46.9",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Restored scrolling navigation and tighter spacing",
+      "changes": [
+        "The phone toolbar hides after scrolling down and returns when scrolling up or reaching the top. Sliding between tabs, tap-to-top refresh, sidebar swipes, and quiet updates keep their established behavior.",
+        "Sign-in no longer reserves space for a toolbar it does not have. Home has a compact heading, closer sections and rows, and less unused space; shared cards and Settings are tighter too.",
+        "Menus use quick entrances and shorter exits, with direct drag feedback and reduced-motion support."
+      ],
+      "employee": {
+        "title": "Less empty space and familiar navigation",
+        "changes": [
+          "The phone toolbar hides when scrolling down and returns when scrolling up. Existing swipe and refresh gestures are preserved.",
+          "Sign-in, page headings, and shared cards use tighter spacing while keeping touch controls accessible."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-11-09-shared-apple-interface",
       "version": "2.46.8",

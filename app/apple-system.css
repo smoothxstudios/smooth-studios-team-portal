@@ -62,12 +62,14 @@ button { touch-action: manipulation; }
 .app-task-sheet .rental-description-fields { gap: 22px; }
 .app-task-sheet .rental-description-fields dt { font-size: .875rem; font-weight: 400; line-height: 1.45; color: var(--muted-foreground); }
 .app-task-sheet .rental-description-fields dd, .app-task-sheet .rental-form-heading { font-size: 1rem; line-height: 1.5; font-weight: 400; }
-.app-picker-menu { animation-duration: 120ms; }
+.app-picker-menu { animation-duration: 180ms; }
+.app-picker-menu[data-state="closed"] { animation: app-picker-out 144ms ease-in; }
+@keyframes app-picker-out { to { opacity: 0; transform: scale(.95); } }
 @keyframes app-modal-appear { from { opacity: 0; } to { opacity: 1; } }
 @keyframes app-modal-leave { to { opacity: 0; } }
 
 /* Floating navigation and a stronger, readable page hierarchy. */
-.dashboard-topbar { min-height: 108px; border: 0; background: color-mix(in srgb, var(--background) 84%, transparent); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); padding-block: 22px; }
+.dashboard-topbar { min-height: 84px; border: 0; background: color-mix(in srgb, var(--background) 84%, transparent); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); padding-block: 14px; }
 .topbar-title h1 { font-size: clamp(1.75rem, 2.8vw, 2.25rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.12; }
 .topbar-title p { font-size: .75rem; font-weight: 500; letter-spacing: .01em; text-transform: none; margin-bottom: 7px; }
 .topbar-alerts, .mobile-menu-trigger { border: 1px solid var(--app-chrome-border) !important; background: var(--app-chrome) !important; box-shadow: 0 2px 12px #00000008 !important; border-radius: 50% !important; }
@@ -86,29 +88,29 @@ button { touch-action: manipulation; }
 .sidebar-user div span { font-size: .75rem; }
 .dashboard-content { max-width: 1380px; padding-top: 12px; }
 .panel, .settings-card, .team-strip, .planner-calendar, .planner-event, .planner-booking, .planner-empty, .availability-person, .creative-card, .studio-info-card { border: 0; border-radius: 24px; background: var(--card); box-shadow: var(--app-group-shadow); }
-.panel-heading { padding: 24px 24px 16px; }
+.panel-heading { padding: 18px 20px 12px; }
 .panel-heading h2, .settings-card h2 { font-size: 1.1875rem; font-weight: 650; letter-spacing: -.025em; line-height: 1.3; }
 .panel-heading p, .settings-card p { font-size: .875rem; line-height: 1.5; }
 .panel-heading button { min-height: 44px; font-size: .875rem; font-weight: 600; }
 .daily-action-list > section { padding-inline: 24px; }
-.daily-action-row { min-height: 90px; padding-block: 18px; border-color: var(--border); }
+.daily-action-row { min-height: 64px; padding-block: 12px; border-color: var(--border); }
 .daily-action-copy > strong { font-size: 1.0625rem; font-weight: 600; letter-spacing: -.015em; }
 .daily-action-copy > small, .daily-next-step, .daily-action-time small { font-size: .8125rem; line-height: 1.45; }
 .daily-action-time { font-size: .9375rem; font-weight: 600; }
 .daily-action-list > section > h3 { font-size: .75rem; font-weight: 500; color: var(--muted-foreground); letter-spacing: .04em; }
 .daily-action-row > svg:last-child { color: var(--muted-foreground); opacity: .55; }
 .home-finances, .owner-reports { border: 0; border-radius: 24px; background: var(--card); }
-.owner-layout-sections { gap: 24px; }
+.owner-layout-sections { gap: 16px; }
 .owner-reports > summary, .home-finances > summary { min-height: 66px; font-size: 1rem; }
 .team-payout-breakdown { background: transparent; box-shadow: none; }
 .team-payout-breakdown > .panel-heading { padding-inline: 4px; }
-.team-payout-people { display: grid; gap: 16px; padding: 0 !important; }
-.team-payout-person { padding: 24px !important; margin: 0 !important; border: 0 !important; border-radius: 24px; background: var(--card); box-shadow: var(--app-group-shadow); }
+.team-payout-people { display: grid; gap: 12px; padding: 0 !important; }
+.team-payout-person { padding: 20px !important; margin: 0 !important; border: 0 !important; border-radius: 24px; background: var(--card); box-shadow: var(--app-group-shadow); }
 .team-payout-person h3 { font-size: 1.125rem; font-weight: 650; }
 .team-payout-record { border: 0 !important; background: var(--secondary) !important; color: var(--foreground); }
 .team-payout-person dd { font-variant-numeric: tabular-nums; }
-.team-page-grid { gap: 18px; }
-.employee-card { padding: 24px; }
+.team-page-grid { gap: 14px; }
+.employee-card { padding: 20px; }
 .employee-card-head h2 { font-size: 1.125rem; }
 .employee-card-head p, .employee-next { font-size: .8125rem; }
 .employee-stats { border-radius: 16px; }
@@ -119,8 +121,8 @@ button { touch-action: manipulation; }
 .settings-tabs, .planner-mobile-switch, .calendar-view-switch, .agenda-view-switch { border: 0; padding: 4px; gap: 4px; border-radius: 16px; background: var(--secondary); }
 .settings-tabs [data-slot="tabs-trigger"], .planner-mobile-switch > button { min-height: 42px; border: 0; border-radius: 12px; font-weight: 600; }
 .settings-tabs [data-state="active"], .planner-mobile-switch > button[aria-pressed="true"] { background: var(--card); color: var(--foreground); box-shadow: 0 2px 5px #0000000d; }
-.settings-preferences { gap: 20px; }
-.settings-card { padding: 22px 24px; }
+.settings-preferences { gap: 14px; }
+.settings-card { padding: 18px 20px; }
 .settings-appearance { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .settings-appearance h2 { margin: 0; }
 .settings-theme { gap: 10px; }
@@ -131,45 +133,46 @@ button { touch-action: manipulation; }
 .planner-days > button { border-radius: 18px; border: 0; padding-block: 12px; }
 .planner-days > button[aria-pressed="true"] { box-shadow: 0 3px 12px color-mix(in srgb, var(--primary) 20%, transparent); }
 .planner-days strong { font-size: 1.25rem; }
-.planner-summary { padding: 18px 8px; }
+.planner-summary { padding: 12px 8px; }
 .planner-summary strong { font-size: 1.5rem; font-weight: 650; letter-spacing: -.025em; }
 .planner-summary span { font-size: .75rem; }
-.planner-booking, .planner-event { padding: 22px; border: 0; }
+.planner-booking, .planner-event { padding: 18px; border: 0; }
 .planner-booking h3, .planner-event h3 { font-size: 1.125rem; line-height: 1.3; font-weight: 650; letter-spacing: -.02em; }
 .planner-booking p, .planner-event p { font-size: .875rem; line-height: 1.45; }
 .planner-kind { font-size: .6875rem; letter-spacing: .07em; color: var(--muted-foreground); }
 .planner-list-heading h3 { font-size: 1.25rem; font-weight: 650; letter-spacing: -.025em; }
-.planner-empty { min-height: 220px; }
+.planner-empty { min-height: 140px; }
 .alerts-row, .alert-item { border-color: var(--border); }
 .dashboard-version-footer { border-top: 0; opacity: .8; font-size: .6875rem; }
 .dashboard-version-badge { border: 0; background: var(--secondary); }
 
 @media (max-width: 767px) {
-  .dashboard-topbar { min-height: 124px; padding: 22px 20px 18px; align-items: flex-start; }
-  .topbar-heading { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 15px; }
-  .topbar-heading > .mobile-menu-trigger { grid-row: 1; }
-  .topbar-title { grid-row: 2; }
+  .dashboard-topbar { min-height: 76px; padding: 12px 16px; align-items: center; }
+  .topbar-heading { flex: 1; display: flex; align-items: center; gap: 12px; }
+  .topbar-heading > .mobile-menu-trigger { flex: 0 0 44px; }
+  .topbar-title { min-width: 0; }
   .topbar-title p { display: none; }
-  .topbar-title h1 { font-size: 2rem; font-weight: 700; line-height: 1.13; letter-spacing: -.035em; }
+  .topbar-title h1 { font-size: 1.625rem; font-weight: 700; line-height: 1.15; letter-spacing: -.035em; }
   .topbar-actions { padding-top: 0; }
-  .dashboard-content { padding: 6px 16px 30px; }
+  .dashboard-content { padding: 4px 16px 20px; }
   .dashboard-content > * { min-width: 0; }
-  .dashboard-version-footer { padding-inline: 20px; padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
-  .mobile-toolbar { bottom: calc(12px + env(safe-area-inset-bottom)); left: 16px; right: 16px; max-width: 420px; gap: 2px; padding: 5px 6px; min-height: 68px; background: var(--app-chrome); border: 1px solid var(--app-chrome-border); box-shadow: var(--app-chrome-shadow); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); transform: none; }
-  .mobile-toolbar button { min-height: 56px; font-size: .6875rem; gap: 4px; color: var(--muted-foreground); }
+  .dashboard-main > .dashboard-version-footer { padding-inline: 16px; padding-bottom: 16px; }
+  .mobile-toolbar { bottom: calc(12px + env(safe-area-inset-bottom)); left: 16px; right: 16px; max-width: 420px; gap: 2px; padding: 5px 6px; min-height: 60px; background: var(--app-chrome); border: 1px solid var(--app-chrome-border); box-shadow: var(--app-chrome-shadow); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); transform: translate3d(0, 0, 0); transition: transform 240ms cubic-bezier(.4,0,.2,1); }
+  .mobile-toolbar[data-scroll-hidden="true"] { transform: translate3d(0, calc(100% + 36px + env(safe-area-inset-bottom)), 0); transition-duration: 192ms; pointer-events: none; }
+  .mobile-toolbar button { min-height: 48px; font-size: .6875rem; gap: 4px; color: var(--muted-foreground); }
   .mobile-toolbar-indicator { top: 5px; bottom: 5px; background: color-mix(in srgb, var(--foreground) 8%, transparent); }
   .mobile-toolbar button[data-selected="true"] { color: var(--primary); }
   .toolbar-icon > svg { width: 23px; height: 23px; stroke-width: 1.8; }
   .mobile-toolbar button:active { opacity: .65; }
   [data-sidebar="sidebar"][data-mobile="true"] { width: min(340px, calc(100vw - 36px)); max-width: calc(100vw - 36px); border-radius: 0 28px 28px 0; background: var(--sidebar); }
-  .panel-heading { padding: 20px 20px 14px; }
+  .panel-heading { padding: 16px 16px 10px; }
   .panel-heading h2 { font-size: 1.1875rem; }
-  .team-payout-person { padding: 20px !important; }
+  .team-payout-person { padding: 16px !important; }
   .settings-appearance { flex-wrap: wrap; }
   .planner-calendar { padding: 14px; }
   .planner-days { gap: 3px; }
   .planner-days > button { padding-inline: 2px; border-radius: 15px; }
-  .planner-booking, .planner-event { padding: 20px; }
+  .planner-booking, .planner-event { padding: 16px; }
   .planner-card-top { gap: 10px; flex-wrap: wrap; }
   .daily-action-list > section { padding-inline: 20px; }
   .daily-action-row { gap: 14px; }
@@ -200,11 +203,33 @@ button { touch-action: manipulation; }
 /* Keep only one inset around grouped Home rows, including narrow phones. */
 .daily-action-list > section { padding-inline: 0; }
 @media (max-width: 767px) {
-  .daily-action-list { padding-inline: 20px; }
+  .daily-action-list { padding: 16px; }
   .daily-action-list > .panel-heading { padding-inline: 0; }
   .daily-action-list > section { padding-inline: 0; }
   .daily-action-time { flex-basis: 66px; font-size: .8125rem; }
   .daily-action-row { gap: 12px; }
   .daily-action-list > .panel-heading { flex-wrap: nowrap; gap: 12px; }
   .daily-action-list > .panel-heading > h2 { font-size: 1.0625rem; }
+}
+
+/* Compact content spacing; reserve toolbar clearance only on signed-in pages. */
+.login-shell { grid-template-columns: minmax(0, 1fr); }
+.login-card { min-width: 0; max-width: 100%; padding: 28px; }
+.login-card form, .login-card .select-field, .login-card .password-field { min-width: 0; }
+.login-card .studio-logo { width: 120px; height: 84px; margin-bottom: 16px; }
+.login-heading { margin-bottom: 20px; }
+.quick-login { margin-bottom: 8px; }
+.login-card .dashboard-version-footer { margin-top: 20px; padding: 0; gap: 6px 10px; }
+.login-card .calendar-privacy-link { margin-top: 12px; }
+.owner-home-layout { gap: 14px; }
+.owner-home-layout > .owner-home-layout-controls { margin-bottom: -6px; }
+.daily-action-list > .panel-heading { padding: 0; margin-bottom: 10px; }
+.daily-action-list > section + section { margin-top: 12px; padding-top: 12px; }
+.daily-action-copy { gap: 4px; }
+.daily-action-list h3 { margin-bottom: 4px; }
+.dashboard-settings { gap: 16px; }
+@media (max-width: 767px) {
+  .login-card { padding: 24px 22px; }
+  .dashboard-main { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .toolbar-icon { transition-timing-function: cubic-bezier(.2,.8,.2,1); }
 }
