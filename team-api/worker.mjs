@@ -1,3 +1,4 @@
+import { syncGuidelineQuiz } from "./guideline-quiz.mjs";
 import { PayrollAccountConflict } from "./payroll-payments.mjs";
 import { tokenHash } from "../lib/team-auth.mjs";
 import { TEAM, localInstant as parseLocalInstant, addLocalDays, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
@@ -183,6 +184,7 @@ async function route(request, env, ctx) {
   if (url.pathname === "/payroll" || url.pathname.startsWith("/payroll/") || url.pathname.startsWith("/sync/payroll")) return payrollRoute({ request, db, user, env, body, fail });
   if (["/studio-reference", "/sync/studio-reference", "/rental-checklists"].includes(url.pathname) || url.pathname.startsWith("/rental-checklists/")) return studioReferenceRoute({ request, db, user, env, body, fail });
   if (url.pathname === "/creative-work" || url.pathname.startsWith("/creative-work/")) return creativeWorkRoute({ request, db, user, env, ctx, body, fail });
+  if (url.pathname === "/sync/quiz-guidelines") return syncGuidelineQuiz({ request, db, user, body, fail });
   if (url.pathname === "/engagement" || url.pathname.startsWith("/engagement/")) return engagementRoute({ request, db, user, env, body, fail });
 
   // The content vault verifies existing dashboard credentials server-to-server.

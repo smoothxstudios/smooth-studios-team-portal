@@ -1,5 +1,5 @@
-import { appointmentCancelled } from "@/lib/appointment-lifecycle.mjs";
 import { categorizeAppointment } from "@/lib/appointment-categories.mjs";
+import { appointmentCancelled } from "@/lib/appointment-lifecycle.mjs";
 import type {
 AccessProfile,
 EmployeePayout,
@@ -7,7 +7,7 @@ Rental,
 UnmatchedStripePayment
 } from "@/lib/dashboard-types";
 import { customerFullyPaid } from "@/lib/owner-finances.mjs";
-import { TEAM, studioLocal } from "@/lib/team-schedule.mjs";
+import { TEAM,studioLocal } from "@/lib/team-schedule.mjs";
 
 export const FALLBACK_PROFILES: AccessProfile[] = TEAM.map(person => ({ id: person.id, label: person.name, role: person.id === "owner" ? "owner" : "employee" }));
 
@@ -37,22 +37,12 @@ export function teamAccent(id: string, fallback = "#242428") {
   return TEAM_ACCENTS[id.toLowerCase()] ?? fallback;
 }
 
-export function formatDate(value: string, compact = false) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: STUDIO_TIME_ZONE,
-    month: compact ? "short" : "long",
-    day: "numeric",
-    year: compact ? undefined : "numeric",
-  }).format(new Date(value));
-}
-
-export function formatTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: STUDIO_TIME_ZONE,
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
+const fullDate = new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_TIME_ZONE, month: "long", day: "numeric", year: "numeric" });
+const shortDate = new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_TIME_ZONE, month: "short", day: "numeric" });
+const clock = new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_TIME_ZONE, hour: "numeric", minute: "2-digit" });
+const checkInDate = new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_TIME_ZONE, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+export function formatDate(value: string, compact = false) { return (compact ? shortDate : fullDate).format(new Date(value)); }
+export function formatTime(value: string) { return clock.format(new Date(value)); }
 
 export function durationLabel(rental: Rental) {
   const minutes = Math.round((new Date(rental.end).getTime() - new Date(rental.start).getTime()) / 60000);
@@ -137,8 +127,5 @@ export function formatCheckInTime(value: string | number, now = Date.now()) {
   const previousDay = new Date(`${today}T12:00:00Z`);
   previousDay.setUTCDate(previousDay.getUTCDate() - 1);
   const label = day === today ? "Today" : day === previousDay.toISOString().slice(0, 10) ? "Yesterday" : null;
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_TIME_ZONE, hour: "numeric", minute: "2-digit" });
-  return label ? `${label} at ${time.format(new Date(value))}` : new Intl.DateTimeFormat("en-US", {
-    timeZone: STUDIO_TIME_ZONE, month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-  }).format(new Date(value));
+  return label ? `${label} at ${clock.format(new Date(value))}` : checkInDate.format(new Date(value));
 }

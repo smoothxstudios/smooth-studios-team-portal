@@ -32,7 +32,8 @@ const earned = {
 const upcoming = { ...earned, id: 'future', start: '2026-10-20T13:00:00Z', end: '2026-10-20T15:00:00Z' };
 const employee = { id: 'jordyn', name: 'Jordyn', accent: '#123456' };
 const money = { generatedAt: '2026-10-17T06:00:00Z', paymentCount: 1, grossCents: 10000, refundedCents: 0, feeCents: 300, netCents: 9700, bankPayoutCents: 9700, pendingPayoutCents: 0, matchedPaymentCount: 1, unmatchedPaymentCount: 0, unmatchedCents: 0, disputedPaymentCount: 0 };
-const render = (Component, props) => renderToStaticMarkup(createElement(Component, props));
+const { DashboardReleaseInfo } = loadDashboardModule('components/dashboard-release-info.tsx');
+const render = (Component, props) => renderToStaticMarkup(createElement(DashboardReleaseInfo, { info: {version: '2.46.11', date: '2026-11-09'} }, createElement(Component, props)));
 const renderNavigation = (Component, props) => renderToStaticMarkup(createElement(SidebarProvider, null, createElement(Component, props)));
 
 test('shared money, duration and Eastern date formatting retain their display contracts', () => {
@@ -169,4 +170,11 @@ test('period totals place manual pay on its work date, not the later approval da
   assert.match(sections[1], /This week<\/span><strong>\$0<\/strong>/);
   assert.match(sections[2], /This month<\/span><strong>\$25<\/strong>/);
   assert.match(sections[3], /This year<\/span><strong>\$25<\/strong>/);
+});
+
+test('closed financial sections do not render their expensive children',()=>{
+  const { DeferredSection }=loadDashboardModule('components/ui/deferred-section.tsx');
+  const Expensive=()=>{throw new Error('closed reports should not mount');};
+  const html=render(DeferredSection,{summary:'Financial reports',children:createElement(Expensive)});
+  assert.match(html,/Financial reports/);assert.doesNotMatch(html,/<details[^>]*open/);
 });

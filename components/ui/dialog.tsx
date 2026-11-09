@@ -1,12 +1,12 @@
 "use client"
 
-import * as React from "react"
 import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
+import * as React from "react"
 
-import { cn } from "@/lib/utils"
-import { SheetHandle } from "@/components/ui/sheet-handle"
 import { Button } from "@/components/ui/button"
+import { SheetHandle } from "@/components/ui/sheet-handle"
+import { cn } from "@/lib/utils"
 
 const DialogActions = React.createContext({ close: () => {} })
 function Dialog({ open: controlled, defaultOpen = false, onOpenChange, ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -56,6 +56,7 @@ function DialogContent({
   closeDisabled = false,
   presentation = "dialog",
   onOpenAutoFocus,
+  onCloseAutoFocus,
   onScroll,
   id: suppliedId,
   ...props
@@ -65,6 +66,7 @@ function DialogContent({
   presentation?: "dialog" | "sheet"
 }) {
   const actions = React.useContext(DialogActions)
+  const restoreFocus = React.useRef<HTMLElement | null>(null)
   const generatedId = React.useId()
   const id = suppliedId ?? generatedId
   return (
@@ -82,7 +84,16 @@ function DialogContent({
         onScroll={event => { event.currentTarget.style.setProperty("--dialog-scroll-y", `${event.currentTarget.scrollTop}px`); onScroll?.(event); }}
         id={id}
         data-has-close={showCloseButton || undefined}
+        onCloseAutoFocus={event => {
+          onCloseAutoFocus?.(event)
+          const previous = restoreFocus.current
+          if (!event.defaultPrevented && previous?.isConnected && previous !== document.body) {
+            event.preventDefault()
+            previous.focus({ preventScroll: true })
+          }
+        }}
         onOpenAutoFocus={(event) => {
+          restoreFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
           onOpenAutoFocus?.(event)
           if (event.defaultPrevented) return
           event.preventDefault()
@@ -174,14 +185,14 @@ function DialogDescription({
 }
 
 export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger,
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogOverlay,
+DialogPortal,
+DialogTitle,
+DialogTrigger
 }

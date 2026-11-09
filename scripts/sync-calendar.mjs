@@ -1,3 +1,4 @@
+import { syncGuidelineQuiz } from "./lib/guideline-quiz-sync.mjs";
 import { createSign } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -127,6 +128,7 @@ if (teamEnabled) {
     ...(calendarAssignmentSync.status === "needs_access" ? { serviceAccountEmail: serviceAccount.client_email } : {}) };
   process.stdout.write(`Calendar assignment notes: ${calendarAssignmentSync.status}; ${calendarAssignmentSync.updated} updated; ${calendarAssignmentSync.failed} need attention.\n`);
 }
+if (teamEnabled) await syncGuidelineQuiz(payloads.owner.rulebook, passwords.owner);
 if (teamEnabled) await syncPayroll(payloads, passwords.owner);
 // Credentials stay only in the owner's encrypted view for private handoff.
 payloads.owner.teamAccess = Object.fromEntries(Object.keys(settings.employees).map(id => [id, { password: passwords[id] }]));

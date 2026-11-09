@@ -1,8 +1,11 @@
-import type { Metadata } from "next";
+import { DashboardReleaseInfo } from "@/components/dashboard-release-info";
+import history from "@/config/dashboard-releases.json";
 import { dashboardBasePath } from "@/lib/site-path.mjs";
+import type { Metadata } from "next";
 import "./globals.css";
-import "./native-controls.css";
-import "./apple-system.css";
+
+// Keep the shared visual system last: it overrides legacy page styles.
+import "./design-system.css";
 
 const siteBasePath = dashboardBasePath();
 const studioLogoUrl = `${siteBasePath}/smooth-studios-logo.png`;
@@ -26,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased"><DashboardReleaseInfo info={{version:history.currentVersion,date:history.releases[0].date}}>{children}</DashboardReleaseInfo></body>
     </html>
   );
 }

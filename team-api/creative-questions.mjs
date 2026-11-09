@@ -112,22 +112,39 @@ const studioHard = [
   question("flash-balance-compensation", "Studio lighting", "At 1/100, f/4, ISO 100, you want ambient light one stop darker while keeping manual-flash brightness similar. Assume 1/200 is within normal sync and captures the full pulse. Which change fits?", "Use 1/200 and keep aperture, ISO, and flash power unchanged", ["Use 1/50 with everything else unchanged", "Close to f/5.6 with flash power unchanged", "Reduce ISO to 50 with flash power unchanged"], "Halving the shutter time reduces ambient exposure by one stop. Under the stated sync conditions, it still captures the same flash pulse.", sources.flash),
   question("depth-exposure-tradeoff", "Portrait planning", "A group needs more depth of field. You change f/2.8 to f/5.6 under fixed continuous light and must keep shutter speed fixed. Starting at ISO 100, what ISO approximately preserves brightness?", "ISO 400", ["ISO 50", "ISO 200", "ISO 800"], "Closing from f/2.8 to f/5.6 is approximately two stops. Increasing ISO by two stops, from 100 to 400, compensates while preserving the chosen shutter speed.", sources.exposure),
 ];
+const mediaSource = { label: "Adobe · Organize media with bins", url: "https://helpx.adobe.com/uk/premiere/desktop/organize-media/file-organization/bins-overview.html" };
+const microphoneSource = { label: "Shure · SM58 microphone guide", url: "https://www.shure.com/en-US/docs/guide/sm58" };
+const practicalEasy = [
+  question("composition-placement", "Composition", "When using the rule of thirds, where can you place a main subject to create an off-center composition?", "Near an intersection of the grid lines", ["Only in the exact center", "Outside the image", "Always against the bottom edge"], "The grid intersections are useful starting points for placing a subject. Adjust to suit the image.", sources.composition),
+  question("edit-bins", "File organization", "What do bins help you do in a video-editing project?", "Organize related media into groups", ["Change the camera's exposure", "Automatically mix every audio track", "Replace the original camera recording"], "Bins group project items, helping you find related footage, audio, and graphics.", mediaSource),
+  question("cardioid-front", "Microphone technique", "Which direction is a cardioid microphone primarily designed to pick up?", "From the front", ["Equally from every direction", "Only from the rear", "Only through its cable"], "A cardioid pattern favors sound arriving from the front and reduces pickup from other directions.", microphoneSource),
+];
+const practicalMedium = [
+  question("composition-intent", "Composition", "A centered portrait has strong symmetry. Must you move the subject off-center to follow the rule of thirds?", "No; use the composition that supports the image", ["Yes; centered compositions are always incorrect", "Yes; symmetry prevents sharp focus", "Only if the camera has no grid"], "The rule of thirds is a compositional guide. Symmetry and a centered subject can be deliberate choices.", sources.composition),
+  question("media-groups", "File organization", "You are editing several interviews and their B-roll. What helps you find material for each interview?", "Group and label related clips in project bins", ["Put every item in one unnamed group", "Rename every clip with the same name", "Change the playback frame rate of all clips"], "Descriptive groups make related media easier to locate. Organizing bins does not require changing capture or playback settings.", mediaSource),
+  question("voice-proximity", "Microphone technique", "A voice becomes noticeably bassier as the speaker moves very close to a directional microphone. What may cause this?", "Proximity effect", ["A change in the lens focal length", "The camera's white balance", "A higher video frame rate"], "Many directional microphones emphasize bass at very close distances. Listen while adjusting microphone distance.", microphoneSource),
+];
+const practicalHard = [
+  question("microphone-drift", "Audio troubleshooting", "A speaker moves toward and away from a cardioid microphone, changing both loudness and bass. What addresses the problem at capture?", "Maintain a suitable, consistent microphone distance and monitor", ["Fix only the headphone listening volume", "Increase camera ISO whenever they move", "Turn off monitoring and use maximum gain"], "Consistent placement limits distance-related level and tonal changes. Monitoring helps you detect problems during the take.", microphoneSource),
+  question("composition-negative-space", "Composition", "A portrait intentionally leaves room in the direction the subject is looking. Which principle best explains that choice?", "Use framing to guide attention and balance the subject with open space", ["Every empty area must be cropped away", "The subject must occupy all nine grid sections", "Only the center can contain a face"], "Subject placement and surrounding space affect visual balance. A grid is a guide rather than a compulsory crop.", sources.composition),
+  question("media-handoff", "File organization", "Another editor needs to find interview audio, B-roll, and graphics in your project. Which organization is easiest to navigate?", "Clearly named bins separating those media groups", ["One bin with no descriptive labels", "Random groups named only after export times", "Duplicate every clip into every bin"], "Grouping related media with descriptive labels helps the next editor locate project items.", mediaSource),
+];
 const interleave = groups => Array.from({ length: Math.max(...groups.map(g => g.length)) }, (_, i) => groups.flatMap(g => g[i] ? [g[i]] : [])).flat();
 export const QUESTION_BANKS = {
-  easy: interleave([studioEasy, craft.filter(q => !["motion-blur", "motion-smear", "shutter-fps"].includes(q.id))]),
-  medium: interleave([studioMedium, [shutter.find(q => q.id === "shutter-60"), frameRates.find(q => q.id === "frame-rate-125"), exposure[0], exposure[1], shutter[0]], craft.filter(q => ["motion-blur", "motion-smear", "shutter-fps"].includes(q.id))]),
-  hard: interleave([studioHard, [advanced[0], angles[0], combinedExposure[0]]]),
+  easy: interleave([practicalEasy, studioEasy, craft.filter(q => !["motion-blur", "motion-smear", "shutter-fps"].includes(q.id))]),
+  medium: interleave([practicalMedium, studioMedium, [shutter.find(q => q.id === "shutter-60"), frameRates.find(q => q.id === "frame-rate-125"), exposure[0], exposure[1], shutter[0]], craft.filter(q => ["motion-blur", "motion-smear", "shutter-fps"].includes(q.id))]),
+  hard: interleave([practicalHard, studioHard, [advanced[0], angles[0], combinedExposure[0]]]),
 };
 export const QUESTION_BANK = Object.values(QUESTION_BANKS).flat();
 
 const hash = value => [...value].reduce((n, c) => Math.imul(n ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
 
-export function dailyQuestion(day, tier = "medium", employeeId = "", offset = 0) {
+export function dailyQuestion(day, tier = "medium", employeeId = "", offset = 0, customBank = null) {
   const difficulty = QUIZ_TIERS.find(item => item.id === tier);
   if (!difficulty) throw new Error("Invalid question tier.");
   const epoch = Date.parse("2026-10-15T00:00:00Z"), date = Date.parse(`${day}T00:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(date) || new Date(date).toISOString().slice(0, 10) !== day) throw new Error("Invalid question date.");
-  const ordinal = Math.round((date - epoch) / 86400_000), bank = QUESTION_BANKS[tier];
+  const ordinal = Math.round((date - epoch) / 86400_000), bank = customBank ?? QUESTION_BANKS[tier];
   const index = ordinal + (employeeId ? hash(employeeId) : 0) + offset;
   const item = bank[((index % bank.length) + bank.length) % bank.length];
   let seed = hash(`${day}:${item.id}${employeeId ? `:${employeeId}` : ""}`);
@@ -145,9 +162,28 @@ export function dailyQuestion(day, tier = "medium", employeeId = "", offset = 0)
 
 // Candidates and their answer keys stay on the server. The database reserves the
 // first unused prompt atomically, so overlapping logins cannot receive a duplicate.
-export function employeeQuestionCandidates(day, tier, employeeId) {
+export function quizTopic(category) {
+  if (/exposure|camera basics|camera equipment|portrait planning|^video$|video \+/i.test(category)) return "Camera settings";
+  if (/^Studio guidelines/.test(category)) return "Studio guidelines";
+  if (/audio/i.test(category)) return "Audio";
+  if (/lighting/i.test(category)) return "Lighting";
+  if (/color/i.test(category)) return "Color";
+  return category;
+}
+export function employeeQuestionCandidates(day, tier, employeeId, guidelines = [], previous = []) {
   if (!employeeId || !QUESTION_BANKS[tier]) throw new Error("Choose an employee and valid question tier.");
-  return QUESTION_BANKS[tier].map((_, offset) => dailyQuestion(day, tier, employeeId, offset));
+  const bank = [...(tier === "easy" ? guidelines : []), ...QUESTION_BANKS[tier]];
+  const candidates = bank.map((_, offset) => dailyQuestion(day, tier, employeeId, offset, bank));
+  const today = previous.filter(item => item.day === day).map(item => quizTopic(item.category));
+  const recentPrompts = new Set(previous.map(item => item.prompt));
+  const recentTopics = previous.slice(0, 3).map(item => quizTopic(item.category));
+  const priority = q => {
+    const topic = quizTopic(q.category);
+    return (today.includes(topic) ? 100 : 0) + (recentPrompts.has(q.prompt) ? 20 : 0)
+      + (recentTopics.includes(topic) ? 4 : 0) + (topic === "Camera settings" ? 2 : 0)
+      - (topic === "Studio guidelines" && !today.includes(topic) ? 10 : 0);
+  };
+  return candidates.sort((a,b) => priority(a) - priority(b));
 }
 
 export function publicQuestion(question) {

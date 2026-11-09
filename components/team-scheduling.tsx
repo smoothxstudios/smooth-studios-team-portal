@@ -1,33 +1,34 @@
 "use client";
-import { AppPicker, ConfirmationRow } from "@/components/ui/app-controls";
 import { AppointmentDetail } from "@/components/appointment-detail";
 import { OwnerDailyActions } from "@/components/dashboard/daily-actions";
 import { MoreOptions } from "@/components/dashboard/more-options";
 import { PersonLabel } from "@/components/dashboard/person-label";
+import { RentalDescription } from "@/components/rental-description";
+import { ScheduleConfirmation } from "@/components/schedule-confirmation";
+import { TimeBlockDialog } from "@/components/time-block-dialog";
+import { AppPicker,ConfirmationRow } from "@/components/ui/app-controls";
 import { buildScheduleAgenda } from "@/lib/schedule-agenda.mjs";
 import type { WorkEntry } from "@/lib/schedule-calendar-types";
-import { ScheduleConfirmation } from "@/components/schedule-confirmation";
-import { RentalDescription } from "@/components/rental-description";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Bell, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, Plus, ShieldCheck, X } from "lucide-react";
+import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
+import { useRefreshSource } from "@/components/dashboard-refresh";
+import { EmployeeHome,type EmployeeHomeOptions } from "@/components/employee-home";
+import { OwnerScheduleAgenda } from "@/components/owner-schedule-agenda";
+import { RentalSuggestions } from "@/components/rental-suggestions";
+import { TeamAvailability } from "@/components/team-availability";
 import { Button } from "@/components/ui/button";
+import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { teamPushIsEnabled, teamRequest, type TeamSchedule, type TeamAppointment, type TeamAssignment, type TimeBlock, type WorkPreference } from "@/lib/team-api";
+import { rentalAlertTargetId,rentalAppointmentId } from "@/lib/alert-target.mjs";
+import { calendarInvitationLabel,calendarInvitationStatus,pendingCalendarInvitations } from "@/lib/calendar-invitations.mjs";
 import type { DashboardPayload } from "@/lib/dashboard-types";
-import { EmployeeHome, type EmployeeHomeOptions } from "@/components/employee-home";
-import { TeamAvailability } from "@/components/team-availability";
-import { OwnerScheduleAgenda } from "@/components/owner-schedule-agenda";
-import { useRefreshSource } from "@/components/dashboard-refresh";
-import { saveScheduleMutation, scheduleMutationMessage, scheduleMutationError } from "@/lib/team-schedule-mutations.mjs";
-import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences, assignmentConflicts, hasConflictOverride, overlaps, workPreferenceMatch } from "@/lib/team-schedule.mjs";
-import { RentalSuggestions } from "@/components/rental-suggestions";
-import { calendarInvitationStatus, calendarInvitationLabel, pendingCalendarInvitations } from "@/lib/calendar-invitations.mjs";
-import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
 import { hapticFeedback } from "@/lib/haptics.mjs";
-import { rentalAppointmentId, rentalAlertTargetId } from "@/lib/alert-target.mjs";
+import { teamPushIsEnabled,teamRequest,type TeamAppointment,type TeamAssignment,type TeamSchedule,type TimeBlock,type WorkPreference } from "@/lib/team-api";
+import { saveScheduleMutation,scheduleMutationError,scheduleMutationMessage } from "@/lib/team-schedule-mutations.mjs";
+import { addLocalDays,assignmentConflicts,blockOccurrences,hasConflictOverride,localInstant,overlaps,STUDIO_ZONE,studioLocal,TEAM,workPreferenceMatch } from "@/lib/team-schedule.mjs";
+import { Bell,CalendarDays,Check,ChevronLeft,ChevronRight,Clock3,Plus,ShieldCheck,X } from "lucide-react";
+import { useCallback,useEffect,useMemo,useRef,useState,type ReactNode } from "react";
 
 const personName = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
 const time = (value: string) => new Date(value).toLocaleTimeString("en-US", { timeZone: STUDIO_ZONE, hour: "numeric", minute: "2-digit" });
@@ -235,8 +236,6 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
   const detailSource = focusedRental ?? focusedItem;
   const detailEntry = schedule && detailSource ? (buildScheduleAgenda(schedule, { from: detailSource.start, to: detailSource.end }) as WorkEntry[]).find(item => item.kind === "work" && (focusedRental ? item.appointment?.id === focusedRental.id : item.assignments.some(offer => offer.id === focusedItem?.id))) : undefined;
   return <section className="team-scheduling">
-    {!isHome && (!isOwner || availabilityOnly || !schedule) && <header className="schedule-intro"><div>{isOwner && <p className="schedule-eyebrow">{availabilityOnly ? "TEAM AVAILABILITY" : "TEAM SCHEDULE"}</p>}<h2>{availabilityOnly ? isOwner ? "Availability" : "My availability" : isOwner ? "Schedule" : "My schedule"}</h2>{!isOwner && <p>{availabilityOnly ? "Add preferred work days or unavailable time." : "Review rental offers and assignments."}</p>}</div>
-</header>}
     {error && <div role="alert" className="schedule-error"><p>{error}</p><Button disabled={busy} variant="outline" onClick={() => void refreshManually()}>Try again</Button></div>}
     {message && <p role="status" className="schedule-success">{message}</p>}
     {ownerHome && <OwnerDailyActions schedule={schedule} loading={loading} onOpen={openWork} onSchedule={ownerHome.onSchedule} />}
@@ -288,16 +287,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
     </>}
 
 
-    <Dialog open={blockOpen} onOpenChange={open => { if (!busy) setBlockOpen(open); }}><DialogContent presentation="sheet" closeDisabled={busy} className="schedule-modal app-task-sheet"><DialogHeader><DialogTitle>Block time</DialogTitle><DialogDescription>Add the time you are unavailable. Existing assignments are not cancelled.</DialogDescription></DialogHeader>
-      <form className="app-sheet-form" onSubmit={async e => { e.preventDefault(); if (await mutate("/blocks", { ...block, repeatUntil: block.weekly ? block.repeatUntil : null })) setBlockOpen(false); }}>
-        <div className="app-sheet-scroll">{isOwner && <AppPicker label="Team member" required placeholder="Choose a person" value={block.userId} disabled={busy} onValueChange={userId => setBlock({ ...block, userId })} options={TEAM.map(p => ({ value: p.id, label: p.name, color: p.color }))} />}
-        <label>Reason<Input required maxLength={120} value={block.reason} onChange={e => setBlock({ ...block, reason: e.target.value })} placeholder="Reason for being unavailable" /></label>
-        <div className="schedule-form-pair"><label>Starts<Input required type="datetime-local" value={block.startLocal} onChange={e => setBlock({ ...block, startLocal: e.target.value })} /></label><label>Ends<Input required type="datetime-local" value={block.endLocal} onChange={e => setBlock({ ...block, endLocal: e.target.value })} /></label></div>
-        <MoreOptions><ConfirmationRow checked={block.weekly} disabled={busy} onCheckedChange={weekly => setBlock({ ...block, weekly })}>Repeat every week on this weekday</ConfirmationRow>
-        {block.weekly && <><p className="schedule-small">For a class that already started, use its original meeting date. The series must include an upcoming meeting.</p><label>Last date of the class or series<Input required type="date" min={block.startLocal.slice(0, 10)} max={addLocalDays(block.startLocal || `${week}T00:00`, 364).slice(0, 10)} value={block.repeatUntil} onChange={e => setBlock({ ...block, repeatUntil: e.target.value })} /></label></>}
-        </MoreOptions>{error && <p className="schedule-error" role="alert">{error}</p>}
-        </div><DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={() => setBlockOpen(false)}>Cancel</Button><Button disabled={busy || needsRefresh} type="submit">{busy ? "Saving…" : error ? "Try again" : "Save time block"}</Button></DialogFooter>
-      </form></DialogContent></Dialog>
+    <TimeBlockDialog blockOpen={blockOpen} setBlockOpen={setBlockOpen} block={block} setBlock={setBlock} busy={busy} needsRefresh={needsRefresh} isOwner={isOwner} error={error} mutate={mutate} />
 
     <Dialog open={assignmentOpen} onOpenChange={open => { if (!busy) setAssignmentOpen(open); }}><DialogContent presentation="sheet" closeDisabled={busy} className="schedule-modal assignment-dialog app-task-sheet"><DialogHeader><DialogTitle>{startedRental ? "Record rental staff" : "Assign work"}</DialogTitle><DialogDescription>{startedRental ? "Confirm who is working or worked this rental." : "Create an offer for one employee. They confirm by accepting it in their dashboard."}</DialogDescription></DialogHeader>
       <form className="app-sheet-form" onSubmit={async e => { e.preventDefault(); if (await mutate("/assignments", assignment)) setAssignmentOpen(false); }}><div className="app-sheet-scroll">

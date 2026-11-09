@@ -1,3 +1,4 @@
+import { syncGuidelineQuiz } from "./lib/guideline-quiz-sync.mjs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +33,8 @@ const serializedGuide = JSON.stringify(submitted);
 if (Buffer.byteLength(serializedGuide, "utf8") > MAX_GUIDELINE_UPDATE_BYTES) throw new Error("A Studio Guidelines update must be 40 KB or smaller");
 const ownerPayload = decryptPayload(await readJson("public/data/owner.json"), passwords.owner);
 const rulebook = normalizeRulebook(submitted.mode === "patch" ? applyGuidePatch(ownerPayload.rulebook, submitted) : submitted, { updatedAt: new Date().toISOString() });
+
+await syncGuidelineQuiz(rulebook, passwords.owner);
 
 const outputs = [];
 for (const id of profiles) {

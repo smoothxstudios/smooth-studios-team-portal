@@ -1,14 +1,15 @@
 "use client";
-import { MoreOptions } from "@/components/dashboard/more-options";
 import { AvailabilityOverview } from "@/components/availability-overview";
+import { MoreOptions } from "@/components/dashboard/more-options";
+import { ConfirmationRow } from "@/components/ui/app-controls";
 
-import { useState } from "react";
-import { CalendarCheck, ChevronDown, Clock3, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TEAM, STUDIO_ZONE, studioLocal, localInstant, addLocalDays, blockOccurrences } from "@/lib/team-schedule.mjs";
-import type { TeamSchedule, WorkPreference, TimeBlock } from "@/lib/team-api";
+import type { TeamSchedule,TimeBlock,WorkPreference } from "@/lib/team-api";
+import { addLocalDays,blockOccurrences,localInstant,STUDIO_ZONE,studioLocal,TEAM } from "@/lib/team-schedule.mjs";
+import { CalendarCheck,ChevronDown,Clock3,Pencil,Plus,Trash2 } from "lucide-react";
+import { useState } from "react";
 
 const name = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
 const date = (local: string) => new Date(localInstant(local)).toLocaleDateString("en-US", { timeZone: STUDIO_ZONE, weekday: "short", month: "short", day: "numeric" });
@@ -57,12 +58,11 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
 
   return <>
     <section className={`availability-panel${isOwner ? " schedule-panel is-owner" : " is-self"}`} aria-label={isOwner ? "Team availability" : "Your availability"}>
-    <div className="schedule-toolbar availability-toolbar">
-      {!isOwner && <p className="schedule-small">Visible to you and Smooth.</p>}
+    <div className="schedule-toolbar availability-toolbar" hidden={!isOwner}>
       {isOwner && <label className="schedule-filter">Team member<select value={filter} onChange={e => selectPerson(e.target.value)}><option value="all">Everyone</option>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
     </div>
     {isOwner && <AvailabilityOverview schedule={schedule} filter={filter} />}
-    <details open={!isOwner || filter !== "all"}><summary>Manage preferences and blocked time</summary>
+    <details className="availability-editor" open={!isOwner || filter !== "all"}><summary hidden={!isOwner}>Edit availability</summary>
     <div className="availability-people">{(isOwner ? TEAM.filter(person => filter === "all" || person.id === filter) : [{ id: userId, name: name(userId), color: "" }]).map(person => {
       const personPreferences = preferences.filter(entry => entry.userId === person.id);
       const personBlocks = blocks.filter(entry => entry.userId === person.id);
@@ -73,13 +73,13 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
       {isOwner && <button type="button" className="availability-person-trigger" aria-expanded={expanded} aria-controls={`availability-details-${person.id}`} onClick={() => togglePerson(person.id)}><span className="employee-avatar" style={{ background: person.color }} aria-hidden="true">{person.name.slice(0, 1)}</span><span className="availability-person-name">{person.name}</span><span className="availability-person-counts"><span>{person.id === "owner" ? "Flexible" : `${personPreferences.length} preferred`}</span><span>{personBlocks.length} unavailable</span></span><ChevronDown size={18} aria-hidden="true" /></button>}
       {expanded && <div className="availability-person-details" id={`availability-details-${person.id}`}>
       <div className="availability-columns">
-      <article className={isOwner ? "availability-section availability-preferred" : "schedule-panel availability-preferred"}><div className="schedule-section-heading"><h3><CalendarCheck size={isOwner ? 17 : 20} />{person.id === "owner" ? "Flexible schedule" : <>Want to work <span className="schedule-count">{personPreferences.length}</span></>}</h3>{!isOwner && <p>Tell Smooth which days or hours you would like to work. This is a preference; an assignment still needs to be offered and accepted.</p>}{person.id !== "owner" && <Button disabled={disabled || !available} onClick={() => edit(undefined, person.id)}><Plus size={16} />Add work preference</Button>}</div>
+      <article className={isOwner ? "availability-section availability-preferred" : "schedule-panel availability-preferred"}><div className="schedule-section-heading"><h3><CalendarCheck size={isOwner ? 17 : 20} />{person.id === "owner" ? "Flexible schedule" : <>Preferred time <span className="schedule-count">{personPreferences.length}</span></>}</h3>{!isOwner && <p>Choose when you’d like to work. Assignments still need your acceptance.</p>}{person.id !== "owner" && <Button variant="outline" disabled={disabled || !available} onClick={() => edit(undefined, person.id)}><Plus size={16} />Add preferred time</Button>}</div>
         {!available && person.id !== "owner" && <p className="schedule-warning" role="status">Work preferences are finishing setup. Refresh in a moment. Your time blocks are still available.</p>}
-        {personPreferences.length ? <div className="schedule-blocks">{previewPreferences.map(p => <div className="schedule-block" key={p.id}><div><strong>{p.note || "Want to work"}</strong>{details(p)}</div><div className="availability-entry-actions"><Button disabled={disabled} size="icon" variant="outline" aria-label={`Edit work preference for ${name(p.userId)} on ${date(p.startLocal)}`} onClick={() => edit(p)}><Pencil size={16} /></Button><Button disabled={disabled} size="icon" variant="outline" aria-label={`Remove work preference for ${name(p.userId)} on ${date(p.startLocal)}`} onClick={() => setRemove({ path: `/work-preferences/${p.id}`, label: `${name(p.userId)}’s preferred work time on ${date(p.startLocal)}${p.repeatUntil ? " and its weekly repeats" : ""}` })}><Trash2 size={16} /></Button></div></div>)}</div> : <p className="schedule-empty">{person.id === "owner" ? "Your schedule is flexible. Add yourself to event plans as needed, and block time when you’re unavailable." : "No work preferences recorded."}</p>}
+        {personPreferences.length ? <div className="schedule-blocks">{previewPreferences.map(p => <div className="schedule-block" key={p.id}><div><strong>{p.note || "Want to work"}</strong>{details(p)}</div><div className="availability-entry-actions"><Button disabled={disabled} size="icon" variant="outline" aria-label={`Edit work preference for ${name(p.userId)} on ${date(p.startLocal)}`} onClick={() => edit(p)}><Pencil size={16} /></Button><Button disabled={disabled} size="icon" variant="outline" aria-label={`Remove work preference for ${name(p.userId)} on ${date(p.startLocal)}`} onClick={() => setRemove({ path: `/work-preferences/${p.id}`, label: `${name(p.userId)}’s preferred work time on ${date(p.startLocal)}${p.repeatUntil ? " and its weekly repeats" : ""}` })}><Trash2 size={16} /></Button></div></div>)}</div> : <p className="schedule-empty">{person.id === "owner" ? "Your schedule is flexible. Add yourself to event plans as needed, and block time when you’re unavailable." : "No preferred time added."}</p>}
         {personPreferences.length > 3 && <button type="button" className="availability-show-more" onClick={() => setShowAllPreferences(value => !value)}>{showAllPreferences ? "Show less" : `Show ${personPreferences.length - 3} more`}</button>}
       </article>
-      <article className={isOwner ? "availability-section" : "schedule-panel"}><div className="schedule-section-heading"><h3><Clock3 size={isOwner ? 17 : 20} />Unavailable <span className="schedule-count">{personBlocks.length}</span></h3>{!isOwner && <p>Block classes, another job, or personal time. Blocks flag scheduling conflicts and take priority over work preferences.</p>}<Button disabled={disabled} variant="outline" onClick={() => onBlockTime(person.id)}><Plus size={16} />Block time</Button></div>
-        {personBlocks.length ? <div className="schedule-blocks">{previewBlocks.map(b => <div className="schedule-block" key={b.id}><div><strong>{b.reason}</strong>{details(b)}</div><Button aria-label={`Remove ${b.reason} block for ${name(b.userId)}`} size="icon" variant="outline" disabled={disabled} onClick={() => setRemove({ path: `/blocks/${b.id}`, label: `${b.reason}${b.repeatUntil ? " and all its weekly repeats" : ""} for ${name(b.userId)}` })}><Trash2 size={16} /></Button></div>)}</div> : <p className="schedule-empty">No blocked time recorded.</p>}
+      <article className={isOwner ? "availability-section" : "schedule-panel"}><div className="schedule-section-heading"><h3><Clock3 size={isOwner ? 17 : 20} />Unavailable <span className="schedule-count">{personBlocks.length}</span></h3>{!isOwner && <p>Add time you can’t work. This takes priority over your preferred time.</p>}<Button disabled={disabled} variant="outline" onClick={() => onBlockTime(person.id)}><Plus size={16} />Block time</Button></div>
+        {personBlocks.length ? <div className="schedule-blocks">{previewBlocks.map(b => <div className="schedule-block" key={b.id}><div><strong>{b.reason}</strong>{details(b)}</div><Button aria-label={`Remove ${b.reason} block for ${name(b.userId)}`} size="icon" variant="outline" disabled={disabled} onClick={() => setRemove({ path: `/blocks/${b.id}`, label: `${b.reason}${b.repeatUntil ? " and all its weekly repeats" : ""} for ${name(b.userId)}` })}><Trash2 size={16} /></Button></div>)}</div> : <p className="schedule-empty">No unavailable time added.</p>}
         {personBlocks.length > 3 && <button type="button" className="availability-show-more" onClick={() => setShowAllBlocks(value => !value)}>{showAllBlocks ? "Show less" : `Show ${personBlocks.length - 3} more`}</button>}
       </article>
     </div>
@@ -87,11 +87,11 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
       </section>;
     })}</div></details>
     <label className="availability-past-toggle"><input type="checkbox" checked={showPast} onChange={e => setShowPast(e.target.checked)} />Include past entries</label>
-    <p className="schedule-small">No preference means no preference recorded. Existing assignments stay in place when availability changes; contact Smooth if you need an assignment changed.</p>
+    <p className="schedule-small">Changing availability won’t cancel accepted work. Contact Smooth if you need coverage.</p>
     </section>
 
-    <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent closeDisabled={busy} className="schedule-modal"><DialogHeader><DialogTitle>{form.id ? "Edit work preference" : "When do you want to work?"}</DialogTitle><DialogDescription>Choose a day or specific hours. Smooth uses this when assigning work.</DialogDescription></DialogHeader>
-      <form onSubmit={async e => {
+    <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent presentation="sheet" closeDisabled={busy} className="schedule-modal app-task-sheet"><DialogHeader><DialogTitle>{form.id ? "Edit preferred time" : "Add preferred time"}</DialogTitle><DialogDescription>Choose a full day or specific hours you’d like to work.</DialogDescription></DialogHeader>
+      <form className="app-sheet-form" onSubmit={async e => {
         e.preventDefault(); setFormError("");
         try {
           const startLocal = `${form.day}T${form.allDay ? "00:00" : form.startTime}`;
@@ -101,15 +101,15 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
           if (await mutate(form.id ? `/work-preferences/${form.id}` : "/work-preferences", { userId: form.userId, startLocal, endLocal, allDay: form.allDay, note: form.note, repeatUntil: form.weekly ? form.repeatUntil : null }, form.id ? "PATCH" : "POST")) { if (isOwner) { if (filter !== "all") setFilter(form.userId); setExpandedPerson(form.userId); setShowAllPreferences(false); setShowAllBlocks(false); } setOpen(false); }
         } catch (caught) { setFormError(caught instanceof Error ? caught.message : "Check the selected date and hours."); }
       }}>
-        {isOwner && <label>Team member<select aria-label="Team member" required disabled={Boolean(form.id)} value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })}><option value="" disabled>Choose a person</option>{TEAM.filter(p => p.id !== "owner").map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
+        <div className="app-sheet-scroll">{isOwner && <label>Team member<select aria-label="Team member" required disabled={Boolean(form.id)} value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })}><option value="" disabled>Choose a person</option>{TEAM.filter(p => p.id !== "owner").map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
         <label>Day<Input required type="date" value={form.day} onChange={e => setForm({ ...form, day: e.target.value })} /></label>
-        <label className="schedule-check"><input type="checkbox" checked={form.allDay} onChange={e => setForm({ ...form, allDay: e.target.checked })} />Full day — any time that day</label>
+        <ConfirmationRow checked={form.allDay} disabled={busy} onCheckedChange={allDay => setForm({ ...form, allDay })}>Full day</ConfirmationRow>
         {!form.allDay && <><div className="schedule-form-pair"><label>From<Input required type="time" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} /></label><label>Until<Input required type="time" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} /></label></div>{form.endTime < form.startTime && <p className="schedule-small">Ends the following day.</p>}</>}
         <MoreOptions defaultOpen={Boolean(form.id && (form.weekly || form.note))}><label className="schedule-check"><input type="checkbox" checked={form.weekly} onChange={e => setForm({ ...form, weekly: e.target.checked })} />Repeat every week on this weekday</label>
         {form.weekly && <label>Repeat through<Input required type="date" min={form.day || undefined} max={form.day ? addLocalDays(`${form.day}T00:00`, 364).slice(0, 10) : undefined} value={form.repeatUntil} onChange={e => setForm({ ...form, repeatUntil: e.target.value })} /></label>}
         <label>Note (optional)<Input maxLength={120} placeholder="Open to extra rentals, prefer an afternoon shift…" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></label></MoreOptions>
         {(formError || error) && <p className="schedule-error" role="alert">{formError || error}</p>}
-        <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={disabled}>{busy ? "Saving…" : error || formError ? "Try again" : "Save preference"}</Button></DialogFooter>
+        </div><DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" disabled={disabled}>{busy ? "Saving…" : error || formError ? "Try again" : "Save"}</Button></DialogFooter>
       </form></DialogContent></Dialog>
     <Dialog open={Boolean(remove)} onOpenChange={value => { if (!busy && !value) setRemove(null); }}><DialogContent closeDisabled={busy} className="schedule-modal"><DialogHeader><DialogTitle>Remove availability entry?</DialogTitle><DialogDescription>Remove {remove?.label}? Existing assignments will stay in place.</DialogDescription></DialogHeader>{error && <p className="schedule-error" role="alert">{error}</p>}<DialogFooter><Button disabled={busy} variant="outline" onClick={() => setRemove(null)}>Keep entry</Button><Button disabled={disabled} onClick={async () => { if (remove && await mutate(remove.path, {}, "DELETE")) setRemove(null); }}>{busy ? "Removing…" : "Remove entry"}</Button></DialogFooter></DialogContent></Dialog>
   </>;

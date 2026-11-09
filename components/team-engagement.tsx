@@ -1,15 +1,15 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronRight, Clock3, Smile, Sparkles, Star, X } from "lucide-react";
+import { useRefreshSource } from "@/components/dashboard-refresh";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle } from "@/components/ui/dialog";
 import { useSidebar } from "@/components/ui/sidebar";
 import { formatCheckInTime } from "@/lib/dashboard-presentation";
 import { teamRequest } from "@/lib/team-api";
-import { useRefreshSource } from "@/components/dashboard-refresh";
-import { MOODS, nextEngagementPrompt, QUIZ_TIERS, STAR_POINTS } from "@/lib/team-engagement.mjs";
-import type { CreativeAttempt, EmployeeEngagement, RewardChange, StudioStars, TeamEngagement } from "@/lib/team-engagement-types";
+import type { CreativeAttempt,EmployeeEngagement,RewardChange,StudioStars,TeamEngagement } from "@/lib/team-engagement-types";
+import { MOODS,nextEngagementPrompt,QUIZ_TIERS,STAR_POINTS } from "@/lib/team-engagement.mjs";
+import { Check,ChevronRight,Clock3,Smile,Sparkles,Star,X } from "lucide-react";
+import { createContext,useCallback,useContext,useEffect,useRef,useState,type ReactNode } from "react";
 
 const clock = (value: string | number) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 const dayLabel = (day: string) => new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(`${day}T12:00:00Z`));
@@ -188,8 +188,8 @@ export function EmployeeEngagementProvider({ token, enabled, homeActive, childre
   return <EngagementContext.Provider value={enabled ? context : null}>
     {children}
     <Dialog open={Boolean(enabled && homeActive && state && panel)} onOpenChange={open => { if (!open) dismiss(); }}>
-      <DialogContent ref={popupRef} className={`engagement-popup${panel === "mood" ? " temp-check-popup" : ""}`} showCloseButton={false}>
-        <div className="engagement-popup-heading"><DialogTitle>{panel === "mood" ? "Temp Check" : "Daily Quiz"}</DialogTitle><button type="button" className="engagement-close" aria-label={panel === "mood" ? "Dismiss Temp Check" : "Dismiss Daily Quiz"} disabled={busy} onClick={dismiss}><X size={19} /></button></div>
+      <DialogContent ref={popupRef} className={`engagement-popup${panel === "mood" ? " temp-check-popup" : ""}`} closeDisabled={busy}>
+        <div className="engagement-popup-heading"><DialogTitle>{panel === "mood" ? "Temp Check" : "Daily Quiz"}</DialogTitle></div>
         <DialogDescription className={panel === "mood" ? "engagement-muted" : "sr-only"}>{panel === "mood" ? state?.moodDue ? "How are you feeling?" : "You're checked in for now." : "One question at a time, with two hours between answers. Up to three different difficulties each day."}</DialogDescription>
         {state && (panel === "mood" ? <>
           {state.moodDue ? <div className="temp-check-moods">{MOODS.map(mood => <button type="button" key={mood.id} disabled={busy} onClick={() => recordMood(mood.id)} aria-label={`I'm feeling ${mood.label.toLowerCase()}`}><span aria-hidden="true">{mood.emoji}</span><strong>{mood.label}</strong></button>)}</div> : <div className="temp-check-saved">{latestMood ? <><span aria-hidden="true">{latestMood.emoji}</span><strong>{latestMood.label}</strong><small>{formatCheckInTime(state.lastMood!.createdAt)}</small></> : <strong>You skipped this check-in.</strong>}</div>}

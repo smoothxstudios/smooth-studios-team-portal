@@ -8,7 +8,7 @@ import { teamToken, tokenHash } from "../lib/team-auth.mjs";
 import { TEMP_CHECK_MIN_MS, TEMP_CHECK_MAX_MS, QUIZ_INTERVAL_MS, MOODS, QUIZ_TIERS, nextEngagementPrompt, starProgress } from "../lib/team-engagement.mjs";
 import { dailyQuestion, employeeQuestionCandidates, publicQuestion, QUESTION_BANK, QUESTION_BANKS } from "../team-api/creative-questions.mjs";
 
-const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql", "0009_push_notifications.sql", "0027_temp_check_pacing.sql", "0016_smoothstar_500_points.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
+const migrations = await Promise.all(["0000_brief_ravenous.sql", "0001_initial_state.sql", "0002_guideline_questions.sql", "0003_work_preferences.sql", "0004_team_engagement.sql", "0005_daily_quiz_tiers.sql", "0006_paced_quizzes_rewards.sql", "0007_individual_quiz_lookup.sql", "0008_engagement_owner_controls.sql", "0009_push_notifications.sql", "0027_temp_check_pacing.sql", "0036_guideline_quiz.sql", "0016_smoothstar_500_points.sql"].map(name => readFile(new URL(`../team-api/migrations/${name}`, import.meta.url), "utf8")));
 const tokens = Object.fromEntries(await Promise.all([...TEAM.map(p => p.id), "sync"].map(async id => [id, await teamToken(`synthetic-engagement-test-only-${id}`, id)])));
 const hashes = Object.fromEntries(await Promise.all(Object.entries(tokens).map(async ([id, token]) => [id, await tokenHash(token)])));
 const now = Date.parse("2026-10-15T17:00:00Z"), today = "2026-10-15";
@@ -683,4 +683,22 @@ test("owner-control migration preserves all preexisting reward entries and balan
   assert.deepEqual(db.prepare('SELECT * FROM team_reward_changes ORDER BY id').all(),ledger);
   assert.deepEqual({...db.prepare('SELECT * FROM team_reward_accounts').get()},{...before,removed_stars:0});
   db.close();
+});
+
+test('guideline imports require sync access, reject stale replacements, and preserve an open quiz', async () => {
+  const { GUIDELINE_QUESTIONS } = await import('../lib/studio-guideline-questions.mjs');
+  const templates = GUIDELINE_QUESTIONS.filter(q => ['arrival-time','booking-review','availability-updates'].includes(q.id));
+  const entries = templates.map(q => ({id:`question-${q.id}`,title:q.title,category:q.category,body:q.choices[0].body}));
+  const f=fixture(),payload={updatedAt:'2026-11-09T12:00:00.000Z',entries};
+  assert.equal((await f.call('jordyn','/sync/quiz-guidelines',payload)).status,403);
+  assert.equal((await f.call('owner','/sync/quiz-guidelines',payload)).status,403);
+  const synced=await f.call('sync','/sync/quiz-guidelines',payload);assert.equal(synced.status,200);assert.equal(synced.data.questions,3);
+  const before=(await f.call('jordyn')).data.currentQuestionId;
+  const saved=f.DB.sqlite.prepare('SELECT data FROM team_quiz_offers WHERE user_id = ?').get('jordyn').data;
+  await f.call('sync','/sync/quiz-guidelines',{...payload,updatedAt:'2026-11-08T12:00:00.000Z',entries:[]});
+  assert.equal(JSON.parse(f.DB.sqlite.prepare('SELECT data FROM team_quiz_guidelines').get().data).length,3);
+  await f.call('sync','/sync/quiz-guidelines',{...payload,updatedAt:'2026-11-10T12:00:00.000Z',entries:[]});
+  assert.equal(JSON.parse(f.DB.sqlite.prepare('SELECT data FROM team_quiz_guidelines').get().data).length,0);
+  assert.equal((await f.call('jordyn')).data.currentQuestionId,before);
+  assert.equal(f.DB.sqlite.prepare('SELECT data FROM team_quiz_offers WHERE user_id = ?').get('jordyn').data,saved);
 });

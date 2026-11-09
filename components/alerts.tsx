@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { attachScrollTapGuard } from "@/lib/scroll-tap-guard.mjs";
-import { alertBody, alertPerson, alertRelativeTime, chronologicalAlerts, groupAlerts } from "@/lib/alert-presentation.mjs";
-import { Bell, Banknote, CalendarDays, Check, CheckCheck, Mail, ClipboardList, Sparkles, ArrowUpRight, MoreHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { AlertsState, DashboardAlert } from "@/lib/use-alerts";
+import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuSeparator,DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { alertBody,alertPerson,alertRelativeTime,chronologicalAlerts,groupAlerts } from "@/lib/alert-presentation.mjs";
+import { attachScrollTapGuard } from "@/lib/scroll-tap-guard.mjs";
+import type { AlertsState,DashboardAlert } from "@/lib/use-alerts";
+import { ArrowUpRight,Banknote,Bell,CalendarDays,Check,CheckCheck,ClipboardList,Mail,MoreHorizontal,Sparkles,Trash2,X } from "lucide-react";
+import { useEffect,useRef,useState,type ReactNode } from "react";
 
 const stamp = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
@@ -48,7 +48,7 @@ export function AlertsPage({ state, onOpen, isOwner = false, action }: { isOwner
     await state.markRead(alert, true);
   };
   return <section ref={page} className="alerts-page" aria-label="Your alerts">
-    <div className="alerts-heading"><h2>Alerts</h2>{action}</div>
+    {action && <div className="alerts-heading alerts-actions-only">{action}</div>}
     <div className="alerts-controls">
       <div className="alerts-filters" role="group" aria-label="Filter alerts">
         <button aria-pressed={state.filter === "all"} disabled={state.busy} onClick={() => state.chooseFilter("all")}>All</button>

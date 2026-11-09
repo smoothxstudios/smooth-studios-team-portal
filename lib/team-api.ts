@@ -1,5 +1,8 @@
-import { TEAM_API_URL } from "@/lib/team-schedule.mjs";
+import { createRequestCoalescer } from "@/lib/request-coalescer.mjs";
+const reads = createRequestCoalescer();
+
 import { unbase64url } from "@/lib/team-auth.mjs";
+import { TEAM_API_URL } from "@/lib/team-schedule.mjs";
 
 export type TimeBlock = { id: string; userId: string; reason: string; startLocal: string; endLocal: string; repeatUntil: string | null; createdAt: string };
 export type WorkPreference = { id: string; userId: string; note: string; allDay: boolean; startLocal: string; endLocal: string; repeatUntil: string | null; createdAt: string };
@@ -11,7 +14,7 @@ export type TeamSchedule = { revision: number; syncedAt: string | null; appointm
 export type PushTestResult = { accepted: boolean; expired: boolean; status: number; provider: string; message: string };
 export type GuidelineQuestionRequest = { id: string; askedBy: string; question: string; status: "open" | "answered" | "dismissed"; createdAt: string };
 
-export async function teamRequest<T>(token: string, path: string, data?: unknown, method?: string): Promise<T> {
+async function performTeamRequest<T>(token: string, path: string, data?: unknown, method?: string): Promise<T> {
   const actionMethod = method ?? (data === undefined ? "GET" : "POST");
   const visibleWrite = typeof window !== "undefined" && actionMethod !== "GET" && /^\/(assignments|rental-staff|rental-checklists|blocks|work-preferences|creative-work|event-planner|dashboard-layout|studio-reference|engagement\/(rewards|reset)|notifications\/send)(\/|$)/.test(path);
   const actionId = visibleWrite ? crypto.randomUUID() : "";
@@ -33,6 +36,14 @@ export async function teamRequest<T>(token: string, path: string, data?: unknown
     if (error instanceof TypeError || (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name))) throw new Error("Couldn’t confirm the request. Check your connection, then try again.");
     throw error;
   }
+}
+
+/** Identical simultaneous reads share a request; writes always run independently. */
+export function teamRequest<T>(token:string,path:string,data?:unknown,method?:string):Promise<T> {
+  const verb=method ?? (data===undefined?"GET":"POST");
+  if(verb==="GET") return reads.read(token,path,()=>performTeamRequest<T>(token,path,data,method));
+  reads.invalidate(token);
+  return performTeamRequest<T>(token,path,data,method).finally(()=>reads.invalidate(token));
 }
 
 export async function teamWorker() {

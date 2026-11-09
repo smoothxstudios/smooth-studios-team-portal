@@ -44,6 +44,13 @@ const unusedQuestion = `WITH candidate AS (
     AND json_extract(a.data, '$.question.prompt') = json_extract(c.value, '$.prompt'))
   ORDER BY CAST(c.key AS INTEGER) LIMIT 1
 )`;
+async function candidatesFor(db, user, day, tier) {
+  const [saved, recent] = await Promise.all([
+    db.prepare("SELECT data FROM team_quiz_guidelines WHERE id = 1").first(),
+    db.prepare("SELECT data FROM team_quiz_attempts WHERE user_id = ? AND reset_at IS NULL ORDER BY created_at DESC LIMIT 21").bind(user).all(),
+  ]);
+  return employeeQuestionCandidates(day, tier, user, saved ? JSON.parse(saved.data) : [], recent.results.map(row => JSON.parse(row.data).question));
+}
 export async function offerQuestion(db, user, day, now) {
   const pending = await pendingOffer(db, user, day, now);
   if (pending) {
@@ -60,7 +67,7 @@ export async function offerQuestion(db, user, day, now) {
             AND json_extract(other.data, '$.prompt') = json_extract(o.data, '$.prompt'))
             OR EXISTS (SELECT 1 FROM team_quiz_attempts a WHERE a.day = o.day AND a.user_id != o.user_id
               AND json_extract(a.data, '$.question.prompt') = json_extract(o.data, '$.prompt')))`)
-        .bind(JSON.stringify(employeeQuestionCandidates(day, pending.tier, user)), day, day,
+        .bind(JSON.stringify(await candidatesFor(db, user, day, pending.tier)), day, day,
           user, day, pending.slot, pending.data).run();
       return pendingOffer(db, user, day, now);
     }
@@ -79,7 +86,7 @@ export async function offerQuestion(db, user, day, now) {
       AND COALESCE((SELECT MAX(created_at) FROM team_quiz_attempts WHERE user_id = ? AND day = ? AND reset_at IS NULL), 0) <= ?
       AND NOT EXISTS (SELECT 1 FROM team_quiz_offers o WHERE o.user_id = ? AND o.day = ?
         AND NOT EXISTS (SELECT 1 FROM team_quiz_attempts a WHERE a.user_id = o.user_id AND a.day = o.day AND a.tier = o.tier AND a.reset_at IS NULL))`)
-    .bind(JSON.stringify(employeeQuestionCandidates(day, tier, user)), day, day, user, day, attempts.length + 1, tier, now,
+    .bind(JSON.stringify(await candidatesFor(db, user, day, tier)), day, day, user, day, attempts.length + 1, tier, now,
       user, day, attempts.length, user, day, now - QUIZ_INTERVAL_MS, user, day).run();
   return pendingOffer(db, user, day, now);
 }

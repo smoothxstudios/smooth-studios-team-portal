@@ -1,6 +1,27 @@
 {
-  "currentVersion": "2.46.10",
+  "currentVersion": "2.46.11",
   "releases": [
+    {
+      "id": "2026-11-09-faster-consistent-dashboard-quizzes",
+      "version": "2.46.11",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Lighter loading, consistent forms, and broader quizzes",
+      "changes": [
+        "Sign-in loads a smaller app shell. Pages, financial reports, and update history load when needed; overlapping data requests share one in-flight request.",
+        "Home, Availability, and Earnings lose repeated headings and excess copy. Empty states, cards, fields, and close controls share consistent spacing and corners.",
+        "Preferred time and Block time use the same mobile sheet, with constrained date fields, a fixed action area, and swipe-down dismissal. Existing navigation and scroll gestures are preserved.",
+        "Daily quizzes include more composition, audio, and editing organization, favor varied topics, and use published studio guidelines. Open questions and recorded scores are preserved."
+      ],
+      "employee": {
+        "title": "Smoother pages and more varied questions",
+        "changes": [
+          "Pages load on demand, with consistent cards, form fields, and close controls.",
+          "Availability uses shorter labels and matching forms. Home and Earnings remove repeated headings and fix clipped empty-state text.",
+          "Daily quizzes mix creative skills with published studio guidelines and favor different topics. Your open question and earned points stay in place."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-alerts-sidebar-payment-polish",
       "version": "2.46.10",
