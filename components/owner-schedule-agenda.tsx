@@ -114,7 +114,7 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
       {removal && <ScheduleConfirmation label="Remove person from rental"><p>Remove {name(removal.employeeId)} from this rental? Their app offers will be cancelled and their Google Calendar invitation will be removed when connected.</p>{feedback}<div className="schedule-actions"><Button variant="outline" disabled={busy} onClick={() => setRemoving(null)}>Cancel</Button><Button variant="destructive" disabled={busy} aria-busy={busy} onClick={async () => { if (item.appointment && await onRemovePerson(item.appointment, removal.employeeId)) setRemoving(null); }}>{busy ? "Removing…" : "Remove person"}</Button></div></ScheduleConfirmation>}
       {removals.filter(offer => offer.calendarSync?.code !== "person_removed").map(offer => <div className="rental-removal-status" role="status" key={offer.id}><span>{name(offer.employeeId)} removed in app · Calendar removal</span><CalendarAssignmentStatus delivery={offer.calendarSync ?? { status: "pending", checkedAt: 0 }} /></div>)}
       <div className="agenda-work-actions">
-        {item.appointment && Date.parse(item.start) > now && <Button disabled={busy} variant={item.status === "unassigned" ? "default" : "outline"} onClick={() => assign(item.appointment!.id)}><Plus size={15} />{item.status === "unassigned" ? "Assign person" : "Add person"}</Button>}
+        {item.appointment && <Button disabled={busy} variant={item.status === "unassigned" ? "default" : "outline"} onClick={() => assign(item.appointment!.id)}><Plus size={15} />{item.status === "unassigned" ? "Assign person" : "Add person"}</Button>}
         <Button variant="outline" onClick={() => onOpenWork(item)}>Open appointment</Button>
       </div>
     </article>;

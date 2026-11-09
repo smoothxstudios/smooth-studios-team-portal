@@ -28,6 +28,7 @@ export function rentalTeamDescription(description, assignments, calendarResponse
   const people = TEAM.filter(p => teamIds.has(p.id)).flatMap(person => {
     const matches = assignments.filter(a => a.employeeId === person.id && ["pending", "accepted"].includes(a.status));
     const calendarStatus = calendarResponses.find(response => response.employeeId === person.id)?.status;
+    if (matches.some(a => a.status === "accepted" && a.ownerConfirmed)) return [`✅ ${person.name} — Confirmed by Smooth`];
     if (matches.some(a => a.status === "accepted")) return [`✅ ${person.name} — Accepted in app`];
     if (matches.length) return [`○ ${person.name} — Awaiting app response${calendarStatus === "accepted" ? " · ✅ Accepted in Google Calendar" : ""}`];
     if (calendarStatus === "accepted") return [`✅ ${person.name} — Accepted in Google Calendar`];

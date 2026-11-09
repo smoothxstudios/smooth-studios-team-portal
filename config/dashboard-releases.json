@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.46.5",
+  "currentVersion": "2.46.6",
   "releases": [
+    {
+      "id": "2026-11-08-record-rental-person",
+      "version": "2.46.6",
+      "date": "2026-11-08",
+      "category": "Scheduling",
+      "title": "Add staff after a rental starts",
+      "changes": [
+        "Assign person stays available on rentals that have started or ended. Choose a team member, confirm they are working or worked the displayed time, then use Record person.",
+        "Recorded work is labeled Confirmed by Smooth and follows the existing rental hours and earnings rules. Previous responses remain visible; recording work does not record a payment."
+      ],
+      "employee": {
+        "title": "Clear confirmation for recorded rental work",
+        "changes": [
+          "Rentals recorded by Smooth show Confirmed by Smooth, with an alert identifying the work. Upcoming offers still require your own response."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-11-08-same-day-rental-times",
       "version": "2.46.5",

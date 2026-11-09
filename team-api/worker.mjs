@@ -294,7 +294,7 @@ async function route(request, env, ctx) {
       .filter(a => a.status === "accepted" && a.appointmentId)
       .map(({ appointmentId, employeeId, start, end }) => ({ appointmentId, employeeId, start, end })),
       calendarAssignments: assignments.filter(a => a.appointmentId)
-        .map(({ appointmentId, employeeId, start, end, status }) => ({ appointmentId, employeeId, start, end, status })),
+        .map(({ appointmentId, employeeId, start, end, status, ownerConfirmation }) => ({ appointmentId, employeeId, start, end, status, ...(ownerConfirmation?.confirmedBy === "owner" ? { ownerConfirmed: true } : {}) })),
       durationRecovery: { restored: assignments.filter(a => a.calendarChange?.kind === "duration_recovered").length,
         needsReview: assignments.filter(a => a.status === "cancelled" && a.note === LEGACY_PAST_NOTE && !a.calendarChange).length },
       pushDiagnostics: { registeredDevices: devices.count, queuedAlerts: alerts.count, retryingAlerts: alerts.retrying },
@@ -497,26 +497,37 @@ async function route(request, env, ctx) {
     const appointment = appointmentId && s.appointments.find(a => a.id === appointmentId);
     if (appointmentId && !appointment) fail(404, "Appointment not found. Refresh the calendar first.");
     if (appointment && appointment.acceptedEmployeeIds.includes(employeeId)) fail(409, "This person already accepted the Calendar invitation.");
-    if (appointmentId && s.assignments.some(a => active(a) && a.appointmentId === appointmentId && a.employeeId === employeeId)) {
+    const existing = appointmentId && s.assignments.find(a => active(a) && a.appointmentId === appointmentId && a.employeeId === employeeId);
+    if (existing && (existing.status !== "pending" || Date.parse(appointment.start) > Date.now())) {
       fail(409, "This person already has an active offer for this appointment.");
     }
     const start = appointment ? appointment.start : localInstant(input.startLocal);
     const end = appointment ? appointment.end : localInstant(input.endLocal);
-    futurePeriod(start, end);
+    const startedRental = Boolean(appointment && Date.parse(start) <= Date.now());
+    if (input.confirmWorked !== undefined && typeof input.confirmWorked !== "boolean") fail(400, "Choose whether to confirm this work.");
+    if (startedRental) {
+      if (input.confirmWorked !== true) fail(400, "This rental has started or ended. Confirm that the selected person is working or worked it.");
+      if (Date.parse(input.confirmedStart) !== Date.parse(start) || Date.parse(input.confirmedEnd) !== Date.parse(end)) fail(409, "The rental time changed. Review it and confirm the work again.");
+      if (!Number.isFinite(Date.parse(end)) || Date.parse(end) <= Date.parse(start) || Date.parse(end) - Date.parse(start) > 7 * 86400_000) fail(400, "The rental must have a valid end after its start (up to 7 days).");
+    } else {
+      if (input.confirmWorked === true) fail(400, "Only a started calendar rental can be recorded as confirmed work. Send an offer for upcoming work.");
+      futurePeriod(start, end);
+    }
     if (s.assignments.filter(a => active(a) && Date.parse(a.end) > Date.now()).length >= 200) fail(400, "There are already 200 active offers. Finish or cancel old offers first.");
     if (input.overrideConflicts !== undefined && typeof input.overrideConflicts !== "boolean") fail(400, "Choose whether to allow time conflicts.");
-    if (!input.overrideConflicts) checkConflicts(employeeId, { start, end, appointmentId }, s);
-    const item = { id: crypto.randomUUID(), employeeId, appointmentId,
+    if (!input.overrideConflicts) checkConflicts(employeeId, { start, end, appointmentId }, s, existing?.id);
+    const item = { id: existing?.id ?? crypto.randomUUID(), employeeId, appointmentId,
       title: appointment ? appointment.title : text(input.title, 160),
-      instructions: text(input.instructions ?? "", 2000, false), start, end,
-      status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      instructions: text(input.instructions || existing?.instructions || "", 2000, false), start, end,
+      status: startedRental ? "accepted" : "pending", createdAt: existing?.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString(),
+      ...(startedRental ? { ownerConfirmation: { confirmedBy: "owner", confirmedAt: new Date().toISOString() }, note: "Smooth confirmed this person worked or is working this rental." } : {}),
       ...(input.overrideConflicts ? { conflictOverride: approveConflict({ start, end }) } : {}) };
     const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices WHERE user_id = ?").bind(employeeId).first();
     await commit(db, s.state, mutation => [saveAssignment(db, item, mutation),
-      ...(item.appointmentId ? [calendarQueueStatement(db, item, mutation)] : [])], assignmentNotifications(item, "offered", [employeeId]));
+      ...(item.appointmentId ? [startedRental ? calendarTimeImportStatement(db, item, appointment, mutation) : calendarQueueStatement(db, item, mutation)] : [])], assignmentNotifications(item, startedRental ? "recorded" : "offered", [employeeId]));
     ctx.waitUntil(flushAlerts(env));
-    if (item.appointmentId) ctx.waitUntil(flushCalendarAssignments(env, { assignmentId: item.id, limit: 1 }));
-    return { saved: true, notification: devices.count
+    if (item.appointmentId && !startedRental) ctx.waitUntil(flushCalendarAssignments(env, { assignmentId: item.id, limit: 1 }));
+    return { saved: true, notification: startedRental ? "Person recorded as Confirmed by Smooth. Hours and rental earnings update on the next sync; no payment was recorded." : devices.count
       ? "Offer saved. A notification was queued for their enabled devices."
       : "Offer saved. This employee has no devices enabled for notifications yet; they can see and accept it in their dashboard." };
   }

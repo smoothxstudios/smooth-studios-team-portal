@@ -27,7 +27,8 @@ export function calendarTimeChange(assignment, appointment, now = Date.now()) {
     note = status === "pending" ? "Calendar time changed. Please accept the new time." : LEGACY_PAST_NOTE;
   }
   return { event, assignment: { ...assignment, ...(appointment ? { start: appointment.start, end: appointment.end } : {}),
-    status, note, conflictOverride: undefined, updatedAt: new Date(now).toISOString(),
+    status, note: assignment.ownerConfirmation && ["same_day", "duration"].includes(event) ? "Rental time updated. Smooth’s work confirmation is unchanged." : note,
+    ownerConfirmation: ["same_day", "duration"].includes(event) ? assignment.ownerConfirmation : undefined, conflictOverride: undefined, updatedAt: new Date(now).toISOString(),
     calendarChange: { kind: event, previousStart: assignment.start, previousEnd: assignment.end,
       previousStatus: assignment.status, changedAt: new Date(now).toISOString() } } };
 }

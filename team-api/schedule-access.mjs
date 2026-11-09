@@ -8,6 +8,7 @@ export async function calendarAssignments(db, s, user) {
   return s.assignments.filter(a => user === "owner" || a.employeeId === user).map(assignment => {
     const appointment = s.appointments.find(item => item.id === assignment.appointmentId);
     if (assignment.status === "pending" && appointment && appointmentCancelled(appointment, s.assignments)) return { ...assignment, status: "cancelled", note: "No team member accepted before the appointment ended." };
+    if (assignment.ownerConfirmation && assignment.status === "accepted") return assignment;
     const row = rows.find(item => item.assignment_id === assignment.id);
     if (!row) return assignment;
     let result = {}; try { result = JSON.parse(row.result ?? "{}"); } catch { /* Preserve pending status. */ }
