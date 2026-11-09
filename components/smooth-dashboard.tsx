@@ -3,6 +3,7 @@ import { DashboardRefreshProvider } from "@/components/dashboard-refresh";
 import { LoginScreen } from "@/components/dashboard/login-screen";
 import { FeatureBoundary } from "@/components/ui/feature-boundary";
 import { PageLoading } from "@/components/ui/page-state";
+import { useDashboardTheme } from "@/hooks/use-dashboard-theme";
 import { decryptDashboard } from "@/lib/dashboard-crypto";
 import { readDashboardData } from "@/lib/dashboard-data-source.mjs";
 import { FALLBACK_PROFILES } from "@/lib/dashboard-presentation";
@@ -20,7 +21,7 @@ export function SmoothDashboard() {
   useEffect(() => attachNotificationMessages(window), []);
   const [profiles, setProfiles] = useState<AccessProfile[]>(FALLBACK_PROFILES);
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useDashboardTheme();
   const [sessionPassword, setSessionPassword] = useState("");
   const [schedulingToken, setSchedulingToken] = useState("");
   const sessionEpoch = useRef(0);
@@ -33,14 +34,6 @@ export function SmoothDashboard() {
       return attachQuietSnapshotRefresh(refreshSnapshot);
     }
   }, [signedIn, refreshSnapshot]);
-
-  useEffect(() => {
-    let savedTheme: string | null = null;
-    try { savedTheme = localStorage.getItem("smooth-theme"); } catch { /* Use device appearance when storage is unavailable. */ }
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const themeTimer = window.setTimeout(() => setDark(savedTheme ? savedTheme === "dark" : prefersDark), 0);
-    return () => window.clearTimeout(themeTimer);
-  }, []);
 
   useEffect(() => {
     if (payload) return;
@@ -65,11 +58,6 @@ export function SmoothDashboard() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [payload]);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    try { localStorage.setItem("smooth-theme", dark ? "dark" : "light"); } catch { /* Appearance still works for this session. */ }
-  }, [dark]);
 
   const unlock = async (profile: AccessProfile, password: string) => {
     const epoch = ++sessionEpoch.current;

@@ -1611,11 +1611,10 @@ button { cursor: pointer; }
 .settings-card-heading { display: flex; align-items: flex-start; gap: 13px; }
 .settings-card-heading > svg { flex: 0 0 auto; margin-top: 4px; }
 .settings-card-heading p { margin-top: 6px; }
-.settings-card button { max-width: 100%; white-space: normal; height: auto; min-height: 44px; }
+.settings-card button:not([data-slot="switch"]) { max-width: 100%; white-space: normal; height: auto; min-height: 44px; }
 .settings-sync { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .settings-appearance { display: flex; align-items: center; justify-content: space-between; gap: 22px; }
 .settings-theme { display: flex; align-items: center; gap: 12px; font-size: 14px; flex-shrink: 0; }
-.settings-theme button { min-height: 0; }
 .rental-checklist h3 { display: flex; align-items: center; gap: 9px; }
 @media (max-width: 640px) {
   .settings-tabs [role=tab] { flex-direction: column; gap: 6px; padding: 9px 5px; font-size: 12px; }

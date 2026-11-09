@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.46.13",
+  "currentVersion": "2.46.14",
   "releases": [
+    {
+      "id": "2026-11-09-dark-mode-switch-status-bar",
+      "version": "2.46.14",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Aligned dark mode switch and phone appearance",
+      "changes": [
+        "The dark mode switch stays aligned in both positions.",
+        "Your saved appearance applies before the page appears and updates the phone’s top-bar color along with the dashboard."
+      ],
+      "employee": {
+        "title": "Smoother dark mode",
+        "changes": [
+          "The appearance switch stays inside its track, and the phone’s top-bar color follows your selected theme.",
+          "Your saved appearance loads without a light-page flash."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-sidebar-touch-icon-color",
       "version": "2.46.13",

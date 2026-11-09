@@ -173,12 +173,14 @@ button { touch-action: manipulation; }
 [data-slot="button"]:active:not(:disabled) { transition-duration: 80ms; transform: scale(.97); }
 [data-slot="button"][data-size^="icon"] { width: 44px; height: 44px; padding: 0; flex-shrink: 0; }
 [data-slot="input"], [data-slot="textarea"], .dashboard-content select { min-height: 44px; border-radius: 12px; font-size: 1rem; background: var(--card); }
-[data-slot="switch"] { position: relative; width: 51px; height: 31px; padding: 2px; border: 0; background: #b9b9bf; transition: background-color 160ms ease; }
+[data-slot="switch"] { --switch-width: 51px; --switch-height: 31px; --switch-thumb: 27px; position: relative; width: var(--switch-width); height: var(--switch-height); padding: 0; border: 0; background: #b9b9bf; transition: background-color 160ms ease; }
+[data-slot="switch"][data-size="sm"] { --switch-width: 43px; --switch-height: 27px; --switch-thumb: 23px; }
 [data-slot="switch"]::before { content: ""; position: absolute; inset: -7px 0; }
 [data-slot="switch"][data-state="checked"] { background: #34c759; }
 .dark [data-slot="switch"][data-state="unchecked"] { background: #535357; }
-[data-slot="switch-thumb"] { width: 27px; height: 27px; background: #fff !important; box-shadow: 0 2px 4px #0003; translate: none; transform: translateX(0); transition: transform 180ms cubic-bezier(.2,.8,.2,1); }
-[data-slot="switch-thumb"][data-state="checked"] { translate: none; transform: translateX(20px); }
+[data-slot="switch-thumb"] { position: absolute; left: 2px; top: 2px; width: var(--switch-thumb); height: var(--switch-thumb); background: #fff; box-shadow: 0 2px 4px #0003; transform: translateX(0); transition: transform 180ms cubic-bezier(.2,.8,.2,1); }
+[data-slot="switch-thumb"][data-state="checked"] { transform: translateX(calc(var(--switch-width) - var(--switch-thumb) - 4px)); }
+@media (prefers-reduced-motion: reduce) { [data-slot="switch"], [data-slot="switch-thumb"] { transition: none; } }
 
 /* Stable modal geometry: the viewport owns placement, the panel owns motion. */
 [data-slot="dialog-viewport"] { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom)); pointer-events: none; }
@@ -213,6 +215,7 @@ button { touch-action: manipulation; }
 
 /* Floating navigation and a stronger, readable page hierarchy. */
 .dashboard-topbar { min-height: 84px; border: 0; background: color-mix(in srgb, var(--background) 84%, transparent); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); padding-block: 14px; }
+.dark .dashboard-topbar { background: var(--background); }
 .topbar-title h1 { font-size: clamp(1.75rem, 2.8vw, 2.25rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.12; }
 .topbar-title p { font-size: .75rem; font-weight: 500; letter-spacing: .01em; text-transform: none; margin-bottom: 7px; }
 .topbar-alerts, .mobile-menu-trigger { border: 1px solid var(--app-chrome-border) !important; background: var(--app-chrome) !important; box-shadow: 0 2px 12px #00000008 !important; border-radius: 50% !important; }
