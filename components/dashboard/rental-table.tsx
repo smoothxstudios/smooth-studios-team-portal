@@ -80,7 +80,7 @@ export function PaymentAmount({ rental, showDetails }: { rental: Rental; showDet
 
 export function RentalTable({ rentals, employeeId, onOpen }: { rentals: Rental[]; employeeId?: string; onOpen?: (id: string) => void }) {
   return (
-    <Table className="rental-table" role="table" aria-label="Appointments">
+    <Table className="rental-table" containerClassName="rental-table-container" role="table" aria-label="Appointments">
       <TableHeader role="rowgroup"><TableRow role="row"><TableHead role="columnheader">Appointment</TableHead><TableHead role="columnheader">Category</TableHead><TableHead role="columnheader">Date & time</TableHead><TableHead role="columnheader">{employeeId ? "Price" : "Price / recorded payment"}</TableHead><TableHead role="columnheader">{employeeId ? "Your earnings" : "Assigned team"}</TableHead><TableHead role="columnheader">Status</TableHead></TableRow></TableHeader>
       <TableBody role="rowgroup">
         {rentals.map((rental) => (

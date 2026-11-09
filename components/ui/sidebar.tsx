@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { flushSync } from "react-dom"
+import { createPortal, flushSync } from "react-dom"
 import { createSidebarMotion } from "@/lib/sidebar-motion.mjs"
 import { cva, type VariantProps } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
@@ -191,6 +191,8 @@ function Sidebar({
 
   if (isMobile) {
     return (
+      <>
+      {createPortal(<><div className="sidebar-drag-shade" aria-hidden="true" /><div data-sidebar="sidebar" data-mobile="true" data-sidebar-preview="true" className="sidebar-drag-preview" aria-hidden="true" inert><div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">{children}</div></div></>, document.body)}
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
         <SheetContent
           data-sidebar="sidebar"
@@ -214,6 +216,7 @@ function Sidebar({
           <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">{children}</div>
         </SheetContent>
       </Sheet>
+      </>
     )
   }
 

@@ -5,7 +5,7 @@ import { teamRequest } from "@/lib/team-api";
 import { TEAM } from "@/lib/team-schedule.mjs";
 import { useRefreshSource } from "@/components/dashboard-refresh";
 
-export type TeamProfile = { userId: string; mode: "initial" | "photo"; photo: string | null; revision: number };
+export type TeamProfile = { userId: string; mode: "initial" | "photo"; photo: string | null; color?: string | null; initial?: string | null; revision: number };
 type ProfilesContext = { profiles: Record<string, TeamProfile>; loading: boolean; error: string; refresh: () => Promise<boolean>; save: (profile: TeamProfile) => Promise<void> };
 const ProfileContext = createContext<ProfilesContext | null>(null);
 export const useTeamProfiles = () => useContext(ProfileContext);
@@ -37,13 +37,13 @@ export function TeamProfilesProvider({ token, userId, children }: { token: strin
   return <ProfileContext.Provider value={{ profiles, loading, error, refresh, save }}>{children}</ProfileContext.Provider>;
 }
 
-export function PersonAvatar({ personId, name, color, className = "", initialOnly = false, children }: { personId: string; name?: string; color?: string; className?: string; initialOnly?: boolean; children?: ReactNode }) {
+export function PersonAvatar({ personId, name, color, initial, className = "", initialOnly = false, children }: { personId: string; name?: string; color?: string; initial?: string; className?: string; initialOnly?: boolean; children?: ReactNode }) {
   const person = TEAM.find(person => person.id === personId);
   const profile = useTeamProfiles()?.profiles[personId];
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   const photo = !initialOnly && profile?.mode === "photo" && profile.photo !== failedPhoto ? profile.photo : null;
-  const accent = color ?? person?.color ?? "#64748b";
+  const accent = (initialOnly ? color ?? profile?.color : profile?.color ?? color) ?? person?.color ?? "#64748b";
   return <span className={`person-avatar ${className}`} style={{ "--person-accent": accent, color: `var(--person-ink, ${accent})`, background: `color-mix(in srgb, ${accent} 12%, var(--card))` } as CSSProperties} aria-label={name ?? person?.name ?? "Team member"}>
-    {photo ? <img src={photo} alt="" onError={() => setFailedPhoto(photo)} /> : (name ?? person?.name ?? personId).slice(0, 1).toUpperCase()}{children}
+    {photo ? <img src={photo} alt="" onError={() => setFailedPhoto(photo)} /> : initial ?? profile?.initial ?? (name ?? person?.name ?? personId).slice(0, 1).toUpperCase()}{children}
   </span>;
 }

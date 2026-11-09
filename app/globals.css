@@ -614,7 +614,7 @@ button { cursor: pointer; }
 .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 9px; border-radius: 12px; }
 .user-avatar { width: 35px; height: 35px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 11px; color: #fff; background: #e10000; font-size: 14px; font-weight: 800; box-shadow: 3px 3px 0 #202024; }
 .sidebar-user div { min-width: 0; flex: 1; }
-.sidebar-user strong, .sidebar-user span { display: block; }
+.sidebar-user strong, .sidebar-user > div > span { display: block; }
 .sidebar-user strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-user div span { margin-top: 2px; color: var(--muted-foreground); font-size: 10px; }
 .sidebar-user button { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; padding: 5px; border: 0; border-radius: 10px; color: var(--muted-foreground); background: transparent; }

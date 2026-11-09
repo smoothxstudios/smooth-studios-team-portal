@@ -1,6 +1,29 @@
 {
-  "currentVersion": "2.47.0",
+  "currentVersion": "2.48.0",
   "releases": [
+    {
+      "id": "2026-11-09-consistent-controls-custom-icons",
+      "version": "2.48.0",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Personal icons, calmer alerts, and appointments that fit",
+      "changes": [
+        "Home greets Smooth by name without the studio suffix. Shared action buttons use the same compact treatment across tabs.",
+        "Choose and save your icon color and one or two initials; the sidebar and team views use the same circular icon.",
+        "Appointments wrap into readable layouts without sideways scrolling. Named Studio A and B rentals now use their confirmed hourly pay rules for past and future bookings.",
+        "Alerts use soft rounded cards and small colored status icons. Sorting, delivery status, and bulk actions are under Options, keeping the mobile toolbar on one row.",
+        "The sidebar follows your finger while opening and closing, including cancelled swipes. Desktop navigation has a distinct surface and subtle edge shadow."
+      ],
+      "employee": {
+        "title": "Personal icons and more consistent controls",
+        "changes": [
+          "Customize your icon color and initials in Settings; it appears consistently across the app.",
+          "Alerts have rounded cards, small colored status icons, and a single-row mobile toolbar.",
+          "Appointment information fits the screen, and shared action buttons are more consistent.",
+          "The sidebar follows your finger while opening and closing, including cancelled swipes."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-alerts-profile-sidebar-polish",
       "version": "2.47.0",

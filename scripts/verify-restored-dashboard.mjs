@@ -4,6 +4,7 @@ import { decryptPayload } from './lib/dashboard-data.mjs';
 import { readTeamSettings, teamPasswords } from './lib/team-settings.mjs';
 import { teamToken } from '../lib/team-auth.mjs';
 import { TEAM_API_URL } from '../lib/team-schedule.mjs';
+import { isStudioRentalTitle } from '../lib/appointment-categories.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
 const config = JSON.parse(await readFile(new URL('../config/studio.config.json', import.meta.url), 'utf8'));
@@ -13,9 +14,16 @@ const { profiles } = JSON.parse(await readFile(new URL('../public/data/access.js
 const ownerPayload = decryptPayload(JSON.parse(await readFile(new URL('../public/data/owner.json', import.meta.url), 'utf8')), passwords.owner);
 const expectedRentals = new Map(ownerPayload.rentals.map(rental => [rental.id, rental]));
 const hourlyHires = config.employees.filter(person => person.compensation?.type === 'hourly');
+let checkedHourlyRentals = 0;
 for (const person of hourlyHires) {
   const actual = ownerPayload.employees.find(employee => employee.id === person.id)?.compensation;
   if (actual?.type !== 'hourly' || actual.hourlyCents !== person.compensation.hourlyCents) throw new Error('A confirmed hourly rental rate is missing from the synced dashboard.');
+  for (const rental of ownerPayload.rentals.filter(rental => isStudioRentalTitle(rental.title) && rental.employeePayouts?.[person.id])) {
+    const pay = rental.employeePayouts[person.id];
+    const expected = Math.round((Date.parse(rental.end) - Date.parse(rental.start)) / 3600000 * person.compensation.hourlyCents);
+    if (rental.categoryId !== 'studio-rentals' || !pay.compensationConfigured || pay.amountCents !== expected) throw new Error('A named studio rental is missing its confirmed hourly earnings.');
+    checkedHourlyRentals++;
+  }
 }
 let checkedDetails = 0, checkedRoomRentals = 0;
 for (const { id, role } of profiles) {
@@ -50,4 +58,5 @@ for (const { id, role } of profiles) {
 }
 console.log(`Verified encrypted sign-in data and live scheduling access for ${profiles.length} current accounts.`);
 console.log(`Verified team profile access and ${hourlyHires.length} confirmed hourly rental policies in the synced dashboard.`);
+console.log(`Verified duration-based hourly pay on ${checkedHourlyRentals} accepted rental assignments, including named Studio A/B rentals.`);
 console.log(`Verified live booking details and customer balances on ${checkedDetails} visible rental records, including ${checkedRoomRentals} Studio A/B records across those accounts.`);

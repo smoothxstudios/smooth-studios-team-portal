@@ -136,7 +136,7 @@ export function TeamNotifications({ token, employees }: { token: string; employe
     (!rentalMode || selected) && (!staleRental || retryUncertain) && !invalidRentalRecipients);
 
   return <>
-    <div className="team-notifications-controls"><Button type="button" variant="outline" className="compact-control" onClick={() => setOpen(true)}><BellPlus size={17} aria-hidden="true" />Send reminder</Button></div>
+    <div className="team-notifications-controls"><Button type="button" variant="outline" className="compact-control reminder-trigger" aria-label="Send reminder" title="Send reminder" onClick={() => setOpen(true)}><BellPlus size={17} aria-hidden="true" /><span>Send reminder</span></Button></div>
     <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent className="schedule-modal team-notifications-dialog" showCloseButton={false} onOpenAutoFocus={event => { event.preventDefault(); heading.current?.focus(); }}>
       <DialogHeader className="team-notifications-header"><div><DialogTitle ref={heading} tabIndex={-1}>Send reminder</DialogTitle><DialogDescription>Choose a studio rental or a team task.</DialogDescription></div><Button type="button" variant="ghost" size="icon" disabled={busy} onClick={() => setOpen(false)} aria-label="Close reminder composer"><X size={20} aria-hidden="true" /></Button></DialogHeader>
       <div className="team-notifications-body"><form id={formId} onSubmit={event => { event.preventDefault(); void send(); }}>

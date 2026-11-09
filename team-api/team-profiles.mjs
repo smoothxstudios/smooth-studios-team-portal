@@ -15,17 +15,23 @@ export function validProfilePhoto(value) {
 export async function teamProfilesRoute({ request, db, user, body, fail }) {
   if (!TEAM.some(person => person.id === user)) fail(403, "Sign in to view team icons.");
   if (request.method === "GET") {
-    const rows = await db.prepare("SELECT user_id, icon_mode, photo_data_url, revision FROM team_profiles").all();
-    return { profiles: rows.results.map(row => ({ userId: row.user_id, mode: row.icon_mode, photo: row.icon_mode === "photo" || row.user_id === user ? row.photo_data_url : null, revision: row.revision })) };
+    const rows = await db.prepare("SELECT user_id, icon_mode, photo_data_url, icon_color, icon_initial, revision FROM team_profiles").all();
+    return { profiles: rows.results.map(row => ({ userId: row.user_id, mode: row.icon_mode, photo: row.icon_mode === "photo" || row.user_id === user ? row.photo_data_url : null, color: row.icon_color, initial: row.icon_initial, revision: row.revision })) };
   }
   if (request.method !== "PUT") fail(405, "This profile action is not available.");
   const input = await body(request);
   if (input.userId !== undefined && input.userId !== user) fail(403, "You can only change your own icon.");
   if (!["initial", "photo"].includes(input.mode) || !validProfilePhoto(input.photo) || (input.mode === "photo" && !input.photo)) fail(400, "Choose an initial or a JPG, PNG, or WebP photo.");
   if (!Number.isSafeInteger(input.revision) || input.revision < 0) fail(400, "Reload your profile before saving.");
+  if (input.color != null && (typeof input.color !== "string" || !/^#[0-9a-f]{6}$/i.test(input.color))) fail(400, "Choose a valid icon color.");
+  if (input.initial != null && (typeof input.initial !== "string" || !/^[\p{L}\p{N}]{1,2}$/u.test(input.initial.trim().toUpperCase()))) fail(400, "Use one or two letters or numbers for your icon.");
   await db.prepare("INSERT OR IGNORE INTO team_profiles (user_id, updated_at) VALUES (?, ?)").bind(user, Date.now()).run();
-  const result = await db.prepare("UPDATE team_profiles SET icon_mode = ?, photo_data_url = ?, revision = revision + 1, updated_at = ? WHERE user_id = ? AND revision = ?")
-    .bind(input.mode, input.photo, Date.now(), user, input.revision).run();
+  // Older clients can still switch between photo and initial without erasing customization.
+  const previous = await db.prepare("SELECT icon_color, icon_initial FROM team_profiles WHERE user_id = ?").bind(user).first();
+  const color = input.color === undefined ? previous.icon_color : input.color?.toLowerCase() ?? null;
+  const initial = input.initial === undefined ? previous.icon_initial : input.initial?.trim().toUpperCase() ?? null;
+  const result = await db.prepare("UPDATE team_profiles SET icon_mode = ?, photo_data_url = ?, icon_color = ?, icon_initial = ?, revision = revision + 1, updated_at = ? WHERE user_id = ? AND revision = ?")
+    .bind(input.mode, input.photo, color, initial, Date.now(), user, input.revision).run();
   if (!result.meta.changes) fail(409, "Your icon changed on another device. Reload your profile before saving.");
-  return { userId: user, mode: input.mode, photo: input.photo, revision: input.revision + 1 };
+  return { userId: user, mode: input.mode, photo: input.photo, color, initial, revision: input.revision + 1 };
 }

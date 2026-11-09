@@ -77,3 +77,25 @@ test("confirmed new-hire rentals pay by actual duration at fifteen dollars per h
     assert.equal(payout({ employee }).compensationConfigured, true);
   }
 });
+
+test("named Studio A and B rentals apply confirmed hourly pay to past and future accepted appointments", () => {
+  const hires = config.employees.filter(person => ['dacari', 'sorayia', 'amia', 'terrill'].includes(person.id)).map(person => ({ ...person, email: `${person.id}@example.invalid` }));
+  const titles = ['Studio A Rental', 'Studio B Rental', 'Quick Studio Rental (Studio A)', 'Studio A — Rental', 'Rental — Studio B'];
+  const calendarEvents = titles.flatMap((title, index) => ['2026-10-20', '2099-10-20'].map(day => ({
+    id: `${index}-${day}`, status: 'confirmed', summary: `Fixture: ${title}`,
+    start: { dateTime: `${day}T10:00:00-04:00` }, end: { dateTime: `${day}T11:30:00-04:00` },
+    description: 'Price: $75.00\nPaid Online: $75.00',
+    attendees: hires.map(person => ({ email: person.email, responseStatus: 'accepted' })),
+  })));
+  const payloads = buildDashboardPayloads({ calendarEvents, config: { ...config, employees: hires }, ledger: { employees: { dacari: { paidThrough: '2026-10-21' } } }, overrides: {} });
+  assert.equal(payloads.owner.rentals.length, 10);
+  for (const rental of payloads.owner.rentals) {
+    assert.equal(rental.categoryId, 'studio-rentals', rental.title);
+    for (const person of hires) {
+      const pay = rental.employeePayouts[person.id];
+      assert.equal(pay.compensationConfigured, true, `${person.id}: ${rental.title}`);
+      assert.equal(pay.amountCents, 2250);
+    }
+    assert.equal(rental.employeePayouts.dacari.paidAmountCents, rental.start.startsWith('2026') ? 2250 : 0, 'existing payment coverage is retained');
+  }
+});

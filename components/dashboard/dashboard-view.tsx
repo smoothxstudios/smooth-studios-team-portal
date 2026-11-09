@@ -21,7 +21,6 @@ import { RentalTable } from "@/components/dashboard/rental-table";
 import { EmptyState,Logo } from "@/components/dashboard/shared";
 import { GithubWorkflowDialog,type OwnerWorkflowRequest } from "@/components/github-workflow-dialog";
 import { MobileToolbar } from "@/components/mobile-toolbar";
-import { NotificationDelivery } from "@/components/notification-delivery";
 import { TeamAccountSetup,type NewTeamSettings } from "@/components/team-account-setup";
 import { EmployeeEngagementBar,EmployeeEngagementProvider,SmoothStarSidebar,TeamEngagementReview } from "@/components/team-engagement";
 import { TeamNotifications } from "@/components/team-notifications";
@@ -313,13 +312,13 @@ export default function DashboardView({ payload, dark, setDark, onLogout, onRefr
 
       <SidebarInset className={`dashboard-main${isOwner ? " owner-dashboard" : ""}`}>
         <header className="dashboard-topbar">
-          <div className="topbar-heading"><MobileMenuButton /><div className="topbar-title"><div><h1>{view === "overview" ? isOwner ? "Smooth" : `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div></div>
+          <div className="topbar-heading"><MobileMenuButton /><div className="topbar-title"><div><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div></div>
           <div className="topbar-actions">{isOwner && view === "overview" && <div id="home-layout-actions" />}{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
         </header>
         <PullToRefresh page={view} request={toolbarRefresh} quietRequestId={quietRefresh} />
         <div className="dashboard-refresh-body">
         <FeatureBoundary key={view}><div className={`dashboard-content${!isOwner && view === "payouts" ? " employee-earnings-view" : ""}`}>
-          {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} action={isOwner ? <div className="alerts-owner-actions"><NotificationDelivery token={schedulingToken}/><TeamNotifications token={schedulingToken} employees={payload.employees} /></div> : undefined} />}
+          {view === "alerts" && <AlertsPage isOwner={isOwner} state={alerts} onOpen={alert => void openAlert(alert)} deliveryToken={isOwner ? schedulingToken : undefined} action={isOwner ? <TeamNotifications token={schedulingToken} employees={payload.employees} /> : undefined} />}
           {["overview", "team", "payouts"].includes(view) && creative.error && <p className="creative-notice" role="alert">Other work and pay totals could not be refreshed. <button onClick={() => void creative.refresh()}>Try again</button></p>}
           {view === "payouts" && payroll.error && <p className="schedule-warning" role="status">{payroll.error}</p>}
           {view === "payouts" && isOwner && <AdvanceReview token={schedulingToken} payroll={payroll.state} employees={payload.employees} rentals={rentals} onSync={openCalendarSync} onFixPayment={id => { setPaymentReviewRentalId(id); setPaymentOverrideOpen(true); }} onReviewed={payroll.updateReviewSummary} onOpenSource={(kind, id) => {

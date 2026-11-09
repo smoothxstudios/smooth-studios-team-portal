@@ -11,8 +11,11 @@ type Delivery = {id:string; userId:string; title:string; createdAt:number; readA
 type Status = {people:Person[]; alerts:Delivery[]};
 const stamp = (time:number) => new Date(time).toLocaleString("en-US", {timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
 
-export function NotificationDelivery({token}:{token:string}) {
-  const [open,setOpen]=useState(false), [person,setPerson]=useState("all"), [data,setData]=useState<Status|null>(null), [error,setError]=useState("");
+export function NotificationDelivery({token, open: controlledOpen, onOpenChange, hideTrigger = false}:{token:string; open?:boolean; onOpenChange?:(open:boolean)=>void; hideTrigger?:boolean}) {
+  const [localOpen,setLocalOpen]=useState(false);
+  const open = controlledOpen ?? localOpen;
+  const setOpen = (value:boolean) => { setLocalOpen(value); onOpenChange?.(value); };
+  const [person,setPerson]=useState("all"), [data,setData]=useState<Status|null>(null), [error,setError]=useState("");
   const sequence=useRef(0), [loading,setLoading]=useState(false);
   const refresh=useCallback(async()=>{
     const id=++sequence.current; setLoading(true);
@@ -27,7 +30,7 @@ export function NotificationDelivery({token}:{token:string}) {
     const timer=window.setInterval(update,15_000); window.addEventListener("focus",update);
     return()=>{sequence.current++;window.clearInterval(timer);window.removeEventListener("focus",update);};
   },[open,refresh]);
-  return <><Button variant="outline" className="compact-control" onClick={()=>setOpen(true)}><Radio size={16}/>Delivery</Button>
+  return <>{!hideTrigger && <Button variant="outline" className="compact-control" onClick={()=>setOpen(true)}><Radio size={16}/>Delivery</Button>}
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="delivery-dialog"><DialogHeader><DialogTitle>Notification delivery</DialogTitle><DialogDescription>Received confirms a device handled the alert. Opened means they tapped it. Neither confirms they read the full message.</DialogDescription></DialogHeader>
       <div className="delivery-body">
         <div className="delivery-people" role="group" aria-label="Filter delivery by person"><button type="button" aria-pressed={person==="all"} onClick={()=>setPerson("all")}>Everyone</button>{data?.people.map(p=><button type="button" key={p.userId} aria-pressed={person===p.userId} onClick={()=>setPerson(p.userId)}>{p.name}</button>)}</div>
