@@ -84,6 +84,9 @@ jobs:
         run: node scripts/reconcile-recorded-payment.mjs rayne 2026-11-02 81c81c1a-353c-4fc0-bb0b-c461ea95172a
       - name: Verify restored account data and scheduling access
         env:
+          EMPLOYEE_EMAIL_AKIVA: ${{ secrets.EMPLOYEE_EMAIL_AKIVA }}
+          EMPLOYEE_EMAIL_JORDYN: ${{ secrets.EMPLOYEE_EMAIL_JORDYN }}
+          EMPLOYEE_EMAIL_RAYNE: ${{ secrets.EMPLOYEE_EMAIL_RAYNE }}
           DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}
           DASHBOARD_PASSWORD_AKIVA: ${{ secrets.DASHBOARD_PASSWORD_AKIVA }}
           DASHBOARD_PASSWORD_JORDYN: ${{ secrets.DASHBOARD_PASSWORD_JORDYN }}
