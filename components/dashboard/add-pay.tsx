@@ -1,4 +1,5 @@
 "use client";
+import { AppPicker, SegmentedControl } from "@/components/ui/app-controls";
 import { MoreOptions } from "@/components/dashboard/more-options";
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
@@ -62,19 +63,19 @@ function AddPayForm({ id, employees, state, token, onClose, onSaved }: { id: str
     catch (error) { setError(error instanceof Error ? error.message : "Pay couldn’t be saved. Try again."); }
     finally { setBusy(false); }
   };
-  return <Dialog open onOpenChange={open => { if (!open && !busy && !optionBusy) onClose(); }}><DialogContent closeDisabled={busy || optionBusy} className="creative-dialog manual-pay-dialog">
+  return <Dialog open onOpenChange={open => { if (!open && !busy && !optionBusy) onClose(); }}><DialogContent presentation="sheet" closeDisabled={busy || optionBusy} className="creative-dialog manual-pay-dialog app-task-sheet">
     <DialogHeader><DialogTitle>Add pay</DialogTitle><DialogDescription>Record onboarding, training, or other completed work.</DialogDescription></DialogHeader>
     <form className="manual-pay-form" onSubmit={submit}>
       <div className="manual-pay-scroll"><fieldset disabled={busy || optionBusy} className="creative-editor manual-pay-fields">
-        <label>Team member<select aria-label="Team member" required value={employeeId} onChange={event => setEmployeeId(event.target.value)}><option value="" disabled>Choose a person</option>{employees.filter(person => !person.onboarding || person.accessReady).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
-        <div className="pay-work-types"><label>Work type<select aria-label="Work type" required value={category} onChange={event => setCategory(event.target.value)}><option value="" disabled>Choose the work</option>{options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
+        <AppPicker label="Team member" required value={employeeId} onValueChange={setEmployeeId} placeholder="Choose a person" disabled={busy || optionBusy} options={employees.filter(person => !person.onboarding || person.accessReady).map(person => ({ value: person.id, label: person.name, color: person.accent }))} />
+        <div className="pay-work-types"><AppPicker label="Work type" required value={category} onValueChange={setCategory} placeholder="Choose the work" disabled={busy || optionBusy} options={options.map(option => ({ value: option.id, label: option.label }))} />
           {!addingOption && <Button type="button" variant="ghost" size="sm" onClick={() => { setAddingOption(true); setOptionMessage(""); }}><Plus size={15} />Add option</Button>}
           {addingOption && <div className="pay-work-type-editor"><label>New work type<Input autoFocus maxLength={60} value={optionName} placeholder="Event coverage, setup, editing…" onChange={event => setOptionName(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void saveOption(); } }} /></label><div><Button type="button" size="sm" disabled={!optionName.trim() || optionBusy} onClick={() => void saveOption()}>{optionBusy ? "Saving option…" : "Save option"}</Button><Button type="button" variant="ghost" size="sm" onClick={() => setAddingOption(false)}>Cancel option</Button></div><p className="creative-hint">Saved across your devices. Adding an option does not create pay.</p></div>}
           {optionError && <p className="creative-error" role="alert">{optionError}</p>}{optionMessage && <p className="creative-hint" role="status">{optionMessage}</p>}
         </div>
         {category === "other" && <label>Work description<Input required maxLength={160} value={title} onChange={event => setTitle(event.target.value)} placeholder="Studio setup, equipment maintenance…" /></label>}
         <div className="creative-form-row"><label>Work date<Input required type="date" max={today} value={workDate} onChange={event => setWorkDate(event.target.value)} /></label><label>Amount (USD)<Input required inputMode="decimal" value={pay} onChange={event => setPay(event.target.value)} placeholder="0.00" /></label></div>
-        <label>Payment status<select value={paymentStatus} onChange={event => setPaymentStatus(event.target.value)}><option value="owed">Still owed</option><option value="paid">Already paid</option></select></label>
+        <SegmentedControl label="Payment status" value={paymentStatus} onValueChange={setPaymentStatus} disabled={busy || optionBusy} options={[{ value: "owed", label: "Still owed" }, { value: "paid", label: "Already paid" }]} />
         {paymentStatus === "paid" ? <><div className="creative-form-row"><label>Payment date<Input required type="date" max={today} value={paidDate} onChange={event => setPaidDate(event.target.value)} /></label><label>Payment method · optional<Input maxLength={80} value={method} onChange={event => setMethod(event.target.value)} placeholder="Cash, bank transfer…" /></label></div><p className="creative-hint">Records a payment you already made. This does not send money.</p></> : <p className="creative-hint">Adds to earned pay. Any remaining advance for this person applies first.</p>}
         <MoreOptions><label>Notes · optional<Textarea maxLength={4000} rows={2} value={note} onChange={event => setNote(event.target.value)} placeholder="What this pay covers" /></label></MoreOptions>
         {error && <p className="creative-error" role="alert">{error}</p>}

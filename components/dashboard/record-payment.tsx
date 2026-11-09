@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { ConfirmationRow } from "@/components/ui/app-controls";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { teamRequest } from "@/lib/team-api";
 import { studioLocal } from "@/lib/team-schedule.mjs";
 import { dollars, formatDate } from "@/lib/dashboard-presentation";
@@ -47,11 +48,11 @@ export function RecordPaymentDialog({open,onOpenChange,employeeId,employees,toke
     }catch(reason){setError(reason instanceof Error?reason.message:"Payment could not be confirmed. Retry to check the same payment.");}
     finally{setBusy(false);}
   }
-  return <Dialog open={open} onOpenChange={value=>{if(!busy)onOpenChange(value);}}><DialogContent className="payment-record-dialog"><DialogHeader>
+  return <Dialog open={open} onOpenChange={value=>{if(!busy)onOpenChange(value);}}><DialogContent presentation="sheet" closeDisabled={busy} className="payment-record-dialog app-task-sheet"><DialogHeader>
     <DialogTitle>{receipt?"Payment recorded":`Record payment · ${name}`}</DialogTitle>
     <DialogDescription>{receipt?"Saved in the payment history. The receipt confirms the balance after this payment.":"Review all earned appointments, training, onboarding, and approved creative work. This records money you already sent."}</DialogDescription>
   </DialogHeader>
-  {receipt?<div className="payment-receipt" role="status"><strong>{dollars(receipt.cashCents,true)} recorded for {name}</strong><p>{dollars(receipt.deductionCents,true)} applied to studio rentals.</p><p>Pay still owed: <b>{dollars(receipt.remainingPayableCents,true)}</b></p>{receipt.carryForwardCents>0&&<p>Rental balance carried forward: {dollars(receipt.carryForwardCents,true)}</p>}<small>Receipt {receipt.id.slice(0,8)} · {formatDate(receipt.recordedAt)}</small><Button onClick={()=>onOpenChange(false)}>Done</Button></div>:<>
+  <div className="app-sheet-scroll">{receipt?<div className="payment-receipt" role="status"><strong>{dollars(receipt.cashCents,true)} recorded for {name}</strong><p>{dollars(receipt.deductionCents,true)} applied to studio rentals.</p><p>Pay still owed: <b>{dollars(receipt.remainingPayableCents,true)}</b></p>{receipt.carryForwardCents>0&&<p>Rental balance carried forward: {dollars(receipt.carryForwardCents,true)}</p>}<small>Receipt {receipt.id.slice(0,8)} · {formatDate(receipt.recordedAt)}</small><Button onClick={()=>onOpenChange(false)}>Done</Button></div>:<>
     <label className="payout-control">Work completed through<input type="date" max={studioLocal(Date.now()).slice(0,10)} value={through} disabled={busy||!!attempt.current} onChange={e=>setThrough(e.target.value)}/></label>
     {loading&&<p role="status">Checking the current balance…</p>}
     {preview&&<><dl className="payment-preview-totals"><div><dt>Earned, unpaid</dt><dd>{dollars(preview.grossCents,true)}</dd></div><div><dt>Studio rental deduction</dt><dd>−{dollars(preview.deductionCents,true)}</dd></div><div className="payment-preview-net"><dt>Payment to record</dt><dd>{dollars(preview.cashCents,true)}</dd></div></dl>
@@ -61,10 +62,11 @@ export function RecordPaymentDialog({open,onOpenChange,employeeId,employees,toke
       {preview.reviewCount>0&&<p role="alert">A rental already deducted has changed. Review that charge before recording another payment.</p>}
       <label className="payout-control">Payment method<input value={method} disabled={busy||!!attempt.current} maxLength={80} placeholder="Cash App, Zelle, cash…" onChange={e=>setMethod(e.target.value)}/></label>
       <label className="payout-control">Note (optional)<input value={note} disabled={busy||!!attempt.current} maxLength={1000} onChange={e=>setNote(e.target.value)}/></label>
-      <label className="payment-confirm"><input type="checkbox" checked={confirmed} disabled={busy} onChange={e=>setConfirmed(e.target.checked)}/><span>{preview.cashCents>0?`I already sent ${dollars(preview.cashCents,true)} to ${name}.`:"Apply these rental deductions. No cash payment is needed."}</span></label>
-      <Button disabled={busy||!confirmed||!preview.items.length||preview.reviewCount>0} onClick={()=>void save()}>{busy?"Saving payment…":attempt.current?"Retry this payment":preview.cashCents>0?`Record ${dollars(preview.cashCents,true)} payment`:"Apply rental deductions"}</Button>
+      <ConfirmationRow checked={confirmed} disabled={busy} onCheckedChange={setConfirmed}>{preview.cashCents>0?`I already sent ${dollars(preview.cashCents,true)} to ${name}.`:"Apply these rental deductions. No cash payment is needed."}</ConfirmationRow>
+
     </>}
   </>}
   {error&&<div><p className="schedule-warning" role="alert">{error}</p>{/balance changed|Pay changed|updated balance|current balance/.test(error)&&<Button variant="outline" disabled={busy} onClick={()=>setReviewSequence(n=>n+1)}>Review updated balance</Button>}</div>}
+  </div>{!receipt && preview && <DialogFooter><Button disabled={busy} variant="outline" onClick={()=>onOpenChange(false)}>Cancel</Button><Button disabled={busy||!confirmed||!preview.items.length||preview.reviewCount>0} onClick={()=>void save()}>{busy?"Saving payment…":attempt.current?"Retry this payment":preview.cashCents>0?`Record ${dollars(preview.cashCents,true)} payment`:"Apply rental deductions"}</Button></DialogFooter>}
   </DialogContent></Dialog>;
 }

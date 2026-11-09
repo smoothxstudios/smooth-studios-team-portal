@@ -1,0 +1,156 @@
+/* Shared web controls, following the spacing and interaction patterns of iOS.
+   Keep these after globals.css so older page rules cannot restore hard outlines. */
+:root {
+  color-scheme: light;
+  --app-ease: cubic-bezier(.22, 1, .36, 1);
+  --app-surface-shadow: 0 24px 80px #00000024, 0 2px 8px #0000000a;
+  --app-control-shadow: 0 1px 3px #00000008;
+}
+.dark { color-scheme: dark; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+[data-slot="button"] {
+  border-radius: 13px; font-weight: 600; letter-spacing: -.012em;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease, opacity 160ms ease, transform 180ms var(--app-ease);
+  touch-action: manipulation;
+}
+[data-slot="button"][data-variant="outline"] { border: 1px solid var(--border); background: var(--card); box-shadow: var(--app-control-shadow); }
+[data-slot="button"][data-variant="default"] { box-shadow: 0 2px 5px color-mix(in srgb, var(--primary) 16%, transparent); }
+[data-slot="button"]:active:not(:disabled) { transform: scale(.975); filter: none; }
+[data-slot="button"]:disabled { box-shadow: none; }
+[data-slot="input"], [data-slot="textarea"] { border-color: var(--input); border-radius: 12px; box-shadow: none; }
+[data-slot="input"]:focus-visible, [data-slot="textarea"]:focus-visible { border-color: var(--primary); outline: 2px solid color-mix(in srgb, var(--primary) 18%, transparent); outline-offset: 1px; }
+[data-slot="dialog-overlay"] { background: #11111950; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); animation-duration: 180ms; }
+[data-slot="dialog-content"] { border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--app-surface-shadow); animation-timing-function: var(--app-ease); }
+[data-slot="dialog-content"] [data-slot="dialog-header"] { text-align: left; }
+[data-slot="dialog-content"] [data-slot="dialog-title"] { letter-spacing: -.035em; line-height: 1.2; }
+[data-slot="dialog-content"] [data-slot="dialog-title"]:focus { outline: none; }
+[data-slot="dialog-content"] [data-slot="dialog-description"] { line-height: 1.5; }
+[data-slot="dialog-content"] > .modal-exit {
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px; border: 0; border-radius: 50%;
+  top: 12px; right: 12px; background: transparent; color: var(--muted-foreground); isolation: isolate;
+}
+[data-slot="dialog-content"] > .modal-exit::before { content: ""; position: absolute; inset: 5px; z-index: -1; border-radius: 50%; background: var(--secondary); }
+[data-slot="dialog-content"] > .modal-exit > svg { width: 17px; height: 17px; stroke-width: 2.5; }
+[data-slot="dialog-content"] > .modal-exit:disabled { opacity: .4; }
+
+/* One scroll surface between the fixed heading and action bar. */
+[data-slot="dialog-content"].app-task-sheet {
+  display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden;
+  width: min(580px, calc(100vw - 32px)); max-width: 580px; max-height: min(860px, calc(100dvh - 48px));
+  background: var(--background);
+}
+[data-slot="dialog-content"].app-task-sheet > [data-slot="dialog-header"] {
+  flex-shrink: 0; padding: 24px 66px 20px 24px; gap: 8px; border-bottom: 1px solid var(--border);
+}
+.app-task-sheet [data-slot="dialog-header"] > [data-slot="dialog-title"] { font-size: 24px; font-weight: 700; }
+.app-task-sheet [data-slot="dialog-description"] { font-size: 14px; }
+[data-slot="dialog-content"].app-task-sheet > form.app-sheet-form {
+  display: flex; flex-direction: column; gap: 0; overflow: hidden; padding: 0; min-height: 0;
+}
+.app-task-sheet .app-sheet-scroll { min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 22px 24px; display: grid; gap: 20px; scroll-padding-block: 20px; }
+.app-task-sheet .app-sheet-scroll > *, .app-task-sheet .app-field { min-width: 0; }
+.app-task-sheet .manual-pay-fields { padding: 22px 24px; gap: 20px; }
+.app-task-sheet .manual-pay-scroll { scroll-padding-block: 20px; }
+.app-task-sheet .app-sheet-scroll > p { margin: 0; }
+.app-task-sheet .app-sheet-scroll label:not(.app-confirmation), .app-task-sheet .manual-pay-fields label:not(.app-confirmation) { font-size: 13px; font-weight: 600; line-height: 1.4; }
+.app-task-sheet :is(input:not([type="checkbox"]), textarea) { min-height: 48px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); padding: 12px 14px; font-size: 16px; font-weight: 400; }
+.app-task-sheet .schedule-small, .app-task-sheet .creative-hint { font-size: 13px; line-height: 1.5; }
+[data-slot="dialog-content"].app-task-sheet [data-slot="dialog-footer"] {
+  flex: 0 0 auto; padding: 14px 24px max(16px, env(safe-area-inset-bottom, 0px)); margin: 0;
+  border-top: 1px solid var(--border); background: var(--card); gap: 10px;
+}
+.app-task-sheet [data-slot="dialog-footer"] > [data-slot="button"] { min-height: 48px; height: auto; font-size: 15px; padding: 12px 18px; }
+.app-task-sheet [data-slot="dialog-footer"] > [data-variant="outline"] { background: var(--secondary); border-color: transparent; box-shadow: none; }
+.app-task-sheet .form-more-options { border: 1px solid var(--border); background: var(--card); border-radius: 14px; overflow: hidden; }
+.app-task-sheet .form-more-options > summary { padding: 0 14px; min-height: 48px; }
+.form-more-options > summary::-webkit-details-marker { display: none; }
+.form-more-options > summary > svg { transition: transform 220ms var(--app-ease); }
+.form-more-options[open] > summary > svg { transform: rotate(180deg); }
+.app-task-sheet .form-more-options > div { padding: 4px 14px 16px; }
+.form-more-options[open] > div { animation: app-reveal 180ms ease-out; }
+
+/* Pickers share the same two-line treatment on phones and larger screens. */
+.app-field { display: grid; gap: 8px; min-width: 0; }
+.app-field > label, .app-field-label { color: var(--muted-foreground); font-size: 13px; font-weight: 600; }
+.app-picker-trigger { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; min-height: 54px; border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; background: var(--card); color: var(--foreground); text-align: left; font-size: 16px; font-weight: 500; box-shadow: var(--app-control-shadow); transition: border-color 160ms ease, background-color 160ms ease; }
+.app-picker-trigger[data-placeholder] { color: var(--muted-foreground); }
+.app-picker-trigger > span:last-child { flex-shrink: 0; color: var(--muted-foreground); }
+.app-picker-trigger[data-state="open"] { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); }
+.app-picker-trigger:focus-visible, .app-segment:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.app-picker-trigger:disabled { opacity: .5; cursor: default; }
+.app-picker-copy { display: grid; gap: 4px; min-width: 0; flex: 1; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+.app-picker-copy small { font-size: 12px; color: var(--muted-foreground); font-weight: 400; line-height: 1.4; }
+.app-person-icon { display: grid; place-items: center; height: 34px; width: 34px; flex: 0 0 34px; border-radius: 50%; color: white; font-size: 14px; font-weight: 650; }
+.app-picker-menu { z-index: 100; width: var(--radix-select-trigger-width); max-width: calc(100vw - 24px); max-height: min(360px, var(--radix-select-content-available-height)); overflow: hidden; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 12px 45px #0003; transform-origin: var(--radix-select-content-transform-origin); animation: app-picker-in 180ms var(--app-ease); }
+.app-picker-options { padding: 6px; }
+.app-picker-option { position: relative; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 12px 34px 12px 12px; border-radius: 12px; font-size: 15px; font-weight: 500; outline: none; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.app-picker-option[data-highlighted] { background: var(--secondary); }
+.app-picker-option[data-state="checked"] { background: var(--accent); color: var(--accent-foreground); }
+.app-picker-option[data-disabled] { opacity: .4; pointer-events: none; }
+.app-picker-check { position: absolute; right: 12px; display: grid; place-items: center; color: var(--primary); }
+.app-picker-scroll { display: grid; place-items: center; height: 24px; color: var(--muted-foreground); background: var(--popover); }
+
+/* Generous acknowledgement rows keep the financial/work confirmation explicit. */
+[data-slot="dialog-content"] label.app-confirmation {
+  position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 15px; margin: 0;
+  border: 1px solid var(--border); border-radius: 15px; background: var(--card); font-size: 14px; font-weight: 500; line-height: 1.5; cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+.app-confirmation > input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }
+.app-confirmation-mark { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; border: 1.5px solid var(--input); border-radius: 50%; background: var(--card); color: white; margin-top: 1px; transition: background-color 160ms ease, border-color 160ms ease; }
+.app-confirmation-mark > svg { opacity: 0; transform: scale(.7); transition: opacity 150ms ease, transform 200ms var(--app-ease); }
+.app-confirmation-copy { display: grid; gap: 5px; min-width: 0; }
+.app-confirmation-copy small { color: var(--muted-foreground); font-size: 12px; font-weight: 400; line-height: 1.5; }
+[data-slot="dialog-content"] .app-confirmation.is-checked { background: color-mix(in srgb, var(--primary) 4%, var(--card)); border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
+.app-confirmation.is-checked .app-confirmation-mark { background: var(--primary); border-color: var(--primary); }
+.app-confirmation.is-checked .app-confirmation-mark > svg { opacity: 1; transform: scale(1); }
+.app-confirmation:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 3px; }
+.app-confirmation[data-disabled] { opacity: .5; cursor: default; }
+.app-confirmation[data-tone="warning"] { border-color: color-mix(in srgb, #b67512 40%, var(--border)); }
+.app-segments { display: flex; gap: 4px; padding: 4px; min-width: 0; background: var(--secondary); border: 1px solid var(--border); border-radius: 14px; }
+.app-segment { flex: 1; min-width: 0; min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--muted-foreground); padding: 8px 12px; font-size: 14px; font-weight: 600; transition: background-color 180ms ease, box-shadow 180ms ease, color 180ms ease; }
+.app-segment[data-state="checked"] { background: var(--card); color: var(--foreground); box-shadow: 0 2px 6px #00000012; }
+.app-segment:disabled { opacity: .5; }
+.app-booking-summary { display: flex; align-items: center; gap: 12px; padding: 4px 2px; min-width: 0; }
+.app-booking-summary > svg { flex: 0 0 20px; color: var(--muted-foreground); }
+.app-booking-summary > div { display: grid; gap: 5px; flex: 1; min-width: 0; }
+.app-booking-summary strong { font-size: 13px; font-weight: 600; line-height: 1.45; }
+.app-booking-summary small { color: var(--muted-foreground); font-size: 11px; }
+.app-booking-summary > b { flex-shrink: 0; font-size: 15px; font-variant-numeric: tabular-nums; }
+.app-task-sheet .appointment-detail > section:not(.apple-calendar) { background: var(--card); padding: 18px; border: 1px solid var(--border); border-radius: 18px; }
+.app-task-sheet .appointment-detail { gap: 16px; }
+.app-task-sheet .appointment-balance { gap: 14px; }
+.app-task-sheet .appointment-people li:last-child { border-bottom: 0; }
+.app-task-sheet .payment-preview-totals { padding: 16px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); }
+
+@keyframes app-reveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes app-picker-in { from { opacity: 0; transform: scale(.97) translateY(-3px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes app-sheet-in { from { opacity: .6; transform: translateY(32px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes app-sheet-out { to { opacity: 0; transform: translateY(24px); } }
+@media (max-width: 640px) {
+  [data-slot="dialog-content"][data-presentation="sheet"] {
+    top: auto; bottom: max(8px, env(safe-area-inset-bottom, 0px)); left: 50%; translate: -50% 0; transform: none;
+    width: calc(100vw - 16px); max-width: none; max-height: calc(100dvh - max(20px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px)));
+    border-radius: 26px;
+  }
+  [data-slot="dialog-content"][data-presentation="sheet"][data-state="open"] { animation: app-sheet-in 300ms var(--app-ease) both; }
+  [data-slot="dialog-content"][data-presentation="sheet"][data-state="closed"] { animation: app-sheet-out 180ms ease-in both; }
+  [data-slot="dialog-content"].app-task-sheet > [data-slot="dialog-header"] { padding: 22px 64px 18px 20px; }
+  .app-task-sheet [data-slot="dialog-header"] > [data-slot="dialog-title"] { font-size: 22px; }
+  .app-task-sheet .app-sheet-scroll, .app-task-sheet .manual-pay-fields { padding: 20px; gap: 18px; }
+  [data-slot="dialog-content"].app-task-sheet [data-slot="dialog-footer"] { padding: 12px 20px max(16px, env(safe-area-inset-bottom, 0px)); flex-wrap: nowrap; }
+  .app-task-sheet [data-slot="dialog-footer"] > [data-slot="button"] { white-space: normal; min-width: 0; }
+  .app-task-sheet [data-slot="dialog-footer"] > [data-variant="default"] { flex: 1; }
+  .app-task-sheet .appointment-detail > section:not(.apple-calendar) { padding: 15px; }
+  .app-task-sheet .appointment-section-heading { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="button"], [data-slot="dialog-content"], [data-slot="dialog-overlay"], .app-picker-menu, .app-confirmation-mark, .app-confirmation-mark > svg, .app-segment, .form-more-options > summary > svg, .form-more-options[open] > div { animation: none !important; transition: none !important; }
+  [data-slot="button"]:active:not(:disabled) { transform: none; }
+}
+@media (prefers-reduced-transparency: reduce) { [data-slot="dialog-overlay"] { backdrop-filter: none; -webkit-backdrop-filter: none; background: #11111980; } }
+@media (prefers-contrast: more) { .app-picker-trigger, .app-picker-menu, [data-slot="dialog-content"], [data-slot="dialog-content"] label.app-confirmation, [data-slot="button"][data-variant="outline"] { border-color: var(--muted-foreground); } }
+/* Existing shared select controls receive the same surface treatment. */
+[data-slot="select-trigger"] { min-height: 44px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--app-control-shadow); }
+[data-slot="select-content"] { z-index: 100; border-color: var(--border); border-radius: 16px; box-shadow: 0 12px 40px #0002; }
+[data-slot="select-item"] { min-height: 44px; border-radius: 9px; }

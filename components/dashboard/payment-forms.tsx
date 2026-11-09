@@ -1,5 +1,6 @@
 "use client";
 
+import { AppPicker } from "@/components/ui/app-controls";
 import { EmptyState } from "@/components/dashboard/shared";
 import { type OwnerWorkflowRequest } from "@/components/github-workflow-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -80,7 +81,7 @@ export function PaymentOverrideForm({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="payment-override-dialog">
+      <DialogContent presentation="sheet" className="payment-override-dialog">
         <DialogHeader>
           <p className="eyebrow">Payment review</p>
           <DialogTitle>Update customer payment</DialogTitle>
@@ -88,25 +89,8 @@ export function PaymentOverrideForm({
         </DialogHeader>
         {reviewRentals.length ? (
           <>
-            <div className="workflow-form-field">
-              <label htmlFor="payment-event">Appointment needing review</label>
-              <select id="payment-event" onChange={(event) => setEventId(event.target.value)} value={eventId}>
-                {!eventId && <option value="" disabled>Choose an appointment</option>}
-                {reviewRentals.map((rental) => (
-                  <option key={rental.id} value={rental.id}>
-                    {formatDate(rental.start, true)} · {rental.customer} · {dollars(rental.priceCents, true)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="workflow-form-field">
-              <label htmlFor="payment-status">Payment decision</label>
-              <select id="payment-status" onChange={(event) => setPaidStatus(event.target.value as "true" | "false" | "clear")} value={paidStatus}>
-                <option value="true">Payment received by invoice, cash, or other</option>
-                <option value="false">Not fully paid</option>
-                <option value="clear">Clear manual status</option>
-              </select>
-            </div>
+            <AppPicker label="Appointment needing review" id="payment-event" value={eventId} onValueChange={setEventId} placeholder="Choose an appointment" options={reviewRentals.map(rental => ({ value: rental.id, label: rental.customer || rental.title, description: `${formatDate(rental.start, true)} · ${dollars(rental.priceCents, true)}` }))} />
+            <AppPicker label="Payment decision" id="payment-status" value={paidStatus} onValueChange={value => setPaidStatus(value as "true" | "false" | "clear")} options={[{ value: "true", label: "Payment received", description: "Invoice, cash, or another payment method" }, { value: "false", label: "Not fully paid" }, { value: "clear", label: "Clear manual status" }]} />
             {selected && (
               <div className="payment-override-summary">
                 <div><span>Price</span><strong>{dollars(selected.priceCents, true)}</strong></div>
@@ -207,7 +191,7 @@ export function StripeMatchForm({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="stripe-match-dialog">
+      <DialogContent presentation="sheet" className="stripe-match-dialog">
         <DialogHeader>
           <p className="eyebrow">Stripe reconciliation</p>
           <DialogTitle>Match payment to appointment</DialogTitle>

@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.46.6",
+  "currentVersion": "2.46.7",
   "releases": [
+    {
+      "id": "2026-11-09-fluid-dashboard-controls",
+      "version": "2.46.7",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Smoother forms and controls",
+      "changes": [
+        "Rental details, assignments, availability, Add pay, and Record payment use softer surfaces, clearer spacing, and phone sheets. Assignment and pay forms keep their headings and main actions visible while the fields scroll.",
+        "Person, rental, and work-type pickers show readable choices with keyboard navigation. Add pay uses a Still owed / Already paid control, and confirmation rows can be tapped anywhere.",
+        "Shared buttons and dialogs have consistent rounded styling, larger close targets, and gentle feedback. Dark mode and reduced-motion preferences are supported."
+      ],
+      "employee": {
+        "title": "Smoother rental and availability screens",
+        "changes": [
+          "Rental details and availability forms open as phone sheets with clearer sections and larger controls.",
+          "Buttons, close controls, and form choices have more consistent styling in light and dark mode."
+        ]
+      },
+      "commits": []
+    },
     {
       "id": "2026-11-08-record-rental-person",
       "version": "2.46.6",
