@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.48.2",
+  "currentVersion": "2.48.3",
   "releases": [
+    {
+      "id": "2026-11-09-scheduling-refactor",
+      "version": "2.48.3",
+      "date": "2026-11-09",
+      "category": "Reliability",
+      "title": "Lighter scheduling and safer background updates",
+      "changes": [
+        "Scheduling forms, offer cards, and data requests now use focused components with shared formatting and less repeated work.",
+        "Offer choices and availability checks run when the editor is open. New offers start fresh; failed saves keep the entered draft.",
+        "Background schedule checks wait for open editors and pickers, and discard responses superseded by a save or a newer request. Confirmed responses remain visible if the follow-up refresh fails.",
+        "Existing navigation, sheet gestures, assignment rules, and payment calculations stay the same."
+      ],
+      "employee": {
+        "title": "Steadier scheduling updates",
+        "changes": [
+          "Background schedule checks wait while an editor or picker is open, keeping your entries in place.",
+          "Confirmed assignment responses remain visible if the updated schedule cannot load immediately."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-organized-settings",
       "version": "2.48.2",
