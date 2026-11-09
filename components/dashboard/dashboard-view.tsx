@@ -312,7 +312,7 @@ export default function DashboardView({ payload, dark, setDark, onLogout, onRefr
 
       <SidebarInset className={`dashboard-main${isOwner ? " owner-dashboard" : ""}`}>
         <header className="dashboard-topbar">
-          <div className="topbar-heading"><MobileMenuButton /><div className="topbar-title"><div><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div></div>
+          <div className="topbar-heading"><MobileMenuButton /><div className="topbar-title"><div><h1 className={view === "overview" ? "dashboard-greeting" : undefined}>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div></div>
           <div className="topbar-actions">{isOwner && view === "overview" && <div id="home-layout-actions" />}{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
         </header>
         <PullToRefresh page={view} request={toolbarRefresh} quietRequestId={quietRefresh} />

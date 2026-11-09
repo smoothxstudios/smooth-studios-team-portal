@@ -151,7 +151,7 @@ body { -webkit-font-smoothing: antialiased; }
   --sidebar-foreground: #28282b; --sidebar-accent-foreground: #c71922;
   --app-chrome: #fafafad9; --app-chrome-border: #ffffffb3;
   --app-group-shadow: 0 2px 6px #16162203;
-  --app-chrome-shadow: 0 8px 32px #16162216, inset 0 1px 0 #ffffff66;
+  --app-chrome-shadow: 0 8px 24px #1616222e, 0 2px 6px #16162218, inset 0 1px 0 #ffffff66;
 }
 .dark {
   --background: #000; --foreground: #f5f5f7; --card: #1c1c1e; --card-foreground: #f5f5f7;
@@ -160,7 +160,7 @@ body { -webkit-font-smoothing: antialiased; }
   --primary: #ff453a; --ring: #ff453a; --sidebar: #111113; --sidebar-accent: #303033;
   --sidebar-foreground: #efeff2; --sidebar-accent-foreground: #ff6961;
   --app-chrome: #242426db; --app-chrome-border: #ffffff1c;
-  --app-chrome-shadow: 0 8px 32px #0005, inset 0 1px 0 #ffffff0d;
+  --app-chrome-shadow: 0 10px 30px #0009, 0 2px 8px #0006, inset 0 1px 0 #ffffff20;
 }
 html { -webkit-text-size-adjust: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-optical-sizing: auto; letter-spacing: 0; }
@@ -217,6 +217,14 @@ button { touch-action: manipulation; }
 .dashboard-topbar { min-height: 84px; border: 0; background: color-mix(in srgb, var(--background) 84%, transparent); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); padding-block: 14px; }
 .dark .dashboard-topbar { background: var(--background); }
 .topbar-title h1 { font-size: clamp(1.75rem, 2.8vw, 2.25rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.12; }
+.topbar-heading:has(.dashboard-greeting) { flex: 1; }
+.topbar-title:has(.dashboard-greeting) { container-type: inline-size; flex: 1; min-width: 0; }
+.topbar-title:has(.dashboard-greeting) > div { width: 100%; min-width: 0; }
+.topbar-title h1.dashboard-greeting { white-space: nowrap; overflow-wrap: normal; overflow: hidden; text-overflow: ellipsis; font-size: clamp(1rem, 8cqi, 2.25rem); }
+@media (max-width: 360px) {
+  .dashboard-topbar:has(.dashboard-greeting) { padding-inline: 12px; gap: 6px; }
+  .topbar-heading:has(.dashboard-greeting) { gap: 6px; }
+}
 .topbar-title p { font-size: .75rem; font-weight: 500; letter-spacing: .01em; text-transform: none; margin-bottom: 7px; }
 .topbar-alerts, .mobile-menu-trigger { border: 1px solid var(--app-chrome-border) !important; background: var(--app-chrome) !important; box-shadow: 0 2px 12px #00000008 !important; border-radius: 50% !important; }
 .dashboard-sidebar { border-right: 0 !important; }
@@ -310,7 +318,7 @@ button { touch-action: manipulation; }
   .mobile-toolbar button[data-selected="true"] { color: var(--primary); }
   .toolbar-icon > svg { width: 23px; height: 23px; stroke-width: 1.8; }
   .mobile-toolbar button:active { opacity: .65; }
-  [data-sidebar="sidebar"][data-mobile="true"] { width: min(340px, calc(100vw - 36px)); max-width: calc(100vw - 36px); border-radius: 0 28px 28px 0; background: var(--sidebar); }
+  [data-sidebar="sidebar"][data-mobile="true"] { width: min(340px, calc(100vw - 36px)); max-width: calc(100vw - 36px); height: 100dvh; border-radius: 0 28px 28px 0; background: var(--sidebar); box-shadow: 10px 0 32px #00000024; }
   .panel-heading { padding: 16px 16px 10px; }
   .panel-heading h2 { font-size: 1.1875rem; }
   .team-payout-person { padding: 16px !important; }
@@ -429,7 +437,8 @@ html[data-sidebar-motion] .sidebar-backdrop {
   opacity: var(--sidebar-drag-opacity, 1) !important;
 }
 
-[data-sidebar="sidebar"][data-mobile="true"][data-sidebar-settled="true"][data-state="open"] { animation: none !important; }
+[data-sidebar="sidebar"][data-mobile="true"][data-sidebar-settled="true"][data-state="open"],
+.sidebar-backdrop[data-sidebar-settled="true"][data-state="open"] { animation: none !important; }
 
 /* Soft appointment surfaces and clear circular dates, with existing calendar geometry. */
 .agenda-work { border: 0; border-radius: 20px; background: color-mix(in srgb, var(--agenda-event-color, #4285f4) 8%, var(--card)); }
@@ -624,7 +633,7 @@ input::-webkit-datetime-edit { min-width: 0; padding: 0; }
 /* Opening stays non-interactive until release, avoiding a modal lock during touch. */
 .sidebar-drag-preview, .sidebar-drag-shade { display: none; pointer-events: none; }
 html[data-sidebar-motion="preview"] .sidebar-drag-preview { display: flex; position: fixed; inset: 0 auto 0 0; z-index: 50; height: 100dvh; color: var(--sidebar-foreground); animation: none !important; }
-html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; position: fixed; inset: 0; z-index: 49; background: #0008; opacity: var(--sidebar-drag-opacity, 0); }
+html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; position: fixed; inset: 0; z-index: 49; background: rgb(0 0 0 / 50%); opacity: var(--sidebar-drag-opacity, 0); }
 @media (min-width: 768px) {
   :root { --sidebar: #e8e8ef; }
   .dark { --sidebar: #17171a; }
