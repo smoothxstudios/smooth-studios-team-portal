@@ -198,7 +198,8 @@ function Sidebar({
           data-mobile="true"
           overlayClassName="sidebar-backdrop"
           onOpenAutoFocus={event => { if (document.documentElement.hasAttribute("data-sidebar-motion")) event.preventDefault() }}
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          showCloseButton={false}
+          className="w-(--sidebar-width) border-0 outline-none bg-sidebar p-0 text-sidebar-foreground"
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,

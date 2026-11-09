@@ -1,4 +1,5 @@
 "use client";
+import { PersonAvatar, TeamProfilesProvider } from "@/components/team-profile";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { AdvanceReview } from "@/components/dashboard/advance-review";
 import { CreativeActionList } from "@/components/dashboard/daily-actions";
@@ -46,7 +47,7 @@ import { rentalAlertTargetId } from "@/lib/alert-target.mjs";
 import { APPOINTMENT_CATEGORIES } from "@/lib/appointment-categories.mjs";
 import { creativeEarningDate,creativeEarnings } from "@/lib/creative-work.mjs";
 import type { PaymentFilter,ViewKey } from "@/lib/dashboard-presentation";
-import { appointmentCategory,customerPaymentState,dollars,formatDate,formatTime,paidEarnings,rentalState,teamAccent,unpaidEarnings } from "@/lib/dashboard-presentation";
+import { appointmentCategory,customerPaymentState,dollars,formatDate,formatTime,paidEarnings,rentalState,unpaidEarnings } from "@/lib/dashboard-presentation";
 import type {
 DashboardPayload,
 StudioGuideline
@@ -223,7 +224,7 @@ export default function DashboardView({ payload, dark, setDark, onLogout, onRefr
     return months.map((month, index) => ({ ...month, paid: month.paid + creativeTotals.monthly[index].paid, owed: month.owed + creativeTotals.monthly[index].owed, payroll: month.payroll + creativeTotals.monthly[index].paid + creativeTotals.monthly[index].owed }));
   }, [employeeId, visibleRentals, creativeTotals]);
 
-  const displayName = payload.user.name;
+  const displayName = isOwner ? "Smooth" : payload.user.name;
 
   const prepareTeamSetup = async (settings: NewTeamSettings) => {
     setTeamSetupBusy(true);
@@ -294,7 +295,7 @@ export default function DashboardView({ payload, dark, setDark, onLogout, onRefr
   };
 
   return (
-    <SidebarProvider>
+    <TeamProfilesProvider key={payload.user.id} token={schedulingToken} userId={payload.user.id}><SidebarProvider>
       <ActionFeedback />
       <EmployeeEngagementProvider key={payload.user.id} token={schedulingToken} enabled={!isOwner} homeActive={view === "overview"}>
       {isOwner && <TeamAccountSetup open={teamSetupOpen} onOpenChange={setTeamSetupOpen} employees={payload.employees} busy={teamSetupBusy} onSubmit={prepareTeamSetup} enabled={Boolean(payload.workflowAccess)} />}
@@ -306,14 +307,14 @@ export default function DashboardView({ payload, dark, setDark, onLogout, onRefr
         </SidebarContent>
         <SidebarFooter className="studio-sidebar-footer">
           <SettingsNavigation active={view === "settings"} onOpen={() => navigate("settings")} />
-          <div className="sidebar-user"><span className="user-avatar" style={{ background: teamAccent(payload.user.id, payload.user.accent) }}>{displayName.slice(0, 1)}</span><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" title="Log out" onClick={onLogout}><LogOut size={18} /></button></div>
+          <div className="sidebar-user"><PersonAvatar personId={payload.user.id} name={displayName} className="user-avatar" /><div><strong>{displayName}</strong><span>{isOwner ? "Studio dashboard" : "Team member"}</span></div><button aria-label="Log out" title="Log out" onClick={onLogout}><LogOut size={18} /></button></div>
         </SidebarFooter>
       </Sidebar>
 
       <SidebarInset className={`dashboard-main${isOwner ? " owner-dashboard" : ""}`}>
         <header className="dashboard-topbar">
-          <div className="topbar-heading"><MobileMenuButton /><div className="topbar-title"><div><p>{isOwner ? "Smooth dashboard" : "My dashboard"}</p><h1>{view === "overview" ? `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div></div>
-          <div className="topbar-actions">{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
+          <div className="topbar-heading"><MobileMenuButton /><div className="topbar-title"><div><h1>{view === "overview" ? isOwner ? "Smooth" : `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${displayName}` : (isOwner ? NAV_ITEMS : EMPLOYEE_NAV_ITEMS).find((item) => item.key === view)?.label}</h1></div></div></div>
+          <div className="topbar-actions">{isOwner && view === "overview" && <div id="home-layout-actions" />}{payload.source === "sample" && <Badge className="sample-badge" variant="outline">Preview data</Badge>}<Button className="topbar-alerts" variant="outline" size="icon" title="Alerts" aria-label={`Alerts${alerts.unreadCount ? `, ${alerts.unreadCount} unread` : ""}`} onClick={() => navigate("alerts")}><Bell size={20} /><UnreadBadge count={alerts.unreadCount} /></Button></div>
         </header>
         <PullToRefresh page={view} request={toolbarRefresh} quietRequestId={quietRefresh} />
         <div className="dashboard-refresh-body">
@@ -401,7 +402,7 @@ export default function DashboardView({ payload, dark, setDark, onLogout, onRefr
         </>
       )}
       </EmployeeEngagementProvider>
-    </SidebarProvider>
+    </SidebarProvider></TeamProfilesProvider>
   );
 }
 

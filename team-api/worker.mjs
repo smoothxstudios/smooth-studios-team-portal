@@ -1,3 +1,4 @@
+import { teamProfilesRoute } from "./team-profiles.mjs";
 import { syncGuidelineQuiz } from "./guideline-quiz.mjs";
 import { PayrollAccountConflict } from "./payroll-payments.mjs";
 import { tokenHash } from "../lib/team-auth.mjs";
@@ -180,6 +181,7 @@ async function route(request, env, ctx) {
   }
   if (url.pathname === "/alerts" || url.pathname.startsWith("/alerts/")) return alertsRoute({ request, db, user, body, fail });
   if (url.pathname === "/event-planner") return eventPlannerRoute({ request, db, user, body, fail, snapshot });
+  if (url.pathname === "/team-profiles") return teamProfilesRoute({ request, db, user, body, fail });
   if (url.pathname === "/dashboard-layout") return dashboardLayoutRoute({ request, db, user, body, fail });
   if (url.pathname === "/payroll" || url.pathname.startsWith("/payroll/") || url.pathname.startsWith("/sync/payroll")) return payrollRoute({ request, db, user, env, body, fail });
   if (["/studio-reference", "/sync/studio-reference", "/rental-checklists"].includes(url.pathname) || url.pathname.startsWith("/rental-checklists/")) return studioReferenceRoute({ request, db, user, env, body, fail });

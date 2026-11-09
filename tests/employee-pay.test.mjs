@@ -60,11 +60,20 @@ test("Calendar and portal acceptance use the same rate and private employee view
 
 test("new hires never inherit the legacy 30% while their pay is unset", () => {
   const employee = config.employees.find(e => e.id === "dacari");
-  const pending = payout({ employee });
+  const pending = payout({ employee: { ...employee, compensation: { type: "pending" } } });
   assert.equal(pending.amountCents, 0);
   assert.equal(pending.compensationConfigured, false);
   assert.equal(pending.paid, false);
   const hourly = { ...employee, compensation: { type: "hourly", hourlyCents: 1500 } };
   assert.equal(payout({ employee: hourly, end: "2026-09-26T19:30:00-04:00" }).amountCents, 2250);
   assert.equal(payout({ employee: hourly, categoryId: "studio-packages" }).compensationConfigured, false);
+});
+
+test("confirmed new-hire rentals pay by actual duration at fifteen dollars per hour", () => {
+  for (const id of ["dacari", "sorayia", "amia", "terrill"]) {
+    const employee = config.employees.find(person => person.id === id);
+    assert.equal(payout({ employee }).amountCents, 1500);
+    assert.equal(payout({ employee, end: "2026-09-26T19:30:00-04:00" }).amountCents, 2250);
+    assert.equal(payout({ employee }).compensationConfigured, true);
+  }
 });

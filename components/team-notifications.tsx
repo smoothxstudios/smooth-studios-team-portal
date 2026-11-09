@@ -1,4 +1,5 @@
 "use client";
+import { PersonAvatar } from "@/components/team-profile";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { BellPlus, CalendarCheck, CalendarClock, Link2, MessageSquare, Pencil, RefreshCw, Send, SlidersHorizontal, X } from "lucide-react";
@@ -10,7 +11,6 @@ import { useRefreshSource } from "@/components/dashboard-refresh";
 import { createNotificationDraft } from "@/lib/team-notification-draft.mjs";
 import { NOTIFICATION_PRESETS, createRentalReminderIntent, notificationPresetMessage, notificationRentalChoices, sameRentalReminder } from "@/lib/notification-presets.mjs";
 import { teamRequest, type TeamSchedule } from "@/lib/team-api";
-import { teamAccent } from "@/lib/dashboard-presentation";
 import { notificationTime } from "@/team-api/notification-content.mjs";
 import type { Employee } from "@/lib/dashboard-types";
 
@@ -136,7 +136,7 @@ export function TeamNotifications({ token, employees }: { token: string; employe
     (!rentalMode || selected) && (!staleRental || retryUncertain) && !invalidRentalRecipients);
 
   return <>
-    <div className="team-notifications-controls"><Button type="button" variant="outline" onClick={() => setOpen(true)}><BellPlus size={17} aria-hidden="true" />Send reminder</Button></div>
+    <div className="team-notifications-controls"><Button type="button" variant="outline" className="compact-control" onClick={() => setOpen(true)}><BellPlus size={17} aria-hidden="true" />Send reminder</Button></div>
     <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent className="schedule-modal team-notifications-dialog" showCloseButton={false} onOpenAutoFocus={event => { event.preventDefault(); heading.current?.focus(); }}>
       <DialogHeader className="team-notifications-header"><div><DialogTitle ref={heading} tabIndex={-1}>Send reminder</DialogTitle><DialogDescription>Choose a studio rental or a team task.</DialogDescription></div><Button type="button" variant="ghost" size="icon" disabled={busy} onClick={() => setOpen(false)} aria-label="Close reminder composer"><X size={20} aria-hidden="true" /></Button></DialogHeader>
       <div className="team-notifications-body"><form id={formId} onSubmit={event => { event.preventDefault(); void send(); }}>
@@ -150,7 +150,7 @@ export function TeamNotifications({ token, employees }: { token: string; employe
         </div>}
         {preset && (!rentalMode || selected) && <>
           {preset === "rental-response" ? <div className="team-notification-locked-recipient"><span>Send to</span><strong>{people.find(person => person.id === offer?.employeeId)?.name ?? "Assigned team member"}</strong><small>The reminder asks them to accept or decline this offer.</small></div> : <fieldset className="team-notification-recipients" disabled={busy}><legend>Send to{preset === "upcoming-rental" ? " · Confirmed team" : ""}</legend><div className="team-notification-recipient-controls"><button type="button" disabled={!selectablePeople.length} onClick={() => { setRecipientIds(selectablePeople.map(person => person.id)); edit(); }}>Select all</button><button type="button" disabled={!recipientIds.length} onClick={() => { setRecipientIds([]); edit(); }}>Clear</button><span>{recipientIds.length} selected</span></div>
-            <div className="team-notification-person-list">{selectablePeople.map(person => <label key={person.id}><input type="checkbox" checked={recipientIds.includes(person.id)} onChange={event => { const checked = event.currentTarget.checked; setRecipientIds(previous => checked ? [...new Set([...previous, person.id])] : previous.filter(id => id !== person.id)); edit(); }} /><span className="employee-avatar" style={{ background: teamAccent(person.id, person.accent) }} aria-hidden="true">{person.name.slice(0, 1)}</span><span>{person.name}</span></label>)}</div>{preset === "upcoming-rental" && !selectablePeople.length && <p className="schedule-small">No confirmed team is recorded for this rental. Custom message lets you choose other recipients.</p>}
+            <div className="team-notification-person-list">{selectablePeople.map(person => <label key={person.id}><input type="checkbox" checked={recipientIds.includes(person.id)} onChange={event => { const checked = event.currentTarget.checked; setRecipientIds(previous => checked ? [...new Set([...previous, person.id])] : previous.filter(id => id !== person.id)); edit(); }} /><PersonAvatar personId={person.id} name={person.name} className="employee-avatar" /><span>{person.name}</span></label>)}</div>{preset === "upcoming-rental" && !selectablePeople.length && <p className="schedule-small">No confirmed team is recorded for this rental. Custom message lets you choose other recipients.</p>}
           </fieldset>}
           {content && <>
             {(preset === "custom" || edited) && <><label className="team-notification-field"><span>Title <small id={titleCountId}>{content.title.length}/80</small></span><Input required maxLength={80} disabled={busy} value={content.title} aria-describedby={titleCountId} onChange={event => setContent({ title: event.target.value })} /></label><label className="team-notification-field"><span>Message <small id={bodyCountId}>{content.body.length}/360</small></span><Textarea required rows={3} maxLength={360} disabled={busy} value={content.body} aria-describedby={bodyCountId} onChange={event => setContent({ body: event.target.value })} /></label></>}

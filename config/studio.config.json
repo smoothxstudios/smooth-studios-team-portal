@@ -44,7 +44,8 @@
       "accent": "rgb(13, 148, 136)",
       "onboarding": true,
       "compensation": {
-        "type": "pending"
+        "type": "hourly",
+        "hourlyCents": 1500
       }
     },
     {
@@ -54,7 +55,8 @@
       "accent": "rgb(219, 39, 119)",
       "onboarding": true,
       "compensation": {
-        "type": "pending"
+        "type": "hourly",
+        "hourlyCents": 1500
       }
     },
     {
@@ -64,7 +66,8 @@
       "accent": "rgb(217, 119, 6)",
       "onboarding": true,
       "compensation": {
-        "type": "pending"
+        "type": "hourly",
+        "hourlyCents": 1500
       }
     },
     {
@@ -74,7 +77,8 @@
       "accent": "rgb(79, 70, 229)",
       "onboarding": true,
       "compensation": {
-        "type": "pending"
+        "type": "hourly",
+        "hourlyCents": 1500
       }
     },
     {

@@ -1,7 +1,7 @@
 "use client";
+import { PersonAvatar } from "@/components/team-profile";
 import { studioLocal } from "@/lib/team-schedule.mjs";
 import { teamEarnings } from "@/lib/team-summary.mjs";
-import { teamAccent } from "@/lib/dashboard-presentation";
 import type { CreativeAssignment } from "@/lib/use-creative-work";
 import type { ReactNode } from "react";
 
@@ -72,7 +72,7 @@ export function PayoutPage({
           const account = payroll?.accounts?.find(item => item.employeeId === person.id);
           const rentalDeduction = account ? Math.min(account.grossOwedCents, account.rentalBalanceCents) : 0;
           return <section className="team-payout-person" key={person.id}>
-            <div className="person-section-heading"><span className="employee-avatar" style={{ background: teamAccent(person.id, person.accent) }}>{person.name.slice(0, 1)}</span><h3>{person.name}</h3></div>
+            <div className="person-section-heading"><PersonAvatar personId={person.id} name={person.name} className="employee-avatar" /><h3>{person.name}</h3></div>
             <div className="team-payout-details">
               <dl>
                 <div><dt>Amount owed</dt><dd>{dollars(account?.payableCents ?? person.owed, true)}</dd></div>

@@ -89,3 +89,22 @@ test("activation publishes separately encrypted accounts without leaking private
     assert.throws(() => decryptPayload(envelope, passwords.amia));
   } finally { await rm(output, { recursive: true, force: true }); }
 });
+
+
+test("confirmed new-hire rental rates replace pending setup without changing existing agreements or logins", () => {
+  const settings = validateTeamSettings(incoming, config);
+  settings.employees.carlos.compensation = { type: "commission", rate: .3 };
+  settings.employees.armani.compensation = { type: "commission", rate: .3 };
+  const passwords = teamPasswords(config, settings, environment);
+  const employees = resolveEmployees(config, settings, passwords, environment);
+  for (const id of ["dacari", "sorayia", "amia", "terrill"]) {
+    assert.deepEqual(employees.find(person => person.id === id).compensation, { type: "hourly", hourlyCents: 1500 });
+    assert.equal(passwords[id], incoming.employees[id].password);
+  }
+  for (const id of ["carlos", "armani"]) assert.deepEqual(employees.find(person => person.id === id).compensation, { type: "commission", rate: .3 });
+  assert.equal(employees.find(person => person.id === "jordyn").commissionHistory[0].rate, .4);
+  const payloads = buildDashboardPayloads({ calendarEvents: [], config: { ...config, employees }, ledger: { employees: {} }, overrides: {} });
+  assert.equal(payloads.owner.employees.find(person => person.id === "dacari").compensation.hourlyCents, 1500);
+  assert.equal(payloads.owner.employees.find(person => person.id === "jordyn").compensation.rate, .4);
+  assert.deepEqual(payloads.dacari.employees.map(person => person.id), ["dacari"]);
+});

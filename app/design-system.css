@@ -366,7 +366,6 @@ button { touch-action: manipulation; }
 .login-card .dashboard-version-footer { margin-top: 20px; padding: 0; gap: 6px 10px; }
 .login-card .calendar-privacy-link { margin-top: 12px; }
 .owner-home-layout { gap: 14px; }
-.owner-home-layout > .owner-home-layout-controls { margin-bottom: -6px; }
 .daily-action-list > .panel-heading { padding: 0; margin-bottom: 10px; }
 .daily-action-list > section + section { margin-top: 12px; padding-top: 12px; }
 .daily-action-copy { gap: 4px; }
@@ -414,7 +413,6 @@ button { touch-action: manipulation; }
 @media (max-width: 380px) {
   .alert-open { padding-left: 12px; gap: 9px; }
   .alert-avatar { flex-basis: 36px; width: 36px; height: 36px; }
-  .alerts-view { width: 100%; order: 3; }
 }
 @media (hover: hover) {
   .manual-pay-action [data-slot="button"].manual-pay-trigger:hover { background: color-mix(in srgb, var(--primary) 7%, transparent); }
@@ -440,13 +438,8 @@ html[data-sidebar-motion] .sidebar-backdrop {
 .calendar-time-header button > strong { width: 36px; height: 36px; font-size: 17px; font-weight: 600; background: var(--background); }
 .calendar-time-header .is-today > strong { background: var(--primary); }
 .alerts-heading { margin-bottom: 12px; }
-.alerts-controls .alerts-filters { order: 0; }
-.alerts-controls > [data-slot="button"] { order: 1; margin-left: auto; }
-.alerts-controls .alerts-view { order: 2; }
 @media (max-width: 600px) {
-  .alerts-controls .alerts-view { width: 100%; }
   .alerts-controls { gap: 6px; }
-  .alerts-view select { border: 0; padding-left: 4px; font-size: 13px; background: transparent; }
 }
 
 /* Shared dimensions for every page and form. */
@@ -494,6 +487,71 @@ input::-webkit-datetime-edit { min-width: 0; padding: 0; }
 /* Older detail dialogs keep their fixed headings, with the shared close target. */
 .engagement-detail-close { width: 44px; height: 44px; min-width: 44px; border: 0; border-radius: 50%; background: var(--secondary); color: var(--muted-foreground); }
 .engagement-detail-close > svg { width: 17px; height: 17px; stroke-width: 2.5; }
-.alerts-actions-only { justify-content: flex-end; }
 
 .app-task-sheet .app-sheet-scroll > .app-confirmation { display: flex; margin-top: 16px; }
+
+/* Compact, shared actions and recognizable people across every page. */
+.compact-control[data-slot="button"] { min-height: 36px; height: 36px; padding: 0 12px; gap: 7px; border-radius: 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.alerts-controls { justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 14px; }
+.alerts-controls > [aria-label="Inbox actions"] { order: 2; }
+.alerts-tools { order: 1; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.alerts-controls .alerts-filters { min-height: 36px; padding: 3px; gap: 2px; border: 0; border-radius: 12px; background: var(--secondary); }
+.alerts-filters > button { min-height: 30px; padding: 4px 11px; border: 0; border-radius: 9px; font-size: 13px; }
+.alerts-filters > button[aria-pressed="true"] { background: var(--card); color: var(--foreground); box-shadow: 0 1px 3px #0000000d; }
+.alerts-filters .alerts-count { min-width: 19px; height: 19px; padding: 0 5px; font-size: 11px; }
+.alerts-tools .alerts-owner-actions { display: contents; }
+.alerts-tools .team-notifications-controls { margin: 0; display: contents; }
+.alert-card { --alert-color: #5275b7; box-shadow: inset 3px 0 var(--alert-color); }
+.alert-card.is-unread { background: color-mix(in srgb, var(--alert-color) 4%, var(--card)); }
+.alert-card[data-category="cancelled"] { --alert-color: #cb4251; }
+.alert-card[data-category="attention"] { --alert-color: #a26716; }
+.alert-card[data-category="payment"], .alert-card[data-category="confirmed"] { --alert-color: #25825d; }
+.alert-card[data-category="availability"] { --alert-color: #167d8d; }
+.alert-card[data-category="creative"] { --alert-color: #8257bc; }
+.alert-card[data-category="quiz"] { --alert-color: #9b7820; }
+.alert-card[data-category="notice"] { --alert-color: #697482; }
+.dark .alert-card[data-category="cancelled"] { --alert-color: #ff8790; }
+.dark .alert-card[data-category="attention"] { --alert-color: #edb764; }
+.dark .alert-card[data-category="payment"], .dark .alert-card[data-category="confirmed"] { --alert-color: #69c79b; }
+.dark .alert-card[data-category="availability"] { --alert-color: #69c5d4; }
+.dark .alert-card[data-category="creative"] { --alert-color: #b997ed; }
+.dark .alert-card[data-category="quiz"] { --alert-color: #dfc578; }
+.dark .alert-card[data-category="rental"] { --alert-color: #90b4f1; }
+.dark .alert-card[data-category="notice"] { --alert-color: #b0bac7; }
+.alert-category { display: inline-flex; align-items: center; color: var(--alert-color); background: color-mix(in srgb, var(--alert-color) 10%, var(--card)); font-size: 10px; font-weight: 650; line-height: 1.4; padding: 2px 6px; border-radius: 6px; margin-left: 3px; }
+.alert-type-avatar { color: var(--alert-color); background: color-mix(in srgb, var(--alert-color) 12%, var(--card)); }
+.person-avatar { position: relative; display: inline-grid; place-items: center; vertical-align: middle; flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; font-size: 14px; font-weight: 650; box-shadow: none; }
+.dark .person-avatar { --person-ink: color-mix(in srgb, var(--person-accent) 65%, #fff); }
+.person-avatar > img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.person-avatar.alert-avatar { width: 40px; height: 40px; flex-basis: 40px; }
+.studio-nav .sidebar-item-label { flex: 1; min-width: 0; }
+.studio-nav .alerts-count { margin-left: auto; margin-right: 0; flex-shrink: 0; }
+.studio-sidebar-content { scrollbar-width: none; }
+.studio-sidebar-content::-webkit-scrollbar { display: none; }
+[data-sidebar="sidebar"][data-mobile="true"] { border: 0 !important; outline: 0; }
+.home-layout-trigger[data-slot="button"] { border: 0; color: var(--muted-foreground); background: var(--card); border-radius: 50%; }
+#home-layout-actions:empty { display: none; }
+.notification-summary > small, .settings-disclosure-action { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 7px 12px; border-radius: 12px; background: var(--secondary); color: var(--foreground); font-size: 13px; font-weight: 600; line-height: 1.3; text-align: center; }
+.settings-disclosure { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; list-style: none; cursor: pointer; }
+.settings-disclosure::-webkit-details-marker { display: none; }
+.settings-disclosure > span:first-child { display: inline-flex; align-items: center; gap: 10px; font-weight: 650; }
+.rental-pay-settings[open] > p { margin-top: 16px; }
+.rental-pay-settings ul { display: grid; gap: 12px; padding: 0; margin: 16px 0 0; list-style: none; width: 100%; }
+.rental-pay-settings li { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.rental-pay-settings li > span:not(.person-avatar) { margin-left: auto; }
+.rental-pay-settings li > svg { color: #25825d; flex-shrink: 0; }
+.profile-icon-preview { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.profile-icon-preview > img, .profile-icon-preview > .person-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; font-size: 24px; }
+.profile-icon-actions, .profile-icon-options { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.profile-settings .profile-icon-actions [data-slot="button"], .profile-settings .profile-icon-options [data-slot="button"] { min-height: 36px; padding: 7px 12px; font-size: 13px; border-radius: 12px; }
+.appointment-calendar-options { border-top: 1px solid var(--border); padding-top: 12px; }
+.appointment-calendar-options > summary { cursor: pointer; color: var(--muted-foreground); font-size: 13px; padding-block: 6px; }
+.appointment-calendar-options .apple-calendar.compact { border: 0; margin: 0; padding-top: 10px; }
+@media (max-width: 767px) {
+  .alerts-controls > [aria-label="Inbox actions"] { order: 1; margin-left: auto; }
+  .alerts-tools { order: 2; width: 100%; margin-left: 0; justify-content: flex-start; gap: 6px; }
+  .compact-control[data-slot="button"] { min-height: 40px; height: 40px; padding-inline: 10px; font-size: 12px; }
+  .alerts-filters > button { min-height: 36px; }
+  .alert-category { margin-left: 0; }
+  .notification-summary { gap: 10px; }
+}

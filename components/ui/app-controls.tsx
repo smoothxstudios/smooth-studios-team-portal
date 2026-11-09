@@ -1,4 +1,5 @@
 "use client";
+import { PersonAvatar } from "@/components/team-profile";
 
 import { useId, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
@@ -17,14 +18,14 @@ export function AppPicker({ label, value, onValueChange, options, placeholder = 
   return <div className="app-field"><label htmlFor={id}>{label}</label>
     <Select.Root value={selected ? encoded(value) : ""} onValueChange={next => onValueChange(next === "__empty_choice__" ? "" : next)} disabled={disabled} required={required}>
       <Select.Trigger id={id} className="app-picker-trigger" aria-label={label}>
-        {selected?.color && <span aria-hidden="true" className="app-person-icon" style={{ background: selected.color }}>{selected.label.slice(0, 1)}</span>}
+        {selected?.color && <PersonAvatar personId={selected.value} name={selected.label} color={selected.color} className="app-person-icon" />}
         <span className="app-picker-copy"><Select.Value placeholder={placeholder}>{selected?.label}</Select.Value>{selected?.description && <small>{selected.description}</small>}</span>
         <Select.Icon><ChevronDown size={18} aria-hidden="true" /></Select.Icon>
       </Select.Trigger>
       <Select.Portal><Select.Content position="popper" sideOffset={6} collisionPadding={12} className="app-picker-menu">
         <Select.ScrollUpButton className="app-picker-scroll"><ChevronUp size={16} /></Select.ScrollUpButton>
         <Select.Viewport className="app-picker-options">{options.map(option => <Select.Item key={encoded(option.value)} value={encoded(option.value)} textValue={option.label} disabled={option.disabled} className="app-picker-option">
-          {option.color && <span aria-hidden="true" className="app-person-icon" style={{ background: option.color }}>{option.label.slice(0, 1)}</span>}
+          {option.color && <PersonAvatar personId={option.value} name={option.label} color={option.color} className="app-person-icon" />}
           <span className="app-picker-copy"><Select.ItemText>{option.label}</Select.ItemText>{option.description && <small>{option.description}</small>}</span>
           <Select.ItemIndicator className="app-picker-check"><Check size={18} /></Select.ItemIndicator>
         </Select.Item>)}</Select.Viewport>

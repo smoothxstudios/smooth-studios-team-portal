@@ -1,10 +1,10 @@
 "use client";
+import { PersonAvatar } from "@/components/team-profile";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRefreshSource } from "@/components/dashboard-refresh";
 import { teamRequest, type TeamSchedule } from "@/lib/team-api";
 import { weeklyTeamHours } from "@/lib/team-summary.mjs";
-import { teamAccent } from "@/lib/dashboard-presentation";
 import { localInstant } from "@/lib/team-schedule.mjs";
 import type { Employee, Rental } from "@/lib/dashboard-types";
 
@@ -33,7 +33,7 @@ export function OwnerWeeklyHours({ employees, rentals, token }: { employees: Emp
       <button type="button" className="team-hours-week-button" aria-label="Next week" disabled={weekOffset === 0} onClick={() => setWeekOffset(value => Math.min(0, value + 1))}><ChevronRight size={18} aria-hidden="true" /></button>
     </div></div>
     <div className="team-hours-body">{loading && <p className="schedule-small" role="status">Updating hours…</p>}{error && <p className="schedule-warning" role="status">{error}</p>}
-    <div className="team-hours-grid">{week.people.map(person => <div key={person.id} className="team-hours-person"><span className="employee-avatar" style={{ background: teamAccent(person.id, person.accent) }}>{person.name.slice(0, 1)}</span><strong>{person.name}</strong><span>{person.hours.toLocaleString("en-US", { maximumFractionDigits: 2 })} <small>hrs</small></span></div>)}</div>
+    <div className="team-hours-grid">{week.people.map(person => <div key={person.id} className="team-hours-person"><PersonAvatar personId={person.id} name={person.name} className="employee-avatar" /><strong>{person.name}</strong><span>{person.hours.toLocaleString("en-US", { maximumFractionDigits: 2 })} <small>hrs</small></span></div>)}</div>
     <p className="schedule-small">Scheduled time · Completed, accepted Calendar appointments and dashboard tasks. Overlapping time counts once.</p></div>
   </section>;
 }

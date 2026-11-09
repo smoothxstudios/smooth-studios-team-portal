@@ -1,6 +1,29 @@
 {
-  "currentVersion": "2.46.14",
+  "currentVersion": "2.47.0",
   "releases": [
+    {
+      "id": "2026-11-09-alerts-profile-sidebar-polish",
+      "version": "2.47.0",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Clearer alerts, personal icons, and compact navigation",
+      "changes": [
+        "Alerts uses a compact, consistent toolbar with readable colors for each notification category.",
+        "Choose a color initial or a profile photo in Settings. The same icon follows each person across alerts, schedules, team lists, and payouts.",
+        "The mobile sidebar supports opening and closing with separate swipes, keeps the unread count aligned at the edge, and removes its visible scrollbar and hard border.",
+        "Home uses a shorter heading with the layout control in the header. Secondary actions and Apple Calendar options take less space.",
+        "Settings shows confirmed rental pay rates, and pending onboarding policies now use confirmed rental rates when available."
+      ],
+      "employee": {
+        "title": "Clearer alerts and your own profile icon",
+        "changes": [
+          "Notification categories have distinct colors and clearer, compact controls.",
+          "Choose your color initial or a photo in Settings → Preferences → Your icon.",
+          "Swipe the sidebar open and closed, with cleaner navigation and secondary actions.",
+          "Apple Calendar is tucked under Calendar options at the bottom of appointment details."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-dark-mode-switch-status-bar",
       "version": "2.46.14",

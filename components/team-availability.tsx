@@ -1,4 +1,5 @@
 "use client";
+import { PersonAvatar } from "@/components/team-profile";
 import { AvailabilityOverview } from "@/components/availability-overview";
 import { MoreOptions } from "@/components/dashboard/more-options";
 import { ConfirmationRow } from "@/components/ui/app-controls";
@@ -70,7 +71,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
       const previewPreferences = showAllPreferences ? personPreferences : personPreferences.slice(0, 3);
       const previewBlocks = showAllBlocks ? personBlocks : personBlocks.slice(0, 3);
       return <section className={`availability-person${isOwner ? " is-owner" : ""}`} key={person.id} aria-label={`${person.name} availability`}>
-      {isOwner && <button type="button" className="availability-person-trigger" aria-expanded={expanded} aria-controls={`availability-details-${person.id}`} onClick={() => togglePerson(person.id)}><span className="employee-avatar" style={{ background: person.color }} aria-hidden="true">{person.name.slice(0, 1)}</span><span className="availability-person-name">{person.name}</span><span className="availability-person-counts"><span>{person.id === "owner" ? "Flexible" : `${personPreferences.length} preferred`}</span><span>{personBlocks.length} unavailable</span></span><ChevronDown size={18} aria-hidden="true" /></button>}
+      {isOwner && <button type="button" className="availability-person-trigger" aria-expanded={expanded} aria-controls={`availability-details-${person.id}`} onClick={() => togglePerson(person.id)}><PersonAvatar personId={person.id} name={person.name} className="employee-avatar" /><span className="availability-person-name">{person.name}</span><span className="availability-person-counts"><span>{person.id === "owner" ? "Flexible" : `${personPreferences.length} preferred`}</span><span>{personBlocks.length} unavailable</span></span><ChevronDown size={18} aria-hidden="true" /></button>}
       {expanded && <div className="availability-person-details" id={`availability-details-${person.id}`}>
       <div className="availability-columns">
       <article className={isOwner ? "availability-section availability-preferred" : "schedule-panel availability-preferred"}><div className="schedule-section-heading"><h3><CalendarCheck size={isOwner ? 17 : 20} />{person.id === "owner" ? "Flexible schedule" : <>Preferred time <span className="schedule-count">{personPreferences.length}</span></>}</h3>{!isOwner && <p>Choose when you’d like to work. Assignments still need your acceptance.</p>}{person.id !== "owner" && <Button variant="outline" disabled={disabled || !available} onClick={() => edit(undefined, person.id)}><Plus size={16} />Add preferred time</Button>}</div>

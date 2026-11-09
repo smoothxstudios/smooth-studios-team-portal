@@ -1,4 +1,6 @@
 "use client";
+import { ProfileSettings } from "@/components/profile-settings";
+import { RentalPaySettings } from "@/components/rental-pay-settings";
 
 import { Contact, CircleHelp, Moon, RefreshCw, Settings, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,8 @@ export function DashboardSettings({ token, profile, password, dark, onThemeChang
     </TabsList>
     <TabsContent value="preferences" className="settings-preferences">
       <section className="settings-card settings-appearance"><div><h2>Appearance</h2><p>Choose the look that feels best for you.</p></div><label className="settings-theme"><Sun size={17} /><span>Dark mode</span><Switch checked={dark} onCheckedChange={onThemeChange} aria-label="Dark mode" /><Moon size={17} /></label></section>
+      <ProfileSettings userId={profile.id} name={profile.label} />
+      {profile.role === "owner" && <RentalPaySettings employees={employees} />}
       {profile.role === "owner" && onPlannerChange && <section className="settings-card settings-appearance"><div><h2>Sidebar</h2><p>Optional tools shown on this device.</p></div><label className="settings-theme"><span>Event Planner</span><Switch checked={plannerEnabled} onCheckedChange={onPlannerChange} aria-label="Show Event Planner" /></label></section>}
       {profile.role === "owner" && <TeamLoginSettings employees={employees} access={teamAccess} />}
       {profile.role === "owner" && onSync && <section className="settings-card settings-sync"><div className="settings-card-heading"><RefreshCw size={23} /><div><h2>Data sync</h2>{lastSynced && <p>Updated {lastSynced}</p>}</div></div><Button variant="outline" onClick={onSync}><RefreshCw size={17} />Sync now</Button></section>}

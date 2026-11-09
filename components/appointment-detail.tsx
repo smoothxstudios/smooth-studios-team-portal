@@ -28,7 +28,6 @@ export function AppointmentDetail({ item, token, userId, isOwner, busy, renderAs
   const previous = item.assignments.filter(offer => !["pending", "accepted"].includes(offer.status));
   return <div className="appointment-detail">
     <header><h2>{item.customer || item.title}</h2>{item.customer && <p>{item.title}</p>}<p>{formatDate(item.start)} · {formatTime(item.start)}–{formatTime(item.end)}{formatDate(item.start) !== formatDate(item.end) ? ` · ends ${formatDate(item.end)}` : ""}</p></header>
-    <AppleCalendarSettings key={userId} token={token} isOwner={isOwner} compact />
     <div className="schedule-dialog-feedback">{feedback}</div>
     {appointment && <section><h3>Rental details</h3><RentalDescription details={appointment.rentalDetails} showHeading={false} />
       <dl className="appointment-balance"><div><dt>Rental price</dt><dd>{dollars(appointment.priceCents, true)}</dd></div><div><dt>{balance!.label}</dt><dd>{balance!.remaining === null ? (isOwner ? "Unconfirmed" : "Confirm with Smooth") : dollars(balance!.remaining, true)}</dd></div></dl>
@@ -41,5 +40,6 @@ export function AppointmentDetail({ item, token, userId, isOwner, busy, renderAs
       <div className="appointment-offers">{live.map(offer => renderAssignment(offer, true))}</div>
       {previous.length > 0 && <details className="appointment-history"><summary>Previous responses ({previous.length})</summary>{previous.map(offer => <div key={offer.id}><PersonLabel id={offer.employeeId} /><span className={`schedule-status ${offer.status}`}>{offer.status === "cancelled" ? "Offer cancelled" : "Declined"}</span><CalendarAssignmentStatus delivery={offer.calendarSync} /></div>)}</details>}
     </section>
+    <details className="appointment-calendar-options"><summary>Calendar options</summary><AppleCalendarSettings key={userId} token={token} isOwner={isOwner} compact /></details>
   </div>;
 }

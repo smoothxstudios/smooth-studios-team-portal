@@ -27,7 +27,7 @@ export function NotificationDelivery({token}:{token:string}) {
     const timer=window.setInterval(update,15_000); window.addEventListener("focus",update);
     return()=>{sequence.current++;window.clearInterval(timer);window.removeEventListener("focus",update);};
   },[open,refresh]);
-  return <><Button variant="outline" onClick={()=>setOpen(true)}><Radio size={16}/>Delivery</Button>
+  return <><Button variant="outline" className="compact-control" onClick={()=>setOpen(true)}><Radio size={16}/>Delivery</Button>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="delivery-dialog"><DialogHeader><DialogTitle>Notification delivery</DialogTitle><DialogDescription>Received confirms a device handled the alert. Opened means they tapped it. Neither confirms they read the full message.</DialogDescription></DialogHeader>
       <div className="delivery-body">
         <div className="delivery-people" role="group" aria-label="Filter delivery by person"><button type="button" aria-pressed={person==="all"} onClick={()=>setPerson("all")}>Everyone</button>{data?.people.map(p=><button type="button" key={p.userId} aria-pressed={person===p.userId} onClick={()=>setPerson(p.userId)}>{p.name}</button>)}</div>

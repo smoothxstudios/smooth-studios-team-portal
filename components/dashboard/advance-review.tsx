@@ -1,10 +1,11 @@
 "use client";
+import { PersonAvatar } from "@/components/team-profile";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowUpRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { dollars, formatDate, formatTime, teamAccent } from "@/lib/dashboard-presentation";
+import { dollars, formatDate, formatTime } from "@/lib/dashboard-presentation";
 import type { Employee, PayrollReview, PayrollState, Rental } from "@/lib/dashboard-types";
 import { teamRequest } from "@/lib/team-api";
 import { advanceCorrectionChecks } from "@/lib/advance-correction.mjs";
@@ -49,7 +50,7 @@ export function AdvanceReview({ token, payroll, employees, rentals, onOpenSource
           {busy && !reviews && <p role="status">Loading review details…</p>}
           {!busy && reviews?.length === 0 && <p role="status">No advance discrepancies remain in the current records.</p>}
           {groups.map(employeeId => <section className="advance-review-person" key={employeeId}>
-            <h3><span aria-hidden="true" className="employee-avatar" style={{ background: teamAccent(employeeId) }}>{name(employeeId).slice(0, 1)}</span>{name(employeeId)}</h3>
+            <h3><PersonAvatar personId={employeeId} name={name(employeeId)} className="employee-avatar" />{name(employeeId)}</h3>
             {reviews!.filter(item => item.employeeId === employeeId).map(item => <article className="advance-review-item" key={`${item.kind}:${item.sourceId}`}>
               <div className="advance-review-record"><strong>{item.customer || item.title}</strong>{item.customer && <span>{item.title}</span>}
                 {item.start ? <span>{formatDate(item.start, true)} · {formatTime(item.start)}{item.kind === "rental" && item.end ? `–${formatTime(item.end)}` : ""}</span> : item.end && <span>Earning date · {formatDate(item.end, true)}</span>}

@@ -1,4 +1,5 @@
 "use client";
+import { createPortal } from "react-dom";
 
 import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, GripVertical, RotateCcw, SlidersHorizontal, X } from "lucide-react";
@@ -26,6 +27,8 @@ export function OwnerHomeLayout({ token, sections }: { token: string; sections: 
   const draftRef = useRef(draft), sequence = useRef(0), saving = useRef(false), drag = useRef<Drag | null>(null);
   const body = useRef<HTMLDivElement>(null), list = useRef<HTMLOListElement>(null), heading = useRef<HTMLHeadingElement>(null), rows = useRef(new Map<DashboardSectionId, HTMLLIElement>());
   const instructionsId = useId();
+  const [toolbar, setToolbar] = useState<HTMLElement | null>(null);
+  useEffect(() => { setToolbar(document.getElementById("home-layout-actions")); }, []);
 
   const updateDraft = useCallback((next: DashboardSectionId[]) => { draftRef.current = next; setDraft(next); }, []);
   const stopDrag = useCallback((announce = false) => {
@@ -127,7 +130,8 @@ export function OwnerHomeLayout({ token, sections }: { token: string; sections: 
   };
 
   return <div className="owner-overview owner-home-layout">
-    <div className="owner-home-layout-controls"><div>{loading && !saved && <span role="status">Loading Home layout…</span>}{loadError && <span role="status">{loadError} <button type="button" disabled={loading} onClick={() => void load()}>Try again</button></span>}</div><Button type="button" variant="ghost" disabled={loading && !fresh} onClick={openEditor}><SlidersHorizontal size={16} aria-hidden="true" />Edit layout</Button></div>
+    {toolbar && createPortal(<Button type="button" variant="outline" size="icon" className="home-layout-trigger" title="Edit Home layout" aria-label="Edit Home layout" disabled={loading && !fresh} onClick={openEditor}><SlidersHorizontal size={19} aria-hidden="true" /></Button>, toolbar)}
+    {loadError && <p className="schedule-small" role="status">{loadError} <button type="button" disabled={loading} onClick={() => void load()}>Try again</button></p>}
     {(saved?.order ?? defaultOrder()).map(id => <div key={id} className="owner-home-section" data-home-section={id}>{sections[id]}</div>)}
     <Dialog open={open} onOpenChange={value => { if (!busy) { stopDrag(); setOpen(value); } }}>
       <DialogContent className="schedule-modal owner-layout-dialog" showCloseButton={false} onOpenAutoFocus={event => { event.preventDefault(); heading.current?.focus(); }}>

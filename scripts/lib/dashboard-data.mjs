@@ -6,7 +6,7 @@ import path from "node:path";
 import { rentalDetails } from "../../lib/rental-details.mjs";
 import { categorizeAppointment } from "../../lib/appointment-categories.mjs";
 import { summarizeStripeSnapshot } from "./stripe-data.mjs";
-import { calculateEmployeePayout, initializePayAdjustments } from "./employee-pay.mjs";
+import { calculateEmployeePayout, initializePayAdjustments, studioDate } from "./employee-pay.mjs";
 import { MAX_GUIDELINES } from "../../lib/studio-guidelines.mjs";
 import { organizeGuideline } from "../../lib/guideline-content.mjs";
 import { CALENDAR_INVITATION_STATUSES } from "../../lib/calendar-invitations.mjs";
@@ -113,8 +113,12 @@ function employeeInvitationEmails(employee) {
   return configured.map((email) => email?.trim().toLowerCase()).filter(Boolean);
 }
 
-function dashboardEmployee(employee) {
-  return { id: employee.id, name: employee.name, email: employee.email, accent: employee.accent,
+function dashboardEmployee(employee, config) {
+  const today = studioDate(Date.now(), config.timeZone);
+  const latestRate = [...(employee.commissionHistory ?? [])].filter(change => change.effectiveFrom <= today).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0]?.rate;
+  const compensation = employee.compensation && employee.compensation.type !== "commission" ? employee.compensation
+    : { type: "commission", rate: latestRate ?? employee.commissionRate ?? employee.compensation?.rate ?? config.commissionRate };
+  return { id: employee.id, name: employee.name, email: employee.email, accent: employee.accent, compensation,
     ...(employee.onboarding ? { onboarding: true, accessReady: employee.accessReady === true } : {}) };
 }
 
@@ -380,7 +384,7 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
     integrations: { calendar: true, stripe: Boolean(stripeSnapshot) },
     rulebook: normalizeRulebook(rulebook),
   };
-  const dashboardEmployees = config.employees.map(dashboardEmployee);
+  const dashboardEmployees = config.employees.map(employee => dashboardEmployee(employee, config));
 
   const owner = {
     ...common,
@@ -403,7 +407,7 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
   };
   const employeePayloads = Object.fromEntries(
     config.employees.map((employee) => {
-      const visibleEmployee = dashboardEmployee(employee);
+      const visibleEmployee = dashboardEmployee(employee, config);
       const filteredRentals = rentals
         .filter((rental) => rental.assignedEmployeeIds.includes(employee.id) || rental.teamRenterId === employee.id)
         .map((rental) => {

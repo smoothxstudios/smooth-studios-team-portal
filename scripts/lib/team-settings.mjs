@@ -54,7 +54,8 @@ export function resolveEmployees(config, settings, passwords, environment = proc
     if (!invitationEmails.length && !employee.onboarding) throw new Error(`Missing required environment variable: ${employee.emailEnvironmentVariable}`);
     if (invitationEmails.some(email => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || usedEmails.has(email))) throw new Error("Employee invitation emails must be valid and belong to one employee.");
     invitationEmails.forEach(email => usedEmails.add(email));
-    const compensation = saved?.compensation ?? employee.compensation;
+    // A confirmed rental policy replaces the onboarding placeholder without changing credentials.
+    const compensation = saved?.compensation?.type === "pending" ? employee.compensation ?? saved.compensation : saved?.compensation ?? employee.compensation;
     return { ...employee, compensation, ...(compensation?.type === "commission" ? { commissionRate: compensation.rate } : {}),
       email: invitationEmails[0], invitationEmails, accessReady: Boolean(passwords[employee.id] && invitationEmails.length) };
   });

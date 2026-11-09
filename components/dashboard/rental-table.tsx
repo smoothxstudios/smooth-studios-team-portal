@@ -1,4 +1,5 @@
 "use client";
+import { PersonAvatar } from "@/components/team-profile";
 import { Button } from "@/components/ui/button";
 import { RentalDescription } from "@/components/rental-description";
 
@@ -11,7 +12,7 @@ TableHeader,
 TableRow,
 } from "@/components/ui/table";
 import type { AppointmentStatus } from "@/lib/dashboard-presentation";
-import { FALLBACK_PROFILES,appointmentCategory,appointmentStatus,dollars,durationLabel,formatDate,formatTime,paidEarnings,teamAccent,unpaidEarnings } from "@/lib/dashboard-presentation";
+import { FALLBACK_PROFILES,appointmentCategory,appointmentStatus,dollars,durationLabel,formatDate,formatTime,paidEarnings,unpaidEarnings } from "@/lib/dashboard-presentation";
 import type {
 EmployeePayout,
 Rental
@@ -89,7 +90,7 @@ export function RentalTable({ rentals, employeeId, onOpen }: { rentals: Rental[]
             <TableCell className="rental-date-cell" data-label="Date & time" role="cell"><div className="rental-date"><strong>{formatDate(rental.start, true)}</strong><span>{formatTime(rental.start)} · {durationLabel(rental)}</span></div></TableCell>
             <TableCell className="money-cell" data-label={employeeId ? "Price" : "Price / payment"} role="cell"><PaymentAmount rental={rental} showDetails={!employeeId} /></TableCell>
             <TableCell data-label={employeeId ? "Your earnings" : "Assigned team"} role="cell">
-              {employeeId ? <EmployeeEarnings payout={rental.employeePayouts[employeeId]} /> : <div className="avatar-stack">{rental.assignedEmployeeIds.length ? rental.assignedEmployeeIds.map((id) => <span aria-label={FALLBACK_PROFILES.find(profile => profile.id === id)?.label ?? id} key={id} style={{ background: teamAccent(id) }}>{id.slice(0, 1).toUpperCase()}</span>) : <em>Unassigned</em>}</div>}
+              {employeeId ? <EmployeeEarnings payout={rental.employeePayouts[employeeId]} /> : <div className="avatar-stack">{rental.assignedEmployeeIds.length ? rental.assignedEmployeeIds.map((id) => <PersonAvatar key={id} personId={id} name={FALLBACK_PROFILES.find(profile => profile.id === id)?.label ?? id} />) : <em>Unassigned</em>}</div>}
             </TableCell>
             <TableCell className="rental-status-cell" data-label="Status" role="cell"><StatusBadge state={appointmentStatus(rental, employeeId)} /></TableCell>
           </TableRow>

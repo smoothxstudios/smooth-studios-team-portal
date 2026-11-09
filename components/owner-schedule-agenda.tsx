@@ -1,4 +1,5 @@
 "use client";
+import { PersonAvatar } from "@/components/team-profile";
 import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
 import { rentalStaffRemovals } from "@/lib/rental-staff.mjs";
 import { ScheduleConfirmation } from "@/components/schedule-confirmation";
@@ -33,9 +34,7 @@ function Person({ id }: { id: string }) {
 function Confirmation({ person, onRemove, busy }: { person: WorkEntry["confirmations"][number]; onRemove?: () => void; busy: boolean }) {
   const accepted = person.appStatus === "accepted" || (!person.appStatus && person.calendarAccepted);
   return <li className={`agenda-guest ${accepted ? "accepted" : "pending"}`}>
-    <span className="agenda-guest-avatar" style={{ background: TEAM.find(member => member.id === person.employeeId)?.color }} aria-hidden="true">
-      {name(person.employeeId).slice(0, 1)}<span className="agenda-guest-check">{accepted ? <Check size={12} strokeWidth={3} /> : <Clock3 size={12} strokeWidth={2.5} />}</span>
-    </span>
+    <PersonAvatar personId={person.employeeId} name={name(person.employeeId)} className="agenda-guest-avatar"><span className="agenda-guest-check">{accepted ? <Check size={12} strokeWidth={3} /> : <Clock3 size={12} strokeWidth={2.5} />}</span></PersonAvatar>
     <span className="agenda-guest-copy"><strong>{name(person.employeeId)}</strong><span className="agenda-guest-response">{assignmentResponseLabel(person)}</span>
       {person.appStatus && person.calendarAccepted && <span className="agenda-guest-calendar"><Check size={12} aria-hidden="true" />Calendar accepted</span>}
       {person.appStatus && person.calendarStatus && <span className="agenda-guest-response">{calendarInvitationLabel(person.calendarStatus)}</span>}

@@ -12,6 +12,11 @@ const passwords = teamPasswords(config, settings);
 const { profiles } = JSON.parse(await readFile(new URL('../public/data/access.json', import.meta.url), 'utf8'));
 const ownerPayload = decryptPayload(JSON.parse(await readFile(new URL('../public/data/owner.json', import.meta.url), 'utf8')), passwords.owner);
 const expectedRentals = new Map(ownerPayload.rentals.map(rental => [rental.id, rental]));
+const hourlyHires = config.employees.filter(person => person.compensation?.type === 'hourly');
+for (const person of hourlyHires) {
+  const actual = ownerPayload.employees.find(employee => employee.id === person.id)?.compensation;
+  if (actual?.type !== 'hourly' || actual.hourlyCents !== person.compensation.hourlyCents) throw new Error('A confirmed hourly rental rate is missing from the synced dashboard.');
+}
 let checkedDetails = 0, checkedRoomRentals = 0;
 for (const { id, role } of profiles) {
   const password = passwords[id];
@@ -20,6 +25,9 @@ for (const { id, role } of profiles) {
   const payload = decryptPayload(envelope, password);
   if (payload.user?.id !== id || payload.role !== role || payload.history?.deferred || !Array.isArray(payload.rentals)) throw new Error('Restored account data is invalid.');
   const proof = await teamToken(password, id);
+  const profileResponse = await fetch(`${TEAM_API_URL}/team-profiles`, { cache: 'no-store', redirect: 'error',
+    headers: { authorization: `Bearer ${proof}` }, signal: AbortSignal.timeout(20_000) });
+  if (!profileResponse.ok || !Array.isArray((await profileResponse.json()).profiles)) throw new Error('Team profile storage is unavailable for a current account.');
   const response = await fetch(`${TEAM_API_URL}/schedule`, { cache: 'no-store', redirect: 'error',
     headers: { authorization: `Bearer ${proof}` }, signal: AbortSignal.timeout(20_000) });
   if (!response.ok) throw new Error(`Restored scheduling access failed (${response.status}).`);
@@ -41,4 +49,5 @@ for (const { id, role } of profiles) {
       schedule.appointments.some(item => item.acceptedEmployeeIds.some(person => person !== id)))) throw new Error('Restored schedule account isolation failed.');
 }
 console.log(`Verified encrypted sign-in data and live scheduling access for ${profiles.length} current accounts.`);
+console.log(`Verified team profile access and ${hourlyHires.length} confirmed hourly rental policies in the synced dashboard.`);
 console.log(`Verified live booking details and customer balances on ${checkedDetails} visible rental records, including ${checkedRoomRentals} Studio A/B records across those accounts.`);

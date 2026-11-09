@@ -7,6 +7,7 @@ export type Employee = {
   accent: string;
   onboarding?: boolean;
   accessReady?: boolean;
+  compensation?: { type: "pending" } | { type: "hourly"; hourlyCents: number } | { type: "commission"; rate: number };
 };
 
 export type EmployeePayout = {

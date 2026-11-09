@@ -80,8 +80,8 @@ export function DashboardNavigation({ isOwner, accountId, view, onNavigate, unre
             <SidebarMenuItem key={item.key}>
               <SidebarMenuButton aria-current={view === item.key ? "page" : undefined} isActive={view === item.key}
                 onClick={() => { onNavigate(item.key); closeMobileMenu(); }} tooltip={item.label}>
-                <item.icon aria-hidden="true" /><span>{item.label}</span>{item.key === "alerts" && <UnreadBadge count={unread} />}
-                {view === item.key && <ChevronRight className="sidebar-current-icon" aria-hidden="true" />}
+                <item.icon aria-hidden="true" /><span className="sidebar-item-label">{item.label}</span>{item.key === "alerts" && <UnreadBadge count={unread} />}
+                {view === item.key && item.key !== "alerts" && <ChevronRight className="sidebar-current-icon" aria-hidden="true" />}
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
