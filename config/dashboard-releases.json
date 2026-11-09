@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.46.11",
+  "currentVersion": "2.46.12",
   "releases": [
+    {
+      "id": "2026-11-09-home-checkin-footer",
+      "version": "2.46.12",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Temp Check first and a lower version footer",
+      "changes": [
+        "Temp Check and Daily Quiz appear at the top of employee Home, above upcoming assignments.",
+        "On short pages, the version footer sits near the bottom navigation. On longer pages it follows the content, with room for the toolbar."
+      ],
+      "employee": {
+        "title": "Temp Check first and a lower footer",
+        "changes": [
+          "Find Temp Check and Daily Quiz at the top of Home.",
+          "The version footer sits lower on short pages and stays clear of the bottom navigation."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-faster-consistent-dashboard-quizzes",
       "version": "2.46.11",

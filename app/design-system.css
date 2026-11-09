@@ -298,7 +298,8 @@ button { touch-action: manipulation; }
   .topbar-actions { padding-top: 0; }
   .dashboard-content { padding: 4px 16px 20px; }
   .dashboard-content > * { min-width: 0; }
-  .dashboard-main > .dashboard-version-footer { padding-inline: 16px; padding-bottom: 16px; }
+  /* The signed-in main already reserves the toolbar and bottom safe area. */
+  .dashboard-refresh-body > .dashboard-version-footer { padding-inline: 16px; padding-bottom: 0; }
   .mobile-toolbar { bottom: calc(12px + env(safe-area-inset-bottom)); left: 16px; right: 16px; max-width: 420px; gap: 2px; padding: 5px 6px; min-height: 60px; background: var(--app-chrome); border: 1px solid var(--app-chrome-border); box-shadow: var(--app-chrome-shadow); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); transform: translate3d(0, 0, 0); transition: transform 240ms cubic-bezier(.4,0,.2,1); }
   .mobile-toolbar[data-scroll-hidden="true"] { transform: translate3d(0, calc(100% + 36px + env(safe-area-inset-bottom)), 0); transition-duration: 192ms; pointer-events: none; }
   .mobile-toolbar button { min-height: 48px; font-size: .6875rem; gap: 4px; color: var(--muted-foreground); }
@@ -452,6 +453,7 @@ html[data-sidebar-motion] .sidebar-backdrop {
 [data-slot="button"][data-size^="icon"] { border-radius: 50%; }
 :is(.panel, .schedule-panel, .settings-card, .employee-shortcut, .employee-earnings-card, .engagement-bar, .creative-card, .studio-info-card) { border-radius: var(--app-card-radius); background: var(--card); box-shadow: var(--app-group-shadow); }
 .engagement-bar { border: 0; }
+.employee-home > .engagement-widget { margin-bottom: 0; }
 .employee-section-heading { padding: var(--app-content-inset); gap: 12px; align-items: center; }
 .employee-home-next > .daily-empty { margin: 0; padding: 0 var(--app-content-inset) var(--app-content-inset); }
 .employee-next-action { padding: 0 var(--app-content-inset) var(--app-content-inset); }
