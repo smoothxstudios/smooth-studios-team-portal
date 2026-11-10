@@ -10,5 +10,5 @@ export async function syncGuidelineQuiz(rulebook, ownerPassword) {
   });
   if (!response.ok) throw new Error(`Published studio guideline quiz sync failed (${response.status}).`);
   const result = await response.json();
-  process.stdout.write(`Studio guideline quiz: ${result.questions} approved questions synced.\n`);
+  process.stdout.write(`Studio guideline quiz: ${result.questions} approved questions synced (${result.scenarioQuestions ?? 0} practical scenarios).\n`);
 }

@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.49.4",
+  "currentVersion": "2.49.5",
   "releases": [
+    {
+      "id": "2026-11-10-studio-guideline-quiz",
+      "version": "2.49.5",
+      "date": "2026-11-10",
+      "category": "Team",
+      "title": "Practical studio questions",
+      "changes": [
+        "Daily Quiz uses published studio guidelines in every round, with practical scenarios and relevant answer choices.",
+        "Questions rotate through studio topics such as rentals, equipment, cleanup, safety, and closing. Unfinished answers and private access details are excluded.",
+        "Unanswered older trivia is replaced when the quiz opens. Completed answers, points, and question timing stay intact."
+      ],
+      "employee": {
+        "title": "Practical studio questions",
+        "changes": [
+          "Daily Quiz now focuses on real studio situations based on the published guidelines.",
+          "Your completed answers and points are kept, with the same three-question daily limit and time between questions."
+        ]
+      }
+    },
     {
       "id": "2026-11-10-payment-alerts",
       "version": "2.49.4",

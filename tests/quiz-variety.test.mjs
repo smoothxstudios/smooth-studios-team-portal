@@ -11,15 +11,14 @@ test('only saved guidelines supply answers, with private details excluded',()=>{
  assert.equal(bank.length,1);assert.equal(bank[0].correct,approved.body);assert.equal(bank[0].prompt,template.prompt);
  assert.equal(bank[0].choices.length,3);
  const question=employeeQuestionCandidates('2026-11-10','easy','jordyn',bank)[0];
- assert.equal(quizTopic(question.category),'Studio guidelines');assert.equal(publicQuestion(question).correctOptionId,undefined);
+ assert.match(quizTopic(question.category),/^Studio guidelines/);assert.equal(publicQuestion(question).correctOptionId,undefined);
  assert.equal(publicQuestion(question).explanation,undefined);
  assert.equal(question.options.find(o=>o.id===question.correctOptionId).text,approved.body);
 });
-test('custom guidelines use published instructions and exclude removed entries',()=>{
+test('unreviewed custom and unfinished guidelines cannot produce misleading quiz answers',()=>{
  const entries=['A','B','C'].map((title,i)=>({id:title,title,body:`Approved synthetic instruction ${i}.`}));
- const bank=guidelineQuizBank({entries});assert.equal(bank.length,3);
- for(const q of bank)assert.ok(entries.some(e=>e.body===q.correct));
- assert.equal(guidelineQuizBank({entries:entries.slice(1)}).length,0); // Need enough distinct choices.
+ assert.deepEqual(guidelineQuizBank({entries}),[]);
+ for(const body of ['Answer later.', 'TBD', 'Not provided', 'Pending']) assert.deepEqual(guidelineQuizBank({entries:[{...approved,body}]}),[]);
 });
 test('the next question favors a different topic and avoids recent prompts',()=>{
  for(const tier of ['easy','medium','hard']){
@@ -27,5 +26,18 @@ test('the next question favors a different topic and avoids recent prompts',()=>
   const second=employeeQuestionCandidates('2026-11-10',tier,'jordyn',[],[first])[0];
   assert.notEqual(quizTopic(second.category),quizTopic(first.category));assert.notEqual(second.prompt,first.prompt);
   assert.ok(employeeQuestionCandidates('2026-11-10',tier,'jordyn').some(q=>q.category==='File organization'));
+ }
+});
+
+test('published guidelines power every tier and rotate studio categories',()=>{
+ const entries=GUIDELINE_QUESTIONS.slice(0,25).map(q=>({id:`question-${q.id}`,title:q.title,category:q.category,body:q.choices[0].body}));
+ const bank=guidelineQuizBank({entries});assert.ok(bank.length>15);
+ for(const tier of ['easy','medium','hard']){
+  const candidates=employeeQuestionCandidates('2026-11-10',tier,'jordyn',bank);
+  assert.equal(candidates.length,bank.length);
+  assert.ok(candidates.every(q=>q.id.includes(':guideline-v2-')&&q.category.startsWith('Studio guidelines')));
+  const next=employeeQuestionCandidates('2026-11-10',tier,'jordyn',bank,[candidates[0]])[0];
+  assert.notEqual(quizTopic(next.category),quizTopic(candidates[0].category));
+  assert.notEqual(next.prompt,candidates[0].prompt);
  }
 });

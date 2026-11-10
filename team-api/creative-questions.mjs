@@ -164,7 +164,7 @@ export function dailyQuestion(day, tier = "medium", employeeId = "", offset = 0,
 // first unused prompt atomically, so overlapping logins cannot receive a duplicate.
 export function quizTopic(category) {
   if (/exposure|camera basics|camera equipment|portrait planning|^video$|video \+/i.test(category)) return "Camera settings";
-  if (/^Studio guidelines/.test(category)) return "Studio guidelines";
+  if (/^Studio guidelines/.test(category)) return category;
   if (/audio/i.test(category)) return "Audio";
   if (/lighting/i.test(category)) return "Lighting";
   if (/color/i.test(category)) return "Color";
@@ -172,7 +172,9 @@ export function quizTopic(category) {
 }
 export function employeeQuestionCandidates(day, tier, employeeId, guidelines = [], previous = []) {
   if (!employeeId || !QUESTION_BANKS[tier]) throw new Error("Choose an employee and valid question tier.");
-  const bank = [...(tier === "easy" ? guidelines : []), ...QUESTION_BANKS[tier]];
+  // Published studio rules power every daily round, regardless of points tier.
+  // Keep the starter bank only while no reviewed guideline questions exist.
+  const bank = guidelines.length ? guidelines : QUESTION_BANKS[tier];
   const candidates = bank.map((_, offset) => dailyQuestion(day, tier, employeeId, offset, bank));
   const today = previous.filter(item => item.day === day).map(item => quizTopic(item.category));
   const recentPrompts = new Set(previous.map(item => item.prompt));
@@ -181,7 +183,7 @@ export function employeeQuestionCandidates(day, tier, employeeId, guidelines = [
     const topic = quizTopic(q.category);
     return (today.includes(topic) ? 100 : 0) + (recentPrompts.has(q.prompt) ? 20 : 0)
       + (recentTopics.includes(topic) ? 4 : 0) + (topic === "Camera settings" ? 2 : 0)
-      - (topic === "Studio guidelines" && !today.includes(topic) ? 10 : 0);
+      - (topic.startsWith("Studio guidelines") && !today.includes(topic) ? 10 : 0);
   };
   return candidates.sort((a,b) => priority(a) - priority(b));
 }

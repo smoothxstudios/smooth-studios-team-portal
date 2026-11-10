@@ -54,9 +54,21 @@ async function candidatesFor(db, user, day, tier) {
 export async function offerQuestion(db, user, day, now) {
   const pending = await pendingOffer(db, user, day, now);
   if (pending) {
-    // Only replace an unanswered pre-update offer when its prompt was also issued
-    // to someone else. Unique snapshots and all submitted answers stay untouched.
+    // Reviewed studio snapshots and owner resets survive refresh unchanged.
     const pendingId = JSON.parse(pending.data).id;
+    if (pendingId.includes(":guideline-v2-") || pendingId.includes(":reset:")) return pending;
+    const candidates = await candidatesFor(db, user, day, pending.tier);
+    const studioCandidates = candidates.filter(question => question.id.includes(":guideline-v2-"));
+    if (studioCandidates.length && !pendingId.includes(":guideline-v2-") && !pendingId.includes(":reset:")) {
+      // Upgrade only unanswered legacy trivia. Preserve its slot, points tier,
+      // cooldown and every submitted attempt; stale answers receive a refresh.
+      await db.prepare(`${unusedQuestion}
+        UPDATE team_quiz_offers SET data = (SELECT data FROM candidate), dismissed_at = NULL
+        WHERE user_id = ? AND day = ? AND slot = ? AND data = ? AND EXISTS(SELECT 1 FROM candidate)
+          AND NOT EXISTS(SELECT 1 FROM team_quiz_attempts a WHERE a.user_id = ? AND a.day = ? AND a.tier = ? AND a.reset_at IS NULL)`)
+        .bind(JSON.stringify(studioCandidates), day, day, user, day, pending.slot, pending.data, user, day, pending.tier).run();
+      return pendingOffer(db, user, day, now);
+    }
     if (pendingId.startsWith("v3:") && !pendingId.includes(":reset:")) {
       await db.prepare(`${unusedQuestion}
         UPDATE team_quiz_offers AS o SET data = (SELECT data FROM candidate), dismissed_at = NULL
@@ -67,7 +79,7 @@ export async function offerQuestion(db, user, day, now) {
             AND json_extract(other.data, '$.prompt') = json_extract(o.data, '$.prompt'))
             OR EXISTS (SELECT 1 FROM team_quiz_attempts a WHERE a.day = o.day AND a.user_id != o.user_id
               AND json_extract(a.data, '$.question.prompt') = json_extract(o.data, '$.prompt')))`)
-        .bind(JSON.stringify(await candidatesFor(db, user, day, pending.tier)), day, day,
+        .bind(JSON.stringify(candidates), day, day,
           user, day, pending.slot, pending.data).run();
       return pendingOffer(db, user, day, now);
     }
