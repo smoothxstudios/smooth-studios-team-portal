@@ -4,6 +4,8 @@ import { fixture } from './helpers/notification-fixture.mjs';
 import { paymentAccounts } from '../team-api/payroll-payments.mjs';
 import { rentalDeductionDateEligible } from '../lib/team-rental-policy.mjs';
 import { buildDashboardPayloads } from '../scripts/lib/dashboard-data.mjs';
+import { calendarRecord } from '../lib/sync-records.mjs';
+import { verifyRentalDeductions } from '../scripts/lib/verify-rental-deductions.mjs';
 
 const now = Date.parse('2026-11-10T18:00:00Z');
 const booking = (id, start, overrides = {}) => ({
@@ -14,6 +16,19 @@ const booking = (id, start, overrides = {}) => ({
 function put(f, a) {
   f.DB.sqlite.prepare('INSERT OR REPLACE INTO team_appointments(generation,id,data) VALUES (?,?,?)').run('', a.id, JSON.stringify(a));
 }
+
+test('deployment verification accepts normalized Calendar timestamps and catches wrong amounts or missing deductions', async () => {
+  const f = await fixture();
+  const source = booking('offset', '2026-11-07T12:00:00-05:00');
+  put(f, calendarRecord(source));
+  const state = await paymentAccounts(f.DB, 'rayne', now);
+  assert.notEqual(state.rentalCharges[0].startAt, source.start);
+  assert.doesNotThrow(() => verifyRentalDeductions(state, [source], new Date(now).toISOString()));
+  assert.throws(() => verifyRentalDeductions({ ...state, rentalCharges: [] }, [source], new Date(now).toISOString()), /missing its deduction/);
+  assert.throws(() => verifyRentalDeductions({ ...state, rentalCharges: [{ ...state.rentalCharges[0], amountCents: 2500 }] }, [source], new Date(now).toISOString()), /full booking price/);
+  assert.throws(() => verifyRentalDeductions({ ...state, rentalCharges: [...state.rentalCharges, ...state.rentalCharges] }, [source], new Date(now).toISOString()), /counted twice/);
+  f.close();
+});
 
 test('cutoff is inclusive September 25 in studio time, using the start of overnight rentals', async () => {
   const f = await fixture();
