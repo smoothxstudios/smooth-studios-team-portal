@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.49.3",
+  "currentVersion": "2.49.4",
   "releases": [
+    {
+      "id": "2026-11-10-payment-alerts",
+      "version": "2.49.4",
+      "date": "2026-11-10",
+      "category": "Payments",
+      "title": "Automatic payment alerts",
+      "changes": [
+        "Recording a payment sends the employee “You just got paid 💸” with a link to Earnings.",
+        "The same message is used for recorded training, onboarding, and creative-work payments.",
+        "Retried saves do not duplicate alerts. Applying rental deductions alone does not send a paid alert."
+      ],
+      "employee": {
+        "title": "You just got paid 💸",
+        "changes": [
+          "A payment recorded by Smooth appears in Alerts and on devices with notifications enabled. Tap the alert to open Earnings."
+        ]
+      }
+    },
     {
       "id": "2026-11-10-rental-deductions",
       "version": "2.49.3",

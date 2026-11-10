@@ -1,5 +1,12 @@
 import { TEAM, STUDIO_ZONE, localInstant } from "../lib/team-schedule.mjs";
 
+// Keep payment alerts consistent without putting amounts or private notes on
+// the lock screen. Only call after recording an actual payment, not an offset.
+export function paymentNotification(personId, targetId) {
+  return { title: "You just got paid 💸", body: "Smooth recorded your payment. View it in Earnings.",
+    target: "payouts", ...(targetId ? { targetId } : {}), personId };
+}
+
 const day = new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_ZONE, weekday: "short", month: "short", day: "numeric" });
 const clock = new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_ZONE, hour: "numeric", minute: "2-digit" });
 const zone = new Intl.DateTimeFormat("en-US", { timeZone: STUDIO_ZONE, timeZoneName: "short" });

@@ -1,6 +1,8 @@
 import { TEAM, studioLocal, localInstant } from '../lib/team-schedule.mjs';
 import { appointmentCancelled } from '../lib/appointment-lifecycle.mjs';
 import { rentalDeductionDateEligible } from '../lib/team-rental-policy.mjs';
+import { paymentNotification } from './notification-content.mjs';
+import { flushAlerts } from './push.mjs';
 
 export class PayrollAccountConflict extends Error {}
 const sum = (items, key) => items.reduce((total, item) => total + Number(item[key] ?? 0), 0);
@@ -94,7 +96,7 @@ export async function paymentPreview(db, employeeId, through, fail) {
     reviewCount:state.accounts[0].reviewCount};
 }
 
-export async function paymentRoute({request,db,user,body,fail}) {
+export async function paymentRoute({request,db,user,env,ctx,body,fail}) {
   const url=new URL(request.url);
   if(user!=='owner') fail(403,'Only Smooth can record team payments.');
   if(request.method==='GET'&&/^\/payroll\/payments\/[a-f0-9-]{36}$/.test(url.pathname)) { const row=await db.prepare('SELECT data FROM payroll_receipts WHERE id=?').bind(url.pathname.split('/').pop()).first(); return {receipt:row?JSON.parse(row.data):null}; }
@@ -150,7 +152,13 @@ export async function paymentRoute({request,db,user,body,fail}) {
     SELECT ?,json_extract(value,'$.rentalId'),json_extract(value,'$.amountCents') FROM json_each(?) WHERE ${guard}
     ON CONFLICT(employee_id,rental_id) DO UPDATE SET amount_cents=amount_cents+excluded.amount_cents`)
     .bind(input.employeeId,JSON.stringify(deductions),input.id,mutation));
+  // Receipt and alert commit together. Duplicate or stale saves cannot create
+  // a second alert, and applying deductions alone is not a cash payment.
+  if(receipt.cashCents>0)statements.push(db.prepare(`INSERT INTO team_notification_events(id,user_id,kind,payload,due_at)
+    SELECT ?,?,'notice',?,? WHERE ${guard}`)
+    .bind(mutation,receipt.employeeId,JSON.stringify(paymentNotification(receipt.employeeId)),Date.now(),input.id,mutation));
   const result=await db.batch(statements);
   if(!result[0].meta.changes){const saved=await existing();if(saved)return saved;fail(409,'Pay changed while saving. Review the updated balance.');}
+  if(receipt.cashCents>0)ctx.waitUntil(flushAlerts(env));
   return {receipt,duplicate:false};
 }

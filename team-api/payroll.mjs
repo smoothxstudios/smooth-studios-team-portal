@@ -78,10 +78,10 @@ async function payrollState(db, user) {
   };
 }
 
-export async function payrollRoute({ request, db, user, env, body, fail }) {
+export async function payrollRoute({ request, db, user, env, ctx, body, fail }) {
   const path = new URL(request.url).pathname;
   const isSync = user === 'sync';
-  if (path.startsWith('/payroll/payments')) { await reconcileAdvances(db); return paymentRoute({request, db, user, body, fail}); }
+  if (path.startsWith('/payroll/payments')) { await reconcileAdvances(db); return paymentRoute({request, db, user, env, ctx, body, fail}); }
   if (path === '/payroll/reviews') {
     if (user !== 'owner') fail(403, 'Only Smooth can review advance discrepancies.');
     if (request.method !== 'GET') fail(405, 'Advance reviews are read-only.');

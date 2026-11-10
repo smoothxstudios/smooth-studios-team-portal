@@ -2,7 +2,7 @@ import { createCreativeOffers } from "./creative-offers.mjs";
 import { TEAM, localInstant, studioLocal } from "../lib/team-schedule.mjs";
 import { reconcileAdvances, creativeAdvanceAmounts, withCreativeAdvance } from "./payroll.mjs";
 import { creativeOwed } from "../lib/creative-work.mjs";
-import { notificationText } from "./notification-content.mjs";
+import { notificationText, paymentNotification } from "./notification-content.mjs";
 import { flushAlerts } from "./push.mjs";
 import { manualPayRoute } from "./manual-pay.mjs";
 import { payWorkTypesRoute } from "./pay-work-types.mjs";
@@ -135,8 +135,8 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
       .bind(item.id, item.employeeId, item.version, mutation, JSON.stringify(item));
   const name = TEAM.find(p => p.id === item.employeeId).name;
   const recipient = isOwner ? item.employeeId : "owner";
-  const title = isOwner ? ({ assigned: "New creative assignment", updated: "Creative assignment updated", approved: "Creative work approved", cancelled: "Creative assignment cancelled", "changes requested": "Changes requested", "payment recorded": "Creative payout recorded" }[event]) : `${name} ${event} creative work`;
-  const notification = JSON.stringify({ title: item.entryType === "manual" ? (event === "pay edited" ? "Pay updated" : "Payment recorded") : title, body: `${notificationText(item.title, 160)}. ${item.entryType === "manual" ? "View the payment in Earnings." : "Open Creative Work to see the details."}`, target: item.entryType === "manual" ? "payouts" : "creative", targetId: item.id, personId: item.employeeId });
+  const title = isOwner ? ({ assigned: "New creative assignment", updated: "Creative assignment updated", approved: "Creative work approved", cancelled: "Creative assignment cancelled", "changes requested": "Changes requested" }[event]) : `${name} ${event} creative work`;
+  const notification = JSON.stringify(event === "payment recorded" ? paymentNotification(item.employeeId, item.id) : { title: item.entryType === "manual" ? "Pay updated" : title, body: `${notificationText(item.title, 160)}. ${item.entryType === "manual" ? "View the payment in Earnings." : "Open Creative Work to see the details."}`, target: item.entryType === "manual" ? "payouts" : "creative", targetId: item.id, personId: item.employeeId });
   const result = await db.batch([write,
     db.prepare(`INSERT INTO team_notification_events (id, user_id, kind, payload, due_at)
       SELECT ?, ?, 'creative', ?, ? WHERE EXISTS (SELECT 1 FROM team_creative_assignments WHERE id = ? AND mutation = ?)`)

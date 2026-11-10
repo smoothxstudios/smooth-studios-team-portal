@@ -15,6 +15,7 @@ test('manual edits preserve payments, reject stale writes and stay owner-only', 
  assert.deepEqual(saved.data.assignment.payments,original.payments);assert.equal(creativeOwed(saved.data.assignment),1000);
  assert.equal(saved.data.assignment.title,'Training correction');assert.equal(saved.data.assignment.history.at(-1).event,'pay edited');
  assert.equal((await f.call('owner',`/creative-work/${original.id}`,change,'PATCH')).status,409);
+ assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_inbox WHERE title='You just got paid 💸'").get().n,1);
 });
 const act = (f, user, item, action, extra = {}) => f.call(user, `/creative-work/${item.id}`, {action, version: item.version, ...extra}, 'PATCH');
 test('only the owner can add pay; each employee can read only their own entries', async t => {
@@ -45,6 +46,7 @@ test('manual earnings use the work date and preserve separate actual recording a
   assert.notEqual(paid.payments[0].recordedAt, paid.payments[0].paidAt);
   const alerts = f.DB.sqlite.prepare('SELECT payload FROM team_notification_events').all().map(row => JSON.parse(row.payload));
   assert.ok(alerts.every(a => a.target === 'payouts' && a.personId === 'jordyn'));
+  assert.deepEqual(alerts.map(a=>a.title),['Pay added','You just got paid 💸']);
 });
 test('empty, inactive, invalid and future fields cannot create a pay entry', async t => {
   const f = await setup(t);
@@ -55,13 +57,14 @@ test('empty, inactive, invalid and future fields cannot create a pay entry', asy
   assert.equal((await f.call('owner', '/creative-work')).data.assignments.length, 0);
 });
 test('retries and simultaneous saves record one earning and alert; changed retries require review', async t => {
-  const f = await setup(t), data = input({category: 'other', title: 'Synthetic studio setup'});
+  const f = await setup(t), data = input({category: 'other', title: 'Synthetic studio setup',paymentStatus:'paid',paidDate:'2025-09-13'});
   const results = await Promise.all([add(f, data), add(f, data)]);
   assert.ok(results.every(r => r.status === 200));
   assert.equal((await add(f, data)).data.duplicate, true);
   assert.equal((await add(f, {...data, amountCents: 9000})).status, 409);
   assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_creative_assignments').get().n, 1);
   assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_notification_events').get().n, 1);
+  assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_inbox WHERE title='You just got paid 💸' AND user_id='jordyn'").get().n,1);
 });
 test('manual pay uses existing partial-payment, ownership, stale-version and overpayment safeguards', async t => {
   const f = await setup(t); let item = (await add(f, input())).data.assignment;
@@ -73,6 +76,7 @@ test('manual pay uses existing partial-payment, ownership, stale-version and ove
   assert.equal((await act(f, 'owner', old, 'pay', {amountCents: 3000})).status, 409);
   item = (await act(f, 'owner', item, 'pay', {amountCents: 5000})).data.assignment;
   assert.equal(creativeOwed(item), 0); assert.equal(creativePaid(item), 8000);
+  assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_inbox WHERE title='You just got paid 💸' AND user_id='jordyn'").get().n,2);
 });
 test('Akiva advance credit affects only Akiva unpaid earnings, never another person or cash already paid', async t => {
   const f = await setup(t);

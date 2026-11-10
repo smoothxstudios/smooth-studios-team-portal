@@ -121,6 +121,9 @@ test("submission, revisions, approval, and partial payouts create a single consi
   assert.equal(creativeOwed(item), 0); assert.equal(item.payments.length, 2);
   assert.deepEqual(creativeEarnings([item]).metrics, { paid: 12500, owed: 0, projected: 0 });
   assert.equal((await act(f, "owner", item, "pay", { amountCents: 1 })).status, 400);
+  const paidAlerts=f.DB.sqlite.prepare("SELECT * FROM team_inbox WHERE title='You just got paid 💸'").all();
+  assert.equal(paidAlerts.length,2);
+  assert.ok(paidAlerts.every(alert=>alert.user_id==='jordyn'&&alert.target==='payouts'&&alert.target_id===item.id));
   f.close();
 });
 test("concurrent approvals, submissions, and payments reject stale versions", async () => {
@@ -132,6 +135,7 @@ test("concurrent approvals, submissions, and payments reject stale versions", as
   const pay = await Promise.all([act(f, "owner", approved, "pay", { amountCents: 12500 }), act(f, "owner", approved, "pay", { amountCents: 12500 })]);
   assert.deepEqual(pay.map(r => r.status).sort(), [200, 409]);
   assert.equal((await f.call("jordyn", "/creative-work")).data.assignments[0].payments.length, 1);
+  assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) AS n FROM team_inbox WHERE title='You just got paid 💸'").get().n,1);
   f.close();
 });
 test("retries, invalid links, invalid amounts and inactive accounts fail safely", async () => {

@@ -1,6 +1,6 @@
 import { TEAM, localInstant, studioLocal } from "../lib/team-schedule.mjs";
 import { reconcileAdvances, withCreativeAdvance } from "./payroll.mjs";
-import { notificationText } from "./notification-content.mjs";
+import { notificationText, paymentNotification } from "./notification-content.mjs";
 import { flushAlerts } from "./push.mjs";
 import { DEFAULT_PAY_WORK_TYPES } from "../lib/pay-work-types.mjs";
 
@@ -47,7 +47,7 @@ export async function manualPayRoute({ request, db, user, env, ctx, body, fail }
     createdAt: now, updatedAt: now, approvedAt: now, submissions: [],
     payments: paidAt ? [{ id: crypto.randomUUID(), amountCents: input.amountCents, method, paidAt, recordedAt: now }] : [],
     history: [{ id: mutation, event: paidAt ? "pay and payment recorded" : "pay added", by: user, at: now }] };
-  const payload = JSON.stringify({ title: paidAt ? "Payment recorded" : "Pay added", body: `${notificationText(title, 160)} · ${input.workDate}. View the amount and payment status in Earnings.`, target: "payouts", targetId: item.id, personId: item.employeeId });
+  const payload = JSON.stringify(paidAt ? paymentNotification(item.employeeId, item.id) : { title: "Pay added", body: `${notificationText(title, 160)} · ${input.workDate}. View the amount and payment status in Earnings.`, target: "payouts", targetId: item.id, personId: item.employeeId });
   const result = await db.batch([
     db.prepare("INSERT OR IGNORE INTO team_creative_assignments (id, employee_id, version, mutation, data) VALUES (?, ?, 1, ?, ?)").bind(item.id, item.employeeId, mutation, JSON.stringify(item)),
     db.prepare(`INSERT INTO team_notification_events (id, user_id, kind, payload, due_at)

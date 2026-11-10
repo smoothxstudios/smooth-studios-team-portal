@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fixture } from './helpers/notification-fixture.mjs';
+import { fixture, device } from './helpers/notification-fixture.mjs';
 import { studioLocal } from '../lib/team-schedule.mjs';
 import { applyRentalAdvances, scopedPayroll } from '../lib/payroll-advances.mjs';
 import { creativeOwed } from '../lib/creative-work.mjs';
@@ -16,6 +16,7 @@ const earning=(id,amount,paid=0,employeeId='rayne')=>({employeeId,rentalId:id,am
 async function manual(f,amount){const r=await f.call('owner','/creative-work/manual-pay',{id:crypto.randomUUID(),employeeId:'rayne',category:'training',workDate:through,amountCents:amount,paymentStatus:'owed',note:''});assert.equal(r.status,200);return r.data.assignment;}
 async function preview(f,id='rayne'){const r=await f.call('owner',`/payroll/payments/preview?employee=${id}&through=${through}`);assert.equal(r.status,200,JSON.stringify(r));return r.data;}
 const input=p=>({id:crypto.randomUUID(),employeeId:p.employeeId,through:p.through,revision:p.revision,reviewKey:p.reviewKey,cashCents:p.cashCents,method:'Synthetic',note:''});
+const paidAlerts=f=>f.DB.sqlite.prepare("SELECT * FROM team_inbox WHERE title='You just got paid 💸'").all();
 function rentalCharge(f,amount,paid=0,id='own-studio'){
   const a={id,title:'Studio A Rental',customer:'Synthetic renter',teamRenterId:'rayne',priceCents:amount,paidOnlineCents:paid,fullyPaid:paid>=amount,start:new Date(Date.parse(past)-3600000).toISOString(),end:past,acceptedEmployeeIds:[]};
   f.DB.sqlite.prepare('INSERT INTO team_appointments(generation,id,data) VALUES (?,?,?)').run('',id,JSON.stringify(a));return a;
@@ -31,6 +32,10 @@ test('one payment settles appointment and added pay, verifies zero, and stale pa
   assert.equal((await f.call('owner','/payroll/payments',{...request,cashCents:999})).status,409);
   assert.equal((await f.call('jordyn','/payroll')).data.accounts[0].payableCents,2000);
   assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM payroll_receipts').get().n,1);
+  assert.equal(paidAlerts(f).length,1);
+  assert.equal(paidAlerts(f)[0].user_id,'rayne');
+  assert.equal(paidAlerts(f)[0].target,'payouts');
+  assert.equal((await f.call('jordyn','/alerts')).data.alerts.length,0);
 });
 test('already-marked rentals stay paid while training is included, and later earnings are not silently covered by a cutoff',async()=>{
   const f=await setup();await sync(f,[earning('already-paid',1500,1500)]);await manual(f,3000);
@@ -42,17 +47,20 @@ test('own rentals deduct full price regardless of online payments, offset cash o
   const f=await setup();await sync(f,[earning('shift',6000)]);rentalCharge(f,10000,2500);
   let p=await preview(f);assert.equal(p.grossCents,6000);assert.equal(p.deductionCents,6000);assert.equal(p.cashCents,0);assert.equal(p.carryForwardCents,4000);
   assert.equal((await f.call('owner','/payroll/payments',input(p))).status,200);
+  assert.equal(paidAlerts(f).length,0);
   const state=(await f.call('rayne','/payroll')).data;assert.equal(state.accounts[0].carryForwardCents,4000);assert.equal(state.rentalCharges[0].appliedCents,6000);
   await manual(f,5000);p=await preview(f);assert.equal(p.deductionCents,4000);assert.equal(p.cashCents,1000);
   assert.equal((await f.call('owner','/payroll/payments',input(p))).status,200);
   assert.equal((await f.call('rayne','/payroll')).data.accounts[0].netCents,0);
   assert.equal((await preview(f)).grossCents,0);
+  assert.equal(paidAlerts(f).length,1);
 });
 test('one person cannot see another account, record payments, or replay a stale review',async()=>{
   const f=await setup();await sync(f,[earning('shift',6000)]);const p=await preview(f);await manual(f,500);
   assert.equal((await f.call('owner','/payroll/payments',input(p))).status,409);
   assert.equal((await f.call('rayne','/payroll/payments',input(p))).status,403);
   assert.equal((await f.call('sync','/payroll/payments',input(p))).status,403);
+  assert.equal(paidAlerts(f).length,0);
   rentalCharge(f,3000);const state=(await f.call('owner','/payroll')).data;
   const scoped=scopedPayroll(state,'jordyn');assert.deepEqual(scoped.rentalCharges,[]);assert.deepEqual(scoped.earnings,[]);assert.deepEqual(scoped.rentalPayments,[]);
   const other=(await f.call('jordyn','/payroll')).data;assert.deepEqual(other.rentalCharges,[]);assert.deepEqual(other.paymentReceipts,[]);
@@ -62,7 +70,29 @@ test('parallel payment submissions cannot pay the same earnings twice',async()=>
   const replies=await Promise.all([f.call('owner','/payroll/payments',request),f.call('owner','/payroll/payments',request)]);
   assert.ok(replies.every(r=>r.status===200||r.status===409),JSON.stringify(replies));
   assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM payroll_receipts').get().n,1);
+  assert.equal(paidAlerts(f).length,1);
   assert.equal((await preview(f)).grossCents,0);
+});
+test('a saved payment immediately pushes the exact message only to its recipient; retries and sync never replay it',async t=>{
+  const f=await fixture();t.after(()=>f.close());
+  const mine=device('payment-recipient'),other=device('payment-other');
+  await f.call('rayne','/push/device',mine);await f.call('jordyn','/push/device',other);
+  const sent=[];
+  t.mock.method(globalThis,'fetch',async(url,options)=>{sent.push({url,payload:mine.decrypt(options.body)});return new Response(null,{status:201});});
+  await sync(f,[earning('already-paid',5000,5000),earning('shift',1500)]);
+  assert.equal(paidAlerts(f).length,0);
+  const request={...input(await preview(f)),note:'Private payout note'};
+  const result=await f.call('owner','/payroll/payments',request);assert.equal(result.status,200,JSON.stringify(result));
+  await Promise.all(f.pending);
+  assert.deepEqual(sent.map(s=>s.url),[mine.endpoint]);
+  assert.equal(sent[0].payload.title,'You just got paid 💸');
+  assert.equal(sent[0].payload.target,'payouts');
+  assert.doesNotMatch(sent[0].payload.body,/Private payout note|1500|\$15/);
+  assert.equal((await f.call('rayne','/alerts')).data.alerts[0].title,'You just got paid 💸');
+  assert.equal((await f.call('owner','/payroll/payments',request)).data.duplicate,true);
+  await sync(f,[earning('already-paid',5000,5000),earning('shift',1500,1500)]);
+  await Promise.all(f.pending);
+  assert.equal(sent.length,1);assert.equal(paidAlerts(f).length,1);
 });
 test('unapproved completed appointments cancel, accepted and team rentals remain valid',()=>{
   const a={id:'x',start:'2026-11-01T04:00:00Z',end:'2026-11-01T07:00:00Z',acceptedEmployeeIds:[]};const now=Date.parse('2026-11-01T08:00Z');
