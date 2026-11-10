@@ -1,6 +1,27 @@
 {
-  "currentVersion": "2.49.2",
+  "currentVersion": "2.49.3",
   "releases": [
+    {
+      "id": "2026-11-10-rental-deductions",
+      "version": "2.49.3",
+      "date": "2026-11-10",
+      "category": "Payments",
+      "title": "Simpler studio rental deductions",
+      "changes": [
+        "Employee studio rentals use the full original booking price as a payroll deduction, regardless of online payments.",
+        "Only rentals starting September 25, 2026 or later qualify. Earlier rentals are excluded and saved payment receipts stay intact.",
+        "Previously applied rental deductions count toward the same booking and cannot be deducted twice.",
+        "A unique exact team name or registered email identifies the renter. Assigned staff are kept separate.",
+        "Rental deductions now opens from one compact row, with just each rental’s name, date, and deduction."
+      ],
+      "employee": {
+        "title": "Simpler rental deductions",
+        "changes": [
+          "Rental deductions opens from one compact row with the rental name, date, and deduction.",
+          "Completed personal studio rentals starting September 25, 2026 or later reduce pay by the full booking price. Earlier rentals are excluded, and payroll deductions already applied are counted once."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-payout-and-schedule-cleanup",
       "version": "2.49.2",

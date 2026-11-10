@@ -1,4 +1,5 @@
 "use client";
+import { RentalDeductions } from "@/components/dashboard/rental-deductions";
 import { PersonAvatar } from "@/components/team-profile";
 import { teamEarnings } from "@/lib/team-summary.mjs";
 import type { CreativeAssignment } from "@/lib/use-creative-work";
@@ -102,7 +103,7 @@ export function PayoutPage({
       <article className="panel payment-account-history"><div className="panel-heading"><h2>Payment history</h2></div>
         {payroll?.paymentReceipts?.length ? payroll.paymentReceipts.map(receipt=><details className="payment-line-items" key={receipt.id}><summary>{isOwner?`${employees.find(p=>p.id===receipt.employeeId)?.name??receipt.employeeId} · `:""}{dollars(receipt.cashCents,true)} · {formatDate(receipt.recordedAt)}</summary><p>Work through {receipt.through} · {receipt.method||"Method not specified"}</p><p>{dollars(receipt.grossCents,true)} earnings settled · {dollars(receipt.deductionCents,true)} rental deductions</p>{receipt.note&&<p>{receipt.note}</p>}<small>Receipt {receipt.id.slice(0,8)}</small></details>) : <p>Payments recorded here will appear with a receipt and the work dates covered. Earlier payments remain included in the totals.</p>}
       </article>
-      {(payroll?.rentalCharges?.length??0)>0 && <article className="panel payment-account-history"><div className="panel-heading"><h2>Team studio rentals</h2></div><p>The unpaid booking price reduces the account balance. Amounts already paid online are excluded.</p>{payroll!.rentalCharges!.map(charge=><div className="payment-charge" key={`${charge.employeeId}:${charge.rentalId}`}><strong>{isOwner?`${employees.find(p=>p.id===charge.employeeId)?.name??charge.employeeId} · `:""}{charge.title}</strong><span>{formatDate(charge.earnedAt)} · {dollars(charge.priceCents,true)} booking · {dollars(charge.paidOnlineCents,true)} already paid</span><span>{dollars(charge.appliedCents,true)} deducted · {dollars(charge.outstandingCents,true)} remaining</span>{charge.needsReview&&<p role="alert" className="schedule-warning">This rental changed after a deduction. Review the saved payment before recording more.</p>}</div>)}</article>}
+      <RentalDeductions charges={payroll?.rentalCharges ?? []} employees={employees} rentals={rentals} isOwner={isOwner} />
     </section>
   );
 }

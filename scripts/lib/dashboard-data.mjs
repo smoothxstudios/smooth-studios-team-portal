@@ -7,10 +7,11 @@ import path from "node:path";
 import { rentalDetails } from "../../lib/rental-details.mjs";
 import { categorizeAppointment } from "../../lib/appointment-categories.mjs";
 import { summarizeStripeSnapshot } from "./stripe-data.mjs";
-import { calculateEmployeePayout, initializePayAdjustments, studioDate } from "./employee-pay.mjs";
+import { calculateEmployeePayout, initializePayAdjustments } from "./employee-pay.mjs";
 import { MAX_GUIDELINES } from "../../lib/studio-guidelines.mjs";
 import { organizeGuideline } from "../../lib/guideline-content.mjs";
 import { CALENDAR_INVITATION_STATUSES } from "../../lib/calendar-invitations.mjs";
+import { rentalDeductionDateEligible } from "../../lib/team-rental-policy.mjs";
 
 const KDF_ITERATIONS = 310_000;
 const RULEBOOK_LIMITS = {
@@ -307,7 +308,13 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
   const assignedEmployees = config.employees.filter(employee => acceptedIds.has(employee.id));
   const title = summaryRentalType(event.summary);
   const category = categorizeAppointment(title);
-  const renterMatches = config.employees.filter(employee => parsed.email && employeeInvitationEmails(employee).includes(normalizedEmail(parsed.email)));
+  const customer = parsed.name ?? summaryCustomer(event.summary);
+  const emailMatches = config.employees.filter(employee => parsed.email && employeeInvitationEmails(employee).includes(normalizedEmail(parsed.email)));
+  // A unique exact booking name also identifies team rentals made with another email.
+  // Never match a name mentioned in the notes, an assigned worker, or a partial name.
+  const nameKey = value => String(value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+  const renterMatches = emailMatches.length ? emailMatches : rentalDeductionDateEligible(start)
+    ? config.employees.filter(employee => nameKey(customer) && nameKey(customer) === nameKey(employee.name)) : [];
   const teamRenterId = /studio.*rental|rental.*studio/i.test(title) && renterMatches.length === 1 ? renterMatches[0].id : undefined;
   const ownerAccepted = (event.attendees ?? []).some(guest => guest.responseStatus === 'accepted' && (guest.organizer === true || (config.owner?.email && normalizedEmail(guest.email) === normalizedEmail(config.owner?.email))));
   const employeePayouts = Object.fromEntries(
@@ -328,7 +335,7 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
     // Room-specific booking names must not lose their form answers just because
     // reporting categories still use the older "Studio Rental" name.
     rentalDetails: /\bstudio\b.*\brental\b|\brental\b.*\bstudio\b/i.test(title) ? rentalDetails(event.description) : "",
-    customer: parsed.name ?? summaryCustomer(event.summary),
+    customer,
     start,
     end,
     priceCents: parsed.priceCents,

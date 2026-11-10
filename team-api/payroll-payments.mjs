@@ -1,5 +1,6 @@
 import { TEAM, studioLocal, localInstant } from '../lib/team-schedule.mjs';
 import { appointmentCancelled } from '../lib/appointment-lifecycle.mjs';
+import { rentalDeductionDateEligible } from '../lib/team-rental-policy.mjs';
 
 export class PayrollAccountConflict extends Error {}
 const sum = (items, key) => items.reduce((total, item) => total + Number(item[key] ?? 0), 0);
@@ -41,17 +42,26 @@ export async function paymentAccounts(db, user, now = Date.now()) {
       ...(source.kind==='rental' ? {customer:appointment?.customer??''} : {}),
       advanceAppliedCents:applied };
   });
-  const charges=appointments.filter(a=>a.teamRenterId && (!employee || a.teamRenterId===employee) &&
+  const charges=appointments.filter(a=>TEAM.some(p=>p.id!=='owner'&&p.id===a.teamRenterId) && (!employee || a.teamRenterId===employee) &&
+    rentalDeductionDateEligible(a.start) &&
     Date.parse(a.end)<=now && !appointmentCancelled(a,assignments,now)).map(a=>{
-    const amountCents=a.fullyPaid ? 0 : Math.max(0,a.priceCents-(a.paidOnlineCents??0));
+    // Payroll uses the original booking price, independently of customer payments.
+    // Saved deductions are credits against that price, never charged a second time.
+    const amountCents=Math.max(0,a.priceCents);
     const appliedCents=consumed.find(c=>c.employee_id===a.teamRenterId&&c.rental_id===a.id)?.amount_cents??0;
-    return {rentalId:a.id,employeeId:a.teamRenterId,title:a.title,earnedAt:a.end,priceCents:a.priceCents,
+    return {rentalId:a.id,employeeId:a.teamRenterId,title:a.title,startAt:a.start,earnedAt:a.end,priceCents:a.priceCents,
       paidOnlineCents:a.paidOnlineCents??0,amountCents,appliedCents,outstandingCents:Math.max(0,amountCents-appliedCents),
       needsReview:appliedCents>amountCents};
   });
   // Removed or reassigned bookings must leave an explicit correction to review.
-  for(const prior of consumed) if(!charges.some(c=>c.rentalId===prior.rental_id&&c.employeeId===prior.employee_id))
-    charges.push({rentalId:prior.rental_id,employeeId:prior.employee_id,title:'Changed team rental',earnedAt:new Date(now).toISOString(),priceCents:0,paidOnlineCents:0,amountCents:0,appliedCents:prior.amount_cents,outstandingCents:0,needsReview:true});
+  for(const prior of consumed) {
+    const booking=appointments.find(a=>a.id===prior.rental_id);
+    // Earlier rentals are outside this policy. Keep their saved receipts intact.
+    if(booking && Number.isFinite(Date.parse(booking.start)) && !rentalDeductionDateEligible(booking.start)) continue;
+    if(!charges.some(c=>c.rentalId===prior.rental_id&&c.employeeId===prior.employee_id))
+      charges.push({rentalId:prior.rental_id,employeeId:prior.employee_id,title:'Changed team rental',earnedAt:new Date(now).toISOString(),priceCents:0,paidOnlineCents:0,amountCents:0,appliedCents:prior.amount_cents,outstandingCents:0,needsReview:true});
+  }
+  charges.sort((a,b)=>Date.parse(a.earnedAt)-Date.parse(b.earnedAt)||a.rentalId.localeCompare(b.rentalId));
   const accounts=TEAM.filter(p=>p.id!=='owner'&&(!employee||p.id===employee)).map(p=>{
     const earned=earnings.filter(e=>e.employeeId===p.id), rentals=charges.filter(c=>c.employeeId===p.id);
     const grossOwedCents=sum(earned,'outstandingCents'), rentalBalanceCents=sum(rentals,'outstandingCents');

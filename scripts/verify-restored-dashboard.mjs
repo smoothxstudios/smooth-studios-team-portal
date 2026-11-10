@@ -7,6 +7,7 @@ import { readTeamSettings, resolveEmployees, teamPasswords } from './lib/team-se
 import { teamToken } from '../lib/team-auth.mjs';
 import { TEAM_API_URL } from '../lib/team-schedule.mjs';
 import { isStudioRentalTitle } from '../lib/appointment-categories.mjs';
+import { rentalDeductionDateEligible } from '../lib/team-rental-policy.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
 const config = JSON.parse(await readFile(new URL('../config/studio.config.json', import.meta.url), 'utf8'));
@@ -15,6 +16,37 @@ const passwords = teamPasswords(config, settings);
 const { profiles } = JSON.parse(await readFile(new URL('../public/data/access.json', import.meta.url), 'utf8'));
 const ownerPayload = decryptPayload(JSON.parse(await readFile(new URL('../public/data/owner.json', import.meta.url), 'utf8')), passwords.owner);
 const expectedRentals = new Map(ownerPayload.rentals.map(rental => [rental.id, rental]));
+// Read-only proof that both the live balance and encrypted snapshot use the new policy.
+const ownerProof = await teamToken(passwords.owner, 'owner');
+const payrollResponse = await fetch(`${TEAM_API_URL}/payroll`, { cache: 'no-store', redirect: 'error',
+  headers: { authorization: `Bearer ${ownerProof}` }, signal: AbortSignal.timeout(20_000) });
+if (!payrollResponse.ok) throw new Error('Could not verify live rental deductions.');
+const livePayroll = await payrollResponse.json();
+for (const payroll of [ownerPayload.payroll, livePayroll]) {
+  if (!Array.isArray(payroll?.rentalCharges) || !Array.isArray(payroll?.accounts)) throw new Error('Rental deduction accounts are missing.');
+  for (const charge of payroll.rentalCharges) {
+    const rental = expectedRentals.get(charge.rentalId);
+    if (charge.needsReview && !charge.startAt) continue; // Saved correction for a removed or reassigned rental.
+    if (!rental || !rentalDeductionDateEligible(rental.start) || charge.startAt !== rental.start ||
+        charge.amountCents !== Math.max(0, rental.priceCents) ||
+        charge.outstandingCents !== Math.max(0, charge.amountCents - charge.appliedCents)) {
+      throw new Error('A team rental deduction does not match its booking price and cutoff.');
+    }
+  }
+  for (const rental of ownerPayload.rentals.filter(r => r.teamRenterId && !r.cancelled &&
+      rentalDeductionDateEligible(r.start) && Date.parse(r.end) <= Date.parse(ownerPayload.generatedAt))) {
+    if (!payroll.rentalCharges.some(c => c.rentalId === rental.id && c.employeeId === rental.teamRenterId)) {
+      throw new Error('An eligible completed team rental is missing its deduction.');
+    }
+  }
+  for (const account of payroll.accounts) {
+    const total = payroll.rentalCharges.filter(c => c.employeeId === account.employeeId).reduce((sum, c) => sum + c.outstandingCents, 0);
+    if (account.rentalBalanceCents !== total || account.payableCents !== Math.max(0, account.grossOwedCents - total)) {
+      throw new Error('A current account does not include its rental deductions.');
+    }
+  }
+}
+console.log('Verified full-price rental deductions, the studio-date cutoff, and current pay balances in live and encrypted accounts.');
 const effectiveConfig = { ...config, employees: resolveEmployees(config, settings, passwords) };
 effectiveConfig.employees = await readRentalPayRates(effectiveConfig, passwords.owner);
 const ratePeople = effectiveConfig.employees;

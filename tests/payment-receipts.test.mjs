@@ -38,12 +38,12 @@ test('already-marked rentals stay paid while training is included, and later ear
   assert.equal((await f.call('owner','/payroll/payments',input(p))).status,200);
   await manual(f,800);assert.equal((await preview(f)).cashCents,800);
 });
-test('own rentals deduct only unpaid price, offset cash once, and preserve a carried balance',async()=>{
+test('own rentals deduct full price regardless of online payments, offset cash once, and preserve a carried balance',async()=>{
   const f=await setup();await sync(f,[earning('shift',6000)]);rentalCharge(f,10000,2500);
-  let p=await preview(f);assert.equal(p.grossCents,6000);assert.equal(p.deductionCents,6000);assert.equal(p.cashCents,0);assert.equal(p.carryForwardCents,1500);
+  let p=await preview(f);assert.equal(p.grossCents,6000);assert.equal(p.deductionCents,6000);assert.equal(p.cashCents,0);assert.equal(p.carryForwardCents,4000);
   assert.equal((await f.call('owner','/payroll/payments',input(p))).status,200);
-  const state=(await f.call('rayne','/payroll')).data;assert.equal(state.accounts[0].carryForwardCents,1500);assert.equal(state.rentalCharges[0].appliedCents,6000);
-  await manual(f,2500);p=await preview(f);assert.equal(p.deductionCents,1500);assert.equal(p.cashCents,1000);
+  const state=(await f.call('rayne','/payroll')).data;assert.equal(state.accounts[0].carryForwardCents,4000);assert.equal(state.rentalCharges[0].appliedCents,6000);
+  await manual(f,5000);p=await preview(f);assert.equal(p.deductionCents,4000);assert.equal(p.cashCents,1000);
   assert.equal((await f.call('owner','/payroll/payments',input(p))).status,200);
   assert.equal((await f.call('rayne','/payroll')).data.accounts[0].netCents,0);
   assert.equal((await preview(f)).grossCents,0);
@@ -81,5 +81,5 @@ test('booking email identifies the renter exactly, hides other payroll, and give
   assert.equal(p.owner.rentals[0].teamRenterId,'rayne');assert.equal(p.owner.rentals[0].cancelled,false);assert.deepEqual(p.owner.rentals[0].employeePayouts,{});
   assert.deepEqual(p.rayne.rentals[0].employeePayouts,{});assert.equal(p.jordyn.rentals.length,0);
   const unknown=buildDashboardPayloads({calendarEvents:[{...event,description:'Name: Rayne\nEmail: unknown@example.invalid\nPrice: $100'}],config,ledger:{employees:{}},overrides:{events:{}},source:'sample'});
-  assert.equal(unknown.owner.rentals[0].teamRenterId,undefined);
+  assert.equal(unknown.owner.rentals[0].teamRenterId,'rayne');
 });

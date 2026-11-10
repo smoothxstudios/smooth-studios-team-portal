@@ -51,3 +51,30 @@
 }
 @media (max-width: 380px) { .team-payout-metrics dd { font-size: 14px; } }
 @media (prefers-reduced-motion: reduce) { .team-payout-adjustment > summary > svg { transition: none; } }
+
+/* Rental history stays out of the way until someone asks for the detail. */
+.panel.rental-deductions { grid-column: 1 / -1; min-width: 0; padding: 0; }
+.rental-deductions > summary { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 16px 24px; cursor: pointer; list-style: none; touch-action: manipulation; }
+.rental-deductions > summary::-webkit-details-marker { display: none; }
+.rental-deductions > summary h2 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -.025em; }
+.rental-deductions-count { color: var(--muted-foreground); font-size: 13px; font-variant-numeric: tabular-nums; }
+.rental-deductions > summary > svg { margin-left: auto; flex-shrink: 0; color: var(--muted-foreground); transition: transform 160ms var(--app-ease); }
+.rental-deductions[open] > summary > svg { transform: rotate(180deg); }
+.rental-deductions > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -4px; border-radius: inherit; }
+.rental-deductions > summary:active { opacity: .75; }
+.rental-deductions-content { padding: 0 24px 8px; }
+.rental-deductions-content > p { margin: 0 0 12px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.rental-deductions-content ul { list-style: none; margin: 0; padding: 0; }
+.rental-deductions-content li { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; gap: 4px 16px; padding: 12px 0; border-top: 1px solid var(--border); }
+.rental-deduction-description { display: grid; gap: 3px; min-width: 0; }
+.rental-deduction-description > strong, .rental-deduction-amount { font-size: 13px; font-weight: 600; line-height: 1.5; }
+.rental-deduction-description > strong { overflow-wrap: anywhere; }
+.rental-deduction-description > span { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.rental-deduction-amount { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rental-deduction-review { grid-column: 1 / -1; margin: 4px 0 0; font-size: 12px; color: var(--muted-foreground); }
+@media (max-width: 640px) {
+  .rental-deductions > summary { min-height: 60px; padding: 14px 16px; }
+  .rental-deductions-content { padding: 0 16px 4px; }
+  .rental-deductions-content li { gap: 4px 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .rental-deductions > summary > svg { transition: none; } }

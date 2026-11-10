@@ -107,7 +107,7 @@ export type PayrollState = {
   accountRevision?: number;
   accounts?: PayrollAccount[];
   earnings?: {employeeId:string;kind:string;sourceId:string;outstandingCents:number}[];
-  rentalCharges?: {employeeId:string;rentalId:string;title:string;earnedAt:string;priceCents:number;paidOnlineCents:number;amountCents:number;appliedCents:number;outstandingCents:number;needsReview:boolean}[];
+  rentalCharges?: {employeeId:string;rentalId:string;title:string;startAt?:string;earnedAt:string;priceCents:number;paidOnlineCents:number;amountCents:number;appliedCents:number;outstandingCents:number;needsReview:boolean}[];
   rentalPayments?: {employeeId:string;rentalId:string;recordedPaidAmountCents:number;rentalDeductionCents:number}[];
   paymentReceipts?: PaymentReceipt[];
   version: 1; syncedAt: string | null; balances: AdvanceBalance[];
