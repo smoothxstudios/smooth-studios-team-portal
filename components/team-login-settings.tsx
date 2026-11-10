@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-controls";
 
 import { useState } from "react";
 import { KeyRound } from "lucide-react";
@@ -30,10 +31,10 @@ export function TeamLoginSettings({ employees, access }: { employees: Employee[]
     <Dialog open={open} onOpenChange={value => { reset(); setOpen(value); }}>
       <DialogContent className="schedule-modal team-login-settings">
         <DialogHeader><DialogTitle>Team logins</DialogTitle><DialogDescription>Choose a person to view or copy their existing login. Share it privately with that person.</DialogDescription></DialogHeader>
-        <label>Person<select value={personId} onChange={event => { reset(); setPersonId(event.target.value); }}>
+        <label>Person<AppSelect value={personId} onValueChange={value => { reset(); setPersonId(value); }}>
           <option value="">Choose a person</option>
           {people.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
-        </select></label>
+        </AppSelect></label>
         {!people.length && <p>No activated team logins are available. Refresh the dashboard after account setup finishes.</p>}
         {person && <>
           <p>Account: <strong>{person.name}</strong></p>

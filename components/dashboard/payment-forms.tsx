@@ -1,6 +1,6 @@
 "use client";
 
-import { AppPicker } from "@/components/ui/app-controls";
+import { AppSelect, AppPicker } from "@/components/ui/app-controls";
 import { EmptyState } from "@/components/dashboard/shared";
 import { type OwnerWorkflowRequest } from "@/components/github-workflow-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -201,13 +201,13 @@ export function StripeMatchForm({
           <>
             <div className="workflow-form-field">
               <label htmlFor="stripe-payment">Stripe payment</label>
-              <select id="stripe-payment" onChange={(event) => changePayment(event.target.value)} value={paymentId}>
+              <AppSelect id="stripe-payment" onValueChange={(value) => changePayment(value)} value={paymentId}>
                 {matchablePayments.map((payment) => (
                   <option key={payment.matchKey} value={payment.matchKey}>
                     {formatDate(payment.created, true)} · {payment.customerName || payment.customerEmail || "Unknown customer"} · {dollars(payment.amountCents, true)}
                   </option>
                 ))}
-              </select>
+              </AppSelect>
             </div>
             {selectedPayment && (
               <div className="stripe-payment-summary">

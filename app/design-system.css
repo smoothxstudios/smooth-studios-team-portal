@@ -718,3 +718,38 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
 .assignment-dialog .suggestion-row > button { flex: 0 0 auto; font-size: 13px; }
 .assignment-dialog .schedule-notice { padding: 0; background: none; border: 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.5; }
 .app-task-sheet .schedule-dialog-feedback .schedule-success { padding: 12px 14px; font-size: 13px; line-height: 1.45; }
+
+/* Shared compact dropdowns and device-native date pickers. */
+.app-picker-trigger { min-height: 44px; padding: 10px 12px; border-color: transparent; border-radius: var(--app-field-radius); background: var(--secondary); font-size: 15px; font-weight: 600; box-shadow: none; }
+@media (hover: hover) and (pointer: fine) { .app-picker-trigger:not(:disabled):hover { background: color-mix(in srgb, var(--secondary) 85%, var(--foreground) 5%); } }
+.app-picker-trigger:active:not(:disabled) { opacity: .8; }
+.app-date-control { position: relative; display: inline-flex; align-items: center; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; border: 1px solid transparent; border-radius: var(--app-field-radius); background: var(--secondary); color: var(--foreground); }
+.app-date-control > input[data-slot="input"] { position: relative; z-index: 1; box-sizing: border-box; display: block; width: 100%; min-width: 0; max-width: 100%; height: 44px; padding: 10px 38px 10px 12px; border: 0; border-radius: inherit; background: transparent; color: inherit; box-shadow: none; font-size: 16px; font-weight: 500; cursor: pointer; }
+.app-date-control > svg { position: absolute; right: 12px; color: var(--muted-foreground); pointer-events: none; }
+.app-date-control:focus-within { outline: 2px solid var(--primary); outline-offset: 3px; }
+.app-date-control > input[data-slot="input"]:focus-visible { outline: none; box-shadow: none; }
+.app-date-control[data-disabled] { opacity: .5; }
+.app-date-control input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
+.app-date-control input::-webkit-date-and-time-value { overflow: hidden; text-overflow: ellipsis; }
+.schedule-filter > .app-picker-trigger, .engagement-filters > .app-picker-trigger, .employee-earnings-heading > .app-picker-trigger { width: auto; min-width: 140px; }
+.schedule-filter > .app-picker-trigger { min-width: 180px; }
+.creative-filters > .app-picker-trigger { flex: 0 1 220px; }
+.agenda-person-filter > .app-picker-trigger { width: 100%; }
+.agenda-date-picker > .app-date-control { width: 180px; }
+.login-account-picker { margin-bottom: 20px; }
+.login-account-picker > .app-picker-trigger { min-height: 50px; }
+.availability-date-controls { display: grid; grid-template-columns: 44px minmax(140px,180px) 44px auto; align-items: center; gap: 6px; width: max-content; max-width: 100%; margin: 12px 0 8px; }
+.availability-date-controls > [data-slot="button"] { min-height: 44px; height: 44px; }
+.availability-date-controls > [data-size="icon"] { width: 44px; }
+@media (max-width: 640px) {
+ .schedule-filter > .app-picker-trigger { flex: 1; min-width: 0; }
+ .creative-filters > label:not(.creative-search), .creative-filters > .app-picker-trigger { flex: 1 1 140px; min-width: 0; }
+ .availability-date-controls { grid-template-columns: 40px minmax(0,1fr) 40px auto; gap: 4px; width: 100%; }
+ .availability-date-controls > [data-slot="button"] { min-width: 0; padding-inline: 8px; font-size: 13px; }
+ .availability-date-controls > [data-size="icon"] { width: 40px; }
+ .availability-date-controls .app-date-control > input[data-slot="input"] { padding: 8px; font-size: 14px; text-align: center; }
+ .availability-date-controls .app-date-control > svg { display: none; }
+ .agenda-date-picker > .app-date-control { flex: 0 1 180px; }
+}
+@media (prefers-reduced-motion: reduce) { .app-picker-trigger { transition: none; } }
+@media (prefers-contrast: more) { .app-picker-trigger, .app-date-control { border-color: var(--muted-foreground); } }

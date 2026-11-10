@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-controls";
 import { AppointmentDetail } from "@/components/appointment-detail";
 import { OwnerDailyActions } from "@/components/dashboard/daily-actions";
 import { PersonLabel } from "@/components/dashboard/person-label";
@@ -90,7 +91,7 @@ export function TeamSchedulingPage({ userId, isOwner, token, onSetup, calendarSy
       <div className="schedule-toolbar"><div className="schedule-actions">
         <Button onClick={onAvailability ?? (() => openBlockTime())} variant="outline"><CalendarDays size={16} />Availability</Button>
         {isOwner && <Button onClick={() => openAssignment()} variant="outline"><Plus size={16} />Assign work</Button>}
-      </div><label className="schedule-filter">{isOwner ? "View team member" : "Your schedule"}{isOwner ? <select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">Everyone</option>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select> : <Person id={userId} />}</label></div>
+      </div><label className="schedule-filter">{isOwner ? "View team member" : "Your schedule"}{isOwner ? <AppSelect value={filter} onValueChange={value => setFilter(value)}><option value="all">Everyone</option>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect> : <Person id={userId} />}</label></div>
       <div className="schedule-notice"><ShieldCheck size={18} /><p>Calendar and payment syncing is scheduled every 5 minutes; portal responses update immediately. {isOwner ? "Check recorded commitments before assigning work. Preferred days express interest; blocked time and existing work take priority. Employees confirm by accepting." : "A pending offer is confirmed when you select Accept."}</p></div>
 
       <article className="schedule-panel"><div className="schedule-row schedule-section-heading"><div><h3><CalendarDays size={20} />Week at a glance</h3><p>{date(localInstant(`${week}T12:00`))}–{date(localInstant(`${days[6]}T12:00`))} · {schedule.syncedAt ? `Calendar synced ${date(schedule.syncedAt)} at ${time(schedule.syncedAt)}` : "Waiting for Calendar"}</p></div><div className="schedule-actions">

@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-controls";
 
 import { Button } from "@/components/ui/button";
 import { DialogContent,DialogHeader,DialogTitle } from "@/components/ui/dialog";
@@ -38,7 +39,7 @@ export default function ReleaseHistoryDialog({ viewer }: { viewer: "owner" | "em
         {viewer === "owner" && <div className="dashboard-release-owner-tools"><span>{previewEmployee ? "Previewing employee updates" : "Full owner history"}</span><Button type="button" size="sm" variant="outline" onClick={() => { setPreviewEmployee(value => !value); setCategory("all"); setQuery(""); }}>{previewEmployee ? "Back to full history" : "Preview employee updates"}</Button></div>}
         <div className="dashboard-release-filters">
           <label className="dashboard-release-search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search update history</span><Input value={query} onChange={event => setQuery(event.target.value)} placeholder={isOwnerView ? "Search all updates" : "Search updates, e.g. schedule"} /></label>
-          <label><span className="sr-only">Filter update topic</span><select value={category} onChange={event => setCategory(event.target.value)}><option value="all">All topics</option>{categories.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+          <label><span className="sr-only">Filter update topic</span><AppSelect value={category} onValueChange={value => setCategory(value)}><option value="all">All topics</option>{categories.map(value => <option key={value} value={value}>{value}</option>)}</AppSelect></label>
         </div>
         <p className="dashboard-release-count" role="status">{filtered ? `${days.length} day${days.length === 1 ? "" : "s"} found` : `Updates from ${days.length} day${days.length === 1 ? "" : "s"}`}</p>
         <div className="dashboard-release-list">

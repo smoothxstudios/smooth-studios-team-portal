@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-controls";
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -56,9 +57,9 @@ export function TeamAccountSetup({ open, onOpenChange, employees, busy, enabled,
       {rows.map(row => <fieldset className="team-account-fields" key={row.id} disabled={busy}><legend>{row.name}</legend>
         <label>Email addresses<input type="email" multiple autoComplete="off" required aria-describedby={`emails-help-${row.id}`} value={row.email} onChange={event => change(row.id, { email: event.target.value })} /></label>
         <p className="schedule-small" id={`emails-help-${row.id}`}>Separate addresses with commas. The first is the default for invitations; all addresses match this person’s Calendar assignments.</p>
-        <div className="schedule-form-pair"><label>Pay setup<select value={row.payType} onChange={event => change(row.id, { payType: event.target.value as Row["payType"] })}>
+        <div className="schedule-form-pair"><label>Pay setup<AppSelect value={row.payType} onValueChange={value => change(row.id, { payType: value as Row["payType"] })}>
           <option value="pending">Set pay rate later</option><option value="hourly">Hourly · studio rentals</option><option value="commission">Percentage of appointment price</option>
-        </select></label>{row.payType !== "pending" && <label>{row.payType === "hourly" ? "Dollars per rental hour" : "Percentage"}<input type="number" min="0.01" max={row.payType === "commission" ? "100" : "1000"} step="0.01" inputMode="decimal" required value={row.rate} onChange={event => change(row.id, { rate: event.target.value })} /></label>}</div>
+        </AppSelect></label>{row.payType !== "pending" && <label>{row.payType === "hourly" ? "Dollars per rental hour" : "Percentage"}<input type="number" min="0.01" max={row.payType === "commission" ? "100" : "1000"} step="0.01" inputMode="decimal" required value={row.rate} onChange={event => change(row.id, { rate: event.target.value })} /></label>}</div>
       </fieldset>)}
       {rows.some(row => row.payType === "pending") && <p className="schedule-small">Accounts with no rate can use scheduling and Studio Guidelines. Their earnings remain uncalculated until a rate is set.</p>}
       {!enabled && <p role="alert">Owner workflow access must be available to activate accounts.</p>}

@@ -2,7 +2,7 @@
 import { PersonAvatar } from "@/components/team-profile";
 import { AvailabilityOverview } from "@/components/availability-overview";
 import { MoreOptions } from "@/components/dashboard/more-options";
-import { ConfirmationRow } from "@/components/ui/app-controls";
+import { AppSelect, ConfirmationRow } from "@/components/ui/app-controls";
 
 import { Button } from "@/components/ui/button";
 import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";
@@ -60,7 +60,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
   return <>
     <section className={`availability-panel${isOwner ? " schedule-panel is-owner" : " is-self"}`} aria-label={isOwner ? "Team availability" : "Your availability"}>
     <div className="schedule-toolbar availability-toolbar" hidden={!isOwner}>
-      {isOwner && <label className="schedule-filter">Team member<select value={filter} onChange={e => selectPerson(e.target.value)}><option value="all">Everyone</option>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
+      {isOwner && <label className="schedule-filter">Team member<AppSelect value={filter} onValueChange={value => selectPerson(value)}><option value="all">Everyone</option>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label>}
     </div>
     {isOwner && <AvailabilityOverview schedule={schedule} filter={filter} />}
     <details className="availability-editor" open={!isOwner || filter !== "all"}><summary hidden={!isOwner}>Edit availability</summary>
@@ -102,7 +102,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
           if (await mutate(form.id ? `/work-preferences/${form.id}` : "/work-preferences", { userId: form.userId, startLocal, endLocal, allDay: form.allDay, note: form.note, repeatUntil: form.weekly ? form.repeatUntil : null }, form.id ? "PATCH" : "POST")) { if (isOwner) { if (filter !== "all") setFilter(form.userId); setExpandedPerson(form.userId); setShowAllPreferences(false); setShowAllBlocks(false); } setOpen(false); }
         } catch (caught) { setFormError(caught instanceof Error ? caught.message : "Check the selected date and hours."); }
       }}>
-        <div className="app-sheet-scroll">{isOwner && <label>Team member<select aria-label="Team member" required disabled={Boolean(form.id)} value={form.userId} onChange={e => setForm({ ...form, userId: e.target.value })}><option value="" disabled>Choose a person</option>{TEAM.filter(p => p.id !== "owner").map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
+        <div className="app-sheet-scroll">{isOwner && <label>Team member<AppSelect aria-label="Team member" required disabled={Boolean(form.id)} value={form.userId} onValueChange={value => setForm({ ...form, userId: value })}><option value="" disabled>Choose a person</option>{TEAM.filter(p => p.id !== "owner").map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label>}
         <label>Day<Input required type="date" value={form.day} onChange={e => setForm({ ...form, day: e.target.value })} /></label>
         <ConfirmationRow checked={form.allDay} disabled={busy} onCheckedChange={allDay => setForm({ ...form, allDay })}>Full day</ConfirmationRow>
         {!form.allDay && <><div className="schedule-form-pair"><label>From<Input required type="time" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} /></label><label>Until<Input required type="time" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} /></label></div>{form.endTime < form.startTime && <p className="schedule-small">Ends the following day.</p>}</>}

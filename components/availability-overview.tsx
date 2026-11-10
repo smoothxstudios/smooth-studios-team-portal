@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { TEAM, studioLocal, localInstant, addLocalDays, blockOccurrences, overlaps } from "@/lib/team-schedule.mjs";
 import type { TeamSchedule } from "@/lib/team-api";
+import { Input } from "@/components/ui/input";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 const time = (s:string) => new Date(s).toLocaleTimeString("en-US", {timeZone:"America/New_York",hour:"numeric",minute:"2-digit"});
 export function AvailabilityOverview({schedule,filter}:{schedule:TeamSchedule;filter:string}) {
@@ -9,7 +11,7 @@ export function AvailabilityOverview({schedule,filter}:{schedule:TeamSchedule;fi
   let start:string,end:string;
   try {start=localInstant(`${day}T00:00`);end=localInstant(addLocalDays(`${day}T00:00`,1));} catch {return null;}
   const span=(p:{start:string;end:string})=>`${time(Date.parse(p.start)<Date.parse(start)?start:p.start)}–${Date.parse(p.end)>=Date.parse(end)?"midnight":time(p.end)}`;
-  return <section className="availability-overview"><h2>Availability at a glance</h2><div className="schedule-actions"><Button variant="outline" onClick={()=>setDay(addLocalDays(`${day}T00:00`,-1).slice(0,10))}>Previous day</Button><label>Day<input aria-label="Availability day" type="date" value={day} onChange={e=>{if(e.target.value)setDay(e.target.value);}} /></label><Button variant="outline" onClick={()=>setDay(addLocalDays(`${day}T00:00`,1).slice(0,10))}>Next day</Button><Button variant="ghost" onClick={()=>setDay(studioLocal(Date.now()).slice(0,10))}>Today</Button></div>
+  return <section className="availability-overview"><h2>Availability at a glance</h2><div className="availability-date-controls"><Button variant="outline" size="icon" aria-label="Previous day" onClick={()=>setDay(addLocalDays(`${day}T00:00`,-1).slice(0,10))}><ChevronLeft size={18} /></Button><Input aria-label="Availability day" type="date" value={day} onChange={e=>{if(e.target.value)setDay(e.target.value);}} /><Button variant="outline" size="icon" aria-label="Next day" onClick={()=>setDay(addLocalDays(`${day}T00:00`,1).slice(0,10))}><ChevronRight size={18} /></Button><Button variant="outline" onClick={()=>setDay(studioLocal(Date.now()).slice(0,10))}>Today</Button></div>
     {TEAM.filter(p=>(filter==="all"||filter===p.id)).map(p=>{
       const preferred=(schedule.workPreferences??[]).filter(x=>x.userId===p.id).flatMap(x=>blockOccurrences(x,start,end));
       const blocks=schedule.blocks.filter(x=>x.userId===p.id).flatMap(x=>blockOccurrences(x,start,end));

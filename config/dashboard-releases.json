@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.49.0",
+  "currentVersion": "2.49.1",
   "releases": [
+    {
+      "id": "2026-11-09-consistent-pickers",
+      "version": "2.49.1",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Consistent dropdowns and date controls",
+      "changes": [
+        "Dropdowns across Availability, Schedule, Settings, Alerts, earnings, and forms now use the same compact menu style.",
+        "Date and time fields use matching controls while keeping the device date picker. Availability has a compact date row with previous, next, and Today controls.",
+        "Menus retain keyboard navigation, disabled choices, and required-field validation."
+      ],
+      "employee": {
+        "title": "Consistent dropdowns and date controls",
+        "changes": [
+          "Dropdowns and date fields now match throughout the app.",
+          "Long options wrap inside the menu, and date fields continue to use your device picker."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-edit-rental-pay-rates",
       "version": "2.49.0",

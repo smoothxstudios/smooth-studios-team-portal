@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-controls";
 
 import { DashboardVersionFooter } from "@/components/dashboard-version-footer";
 import { Logo } from "@/components/dashboard/shared";
@@ -10,12 +11,10 @@ AccessProfile
 import { quickSignInError,quickSignInPassword,quickSignInRecord,rememberedProfile } from "@/lib/quick-sign-in.mjs";
 import {
 ArrowRight,
-ChevronDown,
 Eye,
 EyeOff,
 Fingerprint,
-LockKeyhole,
-Users
+LockKeyhole
 } from "lucide-react";
 import { useEffect,useState } from "react";
 
@@ -80,17 +79,15 @@ export function LoginScreen({ profiles, onUnlock }: { profiles: AccessProfile[];
         </> : <form onSubmit={submit}>
           <input type="hidden" name="username" autoComplete="username" value={selectedId === "owner" ? "smooth" : selectedId} />
           <label className="select-label" htmlFor="dashboard-profile">Account</label>
-          <div className="select-field">
-            <Users aria-hidden="true" size={17} />
-            <select
+          <div className="login-account-picker">
+            <AppSelect
               id="dashboard-profile"
               disabled={loading}
-              onChange={(event) => { const id = event.target.value; setSelection({ id, quickReady: Boolean(quickSignInRecord(id)) }); setPassword(""); setShowPassword(false); setError(""); }}
+              onValueChange={(value) => { const id = value; setSelection({ id, quickReady: Boolean(quickSignInRecord(id)) }); setPassword(""); setShowPassword(false); setError(""); }}
               value={selectedId}
             >
               {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.label}</option>)}
-            </select>
-            <ChevronDown aria-hidden="true" size={17} />
+            </AppSelect>
           </div>
             <label className="password-label" htmlFor="dashboard-password">Password</label>
             <div className="password-field">

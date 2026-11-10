@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-controls";
 import { PersonAvatar, TeamProfilesProvider } from "@/components/team-profile";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
 import { AdvanceReview } from "@/components/dashboard/advance-review";
@@ -379,7 +380,7 @@ export default function DashboardView({ payload, dark, setDark, onLogout, onRefr
             <TabsContent value="engagement"><TeamEngagementReview token={schedulingToken} /></TabsContent>
           </Tabs>}
           {view === "payouts" && <>
-            {!isOwner && <div className="employee-earnings-heading"><label>Year<select value={earningsYear} onChange={event => setEarningsYear(Number(event.target.value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div>}
+            {!isOwner && <div className="employee-earnings-heading"><label>Year<AppSelect value={earningsYear} onValueChange={value => setEarningsYear(Number(value))}>{earningsYears.map(year => <option key={year} value={year}>{year}</option>)}</AppSelect></label></div>}
             <RecordPaymentDialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen} employeeId={payoutEmployee} employees={payload.employees} token={schedulingToken} onSaved={async()=>{await Promise.all([payroll.refresh(),creative.refresh()]);}} /><PayoutPage addPay={isOwner ? <AddPay token={schedulingToken} employees={payload.employees} state={creative} /> : undefined} creative={creative.items} payroll={payroll.state} employeeId={employeeId} employees={payload.employees} metrics={isOwner ? metrics : employeeEarnings.metrics} monthly={isOwner ? monthly : employeeEarnings.monthly} onContinue={openPayoutWorkflow} paidThrough={paidThrough} payoutEmployee={payoutEmployee} rentals={isOwner ? visibleRentals : employeeEarnings.rentals} setPaidThrough={setPaidThrough} setPayoutEmployee={setPayoutEmployee} />
             <CreativeWorkPage state={creative} employees={payload.employees} isOwner={isOwner} earningsOnly focusLoading={alertWorkLoading} focusId={focusedAlert?.target === "payouts" ? focusedAlert.id : undefined} onCloseFocus={() => setFocusedAlert(null)} year={isOwner ? undefined : earningsYear} />
             {!isOwner && earningsYear === currentYear && <PeriodTotals creative={creative.items} employeeId={employeeId} rentals={visibleRentals} />}

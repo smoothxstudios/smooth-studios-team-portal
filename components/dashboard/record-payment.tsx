@@ -1,4 +1,5 @@
 "use client";
+import { Input } from "@/components/ui/input";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmationRow } from "@/components/ui/app-controls";
 import { Button } from "@/components/ui/button";
@@ -53,7 +54,7 @@ export function RecordPaymentDialog({open,onOpenChange,employeeId,employees,toke
     <DialogDescription>{receipt?"Saved in the payment history. The receipt confirms the balance after this payment.":"Review all earned appointments, training, onboarding, and approved creative work. This records money you already sent."}</DialogDescription>
   </DialogHeader>
   <div className="app-sheet-scroll">{receipt?<div className="payment-receipt" role="status"><strong>{dollars(receipt.cashCents,true)} recorded for {name}</strong><p>{dollars(receipt.deductionCents,true)} applied to studio rentals.</p><p>Pay still owed: <b>{dollars(receipt.remainingPayableCents,true)}</b></p>{receipt.carryForwardCents>0&&<p>Rental balance carried forward: {dollars(receipt.carryForwardCents,true)}</p>}<small>Receipt {receipt.id.slice(0,8)} · {formatDate(receipt.recordedAt)}</small><Button onClick={()=>onOpenChange(false)}>Done</Button></div>:<>
-    <label className="payout-control">Work completed through<input type="date" max={studioLocal(Date.now()).slice(0,10)} value={through} disabled={busy||!!attempt.current} onChange={e=>setThrough(e.target.value)}/></label>
+    <label className="payout-control">Work completed through<Input type="date" max={studioLocal(Date.now()).slice(0,10)} value={through} disabled={busy||!!attempt.current} onChange={e=>setThrough(e.target.value)}/></label>
     {(loading || (!preview && !error)) && <div className="payment-loading" role="status"><p>Checking the current balance…</p><div aria-hidden="true" className="payment-loading-lines"><span/><span/><span/><span/></div></div>}
     {preview&&<><dl className="payment-preview-totals"><div><dt>Earned, unpaid</dt><dd>{dollars(preview.grossCents,true)}</dd></div><div><dt>Studio rental deduction</dt><dd>−{dollars(preview.deductionCents,true)}</dd></div><div className="payment-preview-net"><dt>Payment to record</dt><dd>{dollars(preview.cashCents,true)}</dd></div></dl>
       <details className="payment-line-items"><summary>{preview.items.length} earnings included</summary>{preview.items.map(item=><div key={`${item.kind}:${item.sourceId}`}><span><b>{item.title}</b><small>{item.customer?`${item.customer} · `:""}{formatDate(item.earnedAt)}</small></span><strong>{dollars(item.outstandingCents,true)}</strong></div>)}</details>
