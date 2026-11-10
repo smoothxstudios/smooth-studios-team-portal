@@ -1,25 +1,14 @@
 "use client";
 import { PersonAvatar } from "@/components/team-profile";
-import { studioLocal } from "@/lib/team-schedule.mjs";
 import { teamEarnings } from "@/lib/team-summary.mjs";
 import type { CreativeAssignment } from "@/lib/use-creative-work";
 import type { ReactNode } from "react";
 
 import { ChartTooltip } from "@/components/dashboard/shared";
 import { Button } from "@/components/ui/button";
-import {
-Select,
-SelectContent,
-SelectItem,
-SelectTrigger,
-SelectValue,
-} from "@/components/ui/select";
-import { dollars,eligibleForPayout,formatDate } from "@/lib/dashboard-presentation";
+import { dollars,formatDate } from "@/lib/dashboard-presentation";
 import type { Employee,PayrollState,Rental } from "@/lib/dashboard-types";
-import {
-ArrowRight,
-ReceiptText
-} from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import {
 Bar,
 BarChart,
@@ -36,10 +25,7 @@ export function PayoutPage({
   metrics,
   monthly,
   onContinue,
-  paidThrough,
-  payoutEmployee,
   rentals,
-  setPaidThrough,
   setPayoutEmployee,
   payroll,
   creative = [],
@@ -60,33 +46,35 @@ export function PayoutPage({
   setPayoutEmployee: (value: string) => void;
 }) {
   const isOwner = !employeeId;
-  const selectedEmployee = employees.find((employee) => employee.id === payoutEmployee);
   const advance = payroll?.balances.find(item => item.employeeId === employeeId);
-  const payoutScopeLabel = selectedEmployee?.name ?? "All employees";
-  const eligibleAppointments = rentals.filter((rental) => eligibleForPayout(rental, paidThrough, payoutEmployee)).length;
   const hasChartData = monthly.some(month => month.paid > 0 || month.owed > 0);
   return (
     <section className={`payout-layout${isOwner ? "" : " employee-payout-layout"}`}>
-      {isOwner && <article className="panel team-payout-breakdown"><div className="panel-heading"><div><h2>Pay by team member</h2><p>Appointments, training, onboarding, and other earned pay</p></div>{addPay}</div>
+      {isOwner && <article className="panel team-payout-breakdown"><div className="team-payout-heading"><div><h2>Pay by team member</h2><p>Earned pay and payments</p></div>{addPay}</div>
         <div className="team-payout-people">{teamEarnings(employees, rentals, creative).map(person => {
           const account = payroll?.accounts?.find(item => item.employeeId === person.id);
           const rentalDeduction = account ? Math.min(account.grossOwedCents, account.rentalBalanceCents) : 0;
           return <section className="team-payout-person" key={person.id}>
             <div className="person-section-heading"><PersonAvatar personId={person.id} name={person.name} className="employee-avatar" /><h3>{person.name}</h3></div>
             <div className="team-payout-details">
-              <dl>
-                <div><dt>Amount owed</dt><dd>{dollars(account?.payableCents ?? person.owed, true)}</dd></div>
+              <dl className="team-payout-metrics">
+                <div className={(account?.payableCents ?? person.owed) > 0 ? "has-balance" : undefined}><dt>Amount owed</dt><dd>{dollars(account?.payableCents ?? person.owed, true)}</dd></div>
                 <div><dt>Total earned</dt><dd>{dollars(person.earned, true)}</dd></div>
                 <div><dt>Paid</dt><dd>{dollars(person.cashPaid, true)}</dd></div>
-                {person.advanceApplied > 0 && <div className="team-payout-advance"><dt>Advance applied</dt><dd>{dollars(person.advanceApplied, true)}</dd></div>}
               </dl>
-              {account && account.rentalBalanceCents > 0 && <div className="team-payout-rental-balance">
-                {rentalDeduction > 0 && <>
-                  <p><span>Unpaid earnings</span><strong>{dollars(account.grossOwedCents, true)}</strong></p>
-                  <p><span>Studio rental deduction</span><strong>−{dollars(rentalDeduction, true)}</strong></p>
-                  <small>Already included in Amount owed.</small>
-                </>}
-                {account.carryForwardCents > 0 && <p><span>Rental balance carried forward</span><strong>{dollars(account.carryForwardCents, true)}</strong></p>}
+              {(person.advanceApplied > 0 || (account?.rentalBalanceCents ?? 0) > 0) && <div className="team-payout-adjustments">
+                {person.advanceApplied > 0 && <p className="team-payout-advance"><span>Advance applied</span><strong>{dollars(person.advanceApplied, true)}</strong></p>}
+                {account && account.rentalBalanceCents > 0 && <details className="team-payout-adjustment">
+                  <summary aria-label={`View rental breakdown for ${person.name}`}><span>{rentalDeduction > 0 ? "Rental deduction" : "Rental balance"}</span><strong>{rentalDeduction > 0 ? `−${dollars(rentalDeduction, true)}` : dollars(account.carryForwardCents, true)}</strong><ChevronDown size={15} aria-hidden="true" /></summary>
+                  <div className="team-payout-rental-balance">
+                    {rentalDeduction > 0 && <>
+                      <p><span>Unpaid earnings</span><strong>{dollars(account.grossOwedCents, true)}</strong></p>
+                      <p><span>Studio rental deduction</span><strong>−{dollars(rentalDeduction, true)}</strong></p>
+                      <small>Already included in Amount owed.</small>
+                    </>}
+                    {account.carryForwardCents > 0 && <p><span>Rental balance carried forward</span><strong>{dollars(account.carryForwardCents, true)}</strong></p>}
+                  </div>
+                </details>}
               </div>}
               {person.missingRates > 0 && <p className="schedule-warning">Pay rate needed for {person.missingRates} appointment{person.missingRates === 1 ? "" : "s"}.</p>}
             </div>

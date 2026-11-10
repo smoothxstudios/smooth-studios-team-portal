@@ -1,0 +1,70 @@
+/* Employee work: one toolbar, compact day entries, and complete offer summaries. */
+.employee-schedule-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.employee-schedule-switch { display: inline-flex; align-items: center; padding: 4px; gap: 3px; border-radius: var(--app-field-radius); background: var(--secondary); }
+.employee-schedule-switch > .app-button[data-slot="button"][data-variant] { min-height: 40px; padding: 8px 14px; background: transparent; color: var(--muted-foreground); box-shadow: none; }
+.employee-schedule-switch > .app-button[data-slot="button"][data-variant][aria-pressed="true"] { background: var(--card); color: var(--foreground); box-shadow: 0 1px 4px #0000000a; }
+.employee-week-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.employee-week-heading h3 { margin: 0 0 4px; }
+.employee-week-heading p { font-size: 13px; }
+.employee-week-heading .schedule-actions { flex-wrap: nowrap; gap: 6px; }
+.employee-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.employee-week-day { min-width: 0; }
+.employee-week-day > h4 { margin: 0 0 10px; padding: 5px 2px; color: var(--muted-foreground); font-size: 12px; font-weight: 600; }
+.employee-week-day.is-today > h4 { color: var(--primary); }
+.employee-week-items { display: grid; gap: 8px; }
+.employee-week-entry { display: grid; gap: 5px; width: 100%; min-width: 0; margin: 0; padding: 12px; border: 0; border-radius: var(--app-field-radius); background: var(--background); text-align: left; overflow-wrap: anywhere; }
+.employee-week-entry strong { color: var(--foreground); font-size: 14px; font-weight: 600; line-height: 1.4; }
+.employee-week-entry > span:not(.employee-work-status), .employee-week-entry small { color: var(--muted-foreground); font-size: 12px; line-height: 1.4; }
+.employee-week-booking { cursor: pointer; transition: opacity 120ms ease-out; }
+.employee-week-booking:active { opacity: .7; }
+.employee-week-booking:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.employee-work-status { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; line-height: 1.4; color: var(--muted-foreground); margin-bottom: 3px; }
+.employee-work-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--muted-foreground); }
+.employee-work-status.pending::before { background: #d99a20; }
+.employee-work-status.confirmed::before { background: #169966; }
+.employee-week-empty { padding: 8px 2px; font-size: 12px; color: var(--muted-foreground); }
+.employee-week-sync { padding-top: 18px; font-size: 12px; color: var(--muted-foreground); }
+.employee-attention .schedule-offers, .employee-offers-panel .schedule-offers { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.employee-attention .schedule-offers { padding: 0 24px; }
+.employee-attention .schedule-offer, .employee-offers-panel .schedule-offer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px 24px; border: 0; border-top: 1px solid var(--border); border-radius: 0; padding: 18px 0; background: transparent; }
+.employee-attention .schedule-offer:first-child, .employee-offers-panel .schedule-offer:first-child { border-top: 0; }
+.employee-offers-panel .schedule-section-heading { margin-bottom: 4px; }
+.offer-overview, .offer-response { min-width: 0; }
+.schedule-offer.offer-full h3 { margin-top: 10px; margin-bottom: 4px; font-weight: 600; }
+.schedule-offer .offer-time { margin: 6px 0 0; font-size: 13px; }
+.schedule-offer .offer-time svg { flex-shrink: 0; }
+.schedule-offer .offer-rental-title { margin: 0; color: var(--muted-foreground); font-size: 13px; }
+.employee-attention .schedule-actions, .employee-offers-panel .schedule-actions { margin-top: 0; gap: 8px; }
+.employee-attention .schedule-actions button, .employee-offers-panel .schedule-actions button { flex: none; min-height: 44px; padding: 9px 12px; font-size: 13px; }
+.employee-attention .offer-calendar-status, .employee-offers-panel .offer-calendar-status { margin: 6px 0 0; }
+.offer-response .offer-calendar-status > summary { min-height: 44px; }
+.employee-offers-footer { padding: 0 24px 20px; }
+@media (max-width: 1250px) { .employee-week { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 12px; } }
+@media (max-width: 900px) {
+  .employee-attention .schedule-offer, .employee-offers-panel .schedule-offer { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}
+@media (max-width: 640px) {
+  .employee-schedule-toolbar { gap: 8px; }
+  .employee-schedule-toolbar > button, .employee-schedule-switch > .app-button[data-slot="button"][data-variant] { font-size: 13px; padding: 8px 10px; min-height: 44px; }
+  .employee-week-panel, .employee-offers-panel { padding: 16px; }
+  .employee-week { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .employee-week-day > h4 { margin-bottom: 6px; }
+  .employee-week-empty { padding: 0 2px; }
+  .employee-week-entry { padding: 12px; }
+  .employee-attention .schedule-offers { padding: 0 16px; }
+  .employee-attention .schedule-actions, .employee-offers-panel .schedule-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .employee-attention .schedule-actions > button:first-child:nth-last-child(3), .employee-offers-panel .schedule-actions > button:first-child:nth-last-child(3) { grid-column: 1 / -1; }
+  .employee-attention .schedule-actions > button, .employee-offers-panel .schedule-actions > button { width: 100%; }
+  .employee-offers-footer { padding: 0 16px 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .employee-week-booking { transition: none; } }
+
+.employee-attention .offer-response, .employee-offers-panel .offer-response { max-width: 390px; }
+.employee-attention .schedule-confirm-inline, .employee-offers-panel .schedule-confirm-inline { grid-column: 1 / -1; }
+@media (max-width: 900px) { .employee-attention .offer-response, .employee-offers-panel .offer-response { max-width: none; } }
+
+.offer-response .schedule-actions .app-button[data-slot="button"] { min-height: 44px; }
+@media (min-width: 375px) and (max-width: 640px) {
+  .employee-attention .offer-response > .schedule-actions, .employee-offers-panel .offer-response > .schedule-actions { display: flex; flex-wrap: nowrap; }
+  .employee-attention .offer-response > .schedule-actions > button, .employee-offers-panel .offer-response > .schedule-actions > button { width: auto; flex: 1 1 auto; padding-inline: 8px; white-space: nowrap; }
+}

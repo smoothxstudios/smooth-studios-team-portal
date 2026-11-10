@@ -1,0 +1,53 @@
+/* One shared panel, aligned totals, and compact optional account details. */
+.panel.team-payout-breakdown { grid-column: 1 / -1; padding: 24px; background: var(--card); }
+.team-payout-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 20px; }
+.team-payout-heading > div { min-width: 0; }
+.team-payout-heading h2 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -.025em; }
+.team-payout-heading p { margin: 5px 0 0; color: var(--muted-foreground); font-size: 13px; }
+.team-payout-heading > button { flex-shrink: 0; }
+.team-payout-people { display: grid; }
+.team-payout-person { display: grid; grid-template-columns: minmax(150px, .85fr) minmax(0, 2fr) auto; grid-template-areas: "person details action"; align-items: start; gap: 24px; min-width: 0; margin: 0; padding: 20px 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; }
+.team-payout-person:last-child { padding-bottom: 0; }
+.team-payout-person .person-section-heading { grid-area: person; min-width: 0; min-height: 48px; padding: 0; flex-wrap: nowrap; }
+.team-payout-person .person-section-heading h3 { font-size: 16px; font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
+.team-payout-person .employee-avatar { width: 32px; height: 32px; flex-basis: 32px; }
+.team-payout-details { grid-area: details; display: grid; gap: 8px; min-width: 0; }
+.team-payout-metrics { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; margin: 0; }
+.team-payout-metrics > div { min-width: 0; }
+.team-payout-metrics dt { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.team-payout-metrics dd { margin: 4px 0 0; font-size: 18px; font-weight: 650; line-height: 1.4; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.team-payout-metrics .has-balance dd { color: var(--primary); }
+.team-payout-adjustments { display: flex; align-items: start; flex-wrap: wrap; gap: 4px 20px; min-width: 0; }
+.team-payout-advance { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; margin: 0; padding-block: 10px; color: var(--muted-foreground); font-size: 12px; }
+.team-payout-advance strong, .team-payout-adjustment strong { color: var(--foreground); font-weight: 600; font-variant-numeric: tabular-nums; }
+.team-payout-adjustment { max-width: 100%; font-size: 12px; }
+.team-payout-adjustment > summary { display: flex; align-items: center; gap: 8px; min-height: 40px; width: fit-content; max-width: 100%; padding: 6px 10px; border-radius: var(--app-field-radius); color: var(--muted-foreground); background: var(--secondary); cursor: pointer; list-style: none; touch-action: manipulation; }
+.team-payout-adjustment > summary::-webkit-details-marker { display: none; }
+.team-payout-adjustment > summary > svg { flex-shrink: 0; transition: transform 160ms var(--app-ease); }
+.team-payout-adjustment[open] > summary > svg { transform: rotate(180deg); }
+.team-payout-adjustment > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.team-payout-adjustment > summary:active { opacity: .75; }
+.team-payout-rental-balance { display: grid; gap: 6px; width: 330px; max-width: 100%; margin-top: 8px; padding: 12px; border-radius: var(--app-field-radius); background: var(--muted); color: var(--muted-foreground); line-height: 1.5; }
+.team-payout-rental-balance p { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; margin: 0; }
+.team-payout-rental-balance strong { flex-shrink: 0; }
+.team-payout-rental-balance small { font-size: 11px; }
+.team-payout-details > .schedule-warning { margin: 0; padding: 10px 12px; font-size: 12px; }
+.team-payout-person > .team-payout-record { grid-area: action; justify-self: end; min-height: 44px; margin: 0; font-size: 13px; }
+@media (max-width: 1100px) {
+  .team-payout-person { grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "person action" "details details"; gap: 12px 20px; }
+  .team-payout-metrics { max-width: 620px; }
+}
+@media (max-width: 640px) {
+  .panel.team-payout-breakdown { padding: 16px; }
+  .team-payout-heading { gap: 10px; padding-bottom: 16px; }
+  .team-payout-heading h2 { font-size: 17px; }
+  .team-payout-heading p { font-size: 12px; }
+  .team-payout-person { padding-block: 16px; gap: 10px 12px; }
+  .team-payout-person > .team-payout-record { font-size: 12px; padding-inline: 10px; }
+  .team-payout-metrics { gap: 10px; }
+  .team-payout-metrics dt { font-size: 11px; }
+  .team-payout-metrics dd { font-size: 16px; }
+  .team-payout-adjustment > summary { min-height: 44px; }
+}
+@media (max-width: 380px) { .team-payout-metrics dd { font-size: 14px; } }
+@media (prefers-reduced-motion: reduce) { .team-payout-adjustment > summary > svg { transition: none; } }

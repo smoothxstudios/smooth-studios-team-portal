@@ -5,8 +5,10 @@ import { dashboardThemeScript } from "@/lib/dashboard-theme.mjs";
 import type { Metadata } from "next";
 import "./globals.css";
 
-// Keep the shared visual system last: it overrides legacy page styles.
+// Shared controls override legacy styles; focused page styles follow.
 import "./design-system.css";
+import "./payouts.css";
+import "./employee-schedule.css";
 
 const siteBasePath = dashboardBasePath();
 const studioLogoUrl = `${siteBasePath}/smooth-studios-logo.png`;

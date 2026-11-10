@@ -1,6 +1,27 @@
 {
-  "currentVersion": "2.49.1",
+  "currentVersion": "2.49.2",
   "releases": [
+    {
+      "id": "2026-11-09-payout-and-schedule-cleanup",
+      "version": "2.49.2",
+      "date": "2026-11-09",
+      "category": "Interface",
+      "title": "Cleaner payouts, offers, and schedule",
+      "changes": [
+        "Team payouts use aligned rows with consistent padding and subtle dividers.",
+        "Rental deductions open a compact breakdown beside the totals. Advances stay visible, and zero balances use neutral text.",
+        "Record payment stays beside each person on phones, with totals grouped below.",
+        "Every Home offer now shows its rental name and time; later offers no longer lose their details.",
+        "My Schedule has one compact toolbar and shorter weekly entries. A booking and its app offer share one entry; tap it to open full details."
+      ],
+      "employee": {
+        "title": "Clearer offers and schedule",
+        "changes": [
+          "Every Home offer now shows its rental name and time; later offers no longer lose their details.",
+          "My Schedule has one compact toolbar and shorter weekly entries. A booking and its app offer share one entry; tap it to open full details."
+        ]
+      }
+    },
     {
       "id": "2026-11-09-consistent-pickers",
       "version": "2.49.1",

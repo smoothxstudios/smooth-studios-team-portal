@@ -1,4 +1,5 @@
 "use client";
+import { useClock } from "@/lib/use-clock";
 import { RentalDescription } from "@/components/rental-description";
 import { Button } from "@/components/ui/button";
 import { calendarInvitationLabel } from "@/lib/calendar-invitations.mjs";
@@ -19,16 +20,17 @@ export function EmployeeHome({ userId, schedule, loading, options, onBlockTime, 
   userId: string; schedule: TeamSchedule | null; loading: boolean; options: EmployeeHomeOptions;
   onBlockTime: () => void; renderOffer: (assignment: TeamAssignment) => ReactNode; onOpenRental: (id: string) => void;
 }) {
-  const { offers, updates, calendarInvitations, upcoming } = employeeHomeWork(userId, schedule, options.rentals);
+  const now = useClock();
+  const { offers, updates, calendarInvitations, upcoming } = employeeHomeWork(userId, schedule, options.rentals, now);
   const next = upcoming[0];
   const setup = rentalSetupDetails(next?.rentalDetails);
   return <div className="employee-home">
     {options.extras}
     <section className="panel employee-home-next" aria-labelledby="employee-next-heading">
-      <div className="employee-section-heading"><h2 id="employee-next-heading">{next && Date.parse(next.start) <= Date.now() ? "Happening now" : "Your next assignment"}</h2><Button variant="ghost" onClick={options.onSchedule}>Schedule<ArrowRight size={16} /></Button></div>
+      <div className="employee-section-heading"><h2 id="employee-next-heading">{next && Date.parse(next.start) <= now ? "Happening now" : "Your next assignment"}</h2><Button variant="ghost" onClick={options.onSchedule}>Schedule<ArrowRight size={16} /></Button></div>
       {loading && !schedule ? <p className="daily-empty" role="status">Checking your assignments…</p> : next ? <div className="employee-next-action"><p>{formatDate(next.start)} · {formatTime(next.start)}–{formatTime(next.end)}</p><h3>{next.customer || next.title}</h3>{next.customer && <p>{next.title}</p>}{!schedule && <p className="schedule-warning">From the last sync. Open Schedule to confirm current details.</p>}{next.appointmentId && (setup ? <RentalDescription details={setup} heading="Rental setup" /> : <p className="schedule-small">Setup details aren’t available in the current booking. Confirm the backdrop and equipment with Smooth.</p>)}{next.instructions && <p className="schedule-instructions">{next.instructions}</p>}<Button onClick={() => next.appointmentId ? onOpenRental(next.appointmentId) : options.onSchedule()}>{next.appointmentId ? "View rental details" : "View assignment"}</Button>{upcoming.length > 1 && <Button variant="ghost" onClick={options.onSchedule}>{upcoming.length - 1} more upcoming</Button>}</div> : <p className="daily-empty">{offers.length ? "Accept an offer below to confirm your next assignment." : schedule ? "No upcoming assignments." : "Current assignments couldn’t load. Try again above."}</p>}
     </section>
-    {offers.length > 0 && <section className="panel employee-attention" aria-labelledby="employee-offers-heading"><div className="employee-section-heading"><h2 id="employee-offers-heading">Needs your response <span className="schedule-count">{offers.length}</span></h2></div><div className="schedule-offers">{offers.slice(0, 3).map(renderOffer)}</div>{offers.length > 3 && <Button variant="ghost" onClick={options.onSchedule}>View all {offers.length} offers</Button>}</section>}
+    {offers.length > 0 && <section className="panel employee-attention" aria-labelledby="employee-offers-heading"><div className="employee-section-heading"><h2 id="employee-offers-heading">Needs your response <span className="schedule-count">{offers.length}</span></h2></div><div className="schedule-offers">{offers.slice(0, 3).map(offer => renderOffer(offer))}</div>{offers.length > 3 && <div className="employee-offers-footer"><Button variant="outline" onClick={options.onSchedule}>View all {offers.length} offers</Button></div>}</section>}
     {options.work}
     {calendarInvitations.length > 0 && <section className="panel daily-action-list"><div className="panel-heading"><h2>Calendar invitations</h2></div>{calendarInvitations.slice(0, 3).map(item => <button className="daily-action-row" key={item.id} onClick={() => onOpenRental(item.id)}><span className="daily-action-copy"><strong>{item.customer || item.title}</strong><small>{formatDate(item.start)} · {formatTime(item.start)}</small><span className="daily-next-step">{calendarInvitationLabel(item.calendarStatus)} · view invitation</span></span><ArrowRight size={18} /></button>)}</section>}
     {updates.length > 0 && <details className="home-finances employee-updates"><summary>Schedule updates ({updates.length})<ChevronDown size={18} /></summary>{updates.map(item => <p key={item.id}><strong>Offer cancelled · {item.title}</strong><br />{formatDate(item.start)} · {formatTime(item.start)}. {item.note || "Smooth cancelled this dashboard offer."}</p>)}</details>}
