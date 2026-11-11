@@ -318,6 +318,8 @@ button { touch-action: manipulation; }
 }
 @media (max-width: 640px) {
   [data-slot="dialog-viewport"][data-presentation="sheet"] { align-items: flex-end; padding: max(12px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)); }
+  /* Raise only the assignment card; keep its transform free for drag dismissal. */
+  [data-slot="dialog-viewport"][data-presentation="sheet"]:has(> .assignment-dialog) { padding-bottom: calc(max(8px, env(safe-area-inset-bottom, 0px)) + 24px); }
   [data-slot="dialog-viewport"] > [data-slot="dialog-content"][data-presentation="sheet"] { width: 100%; max-width: 100%; max-height: 100%; border-radius: 28px; }
   [data-slot="dialog-content"] > button.app-sheet-handle { display: grid; place-items: center; position: absolute; z-index: 2; top: 0; left: calc(50% - 38px); min-width: 76px; min-height: 44px; width: 76px; height: 44px; background: none; border: 0; touch-action: none; cursor: grab; }
   .app-sheet-handle > span { width: 34px; height: 5px; border-radius: 9px; background: color-mix(in srgb, var(--foreground) 24%, transparent); }

@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.49.5",
+  "currentVersion": "2.49.6",
   "releases": [
+    {
+      "id": "2026-11-10-assignment-card-position",
+      "version": "2.49.6",
+      "date": "2026-11-10",
+      "category": "Scheduling",
+      "title": "Higher assignment card on phones",
+      "changes": [
+        "The Assign work card sits a little higher on phones, with more clearance below its action buttons.",
+        "The form remains scrollable on shorter screens and keeps its existing swipe-to-close behavior."
+      ]
+    },
     {
       "id": "2026-11-10-studio-guideline-quiz",
       "version": "2.49.5",
