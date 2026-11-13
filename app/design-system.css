@@ -743,7 +743,7 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
 .availability-date-controls > .app-date-control { height: 44px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; }
 .availability-date-controls .app-date-control > input[data-slot="input"] { height: 44px; min-height: 44px; padding: 0 4px; font-size: 16px; font-weight: 500; text-align: center; background: transparent; }
 .availability-date-controls input::-webkit-date-and-time-value { text-align: center; }
-.availability-date-controls input::-webkit-datetime-edit { display: inline-flex; padding: 0; }
+.availability-date-controls input::-webkit-datetime-edit { display: inline-flex; justify-content: center; width: 100%; padding: 0; }
 .availability-date-controls .app-date-control > svg { display: none; }
 .availability-overview > .availability-overview-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
 @media (max-width: 640px) {
@@ -754,3 +754,31 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
 }
 @media (prefers-reduced-motion: reduce) { .app-picker-trigger { transition: none; } }
 @media (prefers-contrast: more) { .app-picker-trigger, .app-date-control { border-color: var(--muted-foreground); } }
+
+/* A saved response is the primary status; overlap details stay compact. */
+.schedule-offer .offer-saved-response { margin: 10px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.offer-saved-response > svg { flex: 0 0 auto; color: #15875c; }
+.offer-conflict { margin-top: 12px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; line-height: 1.45; }
+.offer-conflict > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 10px 0; cursor: pointer; font-weight: 500; list-style: none; }
+.offer-conflict > summary::-webkit-details-marker { display: none; }
+.offer-conflict > summary::after { content: "⌄"; flex: 0 0 auto; }
+.offer-conflict[open] > summary::after { transform: rotate(180deg); }
+.schedule-offer .offer-conflict > p { display: block; margin: 0 0 10px; font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
+.offer-conflict.is-approved { color: #147b54; border-color: #16996630; background: #16996609; }
+.offer-conflict.needs-review { color: #956014; border-color: #d8991545; background: #d899150a; }
+.dark .offer-conflict.is-approved { color: #77cfab; }
+.dark .offer-conflict.needs-review { color: #ebbd6c; }
+.appointment-offers .schedule-row { align-items: center; gap: 10px; }
+.appointment-offers .schedule-status { font-size: 11px; padding: 5px 9px; line-height: 1.4; }
+.appointment-offers .offer-response { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0 12px; margin-top: 8px; }
+.appointment-offers .offer-response > .schedule-actions { margin: 0; gap: 8px; }
+.appointment-offers .offer-response > .schedule-actions:empty { display: none; }
+.appointment-offers .offer-response .app-button[data-slot="button"] { min-height: 44px; padding: 8px 12px; font-size: 13px; }
+.appointment-offers .offer-calendar-status { margin: 0; }
+.appointment-offers .offer-calendar-status[open] { flex: 1 0 100%; }
+.appointment-section-heading { align-items: center; gap: 12px; }
+.appointment-section-heading > .app-button[data-slot="button"] { min-height: 44px; padding: 8px 12px; font-size: 13px; }
+@media (max-width: 380px) {
+ .appointment-offers .schedule-row { align-items: flex-start; }
+ .appointment-offers .schedule-status { max-width: 150px; text-align: center; }
+}

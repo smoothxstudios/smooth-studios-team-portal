@@ -102,3 +102,54 @@ test("mutation feedback remains consistent for existing assignment and availabil
   assert.equal(scheduleMutationError("/work-preferences", new Error("Blocked")), "Blocked");
   assert.equal(scheduleMutationError("/blocks", undefined), "Couldn’t save this change.");
 });
+
+const offer = { id: 'one', employeeId: 'rayne', appointmentId: 'rental', title: 'Studio A Rental', instructions: '',
+  start: '2026-12-20T18:00:00Z', end: '2026-12-20T19:00:00Z', createdAt: '2026-11-13T17:00:00Z', status: 'pending' };
+function responseOptions(overrides = {}) {
+  return { path: '/assignments/one', method: 'POST', data: { status: 'accepted' }, revision: 1, userId: 'rayne', isOwner: false,
+    assignments: [offer], onRefresh: () => {}, ...overrides };
+}
+
+test('an unrelated update or new conflict approval allows one revision-safe response retry', async () => {
+  const writes = [], shown = [];
+  const latest = { revision: 3, assignments: [{ ...offer, conflictOverride: { approvedBy: 'owner', start: offer.start, end: offer.end } }] };
+  const result = await saveScheduleMutation(responseOptions({
+    write: async revision => { writes.push(revision); return revision === 1 ? failWith(SCHEDULE_CHANGED_MESSAGE) : { saved: true }; },
+    refresh: async () => latest, onRefresh: fresh => shown.push(fresh),
+  }));
+  assert.deepEqual(writes, [1, 3]); assert.deepEqual(shown, [latest]); assert.equal(result.saved, true);
+});
+
+test('response recovery does not accept changed times, instructions, reassigned or cancelled offers', async () => {
+  for (const change of [{ start: '2026-12-21T18:00:00Z' }, { end: '2026-12-20T20:00:00Z' },
+    { instructions: 'Different work' }, { employeeId: 'jordyn' }, { status: 'cancelled' }, { status: 'declined' }]) {
+    let writes = 0;
+    await assert.rejects(saveScheduleMutation(responseOptions({
+      write: async () => { writes++; return failWith(SCHEDULE_CHANGED_MESSAGE); },
+      refresh: async () => ({ revision: 2, assignments: [{ ...offer, ...change }] }),
+    })), /offer changed/);
+    assert.equal(writes, 1);
+  }
+});
+
+test('lost or duplicate acceptance responses are reconciled by reading without writing twice', async () => {
+  for (const message of [SCHEDULE_CHANGED_MESSAGE, 'Couldn’t confirm the request.', 'Only the assigned employee can respond to a pending offer.']) {
+    let writes = 0;
+    const result = await saveScheduleMutation(responseOptions({
+      write: async () => { writes++; return failWith(message); },
+      refresh: async () => ({ revision: 2, assignments: [{ ...offer, status: 'accepted' }] }),
+    }));
+    assert.equal(result.alreadySaved, true); assert.equal(writes, 1);
+  }
+});
+
+test('uncertain saves and actual conflicts are never replayed; a second revision race stops', async () => {
+  for (const message of ['Couldn’t confirm the request.', 'This time conflicts with Class.', SCHEDULE_CHANGED_MESSAGE]) {
+    let writes = 0;
+    await assert.rejects(saveScheduleMutation(responseOptions({
+      write: async () => { writes++; return failWith(message); },
+      refresh: async () => ({ revision: 2, assignments: [offer] }),
+    })), { message });
+    assert.equal(writes, message === SCHEDULE_CHANGED_MESSAGE ? 2 : 1);
+  }
+});

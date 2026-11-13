@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.51.2",
+  "currentVersion": "2.51.3",
   "releases": [
+    {
+      "id": "2026-11-13-live-offer-responses",
+      "version": "2.51.3",
+      "date": "2026-11-13",
+      "category": "Scheduling",
+      "title": "Reliable offer responses and cleaner appointment details",
+      "changes": [
+        "Open appointment details now pick up conflict approvals and saved responses automatically while editors and confirmations remain protected.",
+        "Unchanged offer responses recover once from an unrelated schedule update; already saved responses are recognized without submitting twice.",
+        "Accepted offers clearly confirm the saved response. Conflict details collapse into one row, with balanced action sizing and less repeated text."
+      ],
+      "employee": {
+        "title": "Clearer rental acceptance",
+        "changes": [
+          "Conflict approvals update while appointment details are open.",
+          "Accepted offers confirm that your response is saved and no second acceptance is needed.",
+          "An unrelated schedule update no longer forces you to restart an unchanged response."
+        ]
+      }
+    },
     {
       "id": "2026-11-13-balanced-availability-hours",
       "version": "2.51.2",

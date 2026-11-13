@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { attachQuietSnapshotRefresh, dashboardHasOpenEditor } from "@/lib/dashboard-refresh.mjs";
+import { attachQuietSnapshotRefresh } from "@/lib/dashboard-refresh.mjs";
 import { hapticFeedback } from "@/lib/haptics.mjs";
-import { applyConfirmedScheduleMutation, readScheduleSnapshot } from "@/lib/schedule-snapshot.mjs";
+import { applyConfirmedScheduleMutation, readScheduleSnapshot, scheduleHasOpenEditor } from "@/lib/schedule-snapshot.mjs";
 import { teamPushIsEnabled, teamRequest, type TeamAssignment, type TeamSchedule } from "@/lib/team-api";
 import { saveScheduleMutation, scheduleMutationError, scheduleMutationMessage } from "@/lib/team-schedule-mutations.mjs";
 
@@ -38,7 +38,7 @@ export function useTeamSchedule({ token, userId, isOwner, availabilityOnly }: {
     const currentSession = session.current;
     const requests = requestVersion;
     async function refresh() {
-      const canRefresh = () => !disposed && !mutationInFlight.current && (!session.current.hasSnapshot || !dashboardHasOpenEditor());
+      const canRefresh = () => !disposed && !mutationInFlight.current && (!session.current.hasSnapshot || !scheduleHasOpenEditor());
       if (!canRefresh()) return;
       const version = ++requestVersion.current;
       const canApply = () => version === requestVersion.current && canRefresh();
@@ -63,7 +63,7 @@ export function useTeamSchedule({ token, userId, isOwner, availabilityOnly }: {
       } finally { if (!disposed) setLoading(false); }
     }
     void refresh();
-    const detach = attachQuietSnapshotRefresh(refresh, { intervalMs: 60_000 });
+    const detach = attachQuietSnapshotRefresh(refresh, { intervalMs: 15_000 });
     return () => { disposed = true; currentSession.active = false; ++requests.current; detach(); };
   }, [token, availabilityOnly]);
 
@@ -74,7 +74,7 @@ export function useTeamSchedule({ token, userId, isOwner, availabilityOnly }: {
     setBusy(true); setError(""); setMessage("");
     try {
       const result = await saveScheduleMutation({
-        path, method, data, revision: schedule.revision, userId, isOwner,
+        path, method, data, revision: schedule.revision, userId, isOwner, assignments: schedule.assignments,
         write: (revision: number) => teamRequest<{ notification?: string; removedAssignment?: TeamAssignment }>(token, path, { ...data, revision }, method),
         refresh: () => teamRequest<TeamSchedule>(token, "/schedule"),
         onRefresh: (fresh: TeamSchedule) => { if (session.current.active && session.current.token === token) { setSchedule(fresh); setNeedsRefresh(false); } },
