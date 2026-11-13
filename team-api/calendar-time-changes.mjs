@@ -28,7 +28,7 @@ export function calendarTimeChange(assignment, appointment, now = Date.now()) {
   }
   return { event, assignment: { ...assignment, ...(appointment ? { start: appointment.start, end: appointment.end } : {}),
     status, note: assignment.ownerConfirmation && ["same_day", "duration"].includes(event) ? "Rental time updated. Smooth’s work confirmation is unchanged." : note,
-    ownerConfirmation: ["same_day", "duration"].includes(event) ? assignment.ownerConfirmation : undefined, conflictOverride: undefined, updatedAt: new Date(now).toISOString(),
+    ownerConfirmation: ["same_day", "duration"].includes(event) ? assignment.ownerConfirmation : undefined, conflictOverride: undefined, overlapApprovals: undefined, updatedAt: new Date(now).toISOString(),
     calendarChange: { kind: event, previousStart: assignment.start, previousEnd: assignment.end,
       previousStatus: assignment.status, changedAt: new Date(now).toISOString() } } };
 }
@@ -82,7 +82,7 @@ export function recoverDurationCancellation(assignment, appointment, assignments
   });
   if (!response) return null;
   const status = response === "accepted" ? "accepted" : "pending";
-  return { assignment: { ...assignment, status, note: durationNote(status), conflictOverride: undefined, updatedAt: new Date(now).toISOString(),
+  return { assignment: { ...assignment, status, note: durationNote(status), conflictOverride: undefined, overlapApprovals: undefined, updatedAt: new Date(now).toISOString(),
     calendarChange: { kind: "duration_recovered", previousStart: assignment.start, previousEnd: end, previousStatus: status,
       cancelledAt: assignment.updatedAt, changedAt: new Date(now).toISOString(), evidenceId: evidence.id } },
     correctedAlerts: cancellations.map(row => ({ id: row.id, userId: row.user_id })) };

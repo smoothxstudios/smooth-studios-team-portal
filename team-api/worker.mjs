@@ -3,7 +3,8 @@ import { teamProfilesRoute } from "./team-profiles.mjs";
 import { syncGuidelineQuiz } from "./guideline-quiz.mjs";
 import { PayrollAccountConflict } from "./payroll-payments.mjs";
 import { tokenHash } from "../lib/team-auth.mjs";
-import { TEAM, localInstant as parseLocalInstant, addLocalDays, assignmentConflicts, hasConflictOverride } from "../lib/team-schedule.mjs";
+import { unapprovedAssignmentConflicts, createConflictOverride, captureOverlapApprovals } from "../lib/assignment-conflict-review.mjs";
+import { TEAM, localInstant as parseLocalInstant, addLocalDays, hasConflictOverride } from "../lib/team-schedule.mjs";
 import { deliverPush, flushAlerts, publicPushKey, pushDeliveryMessage, pushEndpoint } from "./push.mjs";
 import { engagementRoute } from "./engagement.mjs";
 import { subscriptionKeys } from "./push-encryption.mjs";
@@ -123,12 +124,10 @@ function saveAssignment(db, item, mutation) {
     ON CONFLICT(id) DO UPDATE SET data = excluded.data`).bind(item.id, item.employeeId, JSON.stringify(item), mutation);
 }
 function checkConflicts(employeeId, period, s, excludeId = "") {
-  const conflicts = assignmentConflicts(employeeId, period, s.blocks, s.assignments, s.appointments, excludeId);
+  const conflicts = unapprovedAssignmentConflicts(employeeId, period, s.blocks, s.assignments, s.appointments, excludeId);
   if (conflicts.length) fail(409, `This time conflicts with ${conflicts.slice(0, 3).join("; ")}. Choose another person or time.`);
 }
-function approveConflict(period) {
-  return { approvedBy: "owner", approvedAt: new Date().toISOString(), start: period.start, end: period.end };
-}
+
 
 async function route(request, env, ctx) {
   const url = new URL(request.url), db = env.DB;
@@ -527,7 +526,7 @@ async function route(request, env, ctx) {
       instructions: text(input.instructions || existing?.instructions || "", 2000, false), start, end,
       status: startedRental ? "accepted" : "pending", createdAt: existing?.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString(),
       ...(startedRental ? { ownerConfirmation: { confirmedBy: "owner", confirmedAt: new Date().toISOString() }, note: "Smooth confirmed this person worked or is working this rental." } : {}),
-      ...(input.overrideConflicts ? { conflictOverride: approveConflict({ start, end }) } : {}) };
+      ...(input.overrideConflicts ? { conflictOverride: createConflictOverride({ id: existing?.id, employeeId, start, end }, s.assignments) } : {}) };
     const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices WHERE user_id = ?").bind(employeeId).first();
     await commit(db, s.state, mutation => [saveAssignment(db, item, mutation),
       ...(item.appointmentId ? [startedRental ? calendarTimeImportStatement(db, item, appointment, mutation) : calendarQueueStatement(db, item, mutation)] : [])], assignmentNotifications(item, startedRental ? "recorded" : "offered", [employeeId]));
@@ -547,7 +546,7 @@ async function route(request, env, ctx) {
       if (input.overrideConflicts !== true || input.status !== undefined) fail(400, "Approve the time conflict separately from an assignment response.");
       if (!active(item) || Date.parse(item.start) <= Date.now()) fail(409, "Only upcoming active offers can receive a conflict override.");
       await commit(db, s.state, mutation => [saveAssignment(db, {
-        ...item, conflictOverride: approveConflict(item), updatedAt: new Date().toISOString(),
+        ...item, conflictOverride: createConflictOverride(item, s.assignments), updatedAt: new Date().toISOString(),
       }, mutation)], assignmentNotifications(item, "conflict", [item.employeeId]));
       ctx.waitUntil(flushAlerts(env));
       return { saved: true, notification: "Time conflict approved. The employee can now accept this offer; their response is still required." };
@@ -563,7 +562,8 @@ async function route(request, env, ctx) {
         if (!hasConflictOverride(item)) checkConflicts(user, item, s, item.id);
       }
     }
-    const updated = { ...item, status: input.status, updatedAt: new Date().toISOString() };
+    const updated = { ...item, status: input.status, updatedAt: new Date().toISOString(),
+      ...(input.status === "accepted" ? { overlapApprovals: captureOverlapApprovals(item, s.assignments) } : {}) };
     await commit(db, s.state, mutation => [saveAssignment(db, updated, mutation),
       ...(updated.appointmentId ? [calendarQueueStatement(db, updated, mutation)] : [])],
       assignmentNotifications(item, input.status, user === "owner" ? [item.employeeId] : ["owner"]));

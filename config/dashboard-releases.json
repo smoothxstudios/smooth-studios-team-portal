@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.51.3",
+  "currentVersion": "2.51.4",
   "releases": [
+    {
+      "id": "2026-11-13-approved-overlap-pairs",
+      "version": "2.51.4",
+      "date": "2026-11-13",
+      "category": "Scheduling",
+      "title": "Conflict approval works from either overlapping offer",
+      "changes": [
+        "Approving an existing overlap lets the employee accept either of the two reviewed offers.",
+        "New approvals record the exact related offers and times. Older approvals are recognized only for offers proven unchanged since approval.",
+        "Other bookings, blocked time, and changed rental times still require review. Each offer keeps its own employee response."
+      ],
+      "employee": {
+        "title": "Accept approved overlapping rentals",
+        "changes": [
+          "An overlap approved by Smooth no longer blocks acceptance on the other existing offer.",
+          "Each rental still needs your own response. Unrelated conflicts continue to need review."
+        ]
+      }
+    },
     {
       "id": "2026-11-13-live-offer-responses",
       "version": "2.51.3",
