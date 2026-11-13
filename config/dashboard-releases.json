@@ -1,6 +1,18 @@
 {
-  "currentVersion": "2.51.0",
+  "currentVersion": "2.51.1",
   "releases": [
+    {
+      "id": "2026-11-13-simpler-daily-availability",
+      "version": "2.51.1",
+      "date": "2026-11-13",
+      "category": "Scheduling",
+      "title": "Clearer availability and fewer buttons",
+      "changes": [
+        "Daily availability shows a compact status and free hours for each person, with commitments and preferences available on expansion.",
+        "Suggestions assume unblocked, conflict-free team members are available. Preferred hours still rank first; seasonal staff are not suggested automatically.",
+        "Creative assignment management actions are grouped in one Actions menu."
+      ]
+    },
     {
       "id": "2026-11-13-duplicate-creative-work",
       "version": "2.51.0",

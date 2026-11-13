@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { rentalSuggestions } from '../lib/rental-suggestions.mjs';
 const period={id:'rental',start:'2026-11-02T18:00:00Z',end:'2026-11-02T19:00:00Z',acceptedEmployeeIds:[]};
 const schedule={activeEmployeeIds:['akiva','rayne','jordyn'],blocks:[],assignments:[],appointments:[],workPreferences:[{userId:'rayne',startLocal:'2026-11-02T12:00',endLocal:'2026-11-02T15:00'}]};
-test('suggestions prioritize full preferences without selecting or assuming availability',()=>{
- const rows=rentalSuggestions(period,schedule);assert.equal(rows[0].id,'rayne');assert.match(rows.find(p=>p.id==='akiva').reason,/unconfirmed/);assert.ok(!rows.some(p=>p.id==='owner'));
+test('suggestions prioritize full preferences and assume unblocked staff are available',()=>{
+ const rows=rentalSuggestions(period,schedule);assert.equal(rows[0].id,'rayne');assert.match(rows.find(p=>p.id==='akiva').reason,/Available/);assert.ok(!rows.some(p=>p.id==='owner'));
 });
 test('blocks, booked work, pending offers, and Calendar invitations exclude suggestions',()=>{
  const data={...schedule,blocks:[{userId:'rayne',startLocal:'2026-11-02T13:00',endLocal:'2026-11-02T14:00'}],assignments:[{employeeId:'akiva',appointmentId:'rental',status:'pending',...period}],appointments:[]};

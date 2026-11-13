@@ -5,8 +5,9 @@ import { ManualPayEditor } from "@/components/manual-pay-editor";
 import { MoreOptions } from "@/components/dashboard/more-options";
 
 import { Fragment, useEffect, useState } from "react";
-import { ArrowUpRight, Check, ClipboardList, Copy, Plus, Search } from "lucide-react";
+import { ArrowUpRight, Check, ClipboardList, Copy, ChevronDown, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -89,6 +90,7 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
 function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople, onDuplicate }: { item: CreativeAssignment; isOwner: boolean; busy: boolean; error: string; act: (input: Record<string, unknown>, item: CreativeAssignment) => Promise<boolean>; onEdit: () => void; onAddPeople: () => void; onDuplicate: () => void }) {
   const [action, setAction] = useState(""), [note, setNote] = useState(""), [links, setLinks] = useState(""), [pay, setPay] = useState(""), [method, setMethod] = useState("");
   const [validation, setValidation] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
   const today = studioLocal(Date.now()).slice(0, 10);
   const [completedDate, setCompletedDate] = useState(() => [studioLocal(item.dueAt).slice(0, 10), studioLocal(Date.now()).slice(0, 10)].sort()[0]);
   const [confirmCompleted, setConfirmCompleted] = useState(false);
@@ -115,12 +117,18 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople, onD
       {!isOwner && item.status === "offered" && <><Button disabled={busy} onClick={() => void act({ action: "accept" }, item)}><Check size={17} />{busy ? "Saving…" : "Accept assignment"}</Button><Button variant="outline" disabled={busy} onClick={() => show("decline")}>Decline</Button></>}
       {!isOwner && ["accepted", "revision"].includes(item.status) && <Button disabled={busy} onClick={() => show("submit")}>Submit work</Button>}
       {isOwner && item.status === "submitted" && <><Button disabled={busy} onClick={() => show("approve")}><Check size={17} />Approve work</Button><Button variant="outline" disabled={busy} onClick={() => show("revise")}>Request changes</Button></>}
-      {isOwner && item.entryType !== "manual" && openStatuses.includes(item.status) && <Button variant="outline" disabled={busy} onClick={() => show("confirm-past")}><Check size={17} />Confirm past work</Button>}
-      {isOwner && item.entryType !== "manual" && <Button variant="outline" disabled={busy} onClick={onDuplicate}><Copy size={17} />Duplicate assignment</Button>}
       {isOwner && item.status === "approved" && owed > 0 && <Button disabled={busy} onClick={() => show("pay")}>Record payout</Button>}
-      {isOwner && item.entryType !== "manual" && openStatuses.includes(item.status) && <Button variant="outline" disabled={busy} onClick={onEdit}>Edit work</Button>}
-      {isOwner && item.entryType !== "manual" && !["cancelled", "declined"].includes(item.status) && <Button variant="outline" disabled={busy} onClick={onAddPeople}><Plus size={17} />Add people</Button>}
-      {isOwner && openStatuses.includes(item.status) && <Button variant="ghost" disabled={busy} onClick={() => show("cancel")}>Cancel assignment</Button>}
+      {isOwner && item.entryType !== "manual" && <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild onPointerDown={event => event.preventDefault()}><Button variant="outline" disabled={busy} onClick={() => setMenuOpen(value => !value)}>Actions<ChevronDown size={16} /></Button></DropdownMenuTrigger>
+        <DropdownMenuContent align="start" collisionPadding={12}>
+          {openStatuses.includes(item.status) && <DropdownMenuItem onSelect={() => show("confirm-past")}><Check size={16} />Confirm past work</DropdownMenuItem>}
+          <DropdownMenuItem onSelect={onDuplicate}><Copy size={16} />Duplicate assignment</DropdownMenuItem>
+          {openStatuses.includes(item.status) && <DropdownMenuItem onSelect={onEdit}>Edit work</DropdownMenuItem>}
+          {!["cancelled", "declined"].includes(item.status) && <DropdownMenuItem onSelect={onAddPeople}><Plus size={16} />Add people</DropdownMenuItem>}
+          {openStatuses.includes(item.status) && <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={() => show("cancel")}>Cancel assignment</DropdownMenuItem></>}
+        </DropdownMenuContent>
+      </DropdownMenu>}
+
     </div>}
     {action && <form className="creative-action-form" onSubmit={submit}>
       <h3>{{ submit: "Submit your work", approve: "Approve submitted work", "confirm-past": "Confirm past work", revise: "Request changes", pay: "Record a payout", cancel: "Cancel this assignment?", decline: "Decline this assignment?" }[action]}</h3>
