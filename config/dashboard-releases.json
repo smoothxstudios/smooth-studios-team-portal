@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.51.1",
+  "currentVersion": "2.51.2",
   "releases": [
+    {
+      "id": "2026-11-13-balanced-availability-hours",
+      "version": "2.51.2",
+      "date": "2026-11-13",
+      "category": "Scheduling",
+      "title": "Balanced availability controls and studio hours",
+      "changes": [
+        "Availability uses aligned controls, a centered date between matching arrows, and a compact Today button beside the heading.",
+        "Free hours and automatic suggestions stay within noon–10 PM Eastern. Earlier blocks no longer produce irrelevant morning availability."
+      ]
+    },
     {
       "id": "2026-11-13-simpler-daily-availability",
       "version": "2.51.1",

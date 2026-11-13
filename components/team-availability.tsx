@@ -1,4 +1,5 @@
 "use client";
+import { STUDIO_OPEN_TIME, STUDIO_CLOSE_TIME } from "@/lib/studio-hours.mjs";
 import { PersonAvatar } from "@/components/team-profile";
 import { AvailabilityOverview } from "@/components/availability-overview";
 import { MoreOptions } from "@/components/dashboard/more-options";
@@ -15,7 +16,7 @@ import { useState } from "react";
 const name = (id: string) => TEAM.find(p => p.id === id)?.name ?? id;
 const date = (local: string) => new Date(localInstant(local)).toLocaleDateString("en-US", { timeZone: STUDIO_ZONE, weekday: "short", month: "short", day: "numeric" });
 const time = (local: string) => new Date(localInstant(local)).toLocaleTimeString("en-US", { timeZone: STUDIO_ZONE, hour: "numeric", minute: "2-digit" });
-const initial = (userId: string) => ({ id: "", userId, day: addLocalDays(studioLocal(Date.now()), 1).slice(0, 10), startTime: "12:00", endTime: "23:00", allDay: true, weekly: false, repeatUntil: "", note: "" });
+const initial = (userId: string) => ({ id: "", userId, day: addLocalDays(studioLocal(Date.now()), 1).slice(0, 10), startTime: STUDIO_OPEN_TIME, endTime: STUDIO_CLOSE_TIME, allDay: true, weekly: false, repeatUntil: "", note: "" });
 const upcoming = (entry: TimeBlock | WorkPreference) => blockOccurrences(entry, new Date().toISOString(), new Date(Date.now() + 367 * 86400_000).toISOString()).length > 0;
 
 export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh, error, mutate, onBlockTime }: {
@@ -49,7 +50,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
   }
 
   function edit(entry?: WorkPreference, personId = defaultUser) {
-    setForm(entry ? { id: entry.id, userId: entry.userId, day: entry.startLocal.slice(0, 10), startTime: entry.allDay ? "12:00" : entry.startLocal.slice(11), endTime: entry.allDay ? "23:00" : entry.endLocal.slice(11), allDay: entry.allDay, weekly: Boolean(entry.repeatUntil), repeatUntil: entry.repeatUntil ?? "", note: entry.note } : initial(personId));
+    setForm(entry ? { id: entry.id, userId: entry.userId, day: entry.startLocal.slice(0, 10), startTime: entry.allDay ? STUDIO_OPEN_TIME : entry.startLocal.slice(11), endTime: entry.allDay ? STUDIO_CLOSE_TIME : entry.endLocal.slice(11), allDay: entry.allDay, weekly: Boolean(entry.repeatUntil), repeatUntil: entry.repeatUntil ?? "", note: entry.note } : initial(personId));
     setFormError(""); setOpen(true);
   }
   function details(entry: TimeBlock | WorkPreference) {
@@ -59,10 +60,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
 
   return <>
     <section className={`availability-panel${isOwner ? " schedule-panel is-owner" : " is-self"}`} aria-label={isOwner ? "Team availability" : "Your availability"}>
-    <div className="schedule-toolbar availability-toolbar" hidden={!isOwner}>
-      {isOwner && <label className="schedule-filter">Team member<AppSelect value={filter} onValueChange={value => selectPerson(value)}><option value="all">Everyone</option>{TEAM.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label>}
-    </div>
-    {isOwner && <AvailabilityOverview schedule={schedule} filter={filter} />}
+    {isOwner && <AvailabilityOverview schedule={schedule} filter={filter} onFilterChange={selectPerson} />}
     <details className="availability-editor" open={!isOwner || filter !== "all"}><summary hidden={!isOwner}>Edit availability</summary>
     <div className="availability-people">{(isOwner ? TEAM.filter(person => filter === "all" || person.id === filter) : [{ id: userId, name: name(userId), color: "" }]).map(person => {
       const personPreferences = preferences.filter(entry => entry.userId === person.id);

@@ -1358,8 +1358,7 @@ button { cursor: pointer; }
 .suggestion-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .suggestion-row span { display: grid; gap: 4px; }
 .suggestion-row small { color: var(--muted-foreground); }
-.availability-overview { margin: 16px 0; }
-.availability-overview input { min-height: 44px; max-width: 170px; font-size: 16px; background: var(--card); color: var(--foreground); }
+.availability-overview { margin: 0 0 16px; }
 @media (max-width: 640px) { .suggestion-row { flex-wrap: wrap; } }
 .team-login-settings label { display: grid; gap: 8px; min-width: 0; }
 .team-login-settings input, .team-login-settings select { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--foreground); font-size: 16px; }
@@ -1868,9 +1867,6 @@ button { cursor: pointer; }
 .person-section-heading .employee-avatar, .team-hours-person .employee-avatar { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 50%; color: white; font-weight: 700; font-size: 13px; }
 .availability-panel { min-width: 0; }
 .availability-panel.is-self { display: grid; gap: 16px; }
-.availability-toolbar { margin-bottom: 14px; }
-.availability-toolbar .schedule-filter { min-width: 0; max-width: 100%; }
-.availability-toolbar select { min-width: 180px; }
 .availability-people { display: grid; gap: 0; min-width: 0; }
 .availability-person { min-width: 0; }
 .availability-panel.is-owner .availability-person { border-top: 1px solid var(--border); }
@@ -1909,7 +1905,6 @@ button { cursor: pointer; }
   .availability-panel.is-owner .availability-section + .availability-section { border-left: 0; border-top: 1px solid var(--border); padding-left: 0; padding-top: 16px; }
 }
 @media (max-width: 767px) {
-  .availability-toolbar select { min-width: 0; }
   .availability-person-trigger { gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) { .availability-person-trigger > svg { transition: none; } }

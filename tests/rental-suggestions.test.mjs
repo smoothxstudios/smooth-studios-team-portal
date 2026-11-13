@@ -18,3 +18,14 @@ test('seasonal accounts are omitted even with preferred hours and remain in the 
  assert.ok(['carlos','armani'].every(id=>TEAM.some(p=>p.id===id&&p.seasonal)));
  assert.ok(rentalSuggestions(period,{...data,activeEmployeeIds:undefined}).every(p=>!['carlos','armani'].includes(p.id)));
 });
+
+test('suggestions stay within noon–10 PM Eastern, with inclusive opening and closing', () => {
+ for (const [start,end,expected] of [
+ ['2026-11-13T14:00:00Z','2026-11-13T15:00:00Z',false],
+ ['2026-11-13T16:59:00Z','2026-11-13T18:00:00Z',false],
+ ['2026-11-13T17:00:00Z','2026-11-14T03:00:00Z',true],
+ ['2026-11-14T02:00:00Z','2026-11-14T03:01:00Z',false],
+ ['2026-11-14T04:00:00Z','2026-11-14T18:00:00Z',false],
+ ['2026-03-08T16:00:00Z','2026-03-09T02:00:00Z',true],
+ ]) assert.equal(rentalSuggestions({...period,start,end},schedule).length>0,expected);
+});
