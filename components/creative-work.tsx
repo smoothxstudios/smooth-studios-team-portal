@@ -5,7 +5,7 @@ import { ManualPayEditor } from "@/components/manual-pay-editor";
 import { MoreOptions } from "@/components/dashboard/more-options";
 
 import { Fragment, useEffect, useState } from "react";
-import { ArrowUpRight, Check, ClipboardList, Plus, Search } from "lucide-react";
+import { ArrowUpRight, Check, ClipboardList, Copy, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,7 +40,7 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
   const [now, setNow] = useState(Date.now);
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
   const [search, setSearch] = useState(""), [filter, setFilter] = useState("active"), [person, setPerson] = useState("all");
-  const [selected, setSelected] = useState<string | null>(null), [editor, setEditor] = useState<{ item?: CreativeAssignment; id: string; addPeople?: boolean } | null>(null);
+  const [selected, setSelected] = useState<string | null>(null), [editor, setEditor] = useState<{ item?: CreativeAssignment; source?: CreativeAssignment; id: string; addPeople?: boolean } | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const selectedItem = state.items.find(item => item.id === (focusId ?? selected));
   const workItems = earningsOnly ? state.items : state.items.filter(item => item.entryType !== "manual");
@@ -80,13 +80,13 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
     <Dialog open={Boolean(focusId || selectedItem)} onOpenChange={open => { if (!open && !busy) { setSelected(null); onCloseFocus?.(); } }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{selectedItem?.title ?? "Creative assignment"}</DialogTitle><DialogDescription>{selectedItem ? `${name(selectedItem.employeeId)} · ${status(selectedItem)} · ${selectedItem.entryType === "manual" ? "Worked" : "Due"} ${selectedItem.entryType === "manual" ? workDate(selectedItem.dueAt) : date(selectedItem.dueAt)}` : "Review the current assignment details."}</DialogDescription></DialogHeader>
       {!selectedItem && <p role="status">{state.loading || focusLoading ? "Loading assignment…" : state.error || "This assignment is no longer available to this account."}</p>}
       {isOwner && teamItems.length > 1 && <div className="creative-team-tabs" role="group" aria-label="Assigned people">{teamItems.map(person => <Button key={person.id} variant={selectedItem?.id === person.id ? "default" : "outline"} disabled={busy} aria-pressed={selectedItem?.id === person.id} onClick={() => { onCloseFocus?.(); setSelected(person.id); setError(""); }}>{name(person.employeeId)} · {status(person)}</Button>)}</div>}
-      {selectedItem && <WorkDetails key={selectedItem.id} item={selectedItem} isOwner={isOwner} busy={busy} error={error} act={act} onAddPeople={() => { setEditor({ id: selectedItem.id, item: selectedItem, addPeople: true }); setSelected(null); onCloseFocus?.(); }} onEdit={() => { setEditor({ id: selectedItem.id, item: selectedItem }); setSelected(null); onCloseFocus?.(); }} />}
+      {selectedItem && <WorkDetails key={selectedItem.id} item={selectedItem} isOwner={isOwner} busy={busy} error={error} act={act} onDuplicate={() => { setEditor({ id: crypto.randomUUID(), source: selectedItem }); setSelected(null); onCloseFocus?.(); }} onAddPeople={() => { setEditor({ id: selectedItem.id, item: selectedItem, addPeople: true }); setSelected(null); onCloseFocus?.(); }} onEdit={() => { setEditor({ id: selectedItem.id, item: selectedItem }); setSelected(null); onCloseFocus?.(); }} />}
     </DialogContent></Dialog>
     {editor && <WorkEditor key={`${editor.id}-${editor.item?.version ?? 0}`} editor={editor} employees={employees} state={state} onClose={() => setEditor(null)} />}
   </section>;
 }
 
-function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople }: { item: CreativeAssignment; isOwner: boolean; busy: boolean; error: string; act: (input: Record<string, unknown>, item: CreativeAssignment) => Promise<boolean>; onEdit: () => void; onAddPeople: () => void }) {
+function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople, onDuplicate }: { item: CreativeAssignment; isOwner: boolean; busy: boolean; error: string; act: (input: Record<string, unknown>, item: CreativeAssignment) => Promise<boolean>; onEdit: () => void; onAddPeople: () => void; onDuplicate: () => void }) {
   const [action, setAction] = useState(""), [note, setNote] = useState(""), [links, setLinks] = useState(""), [pay, setPay] = useState(""), [method, setMethod] = useState("");
   const [validation, setValidation] = useState("");
   const today = studioLocal(Date.now()).slice(0, 10);
@@ -116,6 +116,7 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople }: {
       {!isOwner && ["accepted", "revision"].includes(item.status) && <Button disabled={busy} onClick={() => show("submit")}>Submit work</Button>}
       {isOwner && item.status === "submitted" && <><Button disabled={busy} onClick={() => show("approve")}><Check size={17} />Approve work</Button><Button variant="outline" disabled={busy} onClick={() => show("revise")}>Request changes</Button></>}
       {isOwner && item.entryType !== "manual" && openStatuses.includes(item.status) && <Button variant="outline" disabled={busy} onClick={() => show("confirm-past")}><Check size={17} />Confirm past work</Button>}
+      {isOwner && item.entryType !== "manual" && <Button variant="outline" disabled={busy} onClick={onDuplicate}><Copy size={17} />Duplicate assignment</Button>}
       {isOwner && item.status === "approved" && owed > 0 && <Button disabled={busy} onClick={() => show("pay")}>Record payout</Button>}
       {isOwner && item.entryType !== "manual" && openStatuses.includes(item.status) && <Button variant="outline" disabled={busy} onClick={onEdit}>Edit work</Button>}
       {isOwner && item.entryType !== "manual" && !["cancelled", "declined"].includes(item.status) && <Button variant="outline" disabled={busy} onClick={onAddPeople}><Plus size={17} />Add people</Button>}
@@ -138,15 +139,16 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople }: {
   </div>;
 }
 
-function WorkEditor({ editor, employees, state, onClose }: { editor: { id: string; item?: CreativeAssignment; addPeople?: boolean }; employees: Employee[]; state: CreativeWorkState; onClose: () => void }) {
+function WorkEditor({ editor, employees, state, onClose }: { editor: { id: string; item?: CreativeAssignment; source?: CreativeAssignment; addPeople?: boolean }; employees: Employee[]; state: CreativeWorkState; onClose: () => void }) {
   const item = editor.item;
   const adding = Boolean(editor.addPeople);
+  const source = item ?? editor.source;
   const assigned = item ? state.items.filter(entry => (entry.groupId ?? entry.id) === (item.groupId ?? item.id)).map(entry => entry.employeeId) : [];
   const activeEmployees = employees.filter(employee => (!employee.onboarding || employee.accessReady) && (!adding || !assigned.includes(employee.id)));
-  const [employeeIds, setEmployeeIds] = useState<string[]>(item && !adding ? [item.employeeId] : []);
-  const [title, setTitle] = useState(item?.title ?? ""), [instructions, setInstructions] = useState(item?.instructions ?? "");
-  const [due, setDue] = useState(item ? studioLocal(item.dueAt).slice(0, 16) : ""), [pay, setPay] = useState(item ? (item.amountCents / 100).toFixed(2) : "");
-  const [references, setReferences] = useState(item?.references.join("\n") ?? ""), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [employeeIds, setEmployeeIds] = useState<string[]>(item && !adding ? [item.employeeId] : editor.source && activeEmployees.some(employee => employee.id === editor.source?.employeeId) ? [editor.source.employeeId] : []);
+  const [title, setTitle] = useState(source?.title ?? ""), [instructions, setInstructions] = useState(source?.instructions ?? "");
+  const [due, setDue] = useState(item ? studioLocal(item.dueAt).slice(0, 16) : ""), [pay, setPay] = useState(source ? (source.amountCents / 100).toFixed(2) : "");
+  const [references, setReferences] = useState(source?.references.join("\n") ?? ""), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const submit = async (event: React.FormEvent) => {
     event.preventDefault(); setError("");
     const amountCents = moneyInputCents(pay);
@@ -156,20 +158,20 @@ function WorkEditor({ editor, employees, state, onClose }: { editor: { id: strin
     catch (error) { setError(error instanceof Error ? error.message : "Assignment couldn’t be saved."); }
     finally { setBusy(false); }
   };
-  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{adding ? "Add people to creative work" : item ? "Edit creative work" : "Assign creative work"}</DialogTitle><DialogDescription>{item && !adding ? `Editing ${name(item.employeeId)}’s assignment. Changes to accepted work require them to accept again.` : "Choose people for this work. Each person receives the fixed pay shown below after their work is approved."}</DialogDescription></DialogHeader>
+  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{editor.source ? "Duplicate assignment" : adding ? "Add people to creative work" : item ? "Edit creative work" : "Assign creative work"}</DialogTitle><DialogDescription>{editor.source ? "Review the copied details, choose people, and set a new deadline. This creates a new offer with no previous approvals or payments." : item && !adding ? `Editing ${name(item.employeeId)}’s assignment. Changes to accepted work require them to accept again.` : "Choose people for this work. Each person receives the fixed pay shown below after their work is approved."}</DialogDescription></DialogHeader>
     <form className="creative-editor" onSubmit={submit}>
       {item && !adding ? <p className="creative-hint">Assigned to {name(item.employeeId)}</p> : <fieldset className="creative-people"><legend>{adding ? "Add to this work" : "Assign to"}</legend>{activeEmployees.map(employee => <label key={employee.id}><input type="checkbox" checked={employeeIds.includes(employee.id)} onChange={event => setEmployeeIds(current => event.target.checked ? [...current, employee.id] : current.filter(id => id !== employee.id))} /><PersonLabel id={employee.id} /></label>)}{!activeEmployees.length && <p>Everyone with an active account is already assigned.</p>}</fieldset>}
 
       <label>Assignment title<Input required maxLength={160} value={title} onChange={event => setTitle(event.target.value)} placeholder="Edit a recap video, retouch a photo set…" /></label>
 
       <div className="creative-form-row"><label>Deadline<Input required type="datetime-local" value={due} onChange={event => setDue(event.target.value)} /></label><label>Pay per person (USD)<Input required inputMode="decimal" value={pay} onChange={event => setPay(event.target.value)} placeholder="0.00" /></label></div>
-      <MoreOptions defaultOpen={Boolean(item && (instructions || references))}>
+      <MoreOptions defaultOpen={Boolean(source && (instructions || references))}>
       <label>Brief & deliverables · optional<Textarea maxLength={8000} rows={5} value={instructions} onChange={event => setInstructions(event.target.value)} placeholder="Add instructions or deliverable details if needed." /></label>
       <label>Reference links · optional, one per line<Textarea maxLength={20500} value={references} onChange={event => setReferences(event.target.value)} placeholder="https://…" /></label>
       </MoreOptions>
       <p className="creative-hint">{adding ? "Existing assignments stay unchanged. " : ""}{employeeIds.length} {employeeIds.length === 1 ? "person" : "people"} · {dollars((moneyInputCents(pay) ?? 0) * employeeIds.length)} total agreed pay. Each person accepts, submits, and earns their own pay after approval.</p>
       {error && <p className="login-error" role="alert">{error}</p>}
-      <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy || !employeeIds.length} type="submit">{busy ? "Saving…" : error ? "Try again" : adding ? "Add people" : item ? "Save changes" : "Assign work"}</Button></DialogFooter>
+      <DialogFooter><Button disabled={busy} type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy || !employeeIds.length} type="submit">{busy ? "Saving…" : error ? "Try again" : editor.source ? "Create new offer" : adding ? "Add people" : item ? "Save changes" : "Assign work"}</Button></DialogFooter>
     </form>
   </DialogContent></Dialog>;
 }

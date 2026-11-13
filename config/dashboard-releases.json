@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.50.0",
+  "currentVersion": "2.51.0",
   "releases": [
+    {
+      "id": "2026-11-13-duplicate-creative-work",
+      "version": "2.51.0",
+      "date": "2026-11-13",
+      "category": "Team",
+      "title": "Duplicate creative assignments",
+      "changes": [
+        "Duplicate an existing creative assignment, review its brief, reference links, people, and pay, then choose a new deadline.",
+        "Copies start as new offers. Previous approvals, submissions, payments, and activity stay with the original."
+      ]
+    },
     {
       "id": "2026-11-13-confirm-past-creative-work",
       "version": "2.50.0",
