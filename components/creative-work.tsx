@@ -1,5 +1,5 @@
 "use client";
-import { AppSelect } from "@/components/ui/app-controls";
+import { ConfirmationRow, AppSelect } from "@/components/ui/app-controls";
 import { PersonLabel } from "@/components/dashboard/person-label";
 import { ManualPayEditor } from "@/components/manual-pay-editor";
 import { MoreOptions } from "@/components/dashboard/more-options";
@@ -89,18 +89,23 @@ export function CreativeWorkPage({ state, employees, isOwner, earningsOnly = fal
 function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople }: { item: CreativeAssignment; isOwner: boolean; busy: boolean; error: string; act: (input: Record<string, unknown>, item: CreativeAssignment) => Promise<boolean>; onEdit: () => void; onAddPeople: () => void }) {
   const [action, setAction] = useState(""), [note, setNote] = useState(""), [links, setLinks] = useState(""), [pay, setPay] = useState(""), [method, setMethod] = useState("");
   const [validation, setValidation] = useState("");
+  const today = studioLocal(Date.now()).slice(0, 10);
+  const [completedDate, setCompletedDate] = useState(() => [studioLocal(item.dueAt).slice(0, 10), studioLocal(Date.now()).slice(0, 10)].sort()[0]);
+  const [confirmCompleted, setConfirmCompleted] = useState(false);
   const owed = creativeOwed(item), paid = creativePaid(item);
-  const show = (action: string) => { setAction(action); setValidation(""); setNote(""); setPay((owed / 100).toFixed(2)); };
+  const show = (action: string) => { setAction(action); setConfirmCompleted(false); setValidation(""); setNote(""); setPay((owed / 100).toFixed(2)); };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault(); setValidation("");
     const input: Record<string, unknown> = { action, note };
     if (action === "submit") input.links = splitLinks(links);
+    if (action === "confirm-past") { if (!confirmCompleted || !completedDate || completedDate > today) { setValidation("Confirm the completed work and choose a date today or earlier."); return; } input.workDate = completedDate; input.confirmCompleted = true; }
     if (action === "pay") { const amount = moneyInputCents(pay); if (!amount || amount > owed) { setValidation("Enter an amount up to the remaining approved pay."); return; } input.amountCents = amount; input.method = method; }
     if (await act(input, item)) { setAction(""); setNote(""); setLinks(""); }
   };
   return <div className="creative-details">
     {isOwner && item.entryType === "manual" && <ManualPayEditor key={item.id} item={item} busy={busy} act={act} />}
     <div className="creative-totals"><div><span>{item.entryType === "manual" ? "Recorded pay" : "Agreed pay"}</span><strong>{dollars(item.amountCents)}</strong></div><div><span>Paid</span><strong>{dollars(paid)}</strong></div><div><span>{item.status === "approved" ? "Owed" : "After approval"}</span><strong>{dollars(item.status === "approved" ? owed : openStatuses.includes(item.status) ? item.amountCents : 0)}</strong></div></div>
+    {item.ownerConfirmation && <p className="creative-hint">Confirmed by Smooth · Completed {workDate(item.earnedAt!)}. Payment is recorded separately.</p>}
     {Boolean(item.advanceAppliedCents) && <p className="creative-hint">{dollars(item.advanceAppliedCents!)} of these earnings is covered by the advance.</p>}
     {(item.instructions || item.references.length > 0) && <section><h3>{item.instructions ? item.entryType === "manual" ? "Notes" : "Brief" : "References"}</h3>{item.instructions && <p className="creative-prose">{item.instructions}</p>}{item.references.length > 0 && <WorkLinks links={item.references} />}</section>}
     {item.submissions.length > 0 && <section><h3>Submissions</h3>{[...item.submissions].reverse().map((submission, index) => <div key={submission.id} className="creative-submission"><strong>{index === 0 ? "Latest submission" : "Earlier submission"} · {date(submission.submittedAt)}</strong><WorkLinks links={submission.links} />{submission.note && <p className="creative-prose">{submission.note}</p>}</div>)}</section>}
@@ -110,21 +115,23 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople }: {
       {!isOwner && item.status === "offered" && <><Button disabled={busy} onClick={() => void act({ action: "accept" }, item)}><Check size={17} />{busy ? "Saving…" : "Accept assignment"}</Button><Button variant="outline" disabled={busy} onClick={() => show("decline")}>Decline</Button></>}
       {!isOwner && ["accepted", "revision"].includes(item.status) && <Button disabled={busy} onClick={() => show("submit")}>Submit work</Button>}
       {isOwner && item.status === "submitted" && <><Button disabled={busy} onClick={() => show("approve")}><Check size={17} />Approve work</Button><Button variant="outline" disabled={busy} onClick={() => show("revise")}>Request changes</Button></>}
+      {isOwner && item.entryType !== "manual" && openStatuses.includes(item.status) && <Button variant="outline" disabled={busy} onClick={() => show("confirm-past")}><Check size={17} />Confirm past work</Button>}
       {isOwner && item.status === "approved" && owed > 0 && <Button disabled={busy} onClick={() => show("pay")}>Record payout</Button>}
       {isOwner && item.entryType !== "manual" && openStatuses.includes(item.status) && <Button variant="outline" disabled={busy} onClick={onEdit}>Edit work</Button>}
       {isOwner && item.entryType !== "manual" && !["cancelled", "declined"].includes(item.status) && <Button variant="outline" disabled={busy} onClick={onAddPeople}><Plus size={17} />Add people</Button>}
       {isOwner && openStatuses.includes(item.status) && <Button variant="ghost" disabled={busy} onClick={() => show("cancel")}>Cancel assignment</Button>}
     </div>}
     {action && <form className="creative-action-form" onSubmit={submit}>
-      <h3>{{ submit: "Submit your work", approve: "Approve submitted work", revise: "Request changes", pay: "Record a payout", cancel: "Cancel this assignment?", decline: "Decline this assignment?" }[action]}</h3>
+      <h3>{{ submit: "Submit your work", approve: "Approve submitted work", "confirm-past": "Confirm past work", revise: "Request changes", pay: "Record a payout", cancel: "Cancel this assignment?", decline: "Decline this assignment?" }[action]}</h3>
       {action === "submit" && <><p>Add links if there are files to review. For physical work or anything that does not need a link, leave them blank and send it for review.</p><label>Submission links · optional, one per line<Textarea maxLength={20500} value={links} onChange={event => setLinks(event.target.value)} placeholder="https://…" /></label><label>Submission notes · optional<Textarea maxLength={4000} value={note} onChange={event => setNote(event.target.value)} placeholder="What you completed or where Smooth can review it" /></label></>}
       {action === "approve" && <p>Approving adds <strong>{dollars(item.amountCents)}</strong> to {name(item.employeeId)}’s earnings. Any remaining advance is applied first.</p>}
+      {action === "confirm-past" && <><p>Add <strong>{dollars(item.amountCents)}</strong> to {name(item.employeeId)}’s earnings for work already completed. Any remaining advance is applied first. This does not record a payment.</p><label>Completion date<Input required type="date" max={today} value={completedDate} onChange={event => setCompletedDate(event.target.value)} /></label><ConfirmationRow checked={confirmCompleted} disabled={busy} onCheckedChange={setConfirmCompleted}>I confirm {name(item.employeeId)} completed this work.</ConfirmationRow><label>Note · optional<Textarea maxLength={4000} value={note} onChange={event => setNote(event.target.value)} /></label></>}
       {action === "revise" && <label>Feedback · optional<Textarea maxLength={4000} value={note} onChange={event => setNote(event.target.value)} placeholder="What should be adjusted?" /></label>}
       {action === "cancel" && <p>This closes the assignment. No earnings have been approved for it.</p>}
       {action === "decline" && <p>Smooth will see that you declined this offer.</p>}
       {action === "pay" && <><p>Record money you’ve already sent to {name(item.employeeId)}. This updates the payment record; it doesn’t transfer money.</p><label>Amount paid (USD)<Input required inputMode="decimal" value={pay} onChange={event => setPay(event.target.value)} /></label><label>Method or reference · optional<Input maxLength={80} placeholder="Apple Pay, cash, transfer…" value={method} onChange={event => setMethod(event.target.value)} /></label></>}
       {validation && <p className="login-error" role="alert">{validation}</p>}
-      <div className="creative-actions"><Button disabled={busy} type="submit">{busy ? "Saving…" : error ? "Try again" : ({ submit: "Send for review", approve: "Approve & add earnings", revise: "Send back for changes", pay: "Save payment record", cancel: "Cancel assignment", decline: "Decline offer" }[action])}</Button><Button disabled={busy} type="button" variant="outline" onClick={() => setAction("")}>Back</Button></div>
+      <div className="creative-actions"><Button disabled={busy} type="submit">{busy ? "Saving…" : error ? "Try again" : ({ submit: "Send for review", approve: "Approve & add earnings", "confirm-past": "Confirm & add earnings", revise: "Send back for changes", pay: "Save payment record", cancel: "Cancel assignment", decline: "Decline offer" }[action])}</Button><Button disabled={busy} type="button" variant="outline" onClick={() => setAction("")}>Back</Button></div>
     </form>}
     {error && <p className="login-error" role="alert">{error}</p>}
     <details className="creative-history"><summary>Activity history</summary>{[...item.history].reverse().map(entry => <p key={entry.id}>{name(entry.by)} · {entry.event}<small>{date(entry.at)}</small></p>)}</details>

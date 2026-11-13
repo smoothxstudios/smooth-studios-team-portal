@@ -1,6 +1,23 @@
 {
-  "currentVersion": "2.49.6",
+  "currentVersion": "2.50.0",
   "releases": [
+    {
+      "id": "2026-11-13-confirm-past-creative-work",
+      "version": "2.50.0",
+      "date": "2026-11-13",
+      "category": "Team",
+      "title": "Confirm past creative work",
+      "changes": [
+        "Smooth can confirm completed creative assignments directly, with a completion date and optional note.",
+        "Confirmed work adds the agreed earnings on its completion date without recording a payment or inventing an employee acceptance or submission."
+      ],
+      "employee": {
+        "title": "Previously completed creative work",
+        "changes": [
+          "Creative work confirmed by Smooth shows its completion date and approved earnings. Payment remains a separate record."
+        ]
+      }
+    },
     {
       "id": "2026-11-10-assignment-card-position",
       "version": "2.49.6",

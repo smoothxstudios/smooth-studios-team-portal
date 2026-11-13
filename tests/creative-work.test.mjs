@@ -269,3 +269,45 @@ test('concurrent additions from different people in one work create only one new
   assert.equal(all.length,3);assert.equal(all.filter(item=>item.employeeId==='akiva').length,1);
   assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_notification_events').get().n,3);
 });
+
+test("Smooth can confirm earlier completed creative work without inventing an employee response or payment", async t => {
+  const f = await setup(); t.after(() => f.close());
+  const original = await create(f);
+  const input = { workDate: "2025-10-05", confirmCompleted: true, note: "Completion verified outside the app." };
+  assert.equal((await act(f, "jordyn", original, "confirm-past", input)).status, 403);
+  const result = await act(f, "owner", original, "confirm-past", input);
+  assert.equal(result.status, 200);
+  const item = result.data.assignment;
+  assert.equal(item.status, "approved");
+  assert.equal(item.earnedAt, "2025-10-05T04:00:00.000Z");
+  assert.equal(item.ownerConfirmation.by, "owner");
+  assert.equal(item.ownerConfirmation.workDate, input.workDate);
+  assert.deepEqual(item.submissions, []);
+  assert.deepEqual(item.payments, []);
+  assert.equal(item.history.at(-1).event, "confirmed by Smooth");
+  assert.equal(item.history.at(-1).note, input.note);
+  assert.equal(creativeEarnings([item], 2025).metrics.owed, original.amountCents);
+  assert.equal(creativeEarnings([item], 2026).metrics.owed, 0);
+  const source = await f.DB.prepare("SELECT earned_at,amount_cents FROM payroll_sources WHERE id=?").bind(item.id).first();
+  assert.equal(source.earned_at, item.earnedAt);
+  assert.equal(source.amount_cents, item.amountCents);
+  assert.equal((await act(f, "owner", original, "confirm-past", input)).status, 409);
+  assert.equal((await act(f, "owner", item, "confirm-past", input)).status, 409);
+  const alerts = (await f.DB.prepare("SELECT title,user_id FROM team_inbox WHERE target_id=? AND title='Creative work confirmed by Smooth'").bind(item.id).all()).results;
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0].user_id, "jordyn");
+  await Promise.allSettled(f.pending);
+});
+
+test("past-work confirmation rejects missing consent, invalid dates, and closed work", async t => {
+  const f = await setup(); t.after(() => f.close());
+  const original = await create(f);
+  for (const input of [ {workDate:"2025-10-05"}, {workDate:"2025-02-30",confirmCompleted:true},
+    {workDate:"2099-01-01",confirmCompleted:true}, {workDate:"",confirmCompleted:true} ]) {
+    assert.equal((await act(f,"owner",original,"confirm-past",input)).status,400);
+  }
+  const closed = (await act(f,"owner",original,"cancel")).data.assignment;
+  assert.equal((await act(f,"owner",closed,"confirm-past",{workDate:"2025-10-05",confirmCompleted:true})).status,409);
+  assert.equal(creativeOwed(closed),0);
+  await Promise.allSettled(f.pending);
+});

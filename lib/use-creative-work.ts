@@ -6,6 +6,7 @@ import { useRefreshSource } from "@/components/dashboard-refresh";
 export type CreativeAssignment = {
   groupId?: string;
   entryType?: "manual"; workCategory?: string; earnedAt?: string;
+  ownerConfirmation?: { by: "owner"; at: string; workDate: string };
   id: string; employeeId: string; version: number; title: string; instructions: string; references: string[];
   dueAt: string; amountCents: number; status: "offered" | "accepted" | "submitted" | "revision" | "approved" | "declined" | "cancelled";
   advanceAppliedCents?: number;

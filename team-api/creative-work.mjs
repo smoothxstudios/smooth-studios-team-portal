@@ -101,6 +101,21 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
         requireOwner();
         if (item.status !== "submitted") fail(409, "Only submitted work can be sent back for changes.");
         item.status = "revision"; event = "changes requested"; break;
+      case "confirm-past": {
+        requireOwner();
+        if (item.entryType === "manual" || !["offered", "accepted", "submitted", "revision"].includes(item.status)) fail(409, "Only active creative assignments can be confirmed. Approved earnings stay unchanged.");
+        if (input.confirmCompleted !== true) fail(400, "Confirm that this person completed the work.");
+        const workDate = text(input.workDate, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(workDate) || workDate > studioLocal(now).slice(0, 10)) fail(400, "Choose a completion date today or earlier.");
+        let earnedAt;
+        try { earnedAt = localInstant(`${workDate}T00:00`); } catch { fail(400, "Choose a valid completion date."); }
+        item.status = "approved";
+        item.earnedAt = earnedAt;
+        item.approvedAt = now;
+        item.ownerConfirmation = { by: "owner", at: now, workDate };
+        event = "confirmed by Smooth";
+        break;
+      }
       case "approve":
         requireOwner();
         if (item.status !== "submitted") fail(409, "Review a submission before approving payment.");
@@ -122,7 +137,7 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
       default: fail(400, "Choose an available assignment action.");
     }
   }
-  const note = ["revise", "approve", "cancel"].includes(input.action) ? text(input.note ?? "", 4000, false) : "";
+  const note = ["revise", "approve", "cancel", "confirm-past"].includes(input.action) ? text(input.note ?? "", 4000, false) : "";
   item.history = [...item.history, { id: mutation, event, by: user, at: now, ...(note ? { note } : {}) }];
   // Each item has its own compare-and-swap revision. The notification insert is
   // guarded by this exact mutation, so stale retries cannot duplicate earnings,
@@ -135,7 +150,7 @@ export async function creativeWorkRoute({ request, db, user, env, ctx, body, fai
       .bind(item.id, item.employeeId, item.version, mutation, JSON.stringify(item));
   const name = TEAM.find(p => p.id === item.employeeId).name;
   const recipient = isOwner ? item.employeeId : "owner";
-  const title = isOwner ? ({ assigned: "New creative assignment", updated: "Creative assignment updated", approved: "Creative work approved", cancelled: "Creative assignment cancelled", "changes requested": "Changes requested" }[event]) : `${name} ${event} creative work`;
+  const title = isOwner ? ({ assigned: "New creative assignment", updated: "Creative assignment updated", approved: "Creative work approved", "confirmed by Smooth": "Creative work confirmed by Smooth", cancelled: "Creative assignment cancelled", "changes requested": "Changes requested" }[event]) : `${name} ${event} creative work`;
   const notification = JSON.stringify(event === "payment recorded" ? paymentNotification(item.employeeId, item.id) : { title: item.entryType === "manual" ? "Pay updated" : title, body: `${notificationText(item.title, 160)}. ${item.entryType === "manual" ? "View the payment in Earnings." : "Open Creative Work to see the details."}`, target: item.entryType === "manual" ? "payouts" : "creative", targetId: item.id, personId: item.employeeId });
   const result = await db.batch([write,
     db.prepare(`INSERT INTO team_notification_events (id, user_id, kind, payload, due_at)
