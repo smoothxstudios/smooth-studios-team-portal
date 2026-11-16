@@ -1,0 +1,23 @@
+name: Verify live guidelines and answer submitted questions
+on:
+  push:
+    branches: [codex/review-studio-guidelines-20261116]
+    paths: [data/reviewed-guidelines-acknowledge.json]
+permissions:
+  contents: read
+jobs:
+  verify-live-and-answer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .current
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify live answers and update the submitted question queue
+        run: node scripts/publish-reviewed-guidelines.mjs answer-questions
+        env:
+          DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}
