@@ -59,7 +59,7 @@
 .schedule-modal form { display: grid; gap: 17px; min-width: 0; }
 .schedule-modal label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; min-width: 0; }
 .schedule-modal input:not([type=checkbox]), .schedule-modal textarea, .schedule-modal select { font-size: 16px; width: 100%; min-width: 0; min-height: 44px; }
-.schedule-form-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.schedule-form-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .875rem; }
 .schedule-modal .schedule-check { display: flex; align-items: center; gap: 10px; font-weight: 450; }
 .schedule-check input { width: 18px; height: 18px; accent-color: var(--primary); }
 
@@ -326,7 +326,7 @@
   .agenda-history > div > div > span:last-child { grid-column: 2; grid-row: 1; }
 }
 @media (max-width: 700px) {
-  .schedule-offers, .schedule-form-pair { grid-template-columns: minmax(0, 1fr); }
+  .schedule-offers { grid-template-columns: minmax(0, 1fr); }
   .schedule-panel { padding: 18px; }
   .schedule-filter { width: 100%; }
   .schedule-filter select { flex: 1; }
@@ -1225,7 +1225,7 @@ button { cursor: pointer; }
 
   .team-scheduling { gap: 16px; }
   .schedule-panel { padding: 16px; }
-  .schedule-offers, .schedule-form-pair { grid-template-columns: minmax(0, 1fr); }
+  .schedule-offers { grid-template-columns: minmax(0, 1fr); }
   .schedule-person, .schedule-section-heading p, .schedule-small, .schedule-filter { font-size: .875rem; }
   .schedule-toolbar, .schedule-filter { align-items: stretch; width: 100%; }
   .schedule-toolbar > .schedule-actions { width: 100%; }
@@ -1372,7 +1372,7 @@ button { cursor: pointer; }
 .owner-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; min-width: 0; }
 .owner-overview > * { min-width: 0; }
 .owner-finances { min-width: 0; }
-.owner-finance-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.owner-finance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); gap: clamp(.875rem, 2vw, 1.125rem); }
 .owner-finance-card { padding: 22px 24px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); min-width: 0; }
 .owner-finance-card header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 14px; }
 .owner-finance-card h2 { font-size: 15px; font-weight: 650; }
@@ -1451,7 +1451,7 @@ button { cursor: pointer; }
 .owner-reports .period-total strong { margin-top: 8px; font-size: 26px; }
 .owner-reports .chart-legend { display: flex; flex-wrap: wrap; font-size: 12px; }
 .owner-reports .legend-dark { background: var(--muted-foreground); }
-.owner-reports .category-revenue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; padding: 0 24px 12px; }
+.owner-reports .category-revenue-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 0 24px; padding: 0 24px 12px; }
 .owner-reports .category-revenue-card { padding: 16px 0; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; }
 .owner-reports .category-revenue-card strong { font-size: 13px; white-space: normal; }
 .owner-reports .category-revenue-card small, .owner-reports .category-revenue-note, .owner-reports .stripe-connected { font-size: 12px; }
@@ -1469,7 +1469,7 @@ button { cursor: pointer; }
 .owner-team-tabs [data-slot="tabs-trigger"] { min-height: 36px; padding: 7px 18px; font-size: 13px; }
 .owner-team-tabs [data-slot="tabs-trigger"][data-state="active"] { color: var(--foreground); background: var(--muted); box-shadow: none; }
 .owner-team-tabs .team-engagement-review { margin-top: 0; }
-.owner-dashboard .team-page-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 10px; align-items: start; }
+.owner-dashboard .team-page-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 10px; align-items: start; }
 .owner-dashboard .employee-card { padding: 14px; border-radius: 16px; }
 .owner-dashboard .employee-card-head { grid-template-columns: 34px minmax(0,1fr); gap: 10px; }
 .owner-dashboard .employee-avatar.large { width: 34px; height: 34px; border-radius: 10px; font-size: 14px; box-shadow: none; }
@@ -1503,7 +1503,6 @@ button { cursor: pointer; }
 @media (max-width: 767px) {
   .owner-overview { gap: 18px; }
   .owner-dashboard .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .owner-finance-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .owner-finance-card { padding: 18px; }
   .owner-dashboard .kpi-card { min-height: 137px; padding: 16px; }
   .owner-dashboard .kpi-heading { align-items: flex-start; font-size: 12px; }
@@ -1531,7 +1530,7 @@ button { cursor: pointer; }
   .owner-reports-toggle > span { display: none !important; }
   .owner-reports .period-strip { grid-template-columns: 1fr; }
   .owner-reports .period-total { padding: 18px; }
-  .owner-reports .category-revenue-grid { grid-template-columns: 1fr; padding: 0 18px 8px; }
+  .owner-reports .category-revenue-grid { padding: 0 18px 8px; }
   .owner-reports .stripe-flow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .owner-reports .stripe-flow-grid article { padding: 16px; }
   .owner-reports .stripe-unmatched { padding: 18px; }
@@ -2366,11 +2365,4 @@ button { cursor: pointer; }
 /* Team visibility controls */
 .roster-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .roster-heading p{margin:0;color:var(--muted-foreground);font-size:13px;max-width:55ch}
-.team-active-control{display:flex;align-items:center;justify-content:space-between;padding:10px 0;margin:8px 0;border-bottom:1px solid var(--border);font-size:13px;font-weight:600}
-.team-active-control input{appearance:none;position:relative;width:40px;height:24px;border-radius:99px;background:var(--muted-foreground);cursor:pointer;transition:background .15s ease-out}
-.team-active-control input:checked{background:#168653}
-.team-active-control input:after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:white;transition:transform .15s ease-out}
-.team-active-control input:checked:after{transform:translateX(16px)}
-.team-active-control input:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
-.team-active-control input:disabled{opacity:.5;cursor:wait}
-@media(prefers-reduced-motion:reduce){.team-active-control input,.team-active-control input:after{transition:none}}
+.team-active-control { display: flex; align-items: center; justify-content: space-between; gap: .75em; min-height: 2.75rem; padding: .625rem 0; margin: .5rem 0; border-bottom: 1px solid var(--border); font-size: .8125rem; font-weight: 600; }

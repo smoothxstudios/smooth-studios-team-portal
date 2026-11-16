@@ -5,6 +5,8 @@
   --app-ease: cubic-bezier(.22, 1, .36, 1);
   --app-surface-shadow: 0 24px 80px #00000024, 0 2px 8px #0000000a;
   --app-control-shadow: 0 1px 3px #00000008;
+  --app-control-min: 2.75rem;
+  --app-control-gap: .75em;
 }
 .dark { color-scheme: dark; }
 body { -webkit-font-smoothing: antialiased; }
@@ -67,20 +69,20 @@ body { -webkit-font-smoothing: antialiased; }
 .form-more-options[open] > div { animation: app-reveal 180ms ease-out; }
 
 /* Pickers share the same two-line treatment on phones and larger screens. */
-.app-field { display: grid; gap: 8px; min-width: 0; }
+.app-field { display: grid; gap: .5em; min-width: 0; }
 .app-field > label, .app-field-label { color: var(--muted-foreground); font-size: 13px; font-weight: 600; }
-.app-picker-trigger { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; min-height: 54px; border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; background: var(--card); color: var(--foreground); text-align: left; font-size: 16px; font-weight: 500; box-shadow: var(--app-control-shadow); transition: border-color 160ms ease, background-color 160ms ease; }
+.app-picker-trigger { display: flex; align-items: center; gap: var(--app-control-gap); width: 100%; min-width: 0; max-width: 100%; min-height: var(--app-control-min); height: auto; border: 1px solid transparent; border-radius: var(--app-field-radius); padding: .625em .8em; background: var(--secondary); color: var(--foreground); text-align: left; font-size: .9375rem; font-weight: 600; box-shadow: none; transition: border-color 160ms ease, background-color 160ms ease; }
 .app-picker-trigger[data-placeholder] { color: var(--muted-foreground); }
 .app-picker-trigger > span:last-child { flex-shrink: 0; color: var(--muted-foreground); }
 .app-picker-trigger[data-state="open"] { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); }
 .app-picker-trigger:focus-visible, .app-segment:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .app-picker-trigger:disabled { opacity: .5; cursor: default; }
-.app-picker-copy { display: grid; gap: 4px; min-width: 0; flex: 1; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
-.app-picker-copy small { font-size: 12px; color: var(--muted-foreground); font-weight: 400; line-height: 1.4; }
-.app-person-icon { display: grid; place-items: center; height: 34px; width: 34px; flex: 0 0 34px; border-radius: 50%; color: white; font-size: 14px; font-weight: 650; }
-.app-picker-menu { z-index: 100; width: var(--radix-select-trigger-width); max-width: calc(100vw - 24px); max-height: min(360px, var(--radix-select-content-available-height)); overflow: hidden; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 12px 45px #0003; transform-origin: var(--radix-select-content-transform-origin); animation: app-picker-in 180ms var(--app-ease); }
+.app-picker-copy { display: grid; gap: .25em; min-width: 0; flex: 1; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+.app-picker-copy small { font-size: .8em; color: var(--muted-foreground); font-weight: 400; line-height: 1.4; }
+.app-person-icon { display: grid; place-items: center; height: auto; width: 2.125rem; aspect-ratio: 1; flex: 0 0 2.125rem; border-radius: 50%; color: white; font-size: 14px; font-weight: 650; }
+.app-picker-menu { z-index: 100; width: var(--radix-select-trigger-width); max-width: calc(100vw - 1.5rem); max-height: min(22.5rem, var(--radix-select-content-available-height)); overflow: hidden; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 12px 45px #0003; transform-origin: var(--radix-select-content-transform-origin); animation: app-picker-in 180ms var(--app-ease); }
 .app-picker-options { padding: 6px; }
-.app-picker-option { position: relative; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 12px 34px 12px 12px; border-radius: 12px; font-size: 15px; font-weight: 500; outline: none; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.app-picker-option { position: relative; display: flex; align-items: center; gap: .625em; min-height: 3rem; padding: .75em 2.25em .75em .75em; border-radius: .75rem; font-size: .9375rem; font-weight: 500; outline: none; cursor: pointer; user-select: none; -webkit-user-select: none; }
 .app-picker-option[data-highlighted] { background: var(--secondary); }
 .app-picker-option[data-state="checked"] { background: var(--accent); color: var(--accent-foreground); }
 .app-picker-option[data-disabled] { opacity: .4; pointer-events: none; }
@@ -172,7 +174,7 @@ button { touch-action: manipulation; }
 [data-slot="button"][data-variant="outline"] { background: var(--secondary); border-color: transparent; box-shadow: none; }
 [data-slot="button"][data-variant="ghost"] { color: var(--primary); }
 [data-slot="button"]:active:not(:disabled) { transition-duration: 80ms; transform: scale(.97); }
-[data-slot="button"][data-size^="icon"] { width: 44px; height: 44px; padding: 0; flex-shrink: 0; }
+[data-slot="button"][data-size^="icon"] { width: var(--app-control-min); height: var(--app-control-min); min-height: var(--app-control-min); aspect-ratio: 1; padding: 0; flex-shrink: 0; }
 [data-slot="input"], [data-slot="textarea"], .dashboard-content select { min-height: 44px; border-radius: 12px; font-size: 1rem; background: var(--card); }
 /* Font-relative width and a constant ratio keep tracks proportional in any row. */
 .app-switch[data-slot="switch"] { --switch-width: clamp(2.5rem, 3.2em, 3.5rem); position: relative; box-sizing: border-box; flex: 0 0 auto; width: min(100%, var(--switch-width)); min-width: 0; max-width: 100%; height: auto; min-height: 0; max-height: none; aspect-ratio: 5 / 3; align-self: center; padding: 0; border: 0; border-radius: 100vmax; background: #b9b9bf; transition: background-color 160ms ease; }
@@ -444,7 +446,7 @@ html[data-sidebar-motion] .sidebar-backdrop {
 }
 
 /* Shared dimensions for every page and form. */
-:root { --app-card-radius: 24px; --app-field-radius: 12px; --app-sheet-radius: 28px; --app-content-inset: 20px; }
+:root { --app-card-radius: 24px; --app-field-radius: 12px; --app-sheet-radius: 28px; --app-content-inset: clamp(1rem, 2vw, 1.25rem); }
 [data-slot="button"] { min-height: 44px; max-width: 100%; border-radius: var(--app-field-radius); }
 [data-slot="button"][data-variant="default"] { box-shadow: none; }
 [data-slot="button"][data-size^="icon"] { border-radius: 50%; }
@@ -478,11 +480,9 @@ input::-webkit-datetime-edit { min-width: 0; padding: 0; }
 .app-task-sheet :is(input:not([type="checkbox"]), textarea), .app-picker-trigger { border-radius: var(--app-field-radius); }
 .app-page-state { display: flex; justify-content: center; align-items: center; gap: 10px; min-height: 160px; color: var(--muted-foreground); font-size: 14px; }
 .app-feature-error { padding: 24px; border-radius: var(--app-card-radius); background: var(--card); display: grid; gap: 12px; justify-items: start; }
-@media (max-width: 767px) { :root { --app-content-inset: 16px; } }
 @media (max-width: 640px) {
   [data-slot="dialog-viewport"][data-presentation="sheet"] { padding-inline: 12px; }
   [data-slot="dialog-content"][data-presentation="sheet"] > .modal-exit { top: 10px; right: 10px; }
-  .schedule-form-pair { grid-template-columns: minmax(0, 1fr); }
 }
 .engagement-popup-heading { padding-right: 44px; }
 /* Older detail dialogs keep their fixed headings, with the shared close target. */
@@ -579,12 +579,12 @@ input::-webkit-datetime-edit { min-width: 0; padding: 0; }
 }
 
 /* The same compact actions across tabs; form fields keep their own geometry. */
-.app-button[data-slot="button"][data-size]:not([data-size^="icon"]) { min-height: 36px; height: auto; padding: 8px 12px; gap: 7px; border-radius: 12px; font-size: 13px; font-weight: 600; line-height: 20px; }
+.app-button[data-slot="button"][data-size]:not([data-size^="icon"]) { min-height: 2.25rem; height: auto; max-width: 100%; padding: .6em .9em; gap: .5em; border-radius: .75rem; font-size: .8125rem; font-weight: 600; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
 .app-button[data-slot="button"]:is([data-variant="outline"], [data-variant="secondary"], [data-variant="ghost"]) { border: 0; background: var(--secondary); color: var(--foreground); box-shadow: none; }
 .app-button[data-slot="button"][data-size^="icon"] { border-radius: 50%; }
 .mobile-menu-trigger.app-button[data-slot="button"] { color: var(--primary); background: var(--card); }
 @media (hover: hover) and (pointer: fine) { .app-button[data-slot="button"]:is([data-variant="outline"], [data-variant="secondary"], [data-variant="ghost"]):hover { background: color-mix(in srgb, var(--foreground) 7%, var(--secondary)); } }
-.app-task-sheet [data-slot="dialog-footer"] .app-button[data-slot="button"] { min-height: 44px; padding: 10px 16px; font-size: 14px; }
+.app-task-sheet [data-slot="dialog-footer"] .app-button[data-slot="button"] { min-height: var(--app-control-min); padding: .625em 1em; font-size: .875rem; }
 .owner-appointment-filters [data-slot="select-trigger"] { min-width: 0; min-height: 36px; height: 36px; border: 0; background: var(--secondary); border-radius: 12px; box-shadow: none; font-size: 13px; }
 .person-avatar.person-avatar { display: inline-grid; place-items: center; border-radius: 50%; line-height: 1; font-weight: 650; box-shadow: none; }
 .profile-customization { display: grid; gap: 16px; min-width: 0; padding: 0; border: 0; }
@@ -647,7 +647,7 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
   .dark .dashboard-sidebar[data-slot="sidebar-container"] { box-shadow: 7px 0 26px #0005, 1px 0 0 #ffffff0c; }
 }
 @media (max-width: 767px) {
-  .app-button[data-slot="button"][data-size]:not([data-size^="icon"]) { min-height: 40px; padding-block: 10px; font-size: 13px; }
+  .app-button[data-slot="button"][data-size]:not([data-size^="icon"]) { min-height: var(--app-control-min); padding-block: .625em; font-size: .8125rem; }
   .alerts-controls .app-button.compact-control { padding-inline: 10px; }
   .alerts-controls .reminder-trigger.app-button { width: 40px; padding: 0; }
   .alerts-filters > button { padding-inline: 10px; }
@@ -671,7 +671,7 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
 .settings-search:focus-within { outline: 2px solid var(--ring); outline-offset: 2px; }
 .settings-search button { display: grid; place-items: center; flex: 0 0 36px; min-height: 44px; border: 0; background: transparent; color: var(--muted-foreground); }
 .settings-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
-.settings-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 24px; }
+.settings-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); align-items: start; gap: clamp(1rem, 2vw, 1.5rem); }
 .settings-group { min-width: 0; }
 .settings-group > h2 { margin: 0 0 8px 16px; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--muted-foreground); }
 .settings-group-rows { overflow: hidden; border-radius: var(--app-card-radius); background: var(--card); box-shadow: var(--app-group-shadow); }
@@ -694,7 +694,6 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
 .settings-notifications > div:not(.settings-card-heading), .rental-pay-settings > ul { width: 100%; min-width: 0; }
 @keyframes settings-enter { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: translateX(0); } }
 @media (hover: hover) and (pointer: fine) { .settings-link:hover { background: color-mix(in srgb, var(--secondary) 55%, var(--card)); } }
-@media (max-width: 680px) { .settings-groups { grid-template-columns: minmax(0, 1fr); gap: 22px; } }
 @media (prefers-reduced-motion: reduce) { .settings-detail { animation: none; } .settings-link { transition: none; } }
 
 /* An offer is one person, one response, and one set of actions. */
@@ -719,22 +718,21 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
 .app-task-sheet .schedule-dialog-feedback .schedule-success { padding: 12px 14px; font-size: 13px; line-height: 1.45; }
 
 /* Shared compact dropdowns and device-native date pickers. */
-.app-picker-trigger { min-height: 44px; padding: 10px 12px; border-color: transparent; border-radius: var(--app-field-radius); background: var(--secondary); font-size: 15px; font-weight: 600; box-shadow: none; }
 @media (hover: hover) and (pointer: fine) { .app-picker-trigger:not(:disabled):hover { background: color-mix(in srgb, var(--secondary) 85%, var(--foreground) 5%); } }
 .app-picker-trigger:active:not(:disabled) { opacity: .8; }
-.app-date-control { position: relative; display: inline-flex; align-items: center; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; border: 1px solid transparent; border-radius: var(--app-field-radius); background: var(--secondary); color: var(--foreground); }
-.app-date-control > input[data-slot="input"] { position: relative; z-index: 1; box-sizing: border-box; display: block; width: 100%; min-width: 0; max-width: 100%; height: 44px; padding: 10px 38px 10px 12px; border: 0; border-radius: inherit; background: transparent; color: inherit; box-shadow: none; font-size: 16px; font-weight: 500; cursor: pointer; }
-.app-date-control > svg { position: absolute; right: 12px; color: var(--muted-foreground); pointer-events: none; }
+.app-date-control { position: relative; display: inline-flex; align-items: center; width: 100%; min-width: 0; max-width: 100%; min-height: var(--app-control-min); border: 1px solid transparent; border-radius: var(--app-field-radius); background: var(--secondary); color: var(--foreground); }
+.app-date-control > input[data-slot="input"] { position: relative; z-index: 1; box-sizing: border-box; display: block; width: 100%; min-width: 0; max-width: 100%; height: auto; min-height: var(--app-control-min); padding: .625em 2.375em .625em .75em; border: 0; border-radius: inherit; background: transparent; color: inherit; box-shadow: none; font-size: 1rem; line-height: 1.5; font-weight: 500; cursor: pointer; }
+.app-date-control > svg { position: absolute; right: .75em; width: 1.125em; height: 1.125em; color: var(--muted-foreground); pointer-events: none; }
 .app-date-control:focus-within { outline: 2px solid var(--primary); outline-offset: 3px; }
 .app-date-control > input[data-slot="input"]:focus-visible { outline: none; box-shadow: none; }
 .app-date-control[data-disabled] { opacity: .5; }
 .app-date-control input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
 .app-date-control input::-webkit-date-and-time-value { overflow: hidden; text-overflow: ellipsis; }
-.schedule-filter > .app-picker-trigger, .engagement-filters > .app-picker-trigger, .employee-earnings-heading > .app-picker-trigger { width: auto; min-width: 140px; }
-.schedule-filter > .app-picker-trigger { min-width: 180px; }
-.creative-filters > .app-picker-trigger { flex: 0 1 220px; }
+.schedule-filter > .app-picker-trigger, .engagement-filters > .app-picker-trigger, .employee-earnings-heading > .app-picker-trigger { width: auto; flex: 0 1 14rem; min-width: min(100%, 9rem); max-width: 100%; }
+.schedule-filter > .app-picker-trigger { min-width: min(100%, 11rem); }
+.creative-filters > .app-picker-trigger { flex: 1 1 14rem; max-width: 100%; }
 .agenda-person-filter > .app-picker-trigger { width: 100%; }
-.agenda-date-picker > .app-date-control { width: 180px; }
+.agenda-date-picker > .app-date-control { width: min(100%, 13rem); flex: 0 1 13rem; }
 .login-account-picker { margin-bottom: 20px; }
 .login-account-picker > .app-picker-trigger { min-height: 50px; }
 /* One aligned filter and date rail, with equal previous/next targets. */
@@ -754,8 +752,7 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
 .availability-overview > .availability-overview-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
 @media (max-width: 640px) {
  .schedule-filter > .app-picker-trigger { flex: 1; min-width: 0; }
- .creative-filters > label:not(.creative-search), .creative-filters > .app-picker-trigger { flex: 1 1 140px; min-width: 0; }
- .agenda-date-picker > .app-date-control { flex: 0 1 180px; }
+ .creative-filters > label:not(.creative-search), .creative-filters > .app-picker-trigger { flex: 1 1 9rem; min-width: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .app-picker-trigger { transition: none; } }
 @media (prefers-contrast: more) { .app-picker-trigger, .app-date-control { border-color: var(--muted-foreground); } }
@@ -787,3 +784,5 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
  .appointment-offers .schedule-row { align-items: flex-start; }
  .appointment-offers .schedule-status { max-width: 150px; text-align: center; }
 }
+
+@media (pointer: coarse) { .app-button[data-slot="button"][data-size]:not([data-size^="icon"]) { min-height: var(--app-control-min); } }

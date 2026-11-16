@@ -1,8 +1,8 @@
 "use client";
 import { IncludeInactive, useTeamRoster } from "@/components/team-roster";
 import { useState } from "react";
-import { TEAM, studioLocal, addLocalDays } from "@/lib/team-schedule.mjs";
-import { dayAvailability } from "@/lib/day-availability.mjs";
+import { studioLocal, addLocalDays } from "@/lib/team-schedule.mjs";
+import { AVAILABILITY_TEAM, dayAvailability } from "@/lib/day-availability.mjs";
 import { PersonAvatar } from "@/components/team-profile";
 import type { TeamSchedule } from "@/lib/team-api";
 import { AppSelect } from "@/components/ui/app-controls";
@@ -13,11 +13,12 @@ const time = (s: string) => new Date(s).toLocaleTimeString("en-US", { timeZone: 
 export function AvailabilityOverview({ schedule, filter, onFilterChange }: { schedule: TeamSchedule; filter: string; onFilterChange: (value: string) => void }) {
   const roster = useTeamRoster();
   const [day, setDay] = useState(() => studioLocal(Date.now()).slice(0, 10));
-  const people = TEAM.filter(p => roster?.visible(p.id) !== false && (filter === "all" || filter === p.id));
+  const visiblePeople = AVAILABILITY_TEAM.filter(person => roster?.visible(person.id) !== false);
+  const people = visiblePeople.filter(person => filter === "all" || filter === person.id);
   return <section className="availability-overview">
     <div className="availability-overview-heading"><h2>Daily availability</h2><Button variant="outline" className="availability-today" onClick={() => setDay(studioLocal(Date.now()).slice(0, 10))}>Today</Button></div>
     <div className="availability-controls">
-      <AppSelect aria-label="Team member" value={filter} onValueChange={onFilterChange}><option value="all">Everyone</option>{TEAM.filter(person => roster?.visible(person.id) !== false).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</AppSelect>
+      <AppSelect aria-label="Team member" value={filter} onValueChange={onFilterChange}><option value="all">Everyone</option>{visiblePeople.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</AppSelect>
       <div className="availability-date-controls" role="group" aria-label="Choose day">
         <Button variant="ghost" size="icon" aria-label="Previous day" onClick={() => setDay(addLocalDays(`${day}T00:00`, -1).slice(0, 10))}><ChevronLeft size={18} /></Button>
         <Input aria-label="Availability day" type="date" value={day} onChange={e => { if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) setDay(e.target.value); }} />
@@ -29,7 +30,7 @@ export function AvailabilityOverview({ schedule, filter, onFilterChange }: { sch
       const dayInfo = dayAvailability(person.id, day, schedule);
       const span = (p: { start: string; end: string }) => `${time(p.start < dayInfo.start ? dayInfo.start : p.start)}–${time(p.end >= dayInfo.end ? dayInfo.end : p.end)}`;
       const freeLabel = dayInfo.free.map(span).join(" · ");
-      const inactive = roster?.isActive(person.id) === false || (person.id !== "owner" && schedule.activeEmployeeIds && !schedule.activeEmployeeIds.includes(person.id));
+      const inactive = roster?.isActive(person.id) === false || (schedule.activeEmployeeIds && !schedule.activeEmployeeIds.includes(person.id));
       const label = person.seasonal ? "Seasonal" : inactive ? "Inactive" : dayInfo.status === "available" ? "Available" : dayInfo.status === "partial" ? "Partly available" : "Unavailable";
       return <details className="availability-daily-person" key={`${day}-${person.id}`}><summary><PersonAvatar personId={person.id} name={person.name} className="employee-avatar" /><span className="availability-daily-copy"><strong>{person.name}</strong><span>{person.seasonal ? "Not suggested automatically" : inactive ? "Not suggested until active" : freeLabel || "Busy during studio hours"}</span></span><span className={`availability-day-status is-${person.seasonal || inactive ? "inactive" : dayInfo.status}`}>{label}</span><ChevronDown size={16} aria-hidden="true" /></summary><div className="availability-daily-details">
         {(person.seasonal || inactive) && <p>Free time: {freeLabel || "None this day"}</p>}

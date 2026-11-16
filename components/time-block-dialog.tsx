@@ -5,7 +5,8 @@ import { AppPicker,ConfirmationRow } from "@/components/ui/app-controls";
 import { Button } from "@/components/ui/button";
 import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { TEAM,addLocalDays,studioLocal } from "@/lib/team-schedule.mjs";
+import { addLocalDays,studioLocal } from "@/lib/team-schedule.mjs";
+import { AVAILABILITY_TEAM } from "@/lib/day-availability.mjs";
 import type { Dispatch,SetStateAction } from "react";
 export type TimeBlockDraft = { userId: string; reason: string; startLocal: string; endLocal: string; repeatUntil: string; weekly: boolean };
 export function TimeBlockDialog({ blockOpen, setBlockOpen, block, setBlock, busy, needsRefresh, isOwner, error, mutate }: {
@@ -17,7 +18,7 @@ export function TimeBlockDialog({ blockOpen, setBlockOpen, block, setBlock, busy
   return (
     <Dialog open={blockOpen} onOpenChange={open => { if (!busy) setBlockOpen(open); }}><DialogContent presentation="sheet" closeDisabled={busy} className="schedule-modal app-task-sheet"><DialogHeader><DialogTitle>Block time</DialogTitle><DialogDescription>Choose when you can’t work. Accepted assignments stay in place.</DialogDescription></DialogHeader>
       <form className="app-sheet-form" onSubmit={async e => { e.preventDefault(); if (await mutate("/blocks", { ...block, repeatUntil: block.weekly ? block.repeatUntil : null })) setBlockOpen(false); }}>
-        <div className="app-sheet-scroll">{isOwner && <AppPicker label="Team member" required placeholder="Choose a person" value={block.userId} disabled={busy} onValueChange={userId => setBlock({ ...block, userId })} options={TEAM.filter(p => roster?.visible(p.id) !== false || p.id === block.userId).map(p => ({ value: p.id, label: p.name, color: p.color }))} />}
+        <div className="app-sheet-scroll">{isOwner && <AppPicker label="Team member" required placeholder="Choose a person" value={block.userId} disabled={busy} onValueChange={userId => setBlock({ ...block, userId })} options={AVAILABILITY_TEAM.filter(p => roster?.visible(p.id) !== false || p.id === block.userId).map(p => ({ value: p.id, label: p.name, color: p.color }))} />}
         <label>Reason<Input required maxLength={120} value={block.reason} onChange={e => setBlock({ ...block, reason: e.target.value })} placeholder="Reason for being unavailable" /></label>
         <div className="schedule-form-pair"><label>Starts<Input required type="datetime-local" value={block.startLocal} onChange={e => setBlock({ ...block, startLocal: e.target.value })} /></label><label>Ends<Input required type="datetime-local" value={block.endLocal} onChange={e => setBlock({ ...block, endLocal: e.target.value })} /></label></div>
         <MoreOptions><ConfirmationRow checked={block.weekly} disabled={busy} onCheckedChange={weekly => setBlock({ ...block, weekly })}>Repeat every week on this weekday</ConfirmationRow>
