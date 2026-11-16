@@ -174,13 +174,15 @@ button { touch-action: manipulation; }
 [data-slot="button"]:active:not(:disabled) { transition-duration: 80ms; transform: scale(.97); }
 [data-slot="button"][data-size^="icon"] { width: 44px; height: 44px; padding: 0; flex-shrink: 0; }
 [data-slot="input"], [data-slot="textarea"], .dashboard-content select { min-height: 44px; border-radius: 12px; font-size: 1rem; background: var(--card); }
-[data-slot="switch"] { --switch-width: 51px; --switch-height: 31px; --switch-thumb: 27px; position: relative; width: var(--switch-width); height: var(--switch-height); padding: 0; border: 0; background: #b9b9bf; transition: background-color 160ms ease; }
+.app-switch[data-slot="switch"] { --switch-width: 51px; --switch-height: 31px; --switch-thumb: 27px; position: relative; box-sizing: border-box; flex: 0 0 var(--switch-width); width: var(--switch-width); min-width: var(--switch-width); max-width: var(--switch-width); height: var(--switch-height); min-height: var(--switch-height); max-height: var(--switch-height); align-self: center; padding: 0; border: 0; border-radius: 999px; background: #b9b9bf; transition: background-color 160ms ease; }
 [data-slot="switch"][data-size="sm"] { --switch-width: 43px; --switch-height: 27px; --switch-thumb: 23px; }
-[data-slot="switch"]::before { content: ""; position: absolute; inset: -7px 0; }
+[data-slot="switch"]::before { content: ""; position: absolute; inset: calc((var(--switch-height) - 44px) / 2) 0; }
 [data-slot="switch"][data-state="checked"] { background: #34c759; }
 .dark [data-slot="switch"][data-state="unchecked"] { background: #535357; }
 [data-slot="switch-thumb"] { position: absolute; left: 2px; top: 2px; width: var(--switch-thumb); height: var(--switch-thumb); background: #fff; box-shadow: 0 2px 4px #0003; transform: translateX(0); transition: transform 180ms cubic-bezier(.2,.8,.2,1); }
 [data-slot="switch-thumb"][data-state="checked"] { transform: translateX(calc(var(--switch-width) - var(--switch-thumb) - 4px)); }
+.app-switch-row { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 13px; }
+.app-switch-row > label { min-width: 0; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { [data-slot="switch"], [data-slot="switch-thumb"] { transition: none; } }
 
 /* Stable modal geometry: the viewport owns placement, the panel owns motion. */
@@ -742,9 +744,10 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
 .availability-date-controls { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 0; width: 100%; min-width: 0; height: 44px; border-radius: var(--app-field-radius); background: var(--secondary); }
 .availability-date-controls > [data-slot="button"] { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: var(--app-field-radius); background: transparent; box-shadow: none; }
 .availability-date-controls > .app-date-control { height: 44px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; }
-.availability-date-controls .app-date-control > input[data-slot="input"] { height: 44px; min-height: 44px; padding: 0 4px; font-size: 16px; font-weight: 500; text-align: center; background: transparent; }
-.availability-date-controls input::-webkit-date-and-time-value { text-align: center; }
-.availability-date-controls input::-webkit-datetime-edit { display: inline-flex; justify-content: center; width: 100%; padding: 0; }
+.availability-date-controls .app-date-control > input[data-slot="input"] { height: 44px; min-height: 44px; padding: 0 4px; font-size: 16px; font-weight: 500; line-height: 44px; text-align: center; background: transparent; }
+/* Center Safari's date value and Chromium's segmented editor in the same row. */
+.availability-date-controls input::-webkit-date-and-time-value { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 0; line-height: 44px; text-align: center; }
+.availability-date-controls input::-webkit-datetime-edit { display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 0; }
 .availability-date-controls .app-date-control > svg { display: none; }
 .availability-overview > .availability-overview-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
 @media (max-width: 640px) {

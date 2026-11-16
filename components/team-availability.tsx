@@ -7,6 +7,7 @@ import { MoreOptions } from "@/components/dashboard/more-options";
 import { AppSelect, ConfirmationRow } from "@/components/ui/app-controls";
 
 import { Button } from "@/components/ui/button";
+import { SwitchRow } from "@/components/ui/switch";
 import { Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { TeamSchedule,TimeBlock,WorkPreference } from "@/lib/team-api";
@@ -87,7 +88,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
       </div>}
       </section>;
     })}</div></details>
-    <label className="availability-past-toggle"><input type="checkbox" checked={showPast} onChange={e => setShowPast(e.target.checked)} />Include past entries</label>
+    <SwitchRow className="availability-past-toggle" checked={showPast} onCheckedChange={setShowPast}>Include past entries</SwitchRow>
     <p className="schedule-small">Changing availability won’t cancel accepted work. Contact Smooth if you need coverage.</p>
     </section>
 
@@ -106,7 +107,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
         <label>Day<Input required type="date" value={form.day} onChange={e => setForm({ ...form, day: e.target.value })} /></label>
         <ConfirmationRow checked={form.allDay} disabled={busy} onCheckedChange={allDay => setForm({ ...form, allDay })}>Full day</ConfirmationRow>
         {!form.allDay && <><div className="schedule-form-pair"><label>From<Input required type="time" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} /></label><label>Until<Input required type="time" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} /></label></div>{form.endTime < form.startTime && <p className="schedule-small">Ends the following day.</p>}</>}
-        <MoreOptions defaultOpen={Boolean(form.id && (form.weekly || form.note))}><label className="schedule-check"><input type="checkbox" checked={form.weekly} onChange={e => setForm({ ...form, weekly: e.target.checked })} />Repeat every week on this weekday</label>
+        <MoreOptions defaultOpen={Boolean(form.id && (form.weekly || form.note))}><SwitchRow checked={form.weekly} disabled={busy} onCheckedChange={weekly => setForm({ ...form, weekly })}>Repeat every week on this weekday</SwitchRow>
         {form.weekly && <label>Repeat through<Input required type="date" min={form.day || undefined} max={form.day ? addLocalDays(`${form.day}T00:00`, 364).slice(0, 10) : undefined} value={form.repeatUntil} onChange={e => setForm({ ...form, repeatUntil: e.target.value })} /></label>}
         <label>Note (optional)<Input maxLength={120} placeholder="Open to extra rentals, prefer an afternoon shift…" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></label></MoreOptions>
         {(formError || error) && <p className="schedule-error" role="alert">{formError || error}</p>}

@@ -1,6 +1,24 @@
 {
-  "currentVersion": "2.52.1",
+  "currentVersion": "2.52.2",
   "releases": [
+    {
+      "id": "2026-11-16-availability-control-alignment",
+      "version": "2.52.2",
+      "date": "2026-11-16",
+      "category": "Appearance",
+      "title": "Aligned dates and consistent availability switches",
+      "changes": [
+        "The daily availability date sits vertically centered between its arrows.",
+        "Include Inactive stays a compact oval switch on Schedule and other pages.",
+        "Include past entries and weekly availability repeat options use matching switches."
+      ],
+      "employee": {
+        "title": "Consistent availability controls",
+        "changes": [
+          "Include past entries and weekly availability repeat options use matching switches."
+        ]
+      }
+    },
     {
       "id": "2026-11-16-shift-labels-and-form-spacing",
       "version": "2.52.1",
