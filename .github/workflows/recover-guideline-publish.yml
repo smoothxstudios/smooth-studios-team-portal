@@ -1,0 +1,21 @@
+name: Recover stalled guideline publication
+on:
+  push:
+    branches: [codex/review-studio-guidelines-20261116]
+    paths: [data/guideline-publish-recovery.json]
+permissions:
+  actions: write
+  contents: read
+jobs:
+  cancel-stalled-owned-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const run = await github.rest.actions.getWorkflowRun({owner: context.repo.owner, repo: context.repo.repo, run_id: 43927857312});
+            if (run.data.status !== 'completed') {
+              await github.rest.actions.cancelWorkflowRun({owner: context.repo.owner, repo: context.repo.repo, run_id: 43927857312});
+              core.info('Cancelled the stalled guideline save so it can be retried safely.');
+            }
