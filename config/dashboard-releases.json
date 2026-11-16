@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.52.3",
+  "currentVersion": "2.52.4",
   "releases": [
+    {
+      "id": "2026-11-16-event-planner-availability-roster",
+      "version": "2.52.4",
+      "date": "2026-11-16",
+      "category": "Scheduling",
+      "title": "Consistent event-planner availability",
+      "changes": [
+        "Smooth is also omitted from Event Planner availability lists and notes; Add myself remains available when planning an event.",
+        "Event Planner follows the active-team filter. Include Inactive shows paused people, while existing crew choices stay visible for review."
+      ]
+    },
     {
       "id": "2026-11-16-responsive-layout-team-availability",
       "version": "2.52.3",
