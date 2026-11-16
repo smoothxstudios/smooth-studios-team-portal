@@ -47,7 +47,8 @@ body { -webkit-font-smoothing: antialiased; }
 .app-task-sheet .app-sheet-scroll > *, .app-task-sheet .app-field { min-width: 0; }
 .app-task-sheet .manual-pay-fields { padding: 22px 24px; gap: 20px; }
 .app-task-sheet .manual-pay-scroll { scroll-padding-block: 20px; }
-.app-task-sheet .app-sheet-scroll > p { margin: 0; }
+/* Let the shared sibling spacing apply to feedback paragraphs too. */
+.app-task-sheet .app-sheet-scroll > :where(p) { margin: 0; }
 .app-task-sheet .app-sheet-scroll label:not(.app-confirmation), .app-task-sheet .manual-pay-fields label:not(.app-confirmation) { font-size: 13px; font-weight: 600; line-height: 1.4; }
 .app-task-sheet :is(input:not([type="checkbox"]), textarea) { min-height: 48px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); padding: 12px 14px; font-size: 16px; font-weight: 400; }
 .app-task-sheet .schedule-small, .app-task-sheet .creative-hint { font-size: 13px; line-height: 1.5; }

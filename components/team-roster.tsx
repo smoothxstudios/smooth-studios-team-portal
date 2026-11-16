@@ -1,5 +1,6 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Switch } from "@/components/ui/switch";
 import { teamRequest } from "@/lib/team-api";
 import { useRefreshSource } from "@/components/dashboard-refresh";
 type Member = { id: string; active: boolean; revision: number };
@@ -40,5 +41,6 @@ export function TeamRosterProvider({ token, children }: { token: string; childre
 }
 export function IncludeInactive() {
   const roster = useTeamRoster();
-  return roster ? <label className="roster-filter"><input type="checkbox" checked={roster.includeInactive} onChange={event => roster.setIncludeInactive(event.target.checked)} />Include Inactive</label> : null;
+  const id = useId();
+  return roster ? <div className="roster-filter"><Switch id={id} size="sm" checked={roster.includeInactive} onCheckedChange={roster.setIncludeInactive} /><label htmlFor={id}>Include Inactive</label></div> : null;
 }

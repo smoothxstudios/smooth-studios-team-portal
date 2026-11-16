@@ -35,25 +35,25 @@ export function notificationTime(start, end, { legacyTimezone = false } = {}) {
 }
 
 export function assignmentNotifications(item, event, recipients, options) {
-  const type = item.appointmentId ? "rental" : "task", name = person(item.employeeId);
+  const type = item.appointmentId ? "rental" : "shift", name = person(item.employeeId);
   const detail = `${notificationText(item.title, 120)} · ${notificationTime(item.start, item.end, options)}.`;
   return [...new Set(recipients)].map(userId => {
     const owner = userId === "owner";
     const content = {
       recorded: { title: "Rental work confirmed by Smooth", body: `${detail} Smooth recorded you as working this rental. View the saved record in your dashboard.` },
-      offered: { title: `New ${type} assignment`, body: `${detail} Tap to accept or decline.` },
+      offered: { title: item.appointmentId ? "New rental assignment" : "New shift", body: `${detail} Tap to accept or decline.` },
       accepted: { title: `${name} accepted a ${type}`, body: detail },
       declined: { title: `${name} declined a ${type}`, body: `${detail} Choose another team member.` },
-      cancelled: { title: `${type === "rental" ? "Rental" : "Task"} assignment cancelled`, body: detail },
-      conflict: { title: "Time conflict approved", body: `${detail} Smooth approved the conflict. Tap to review your offer.` },
-      rescheduled: { title: owner ? `${name}’s ${type} time changed` : `${type === "rental" ? "Rental" : "Task"} time changed`, body: `${detail} ${owner ? "A new acceptance is needed." : "Tap to accept the new time."}` },
+      cancelled: { title: item.appointmentId ? "Rental assignment cancelled" : "Shift cancelled", body: detail },
+      conflict: { title: item.appointmentId ? "Time conflict approved" : "Shift conflict approved", body: `${detail} Smooth approved the conflict. Tap to review your ${item.appointmentId ? "offer" : "shift"}.` },
+      rescheduled: { title: owner ? `${name}’s ${type} time changed` : `${type === "rental" ? "Rental" : "Shift"} time changed`, body: `${detail} ${owner ? "A new acceptance is needed." : "Tap to accept the new time."}` },
       duration: { title: owner ? `${name}’s rental duration updated` : "Rental duration updated", body: `${detail} ${item.status === "accepted" ? (item.ownerConfirmation ? "Smooth’s work confirmation is kept." : "The existing acceptance is kept.") : "The existing offer is still awaiting a response."}` },
       same_day: { title: owner ? `${name}’s rental time updated` : "Rental time updated", body: `${detail} The rental is still on the same day. ${item.status === "accepted" ? (item.ownerConfirmation ? "Smooth’s work confirmation is kept." : "The existing acceptance is kept.") : "The existing offer is still awaiting a response."}` },
       removed: { title: owner ? `${name}’s rental was cancelled` : "Rental removed from Calendar", body: `${detail} The assignment is cancelled.` },
       past: { title: "Changed rental needs review", body: `${name} · ${detail} The assignment was cancelled because the new time is in the past.` },
     }[event];
     if (!content) throw new Error("Unsupported assignment notification.");
-    return { userId, kind: event === "offered" ? "assignment" : "schedule", ...notificationDetails(content), target: "scheduling", targetId: item.id, personId: item.employeeId };
+    return { userId, kind: !item.appointmentId ? "shift" : event === "offered" ? "assignment" : "schedule", ...notificationDetails(content), target: "scheduling", targetId: item.id, personId: item.employeeId };
   });
 }
 

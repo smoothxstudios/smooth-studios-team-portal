@@ -43,7 +43,7 @@ test("existing devices upgrade keys only for their owner and status cannot reviv
   f.close();
 });
 
-test("a task assignment immediately sends an encrypted assignment alert only to its employee", async t => {
+test("a standalone shift sends a compatible encrypted push with shift wording only to its employee", async t => {
   const f = await fixture(), mine = device("assigned"), other = device("other");
   await f.call("jordyn", "/push/device", mine); await f.call("rayne", "/push/device", other);
   f.DB.sqlite.prepare("UPDATE team_state SET synced_at = ? WHERE id = 1").run(new Date(now).toISOString());
@@ -52,8 +52,8 @@ test("a task assignment immediately sends an encrypted assignment alert only to 
   const result = await f.call("owner", "/assignments", { revision: 0, employeeId: "jordyn", startLocal: "2026-10-17T13:00", endLocal: "2026-10-17T14:00", title: "Synthetic task", instructions: "Private instructions" });
   assert.equal(result.status, 200, JSON.stringify(result)); await Promise.all(f.pending);
   assert.deepEqual(sent.map(item => item.url), [mine.endpoint]);
-  assert.equal(sent[0].payload.type, "assignment");
-  assert.equal(sent[0].payload.title, "New task assignment");
+  assert.equal(sent[0].payload.type, "schedule");
+  assert.equal(sent[0].payload.title, "New shift");
   assert.equal(sent[0].payload.body, "Synthetic task · Sat, Oct 17 · 1:00 PM–2:00 PM. Tap to accept or decline.");
   assert.doesNotMatch(JSON.stringify(sent), /Private instructions/);
   assert.equal(f.DB.sqlite.prepare("SELECT COUNT(*) n FROM team_notification_events").get().n, 0);

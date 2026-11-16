@@ -505,7 +505,7 @@ async function route(request, env, ctx) {
       const saved = s.assignments.find(item => item.id === input.id);
       if (saved) {
         if (saved.employeeId !== input.employeeId || saved.title !== input.title?.trim() || saved.start !== localInstant(input.startLocal) || saved.end !== localInstant(input.endLocal) || saved.instructions !== (input.instructions ?? "").trim() || saved.taskPay?.type !== input.taskPay?.type || saved.taskPay?.rateCents !== input.taskPay?.rateCents) fail(409, "This shift was already saved with different details. Review the schedule before creating another.");
-        return { saved: true, notification: "This studio task shift is already scheduled." };
+        return { saved: true, notification: "This shift is already scheduled." };
       }
     }
     expectedRevision(input, s.state);
@@ -554,8 +554,8 @@ async function route(request, env, ctx) {
     ctx.waitUntil(flushAlerts(env));
     if (item.appointmentId && !startedRental) ctx.waitUntil(flushCalendarAssignments(env, { assignmentId: item.id, limit: 1 }));
     return { saved: true, notification: startedRental ? "Person recorded as Confirmed by Smooth. Hours and rental earnings update on the next sync; no payment was recorded." : devices.count
-      ? "Offer saved. A notification was queued for their enabled devices."
-      : "Offer saved. This employee has no devices enabled for notifications yet; they can see and accept it in their dashboard." };
+      ? `${item.appointmentId ? "Offer" : "Shift"} saved. A notification was queued for their enabled devices.`
+      : `${item.appointmentId ? "Offer" : "Shift"} saved. This employee has no devices enabled for notifications yet; they can see and accept it in their dashboard.` };
   }
   if (request.method === "POST" && url.pathname.startsWith("/assignments/")) {
     const input = await body(request), s = await snapshot(db);
@@ -574,7 +574,7 @@ async function route(request, env, ctx) {
         ...item, conflictOverride: createConflictOverride(item, s.assignments), updatedAt: new Date().toISOString(),
       }, mutation)], assignmentNotifications(item, "conflict", [item.employeeId]));
       ctx.waitUntil(flushAlerts(env));
-      return { saved: true, notification: "Time conflict approved. The employee can now accept this offer; their response is still required." };
+      return { saved: true, notification: `Time conflict approved. The employee can now accept this ${item.appointmentId ? "offer" : "shift"}; their response is still required.` };
     }
     if (input.status === "cancelled") {
       owner(user);
@@ -594,7 +594,7 @@ async function route(request, env, ctx) {
       assignmentNotifications(item, input.status, user === "owner" ? [item.employeeId] : ["owner"]));
     ctx.waitUntil(flushAlerts(env));
     if (updated.appointmentId) ctx.waitUntil(flushCalendarAssignments(env, { assignmentId: updated.id, limit: 1 }));
-    return { saved: true };
+    return { saved: true, ...(!updated.appointmentId ? { notification: `Shift ${input.status}.` } : {}) };
   }
   if (request.method === "POST" && url.pathname === "/push/device/status") {
     const input = await body(request);
