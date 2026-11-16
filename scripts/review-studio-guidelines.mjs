@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { createCipheriv, publicEncrypt, randomBytes, constants } from 'node:crypto';
-import { decryptPayload } from './lib/dashboard-data.mjs';
+import { createCipheriv, publicEncrypt, randomBytes, constants, generateKeyPairSync } from 'node:crypto';
+import { decryptPayload, encryptPayload } from './lib/dashboard-data.mjs';
 import { teamToken } from '../lib/team-auth.mjs';
 import { TEAM_API_URL } from '../lib/team-schedule.mjs';
 
@@ -22,3 +22,10 @@ const ciphertext = Buffer.concat([cipher.update(JSON.stringify(data)), cipher.fi
 const envelope = { key: publicEncrypt({ key: publicKey, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' }, key).toString('base64'), iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), ciphertext: ciphertext.toString('base64') };
 await writeFile('guideline-review.enc.json', JSON.stringify(envelope));
 console.log('Encrypted the current studio guidelines, question queue, and studio reference for review.');
+
+const publishing = generateKeyPairSync('rsa', { modulusLength: 3072 });
+await writeFile('guideline-publish-key.json', JSON.stringify({
+  publicKey: publishing.publicKey.export({ type: 'spki', format: 'pem' }),
+  privateKeyEnvelope: encryptPayload({ privateKey: publishing.privateKey.export({ type: 'pkcs8', format: 'pem' }) }, password)
+}));
+console.log('Prepared an owner-encrypted publication key; no password or private key is exported in plaintext.');

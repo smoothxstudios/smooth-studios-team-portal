@@ -22,5 +22,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: encrypted-guideline-review
-          path: guideline-review.enc.json
+          path: |
+            guideline-review.enc.json
+            guideline-publish-key.json
           retention-days: 1
