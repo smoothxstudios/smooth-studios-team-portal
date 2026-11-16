@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.52.0",
+  "currentVersion": "2.52.1",
   "releases": [
+    {
+      "id": "2026-11-16-shift-labels-and-form-spacing",
+      "version": "2.52.1",
+      "date": "2026-11-16",
+      "category": "Scheduling",
+      "title": "Clear shift alerts and cleaner scheduling controls",
+      "changes": [
+        "Include Inactive uses the same switch as Settings instead of a checkbox.",
+        "Scheduling forms keep a clear gap below the person picker and between feedback messages.",
+        "Studio shifts use Shift Title, Accept Shift, and Cancel Shift. New alerts say New shift and show the Shift category; saved task alerts use the corrected wording too."
+      ],
+      "employee": {
+        "title": "Clearer shift notifications",
+        "changes": [
+          "Studio shifts are labeled Shift in alerts, with New shift notifications and an Accept Shift action.",
+          "Saved task alerts use the same shift wording."
+        ]
+      }
+    },
     {
       "id": "2026-11-16-team-visibility-studio-tasks",
       "version": "2.52.0",

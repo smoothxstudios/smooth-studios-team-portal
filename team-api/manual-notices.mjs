@@ -91,8 +91,8 @@ export async function manualNoticesRoute({ request, env, user, body, fail, ctx }
     rawAssignment = row.data; assignment = JSON.parse(row.data);
     if (assignment.status !== "pending" || !employees.has(assignment.employeeId) || !Number.isFinite(Date.parse(assignment.start)) || !Number.isFinite(Date.parse(assignment.end)) ||
         Date.parse(assignment.start) <= Date.now() || Date.parse(assignment.end) <= Date.parse(assignment.start)) fail(409, "Only upcoming assignments awaiting a response can receive a reminder.");
-    recipients = [assignment.employeeId]; title = "Assignment response reminder";
-    message = notificationText(`${notificationText(assignment.title, 120)} · ${notificationTime(assignment.start, assignment.end)}. Please accept or decline this offer in your dashboard.`, 360);
+    recipients = [assignment.employeeId]; title = assignment.appointmentId ? "Assignment response reminder" : "Shift response reminder";
+    message = notificationText(`${notificationText(assignment.title, 120)} · ${notificationTime(assignment.start, assignment.end)}. Please accept or decline this ${assignment.appointmentId ? "offer" : "shift"} in your dashboard.`, 360);
     target = "scheduling";
   }
   const now = Date.now(), token = crypto.randomUUID(), recipientIds = JSON.stringify(recipients);

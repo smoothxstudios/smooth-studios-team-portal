@@ -2367,8 +2367,8 @@ button { cursor: pointer; }
 /* Team visibility controls */
 .roster-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .roster-heading p{margin:0;color:var(--muted-foreground);font-size:13px;max-width:55ch}
-.roster-filter{display:inline-flex!important;align-items:center;gap:8px;min-height:40px;font-size:13px;white-space:nowrap;cursor:pointer}
-.roster-filter input{width:17px;height:17px;accent-color:var(--primary)}
+.roster-filter{display:flex;align-items:center;gap:10px;min-height:44px;font-size:13px}
+.roster-filter label{cursor:pointer}
 .team-active-control{display:flex;align-items:center;justify-content:space-between;padding:10px 0;margin:8px 0;border-bottom:1px solid var(--border);font-size:13px;font-weight:600}
 .team-active-control input{appearance:none;position:relative;width:40px;height:24px;border-radius:99px;background:var(--muted-foreground);cursor:pointer;transition:background .15s ease-out}
 .team-active-control input:checked{background:#168653}

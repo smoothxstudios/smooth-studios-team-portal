@@ -1,4 +1,5 @@
-import { alertCategory } from "../lib/alert-presentation.mjs";
+import { alertCategory, alertTitle } from "../lib/alert-presentation.mjs";
+import { assignmentNotifications } from "../team-api/notification-content.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { alertTimestamp, chronologicalAlerts, groupAlerts } from '../lib/alert-presentation.mjs';
@@ -30,4 +31,37 @@ test("notification categories preserve urgency while distinguishing everyday wor
     const result = alertCategory({ title: "New update", kind: "update", target });
     assert.equal(result.id, category); assert.ok(result.label, "color is accompanied by readable category text");
   }
+});
+
+test('saved standalone task alerts display as shifts without changing rental or creative alerts', () => {
+  const saved = { id: 'existing-alert', target: 'scheduling', kind: 'assignment', title: 'New task assignment', readAt: 123 };
+  assert.equal(alertTitle(saved), 'New shift');
+  assert.deepEqual(alertCategory(saved), { id: 'shift', label: 'Shift' });
+  assert.equal(saved.title, 'New task assignment');
+  assert.equal(saved.readAt, 123);
+  assert.equal(alertTitle({ ...saved, title: 'Task assignment cancelled' }), 'Shift cancelled');
+  assert.equal(alertTitle({ ...saved, title: 'Jordyn accepted a task' }), 'Jordyn accepted a shift');
+  assert.equal(alertTitle({ ...saved, title: 'Jordyn’s task time changed' }), 'Jordyn’s shift time changed');
+  assert.equal(alertTitle({ ...saved, target: 'creative' }), 'New task assignment');
+  assert.equal(alertCategory({ ...saved, title: 'New rental assignment' }).id, 'rental');
+  assert.equal(alertCategory({ ...saved, kind: 'notice', title: 'Shift response reminder' }).id, 'shift');
+});
+
+test('shift notifications keep their destination and never use rental or assignment wording', () => {
+  const item = { id: 'shift-id', employeeId: 'jordyn', appointmentId: null, title: 'Organize equipment', start: '2026-11-17T17:00:00Z', end: '2026-11-17T19:00:00Z' };
+  for (const event of ['offered', 'accepted', 'declined', 'cancelled', 'conflict', 'rescheduled']) {
+    const alerts = assignmentNotifications(item, event, ['owner', 'jordyn']);
+    for (const alert of alerts) {
+      assert.equal(alert.kind, 'shift');
+      assert.equal(alert.target, 'scheduling');
+      assert.equal(alert.targetId, item.id);
+      assert.match(alert.title, /shift/i);
+      assert.doesNotMatch(alert.title.toLowerCase(), /rental|assignment|task/);
+      assert.notEqual(alertCategory(alert).id, 'rental');
+    }
+  }
+  const rental = assignmentNotifications({ ...item, appointmentId: 'rental-id' }, 'offered', ['jordyn'])[0];
+  assert.equal(rental.title, 'New rental assignment');
+  assert.equal(rental.kind, 'assignment');
+  assert.equal(alertCategory(rental).id, 'rental');
 });

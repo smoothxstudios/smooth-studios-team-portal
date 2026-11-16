@@ -33,11 +33,11 @@ export async function vapidAuthorization(endpoint, jwk, now = Date.now()) {
 // registrations retain generic alerts until a dashboard visit adds keys.
 export async function deliverPush(endpoint, jwk, send = fetch, { keys, kind = "schedule", ttl = 86400, details, notificationId, receipt } = {}) {
   const url = pushEndpoint(endpoint);
-  if (!["schedule", "assignment", "creative", "quiz", "test", "notice"].includes(kind)) throw new Error("Invalid notification type.");
+  if (!["schedule", "assignment", "shift", "creative", "quiz", "test", "notice"].includes(kind)) throw new Error("Invalid notification type.");
   const eventId = typeof notificationId === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(notificationId) ? notificationId : null;
   // Existing installed service workers already understand schedule payloads.
-  // Preserve the actual reminder text while newer workers add its destination.
-  const content = { type: kind === "notice" ? "schedule" : kind, ...notificationDetails(details),
+  // Preserve shift/reminder text while keeping installed workers compatible.
+  const content = { type: kind === "notice" || kind === "shift" ? "schedule" : kind, ...notificationDetails(details),
     ...(["alerts", "settings", "scheduling", "creative", "availability", "payouts", "quiz"].includes(details?.target) ? { target: details.target } : {}),
     ...(eventId ? { id: eventId } : {}),
     ...(typeof receipt === "string" && /^[A-Za-z0-9_-]{43}$/.test(receipt) ? { receipt } : {}) };

@@ -18,7 +18,7 @@ export async function completeStudioTask({ db, item, input, user, state, commit,
     db.prepare(`INSERT INTO team_creative_assignments (id, employee_id, version, mutation, data)
       SELECT ?, ?, 1, ?, ? WHERE EXISTS (SELECT 1 FROM team_state WHERE id = 1 AND mutation = ?)`)
       .bind(earning.id, earning.employeeId, mutation, JSON.stringify(earning), mutation)],
-    [{ userId: item.employeeId, kind: 'creative', title: 'Studio tasks completed', body: 'Smooth confirmed your shift. Your earnings are ready to review.', target: 'payouts', targetId: earning.id, personId: item.employeeId }]);
+    [{ userId: item.employeeId, kind: 'creative', title: 'Shift completed', body: 'Smooth confirmed your shift. Your earnings are ready to review.', target: 'payouts', targetId: earning.id, personId: item.employeeId }]);
   ctx.waitUntil(flushAlerts(env));
   await reconcileAdvances(db);
   return { saved: true, assignment: updated, notification: 'Shift completed and earnings added to Payouts. No payment was recorded.' };

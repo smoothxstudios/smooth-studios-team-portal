@@ -4,6 +4,7 @@ import { fixture } from './helpers/notification-fixture.mjs';
 import { rentalSuggestions } from '../lib/rental-suggestions.mjs';
 import { studioTaskPay } from '../lib/studio-tasks.mjs';
 import { localInstant } from '../lib/team-schedule.mjs';
+import { alertCategory } from '../lib/alert-presentation.mjs';
 
 const now = Date.parse('2026-11-16T16:00:00Z');
 async function setup(t) {
@@ -55,13 +56,33 @@ test('studio shifts save agreed hourly pay, appear privately in schedules and re
   assert.equal(result.status, 200, JSON.stringify(result.data));
   const s = await schedule(f), item = s.assignments[0];
   assert.equal(item.appointmentId, null);
+  assert.match(result.data.notification, /^Shift saved/);
   assert.deepEqual(item.taskPay, { type: 'hourly', rateCents: 1500, amountCents: 3750 });
   assert.equal((await f.call('rayne', '/schedule')).data.assignments.length, 0);
+  const alert = (await f.call('jordyn', '/alerts')).data.alerts[0];
+  assert.equal(alert.title, 'New shift');
+  assert.equal(alert.kind, 'shift');
+  assert.equal(alert.targetId, item.id);
+  assert.equal(alertCategory(alert).label, 'Shift');
   assert.equal((await f.call('owner', '/assignments', request)).status, 200);
   assert.equal((await schedule(f)).assignments.length, 1);
   assert.equal((await f.call('owner', '/assignments', { ...request, taskPay: { type: 'flat', rateCents: 9999 } })).status, 409);
   assert.equal((await f.call('jordyn', `/assignments/${item.id}`, { revision: s.revision, status: 'accepted' })).status, 200);
   assert.equal((await f.call('jordyn', '/creative-work')).data.assignments.length, 0);
+});
+
+test('a shift response reminder stays labeled as a shift and links to the same scheduled work', async t => {
+  const f = await setup(t);
+  const { request, result } = await create(f);
+  assert.equal(result.status, 200);
+  const reminder = await f.call('owner', `/assignments/${request.id}/remind`, { id: crypto.randomUUID() });
+  assert.equal(reminder.status, 200, JSON.stringify(reminder.data));
+  const alerts = (await f.call('jordyn', '/alerts')).data.alerts;
+  const alert = alerts.find(item => item.title === 'Shift response reminder');
+  assert.ok(alert);
+  assert.equal(alertCategory(alert).label, 'Shift');
+  assert.equal(alert.targetId, request.id);
+  assert.match(alert.body, /accept or decline this shift/);
 });
 
 test('invalid pay, rental linkage, stale revisions and overlapping shifts cannot silently create new tasks', async t => {
