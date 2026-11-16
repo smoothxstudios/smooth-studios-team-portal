@@ -1,0 +1,43 @@
+name: Publish reviewed studio guidelines
+on:
+  push:
+    branches: [codex/review-studio-guidelines-20261116]
+    paths: [data/reviewed-guidelines.sealed.json]
+permissions:
+  contents: write
+concurrency:
+  group: smooth-studios-data-writes
+  cancel-in-progress: false
+  queue: max
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .current
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: .current/package-lock.json
+      - run: npm ci
+        working-directory: .current
+      - name: Publish the encrypted reviewed patch
+        run: node scripts/publish-reviewed-guidelines.mjs prepare
+        env:
+          DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}
+          DASHBOARD_PASSWORD_AKIVA: ${{ secrets.DASHBOARD_PASSWORD_AKIVA }}
+          DASHBOARD_PASSWORD_JORDYN: ${{ secrets.DASHBOARD_PASSWORD_JORDYN }}
+          DASHBOARD_PASSWORD_RAYNE: ${{ secrets.DASHBOARD_PASSWORD_RAYNE }}
+      - name: Save encrypted guidelines
+        working-directory: .current
+        run: |
+          git config user.name "smooth-studios-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/data
+          git diff --cached --quiet || git commit -m "guide: document studio shifts and answer reviewed questions"
+          git pull --rebase origin main
+          git push origin HEAD:main

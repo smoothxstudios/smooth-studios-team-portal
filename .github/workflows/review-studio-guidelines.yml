@@ -2,6 +2,7 @@ name: Review studio guidelines privately
 on:
   push:
     branches: [codex/review-studio-guidelines-20261116]
+    paths: [scripts/review-studio-guidelines.mjs, .github/workflows/review-studio-guidelines.yml]
 permissions:
   contents: read
 jobs:
