@@ -5,6 +5,7 @@ on:
     paths: [data/reviewed-guidelines.sealed.json]
 permissions:
   contents: write
+  actions: write
 concurrency:
   group: smooth-studios-data-writes
   cancel-in-progress: false
@@ -12,6 +13,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -32,12 +34,29 @@ jobs:
           DASHBOARD_PASSWORD_AKIVA: ${{ secrets.DASHBOARD_PASSWORD_AKIVA }}
           DASHBOARD_PASSWORD_JORDYN: ${{ secrets.DASHBOARD_PASSWORD_JORDYN }}
           DASHBOARD_PASSWORD_RAYNE: ${{ secrets.DASHBOARD_PASSWORD_RAYNE }}
-      - name: Save encrypted guidelines
-        working-directory: .current
-        run: |
-          git config user.name "smooth-studios-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add public/data
-          git diff --cached --quiet || git commit -m "guide: document studio shifts and answer reviewed questions"
-          git pull --rebase origin main
-          git push origin HEAD:main
+      - name: Save verified encrypted guidelines
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = await import('node:fs/promises');
+            const { execFileSync } = await import('node:child_process');
+            const paths = execFileSync('git', ['-C', '.current', 'diff', '--name-only', '--', 'public/data'], {encoding:'utf8'}).trim().split('\n').filter(Boolean);
+            if (paths.some(p => !/^public\/data\/[a-z0-9_-]+\.json$/.test(p))) throw new Error('Unexpected file in guideline publication.');
+            const {owner,repo} = context.repo;
+            const ref = await github.rest.git.getRef({owner,repo,ref:'heads/main'});
+            const base = await github.rest.git.getCommit({owner,repo,commit_sha:ref.data.object.sha});
+            const tree = [];
+            for (const file of paths) {
+              const checkedOutBlob = execFileSync('git', ['-C','.current','rev-parse',`HEAD:${file}`], {encoding:'utf8'}).trim();
+              const live = await github.rest.repos.getContent({owner,repo,path:file,ref:base.data.sha});
+              if (live.data.sha !== checkedOutBlob) throw new Error('Dashboard data changed during review; retry with fresh data.');
+              tree.push({path:file,mode:'100644',type:'blob',content:await fs.readFile(`.current/${file}`,'utf8')});
+            }
+            if (tree.length) {
+              const created = await github.rest.git.createTree({owner,repo,base_tree:base.data.tree.sha,tree});
+              const commit = await github.rest.git.createCommit({owner,repo,tree:created.data.sha,parents:[base.data.sha],message:'guide: document studio shifts and answer reviewed questions'});
+              await github.rest.git.updateRef({owner,repo,ref:'heads/main',sha:commit.data.sha,force:false});
+              core.info(`Saved ${tree.length} encrypted dashboard files while preserving concurrent changes.`);
+            }
+            await github.rest.actions.createWorkflowDispatch({owner,repo,workflow_id:'deploy-pages.yml',ref:'main'});
+            core.info('Requested the standard production build and deployment.');

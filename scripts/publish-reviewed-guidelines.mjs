@@ -45,5 +45,9 @@ if(stage==='prepare') {
   const response=await fetch(`${TEAM_API_URL}/guidelines/questions/${id}`,{method:'PATCH',redirect:'error',signal:AbortSignal.timeout(30000),headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({status:'answered'})});
   if(!response.ok) throw new Error(`Question status could not be updated (${response.status}).`);
  }
- console.log(`Marked ${packet.answeredQuestionIds.length} submitted questions answered after publication.`);
+ const response=await fetch(`${TEAM_API_URL}/guidelines/questions`,{redirect:'error',signal:AbortSignal.timeout(30000),headers:{authorization:`Bearer ${token}`}});
+ if(!response.ok) throw new Error('The question queue could not be verified.');
+ const {questions}=await response.json();
+ if(!packet.answeredQuestionIds.every(id=>questions.some(q=>q.id===id && q.status==='answered'))) throw new Error('A submitted question is still open.');
+ console.log(`Verified the live dashboard and marked ${packet.answeredQuestionIds.length} submitted questions answered.`);
 } else throw new Error('Choose prepare or answer-questions.');
