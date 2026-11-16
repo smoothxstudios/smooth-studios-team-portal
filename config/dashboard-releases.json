@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.52.2",
+  "currentVersion": "2.52.3",
   "releases": [
+    {
+      "id": "2026-11-16-responsive-layout-team-availability",
+      "version": "2.52.3",
+      "date": "2026-11-16",
+      "category": "Appearance",
+      "title": "Flexible layouts and team availability",
+      "changes": [
+        "Forms, filters, settings groups, and financial cards adapt to the space available. Text and controls scale without crowding.",
+        "Smooth no longer appears in availability lists, editors, or person pickers.",
+        "Team cards use the shared switch, and changing the visible roster keeps each card independent.",
+        "Help reflects the current availability, studio-shift, and guideline workflows."
+      ],
+      "employee": {
+        "title": "Forms that fit your screen",
+        "changes": [
+          "Form fields adapt to the space available, and long picker labels and action text can wrap.",
+          "Controls keep comfortable touch targets as text size changes."
+        ]
+      }
+    },
     {
       "id": "2026-11-16-availability-control-alignment",
       "version": "2.52.2",
