@@ -1,4 +1,5 @@
 "use client";
+import { IncludeInactive, useTeamRoster } from "@/components/team-roster";
 import { AppSelect } from "@/components/ui/app-controls";
 import { PersonAvatar } from "@/components/team-profile";
 
@@ -28,7 +29,8 @@ const emptyContent: Content = { title: "", body: "", target: "alerts" };
 const sentTime = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
 export function TeamNotifications({ token, employees }: { token: string; employees: Employee[] }) {
-  const people = employees.filter(person => person.id !== "owner");
+  const roster = useTeamRoster();
+  const people = employees.filter(person => person.id !== "owner" && roster?.visible(person.id) !== false);
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [preset, setPreset] = useState<Preset | null>(null);
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
   const [custom, setCustom] = useState<Content>(emptyContent), [edited, setEdited] = useState<Content | null>(null);

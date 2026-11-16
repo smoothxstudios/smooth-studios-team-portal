@@ -9,7 +9,7 @@ export const money = (cents: number) => dollars(cents, true);
 export const future = (value: string) => Date.parse(value) > Date.now();
 export const initialPeriod = () => {
   const day = addLocalDays(studioLocal(Date.now()), 1).slice(0, 10);
-  return { startLocal: `${day}T09:00`, endLocal: `${day}T10:00` };
+  return { startLocal: `${day}T12:00`, endLocal: `${day}T13:00` };
 };
 export type ScheduleMutation = (path: string, data: object, method?: string) => Promise<boolean>;
 export type ScheduleConfirmationChange = { path: string; method: string; data: object; description: string };

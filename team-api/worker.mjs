@@ -1,3 +1,6 @@
+import { readTeamRoster, teamRosterRoute } from "./team-roster.mjs";
+import { studioTaskPay } from "../lib/studio-tasks.mjs";
+import { completeStudioTask } from "./studio-tasks.mjs";
 import { rentalPayRatesRoute } from "./rental-pay-rates.mjs";
 import { teamProfilesRoute } from "./team-profiles.mjs";
 import { syncGuidelineQuiz } from "./guideline-quiz.mjs";
@@ -145,7 +148,7 @@ async function route(request, env, ctx) {
   }
   if (request.method === "GET" && url.pathname === "/health") {
     const ready = Boolean(env.TEAM_TOKEN_HASHES && db && await db.prepare("SELECT id FROM team_state WHERE id = 1").first());
-    return { version: 1, ready, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, paymentReceiptsVersion: 1, paymentNotificationsVersion: 1, studioQuizVersion: 2, rentalPayRatesVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, appleCalendarVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
+    return { version: 1, ready, teamRosterVersion: 1, studioTasksVersion: 1, pushReady: Boolean(env.VAPID_JWK), identityVersion: 1, availabilityVersion: 1, engagementVersion: 5, notificationVersion: 4, creativeWorkVersion: 4, studioReferenceVersion: 1, payrollVersion: 1, paymentReceiptsVersion: 1, paymentNotificationsVersion: 1, studioQuizVersion: 2, rentalPayRatesVersion: 1, alertsVersion: 3, calendarInvitationsVersion: 1, calendarDeliveryVersion: 1, calendarConnectionVersion: 2, appleCalendarVersion: 1, manualNoticesVersion: 1, reminderTemplatesVersion: 1, dashboardLayoutVersion: 1, eventPlannerVersion: 2, rentalStaffVersion: 1, rentalTimeVersion: 1, incrementalSyncVersion: 1, payrollReviewVersion: 1, manualPayVersion: 2, backgroundSyncVersion: 2, tempCheckVersion: 1, pushReceiptVersion: 2, rentalBalanceReminderVersion: 1, backgroundSyncReady: Boolean(env.DASHBOARD_SYNC_TOKEN) };
   }
   const user = await authenticate(request, env);
   if (url.pathname.startsWith("/sync/")) syncOnly(user);
@@ -182,6 +185,7 @@ async function route(request, env, ctx) {
   if (url.pathname === "/alerts" || url.pathname.startsWith("/alerts/")) return alertsRoute({ request, db, user, body, fail });
   if (url.pathname === "/event-planner") return eventPlannerRoute({ request, db, user, body, fail, snapshot });
   if (["/rental-pay-rates", "/sync/rental-pay-rates"].includes(url.pathname)) return rentalPayRatesRoute({ request, db, user, body, fail });
+  if (url.pathname === "/team-roster") return teamRosterRoute({ request, db, user, body, fail });
   if (url.pathname === "/team-profiles") return teamProfilesRoute({ request, db, user, body, fail });
   if (url.pathname === "/dashboard-layout") return dashboardLayoutRoute({ request, db, user, body, fail });
   if (url.pathname === "/payroll" || url.pathname.startsWith("/payroll/") || url.pathname.startsWith("/sync/payroll")) return payrollRoute({ request, db, user, env, ctx, body, fail });
@@ -245,6 +249,7 @@ async function route(request, env, ctx) {
       ? await jsonRows(db, "SELECT data FROM team_work_preferences")
       : await jsonRows(db, "SELECT data FROM team_work_preferences WHERE user_id = ?", user);
     return { revision: s.state.revision, syncedAt: s.state.synced_at, availabilityVersion: 1, workPreferences,
+      ...(isOwner ? { inactiveEmployeeIds: (await readTeamRoster(db)).filter(person => !person.active).map(person => person.id) } : {}),
       ...(isOwner ? { activeEmployeeIds: Object.keys(JSON.parse(env.TEAM_TOKEN_HASHES)).filter(id => id !== "owner" && id !== "sync") } : {}),
       appointments: visibleAppointments(s, assignments, user),
       blocks: s.blocks.filter(b => isOwner || b.userId === user), assignments,
@@ -495,9 +500,18 @@ async function route(request, env, ctx) {
   if (request.method === "POST" && url.pathname === "/assignments") {
     owner(user);
     const input = await body(request), s = await snapshot(db);
+    if (input.workType === "studio-task") {
+      if (!/^[a-f0-9-]{36}$/.test(input.id ?? "")) fail(400, "Reopen Schedule Work and try again.");
+      const saved = s.assignments.find(item => item.id === input.id);
+      if (saved) {
+        if (saved.employeeId !== input.employeeId || saved.title !== input.title?.trim() || saved.start !== localInstant(input.startLocal) || saved.end !== localInstant(input.endLocal) || saved.instructions !== (input.instructions ?? "").trim() || saved.taskPay?.type !== input.taskPay?.type || saved.taskPay?.rateCents !== input.taskPay?.rateCents) fail(409, "This shift was already saved with different details. Review the schedule before creating another.");
+        return { saved: true, notification: "This studio task shift is already scheduled." };
+      }
+    }
     expectedRevision(input, s.state);
     if (!s.state.synced_at || Date.now() - Date.parse(s.state.synced_at) > 2 * 3600_000) fail(409, "Calendar data is over two hours old. Run a calendar sync before assigning work.");
     const employeeId = person(input.employeeId, true);
+    if (!JSON.parse(env.TEAM_TOKEN_HASHES)[employeeId]) fail(400, "Set up this person’s dashboard account before assigning work.");
     const appointmentId = input.appointmentId ? text(input.appointmentId, 300) : null;
     const appointment = appointmentId && s.appointments.find(a => a.id === appointmentId);
     if (appointmentId && !appointment) fail(404, "Appointment not found. Refresh the calendar first.");
@@ -508,6 +522,12 @@ async function route(request, env, ctx) {
     }
     const start = appointment ? appointment.start : localInstant(input.startLocal);
     const end = appointment ? appointment.end : localInstant(input.endLocal);
+    let taskPay;
+    if (input.workType === "studio-task") {
+      if (appointmentId) fail(400, "Studio tasks are scheduled separately from rentals.");
+      text(input.instructions, 2000);
+      try { taskPay = studioTaskPay(input.taskPay, start, end); } catch (error) { fail(400, error.message); }
+    }
     const startedRental = Boolean(appointment && Date.parse(start) <= Date.now());
     if (input.confirmWorked !== undefined && typeof input.confirmWorked !== "boolean") fail(400, "Choose whether to confirm this work.");
     if (startedRental) {
@@ -521,7 +541,8 @@ async function route(request, env, ctx) {
     if (s.assignments.filter(a => active(a) && Date.parse(a.end) > Date.now()).length >= 200) fail(400, "There are already 200 active offers. Finish or cancel old offers first.");
     if (input.overrideConflicts !== undefined && typeof input.overrideConflicts !== "boolean") fail(400, "Choose whether to allow time conflicts.");
     if (!input.overrideConflicts) checkConflicts(employeeId, { start, end, appointmentId }, s, existing?.id);
-    const item = { id: existing?.id ?? crypto.randomUUID(), employeeId, appointmentId,
+    const item = { id: existing?.id ?? (taskPay ? input.id : crypto.randomUUID()), employeeId, appointmentId,
+      ...(taskPay ? { workType: "studio-task", taskPay } : {}),
       title: appointment ? appointment.title : text(input.title, 160),
       instructions: text(input.instructions || existing?.instructions || "", 2000, false), start, end,
       status: startedRental ? "accepted" : "pending", createdAt: existing?.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString(),
@@ -538,9 +559,13 @@ async function route(request, env, ctx) {
   }
   if (request.method === "POST" && url.pathname.startsWith("/assignments/")) {
     const input = await body(request), s = await snapshot(db);
-    expectedRevision(input, s.state);
     const item = s.assignments.find(a => a.id === url.pathname.slice(13));
     if (!item || (user !== "owner" && item.employeeId !== user)) fail(404, "Assignment not found.");
+    if (input.action === "complete-task") {
+      if (!item.completedAt) expectedRevision(input, s.state);
+      return completeStudioTask({ db, item, input, user, state: s.state, commit, saveAssignment, fail, env, ctx, flushAlerts });
+    }
+    expectedRevision(input, s.state);
     if (input.overrideConflicts !== undefined) {
       owner(user);
       if (input.overrideConflicts !== true || input.status !== undefined) fail(400, "Approve the time conflict separately from an assignment response.");
@@ -553,7 +578,7 @@ async function route(request, env, ctx) {
     }
     if (input.status === "cancelled") {
       owner(user);
-      if (!active(item) || Date.parse(item.start) <= Date.now()) fail(409, "Only upcoming offers can be cancelled here. Past earnings are not changed.");
+      if (!active(item) || item.completedAt || (item.workType !== "studio-task" && Date.parse(item.start) <= Date.now())) fail(409, "Only upcoming offers or unfinished studio tasks can be cancelled. Past earnings are not changed.");
     } else {
       if (user !== item.employeeId || item.status !== "pending" || !["accepted", "declined"].includes(input.status)) fail(409, "Only the assigned employee can respond to a pending offer.");
       if (Date.parse(item.start) <= Date.now()) fail(409, "This offer has started or ended. Ask Smooth to review it.");

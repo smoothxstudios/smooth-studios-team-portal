@@ -207,3 +207,8 @@ export const payrollRentalDeductions=sqliteTable("payroll_rental_deductions",{
   employeeId:text("employee_id").notNull(),rentalId:text("rental_id").notNull(),amountCents:integer("amount_cents").notNull(),
 },table=>[primaryKey({columns:[table.employeeId,table.rentalId]})]);
 export const payrollAccountRevision=sqliteTable("payroll_account_revision",{id:integer("id").primaryKey(),revision:integer("revision").notNull().default(0)});
+
+export const teamRoster = sqliteTable("team_roster", {
+  userId: text("user_id").primaryKey(), active: integer("active").notNull().default(1),
+  revision: integer("revision").notNull().default(0), updatedAt: text("updated_at").notNull(),
+}, table => [check("team_roster_active", sql`${table.active} IN (0, 1)`)]);
