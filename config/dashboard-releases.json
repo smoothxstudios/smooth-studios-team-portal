@@ -1,6 +1,25 @@
 {
-  "currentVersion": "2.52.1",
+  "currentVersion": "2.52.2",
   "releases": [
+    {
+      "id": "2026-11-16-availability-control-alignment",
+      "version": "2.52.2",
+      "date": "2026-11-16",
+      "category": "Appearance",
+      "title": "Responsive availability controls",
+      "changes": [
+        "Availability controls fit their container, with the date centered between its arrows.",
+        "Switches scale with text size while retaining oval proportions across Schedule and other pages.",
+        "Include past entries and weekly availability repeat options use matching switches."
+      ],
+      "employee": {
+        "title": "Consistent availability controls",
+        "changes": [
+          "Include past entries and weekly availability repeat options use matching switches.",
+          "Switches adapt to text size while keeping their proportions."
+        ]
+      }
+    },
     {
       "id": "2026-11-16-shift-labels-and-form-spacing",
       "version": "2.52.1",
