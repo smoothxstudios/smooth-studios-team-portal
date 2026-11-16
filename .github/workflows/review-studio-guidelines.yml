@@ -1,0 +1,26 @@
+name: Review studio guidelines privately
+on:
+  push:
+    branches: [codex/review-studio-guidelines-20261116]
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .current
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/review-studio-guidelines.mjs
+        env:
+          DASHBOARD_PASSWORD_OWNER: ${{ secrets.DASHBOARD_PASSWORD_OWNER }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-guideline-review
+          path: guideline-review.enc.json
+          retention-days: 1
