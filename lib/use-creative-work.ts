@@ -36,8 +36,8 @@ export function useCreativeWork(token: string) {
     const invalidate = () => { requestId.current++; };
     const update = () => { if (document.visibilityState === "visible") void refresh(); };
     const interval = window.setInterval(update, 60_000);
-    window.addEventListener("focus", update); document.addEventListener("visibilitychange", update);
-    return () => { invalidate(); window.clearTimeout(initial); window.clearInterval(interval); window.removeEventListener("focus", update); document.removeEventListener("visibilitychange", update); };
+    window.addEventListener("smooth-payroll-updated", update); window.addEventListener("focus", update); document.addEventListener("visibilitychange", update);
+    return () => { invalidate(); window.clearTimeout(initial); window.clearInterval(interval); window.removeEventListener("smooth-payroll-updated", update); window.removeEventListener("focus", update); document.removeEventListener("visibilitychange", update); };
   }, [refresh]);
   const mutate = async (input: Record<string, unknown>, item?: CreativeAssignment, manual = false) => {
     requestId.current++;

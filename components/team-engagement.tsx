@@ -1,4 +1,5 @@
 "use client";
+import { IncludeInactive, useTeamRoster } from "@/components/team-roster";
 import { AppSelect } from "@/components/ui/app-controls";
 
 import { useRefreshSource } from "@/components/dashboard-refresh";
@@ -243,6 +244,7 @@ export function SmoothStarSidebar() {
 }
 
 export function TeamEngagementReview({ token }: { token: string }) {
+  const roster = useTeamRoster();
   const [state, setState] = useState<TeamEngagement | null>(null);
   const [selected, setSelected] = useState("");
   const reviewTitle = useRef<HTMLHeadingElement>(null);
@@ -302,10 +304,10 @@ export function TeamEngagementReview({ token }: { token: string }) {
     } catch (e) { if (request === sequence.current) setRewardError(e instanceof Error ? e.message : "That wasn't saved. Try again."); }
     finally { savingRef.current = false; setSaving(false); }
   }
-  return <section className="panel team-engagement-review">
+  return <section className="panel team-engagement-review"><IncludeInactive />
     <div className="panel-heading"><div><h2><Smile size={20} /> Temp Check & SmoothStars</h2></div></div>
     {error && <p className="engagement-error" role="alert">{error}</p>}
-    {state && <><div className="team-checkin-grid">{state.members.map(person => {
+    {state && <><div className="team-checkin-grid">{state.members.filter(person => roster?.visible(person.userId) !== false).map(person => {
       const mood = moodFor(person.moods[0]?.mood);
       return <button type="button" key={person.userId} className="team-checkin-card" onClick={() => { setReviewView("overview"); setSelected(person.userId); }}>
         <span className="engagement-row"><strong className="schedule-person"><i style={{ background: person.color }} />{person.name}</strong><ChevronRight size={16} /></span>

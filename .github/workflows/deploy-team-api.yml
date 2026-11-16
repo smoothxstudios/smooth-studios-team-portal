@@ -7,6 +7,7 @@ on:
       - "team-api/**"
       - "lib/team-*.mjs"
       - "lib/rental-pay-rates.mjs"
+      - "lib/studio-tasks.mjs"
       - "scripts/lib/rental-pay-rates.mjs"
       - "lib/event-planner.mjs"
       - "lib/sync-records.mjs"

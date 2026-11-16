@@ -1,4 +1,5 @@
 "use client";
+import { IncludeInactive, useTeamRoster } from "@/components/team-roster";
 import { ConfirmationRow, AppSelect } from "@/components/ui/app-controls";
 import { PersonLabel } from "@/components/dashboard/person-label";
 import { ManualPayEditor } from "@/components/manual-pay-editor";
@@ -148,11 +149,12 @@ function WorkDetails({ item, isOwner, busy, error, act, onEdit, onAddPeople, onD
 }
 
 function WorkEditor({ editor, employees, state, onClose }: { editor: { id: string; item?: CreativeAssignment; source?: CreativeAssignment; addPeople?: boolean }; employees: Employee[]; state: CreativeWorkState; onClose: () => void }) {
+  const roster = useTeamRoster();
   const item = editor.item;
   const adding = Boolean(editor.addPeople);
   const source = item ?? editor.source;
   const assigned = item ? state.items.filter(entry => (entry.groupId ?? entry.id) === (item.groupId ?? item.id)).map(entry => entry.employeeId) : [];
-  const activeEmployees = employees.filter(employee => (!employee.onboarding || employee.accessReady) && (!adding || !assigned.includes(employee.id)));
+  const activeEmployees = employees.filter(employee => roster?.visible(employee.id) !== false && (!employee.onboarding || employee.accessReady) && (!adding || !assigned.includes(employee.id)));
   const [employeeIds, setEmployeeIds] = useState<string[]>(item && !adding ? [item.employeeId] : editor.source && activeEmployees.some(employee => employee.id === editor.source?.employeeId) ? [editor.source.employeeId] : []);
   const [title, setTitle] = useState(source?.title ?? ""), [instructions, setInstructions] = useState(source?.instructions ?? "");
   const [due, setDue] = useState(item ? studioLocal(item.dueAt).slice(0, 16) : ""), [pay, setPay] = useState(source ? (source.amountCents / 100).toFixed(2) : "");
@@ -168,7 +170,7 @@ function WorkEditor({ editor, employees, state, onClose }: { editor: { id: strin
   };
   return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent closeDisabled={busy} className="creative-dialog"><DialogHeader><DialogTitle>{editor.source ? "Duplicate assignment" : adding ? "Add people to creative work" : item ? "Edit creative work" : "Assign creative work"}</DialogTitle><DialogDescription>{editor.source ? "Review the copied details, choose people, and set a new deadline. This creates a new offer with no previous approvals or payments." : item && !adding ? `Editing ${name(item.employeeId)}’s assignment. Changes to accepted work require them to accept again.` : "Choose people for this work. Each person receives the fixed pay shown below after their work is approved."}</DialogDescription></DialogHeader>
     <form className="creative-editor" onSubmit={submit}>
-      {item && !adding ? <p className="creative-hint">Assigned to {name(item.employeeId)}</p> : <fieldset className="creative-people"><legend>{adding ? "Add to this work" : "Assign to"}</legend>{activeEmployees.map(employee => <label key={employee.id}><input type="checkbox" checked={employeeIds.includes(employee.id)} onChange={event => setEmployeeIds(current => event.target.checked ? [...current, employee.id] : current.filter(id => id !== employee.id))} /><PersonLabel id={employee.id} /></label>)}{!activeEmployees.length && <p>Everyone with an active account is already assigned.</p>}</fieldset>}
+      {item && !adding ? <p className="creative-hint">Assigned to {name(item.employeeId)}</p> : <fieldset className="creative-people"><legend>{adding ? "Add to this work" : "Assign to"}</legend><IncludeInactive />{activeEmployees.map(employee => <label key={employee.id}><input type="checkbox" checked={employeeIds.includes(employee.id)} onChange={event => setEmployeeIds(current => event.target.checked ? [...current, employee.id] : current.filter(id => id !== employee.id))} /><PersonLabel id={employee.id} /></label>)}{!activeEmployees.length && <p>Everyone with an active account is already assigned.</p>}</fieldset>}
 
       <label>Assignment title<Input required maxLength={160} value={title} onChange={event => setTitle(event.target.value)} placeholder="Edit a recap video, retouch a photo set…" /></label>
 

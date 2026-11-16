@@ -1,4 +1,5 @@
 "use client";
+import { TeamRosterProvider } from "@/components/team-roster";
 import { AppSelect } from "@/components/ui/app-controls";
 import { PersonAvatar, TeamProfilesProvider } from "@/components/team-profile";
 import { ActionFeedback } from "@/components/dashboard/action-feedback";
@@ -295,7 +296,7 @@ export default function DashboardView({ payload, dark, setDark, onLogout, onRefr
   };
 
   return (
-    <TeamProfilesProvider key={payload.user.id} token={schedulingToken} userId={payload.user.id}><SidebarProvider>
+    <TeamRosterProvider key={payload.user.id} token={schedulingToken}><TeamProfilesProvider key={payload.user.id} token={schedulingToken} userId={payload.user.id}><SidebarProvider>
       <ActionFeedback />
       <EmployeeEngagementProvider key={payload.user.id} token={schedulingToken} enabled={!isOwner} homeActive={view === "overview"}>
       {isOwner && <TeamAccountSetup open={teamSetupOpen} onOpenChange={setTeamSetupOpen} employees={payload.employees} busy={teamSetupBusy} onSubmit={prepareTeamSetup} enabled={Boolean(payload.workflowAccess)} />}
@@ -402,7 +403,7 @@ export default function DashboardView({ payload, dark, setDark, onLogout, onRefr
         </>
       )}
       </EmployeeEngagementProvider>
-    </SidebarProvider></TeamProfilesProvider>
+    </SidebarProvider></TeamProfilesProvider></TeamRosterProvider>
   );
 }
 

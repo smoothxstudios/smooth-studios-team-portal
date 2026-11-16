@@ -85,6 +85,7 @@ export function useTeamSchedule({ token, userId, isOwner, availabilityOnly }: {
       // Once saved, a refresh failure must not invite a duplicate submission.
       setMessage(scheduleMutationMessage(path, data, method, result));
       hapticFeedback("success");
+      if ("action" in data && data.action === "complete-task") window.dispatchEvent(new Event("smooth-payroll-updated"));
       try { await load(); } catch { if (session.current.active && session.current.token === token) setError("Your change was saved, but the updated view could not load. Try again to load the latest view before making another change."); }
       return true;
     } catch (e) { if (session.current.active && session.current.token === token) { setError(scheduleMutationError(path, e)); hapticFeedback("warning"); } return false; }

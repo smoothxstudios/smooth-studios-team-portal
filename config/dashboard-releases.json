@@ -1,6 +1,26 @@
 {
-  "currentVersion": "2.51.4",
+  "currentVersion": "2.52.0",
   "releases": [
+    {
+      "id": "2026-11-16-team-visibility-studio-tasks",
+      "version": "2.52.0",
+      "date": "2026-11-16",
+      "category": "Scheduling",
+      "title": "Active team controls and Studio Tasks shifts",
+      "changes": [
+        "Turn Active off on a Team card to hide someone from everyday team lists and availability. Include Inactive restores access to their card and lets you turn them back on.",
+        "Accounts, assignments, payment history, and outstanding balances remain available.",
+        "Schedule Work now includes Studio Tasks with a date, start and end time, responsibilities, and hourly or flat pay.",
+        "After a shift ends, Complete & Add Pay records its earnings once. Employees can review and accept their shifts in Schedule."
+      ],
+      "employee": {
+        "title": "Studio Tasks shifts",
+        "changes": [
+          "Studio Tasks appear in your schedule with times, responsibilities, and agreed pay. Accept or decline in the app.",
+          "Your earnings update after Smooth confirms the completed shift."
+        ]
+      }
+    },
     {
       "id": "2026-11-13-approved-overlap-pairs",
       "version": "2.51.4",

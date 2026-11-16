@@ -1,4 +1,5 @@
 "use client";
+import { IncludeInactive, useTeamRoster } from "@/components/team-roster";
 import { PersonAvatar } from "@/components/team-profile";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -11,6 +12,7 @@ import type { Employee, Rental } from "@/lib/dashboard-types";
 const weekDate = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
 
 export function OwnerWeeklyHours({ employees, rentals, token }: { employees: Employee[]; rentals: Rental[]; token: string }) {
+  const roster = useTeamRoster();
   const [schedule, setSchedule] = useState<TeamSchedule | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -32,8 +34,8 @@ export function OwnerWeeklyHours({ employees, rentals, token }: { employees: Emp
       {weekOffset < 0 && <button type="button" className="team-hours-week-button" onClick={() => setWeekOffset(0)}>This week</button>}
       <button type="button" className="team-hours-week-button" aria-label="Next week" disabled={weekOffset === 0} onClick={() => setWeekOffset(value => Math.min(0, value + 1))}><ChevronRight size={18} aria-hidden="true" /></button>
     </div></div>
-    <div className="team-hours-body">{loading && <p className="schedule-small" role="status">Updating hours…</p>}{error && <p className="schedule-warning" role="status">{error}</p>}
-    <div className="team-hours-grid">{week.people.map(person => <div key={person.id} className="team-hours-person"><PersonAvatar personId={person.id} name={person.name} className="employee-avatar" /><strong>{person.name}</strong><span>{person.hours.toLocaleString("en-US", { maximumFractionDigits: 2 })} <small>hrs</small></span></div>)}</div>
+    <div className="team-hours-body"><IncludeInactive />{loading && <p className="schedule-small" role="status">Updating hours…</p>}{error && <p className="schedule-warning" role="status">{error}</p>}
+    <div className="team-hours-grid">{week.people.filter(person => roster?.visible(person.id) !== false).map(person => <div key={person.id} className="team-hours-person"><PersonAvatar personId={person.id} name={person.name} className="employee-avatar" /><strong>{person.name}</strong><span>{person.hours.toLocaleString("en-US", { maximumFractionDigits: 2 })} <small>hrs</small></span></div>)}</div>
     <p className="schedule-small">Scheduled time · Completed, accepted Calendar appointments and dashboard tasks. Overlapping time counts once.</p></div>
   </section>;
 }

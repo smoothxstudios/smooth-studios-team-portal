@@ -1,4 +1,5 @@
 "use client";
+import { IncludeInactive, useTeamRoster } from "@/components/team-roster";
 import { RentalDeductions } from "@/components/dashboard/rental-deductions";
 import { PersonAvatar } from "@/components/team-profile";
 import { teamEarnings } from "@/lib/team-summary.mjs";
@@ -49,10 +50,11 @@ export function PayoutPage({
   const isOwner = !employeeId;
   const advance = payroll?.balances.find(item => item.employeeId === employeeId);
   const hasChartData = monthly.some(month => month.paid > 0 || month.owed > 0);
+  const roster = useTeamRoster();
   return (
     <section className={`payout-layout${isOwner ? "" : " employee-payout-layout"}`}>
       {isOwner && <article className="panel team-payout-breakdown"><div className="team-payout-heading"><div><h2>Pay by team member</h2><p>Earned pay and payments</p></div>{addPay}</div>
-        <div className="team-payout-people">{teamEarnings(employees, rentals, creative).map(person => {
+        <IncludeInactive /><p className="schedule-small">Inactive members with an outstanding payment balance remain visible.</p><div className="team-payout-people">{teamEarnings(employees, rentals, creative).filter(person => roster?.visible(person.id) !== false || (payroll?.accounts?.find(account => account.employeeId === person.id)?.payableCents ?? person.owed) > 0).map(person => {
           const account = payroll?.accounts?.find(item => item.employeeId === person.id);
           const rentalDeduction = account ? Math.min(account.grossOwedCents, account.rentalBalanceCents) : 0;
           return <section className="team-payout-person" key={person.id}>

@@ -1,4 +1,5 @@
 "use client";
+import { IncludeInactive, useTeamRoster } from "@/components/team-roster";
 import { STUDIO_OPEN_TIME, STUDIO_CLOSE_TIME } from "@/lib/studio-hours.mjs";
 import { PersonAvatar } from "@/components/team-profile";
 import { AvailabilityOverview } from "@/components/availability-overview";
@@ -23,6 +24,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
   userId: string; isOwner: boolean; schedule: TeamSchedule; busy: boolean; needsRefresh: boolean; error: string;
   mutate: (path: string, data: object, method?: string) => Promise<boolean>; onBlockTime: (id?: string) => void;
 }) {
+  const roster = useTeamRoster();
   const [filter, setFilter] = useState(isOwner ? "all" : userId);
   const [expandedPerson, setExpandedPerson] = useState<string | null>(isOwner ? null : userId);
   const [showAllPreferences, setShowAllPreferences] = useState(false);
@@ -34,7 +36,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
   const [remove, setRemove] = useState<{ path: string; label: string } | null>(null);
   const disabled = busy || needsRefresh;
   const available = schedule.availabilityVersion === 1;
-  const visible = (entry: TimeBlock | WorkPreference) => (filter === "all" || entry.userId === filter) && (showPast || upcoming(entry));
+  const visible = (entry: TimeBlock | WorkPreference) => (!isOwner || roster?.visible(entry.userId) !== false) && (filter === "all" || entry.userId === filter) && (showPast || upcoming(entry));
   const preferences = (schedule.workPreferences ?? []).filter(visible).sort((a, b) => a.startLocal.localeCompare(b.startLocal));
   const blocks = schedule.blocks.filter(visible).sort((a, b) => a.startLocal.localeCompare(b.startLocal));
   const defaultUser = isOwner ? "" : userId;
@@ -62,7 +64,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
     <section className={`availability-panel${isOwner ? " schedule-panel is-owner" : " is-self"}`} aria-label={isOwner ? "Team availability" : "Your availability"}>
     {isOwner && <AvailabilityOverview schedule={schedule} filter={filter} onFilterChange={selectPerson} />}
     <details className="availability-editor" open={!isOwner || filter !== "all"}><summary hidden={!isOwner}>Edit availability</summary>
-    <div className="availability-people">{(isOwner ? TEAM.filter(person => filter === "all" || person.id === filter) : [{ id: userId, name: name(userId), color: "" }]).map(person => {
+    <div className="availability-people">{(isOwner ? TEAM.filter(person => roster?.visible(person.id) !== false && (filter === "all" || person.id === filter)) : [{ id: userId, name: name(userId), color: "" }]).map(person => {
       const personPreferences = preferences.filter(entry => entry.userId === person.id);
       const personBlocks = blocks.filter(entry => entry.userId === person.id);
       const expanded = !isOwner || expandedPerson === person.id;
@@ -100,7 +102,7 @@ export function TeamAvailability({ userId, isOwner, schedule, busy, needsRefresh
           if (await mutate(form.id ? `/work-preferences/${form.id}` : "/work-preferences", { userId: form.userId, startLocal, endLocal, allDay: form.allDay, note: form.note, repeatUntil: form.weekly ? form.repeatUntil : null }, form.id ? "PATCH" : "POST")) { if (isOwner) { if (filter !== "all") setFilter(form.userId); setExpandedPerson(form.userId); setShowAllPreferences(false); setShowAllBlocks(false); } setOpen(false); }
         } catch (caught) { setFormError(caught instanceof Error ? caught.message : "Check the selected date and hours."); }
       }}>
-        <div className="app-sheet-scroll">{isOwner && <label>Team member<AppSelect aria-label="Team member" required disabled={Boolean(form.id)} value={form.userId} onValueChange={value => setForm({ ...form, userId: value })}><option value="" disabled>Choose a person</option>{TEAM.filter(p => p.id !== "owner").map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label>}
+        <div className="app-sheet-scroll">{isOwner && <label>Team member<AppSelect aria-label="Team member" required disabled={Boolean(form.id)} value={form.userId} onValueChange={value => setForm({ ...form, userId: value })}><option value="" disabled>Choose a person</option>{TEAM.filter(p => p.id !== "owner" && (roster?.visible(p.id) !== false || p.id === form.userId)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</AppSelect></label>}
         <label>Day<Input required type="date" value={form.day} onChange={e => setForm({ ...form, day: e.target.value })} /></label>
         <ConfirmationRow checked={form.allDay} disabled={busy} onCheckedChange={allDay => setForm({ ...form, allDay })}>Full day</ConfirmationRow>
         {!form.allDay && <><div className="schedule-form-pair"><label>From<Input required type="time" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} /></label><label>Until<Input required type="time" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} /></label></div>{form.endTime < form.startTime && <p className="schedule-small">Ends the following day.</p>}</>}

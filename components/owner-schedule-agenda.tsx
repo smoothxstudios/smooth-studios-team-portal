@@ -1,4 +1,5 @@
 "use client";
+import { IncludeInactive, useTeamRoster } from "@/components/team-roster";
 import { AppSelect } from "@/components/ui/app-controls";
 import { PersonAvatar } from "@/components/team-profile";
 import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
@@ -51,6 +52,7 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
   onAssign: (appointmentId?: string) => void; onAvailability: () => void;
   onChecklist?: () => void; busy: boolean; renderAssignment: (item: TeamAssignment) => ReactNode;
 }) {
+  const roster = useTeamRoster();
   const [removing, setRemoving] = useState<{ appointmentId: string; employeeId: string } | null>(null);
   const [now, setNow] = useState(Date.now);
   const [selectedDay, setSelectedDay] = useState(() => studioLocal(now).slice(0, 10));
@@ -121,10 +123,10 @@ export function OwnerScheduleAgenda({ schedule, employeeId, onEmployeeChange, on
   }
 
   return <div className="owner-agenda">
-    <div className="agenda-heading"><div className="schedule-actions"><Button onClick={() => onAssign()} disabled={busy}><Plus size={16} />Assign work</Button><Button onClick={onAvailability} variant="outline"><CalendarDays size={16} />Availability</Button></div></div>
+    <IncludeInactive /><div className="agenda-heading"><div className="schedule-actions"><Button onClick={() => onAssign()} disabled={busy}><Plus size={16} />Schedule Work</Button><Button onClick={onAvailability} variant="outline"><CalendarDays size={16} />Availability</Button></div></div>
     <section className="schedule-panel agenda-panel" aria-label="Team calendar">
       <div className="agenda-controls">
-        <div className="agenda-search-row"><label className="agenda-search"><Search size={17} aria-hidden="true" /><Input aria-label="Search schedule" placeholder="Find a client, booking, or teammate" type="search" value={query} onChange={event => setQuery(event.target.value)} /></label><label className="agenda-person-filter"><span className="sr-only">Team member</span><AppSelect aria-label="Team member" value={employeeId} onValueChange={value => onEmployeeChange(value)}><option value="all">Everyone</option>{TEAM.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</AppSelect></label></div>
+        <div className="agenda-search-row"><label className="agenda-search"><Search size={17} aria-hidden="true" /><Input aria-label="Search schedule" placeholder="Find a client, booking, or teammate" type="search" value={query} onChange={event => setQuery(event.target.value)} /></label><label className="agenda-person-filter"><span className="sr-only">Team member</span><AppSelect aria-label="Team member" value={employeeId} onValueChange={value => onEmployeeChange(value)}><option value="all">Everyone</option>{TEAM.filter(person => roster?.visible(person.id) !== false).map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</AppSelect></label></div>
         <div className="agenda-period-row"><div className="agenda-view-switch" role="group" aria-label="Calendar view">{([{ id: "month", label: "Month" }, { id: "week", label: "Week" }, { id: "day", label: "Day" }, { id: "list", label: "List" }] as const).map(option => <button key={option.id} type="button" aria-pressed={view === option.id} onClick={() => setView(option.id)}>{option.label}</button>)}</div><label className="agenda-date-picker"><span>Jump to date</span><Input aria-label="Jump to date" type="date" value={selectedDay} onChange={event => { if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) setSelectedDay(event.target.value); }} /></label></div>
         <div className="agenda-date-heading"><div><h3>{new Date(localInstant(`${selectedDay}T12:00`)).toLocaleDateString("en-US", { timeZone: STUDIO_ZONE, month: "long", year: "numeric" })}</h3><small>{view === "list" ? "Next 30 days" : "Tap an event for details"}</small></div><div className="schedule-actions"><Button size="icon" variant="outline" aria-label={`Previous ${view === "list" ? "30 days" : view}`} onClick={() => moveDate(-1)}><ChevronLeft size={18} /></Button><Button variant="outline" onClick={() => setSelectedDay(today)}>Today</Button><Button size="icon" variant="outline" aria-label={`Next ${view === "list" ? "30 days" : view}`} onClick={() => moveDate(1)}><ChevronRight size={18} /></Button></div></div>
         <div className="agenda-status-filters" role="group" aria-label="Filter staffing status">{statusOptions.map(option => <button type="button" key={option.id} className={option.id} aria-pressed={status === option.id} onClick={() => setStatus(option.id)}>{option.label}<span>{counts[option.id]}</span></button>)}</div>
