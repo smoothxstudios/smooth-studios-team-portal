@@ -1,6 +1,23 @@
 {
-  "currentVersion": "2.52.4",
+  "currentVersion": "2.52.5",
   "releases": [
+    {
+      "id": "2026-11-17-team-rental-start",
+      "version": "2.52.5",
+      "date": "2026-11-17",
+      "category": "Payments",
+      "title": "Exclude rentals from before joining the team",
+      "changes": [
+        "Team cards include a personal start date for rental deductions. Earlier bookings no longer reduce the person’s current pay.",
+        "Payout totals, payment previews, and encrypted syncs use the saved cutoff. Existing receipts remain available, and earlier settled deductions are flagged for review."
+      ],
+      "employee": {
+        "title": "Rental deductions respect team start dates",
+        "changes": [
+          "Personal rentals from before your saved team start date are excluded from your current pay balance."
+        ]
+      }
+    },
     {
       "id": "2026-11-16-event-planner-availability-roster",
       "version": "2.52.4",

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture } from './helpers/notification-fixture.mjs';
 import { paymentAccounts } from '../team-api/payroll-payments.mjs';
-import { rentalDeductionDateEligible } from '../lib/team-rental-policy.mjs';
+import { rentalDeductionDateEligible, validRentalDeductionStart } from '../lib/team-rental-policy.mjs';
+import { scopedPayroll } from '../lib/payroll-advances.mjs';
 import { buildDashboardPayloads } from '../scripts/lib/dashboard-data.mjs';
 import { calendarRecord } from '../lib/sync-records.mjs';
 import { verifyRentalDeductions } from '../scripts/lib/verify-rental-deductions.mjs';
@@ -102,4 +103,94 @@ test('renter matching uses a unique exact customer name or known email, never cr
   assert.equal(renter({ summary: 'Rayne: Portrait Session' }), undefined);
   assert.equal(renter({ start: { dateTime: '2026-09-24T17:00:00Z' }, end: { dateTime: '2026-09-24T18:00:00Z' } }), undefined);
   assert.equal(renter({}, [...config.employees, { id: 'another-rayne', name: 'Rayne' }]), undefined);
+});
+
+test('a personal cutoff cannot move the studio cutoff earlier and uses the local start date', () => {
+  assert.equal(rentalDeductionDateEligible('2026-09-24T17:00:00Z', '2026-08-01'), false);
+  assert.equal(rentalDeductionDateEligible('2026-11-08T04:59:59Z', '2026-11-08'), false);
+  assert.equal(rentalDeductionDateEligible('2026-11-08T05:00:00Z', '2026-11-08'), true);
+  assert.equal(rentalDeductionDateEligible('2026-11-08T17:00:00Z', 'invalid'), false);
+  for (const value of ['2026-02-30', '2026-13-01', '', '2026-1-01', '2026-11-08T00:00Z']) assert.equal(validRentalDeductionStart(value), false);
+  assert.equal(validRentalDeductionStart('2028-02-29'), true);
+});
+
+test('saving a team start excludes earlier rentals and restores earned pay without recording a payment', async () => {
+  const f = await fixture();
+  const before = booking('before-team', '2026-10-01T23:00:00Z', { priceCents: 10000, paidOnlineCents: 10000 });
+  put(f, before);
+  f.DB.sqlite.prepare(`INSERT INTO payroll_rental_earnings(generation,employee_id,rental_id,amount_cents,paid_cents,earned_at,eligible,as_of)
+    VALUES ('','rayne','earned-work',7500,0,'2026-11-01T18:00:00Z',1,'2026-11-10T18:00:00Z')`).run();
+  assert.equal((await paymentAccounts(f.DB, 'rayne', now)).accounts[0].payableCents, 0);
+  const oldPreview = (await f.call('owner', '/payroll/payments/preview?employee=rayne&through=2026-11-10')).data;
+  const saved = await f.call('owner', '/team-roster', { id: 'rayne', rentalDeductionStart: '2026-10-10', revision: 0 }, 'PUT');
+  assert.equal(saved.status, 200);
+  assert.equal(saved.data.active, true);
+  const after = await paymentAccounts(f.DB, 'rayne', now);
+  assert.equal(after.accounts[0].payableCents, 7500);
+  assert.equal(after.accounts[0].rentalBalanceCents, 0);
+  assert.equal(after.accounts[0].carryForwardCents, 0);
+  assert.deepEqual(after.rentalCharges, []);
+  assert.deepEqual(after.paymentReceipts, []);
+  const stalePayment = await f.call('owner', '/payroll/payments', { id: crypto.randomUUID(), employeeId: 'rayne', through: '2026-11-10',
+    revision: oldPreview.revision, reviewKey: oldPreview.reviewKey, cashCents: oldPreview.cashCents, method: '', note: '' });
+  assert.equal(stalePayment.status, 409);
+  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM payroll_rental_deductions').get().n, 0);
+  assert.doesNotThrow(() => verifyRentalDeductions(after, [before], new Date(now).toISOString()));
+  put(f, before); // Reimporting the booking cannot restore the excluded deduction.
+  assert.equal((await paymentAccounts(f.DB, 'rayne', now)).accounts[0].payableCents, 7500);
+  f.close();
+});
+
+test('a cutoff applies to one renter and preserves deductions on or after their start', async () => {
+  const f = await fixture();
+  put(f, booking('earlier', '2026-11-07T17:00:00Z'));
+  put(f, booking('eligible', '2026-11-08T17:00:00Z'));
+  put(f, booking('other-person', '2026-11-07T17:00:00Z', { teamRenterId: 'jordyn' }));
+  await f.call('owner', '/team-roster', { id: 'rayne', rentalDeductionStart: '2026-11-08', revision: 0 }, 'PUT');
+  const state = await paymentAccounts(f.DB, 'owner', now);
+  assert.deepEqual(state.rentalCharges.map(c => c.rentalId), ['other-person', 'eligible']);
+  assert.equal(state.accounts.find(a => a.employeeId === 'rayne').rentalBalanceCents, 6000);
+  assert.equal(state.accounts.find(a => a.employeeId === 'jordyn').rentalBalanceCents, 6000);
+  assert.deepEqual((await paymentAccounts(f.DB, 'jordyn', now)).rentalPolicies, []);
+  assert.deepEqual(scopedPayroll({ ...state, balances: [], allocations: [] }, 'jordyn').rentalPolicies, []);
+  const employeeRoster = await f.call('jordyn', '/team-roster');
+  assert.ok(employeeRoster.data.members.every(member => !Object.hasOwn(member, 'rentalDeductionStart')));
+  f.close();
+});
+
+test('cutoff saves require the owner, reject invalid or stale changes, and preserve visibility', async () => {
+  const f = await fixture();
+  const input = { id: 'rayne', rentalDeductionStart: '2026-11-08', revision: 0 };
+  assert.equal((await f.call('rayne', '/team-roster', input, 'PUT')).status, 403);
+  assert.equal((await f.call('owner', '/team-roster', { ...input, rentalDeductionStart: '2026-02-30' }, 'PUT')).status, 400);
+  await f.call('owner', '/team-roster', { id: 'rayne', active: false, revision: 0 }, 'PUT');
+  assert.equal((await f.call('owner', '/team-roster', input, 'PUT')).status, 409);
+  const before = (await paymentAccounts(f.DB, 'owner', now)).accountRevision;
+  const saved = await f.call('owner', '/team-roster', { ...input, revision: 1 }, 'PUT');
+  assert.equal(saved.status, 200);
+  assert.equal(saved.data.active, false);
+  assert.equal(saved.data.rentalDeductionStart, input.rentalDeductionStart);
+  assert.ok((await paymentAccounts(f.DB, 'owner', now)).accountRevision > before);
+  const active = await f.call('owner', '/team-roster', { id: 'rayne', active: true, revision: saved.data.revision }, 'PUT');
+  assert.equal(active.data.rentalDeductionStart, input.rentalDeductionStart);
+  const cleared = await f.call('owner', '/team-roster', { id: 'rayne', rentalDeductionStart: null, revision: active.data.revision }, 'PUT');
+  assert.equal(cleared.data.rentalDeductionStart, null);
+  assert.equal(cleared.data.active, true);
+  f.close();
+});
+
+test('an already settled rental newly excluded by a cutoff requires review without rewriting its settlement', async () => {
+  const f = await fixture();
+  put(f, booking('settled-before-team', '2026-11-07T17:00:00Z'));
+  f.DB.sqlite.prepare('INSERT INTO payroll_rental_deductions(employee_id,rental_id,amount_cents) VALUES (?,?,?)').run('rayne', 'settled-before-team', 2500);
+  const before = f.DB.sqlite.prepare('SELECT * FROM payroll_rental_deductions').all();
+  await f.call('owner', '/team-roster', { id: 'rayne', rentalDeductionStart: '2026-11-08', revision: 0 }, 'PUT');
+  const state = await paymentAccounts(f.DB, 'rayne', now);
+  assert.equal(state.accounts[0].reviewCount, 1);
+  assert.equal(state.rentalCharges[0].needsReview, true);
+  assert.equal(state.rentalCharges[0].appliedCents, 2500);
+  assert.deepEqual(f.DB.sqlite.prepare('SELECT * FROM payroll_rental_deductions').all(), before);
+  const preview = await f.call('owner', '/payroll/payments/preview?employee=rayne&through=2026-11-10');
+  assert.equal(preview.data.reviewCount, 1);
+  f.close();
 });

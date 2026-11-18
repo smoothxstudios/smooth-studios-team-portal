@@ -105,6 +105,7 @@ export type PayrollAccount = { employeeId:string; grossOwedCents:number; rentalB
 export type PaymentReceipt = { id:string; employeeId:string; through:string; recordedAt:string; method:string; note:string; grossCents:number; deductionCents:number; cashCents:number; remainingPayableCents:number; carryForwardCents:number };
 export type PayrollState = {
   accountRevision?: number;
+  rentalPolicies?: { employeeId: string; startDate: string }[];
   accounts?: PayrollAccount[];
   earnings?: {employeeId:string;kind:string;sourceId:string;outstandingCents:number}[];
   rentalCharges?: {employeeId:string;rentalId:string;title:string;startAt?:string;earnedAt:string;priceCents:number;paidOnlineCents:number;amountCents:number;appliedCents:number;outstandingCents:number;needsReview:boolean}[];

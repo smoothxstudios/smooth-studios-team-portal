@@ -10,6 +10,28 @@ import { dollars, formatDate, paidEarnings, rentalState, unpaidEarnings } from "
 import type { Employee, PayrollState, Rental } from "@/lib/dashboard-types";
 import type { CreativeAssignment } from "@/lib/use-creative-work";
 import { CalendarDays } from "lucide-react";
+import { useState } from "react";
+
+function RentalDeductionStart({ employee }: { employee: Employee }) {
+  const roster = useTeamRoster();
+  const member = roster?.members.find(person => person.id === employee.id);
+  const [editing, setEditing] = useState(false), [draft, setDraft] = useState("");
+  const unavailable = !member || roster?.loading || roster?.busy || Boolean(roster?.error);
+  return <div className="team-rental-start">
+    <div className="team-rental-start-heading"><span>Rental deduction start</span>
+      <Button size="sm" variant="ghost" disabled={unavailable} aria-label={`Edit rental deduction start for ${employee.name}`}
+        onClick={() => { setDraft(member?.rentalDeductionStart ?? ""); setEditing(true); }}>Edit</Button></div>
+    {!editing ? <p>{member?.rentalDeductionStart ? formatDate(`${member.rentalDeductionStart}T12:00:00Z`) : "Studio cutoff · Sep 25, 2026"}</p> :
+      <form onSubmit={async event => { event.preventDefault(); if (await roster?.setRentalDeductionStart(employee.id, draft || null)) setEditing(false); }}>
+        <label htmlFor={`rental-start-${employee.id}`}>Team start date</label>
+        <input id={`rental-start-${employee.id}`} type="date" value={draft} disabled={roster?.busy}
+          aria-describedby={`rental-start-help-${employee.id}`} onChange={event => setDraft(event.target.value)} />
+        <p id={`rental-start-help-${employee.id}`}>Earlier rentals are excluded from pay deductions. Blank uses the studio cutoff. Saved payment receipts stay intact.</p>
+        <div className="team-rental-start-actions"><Button size="sm" variant="outline" type="button" disabled={roster?.busy} onClick={() => setEditing(false)}>Cancel</Button>
+          <Button size="sm" type="submit" disabled={unavailable}>{roster?.busy ? "Saving…" : "Save date"}</Button></div>
+      </form>}
+  </div>;
+}
 
 type TeamPageProps = {
   employees: Employee[];
@@ -50,6 +72,7 @@ function TeamMemberCard({ employee, rentals, creative, payroll, onSetup }: TeamM
       <div><span>Appointments</span><strong>{assigned.length}</strong></div>
     </div>
     <div className="employee-next"><CalendarDays size={14} /><span>Next accepted</span><strong>{next ? formatDate(next.start, true) : "None scheduled"}</strong></div>
+    <RentalDeductionStart employee={employee} />
     {employee.onboarding && !employee.accessReady && <Button className="team-setup-action" variant="outline" onClick={onSetup}>Set up private account</Button>}
   </article>;
 }

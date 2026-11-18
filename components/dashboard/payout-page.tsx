@@ -105,7 +105,7 @@ export function PayoutPage({
       <article className="panel payment-account-history"><div className="panel-heading"><h2>Payment history</h2></div>
         {payroll?.paymentReceipts?.length ? payroll.paymentReceipts.map(receipt=><details className="payment-line-items" key={receipt.id}><summary>{isOwner?`${employees.find(p=>p.id===receipt.employeeId)?.name??receipt.employeeId} · `:""}{dollars(receipt.cashCents,true)} · {formatDate(receipt.recordedAt)}</summary><p>Work through {receipt.through} · {receipt.method||"Method not specified"}</p><p>{dollars(receipt.grossCents,true)} earnings settled · {dollars(receipt.deductionCents,true)} rental deductions</p>{receipt.note&&<p>{receipt.note}</p>}<small>Receipt {receipt.id.slice(0,8)}</small></details>) : <p>Payments recorded here will appear with a receipt and the work dates covered. Earlier payments remain included in the totals.</p>}
       </article>
-      <RentalDeductions charges={payroll?.rentalCharges ?? []} employees={employees} rentals={rentals} isOwner={isOwner} />
+      <RentalDeductions charges={payroll?.rentalCharges ?? []} policies={payroll?.rentalPolicies} employees={employees} rentals={rentals} isOwner={isOwner} />
     </section>
   );
 }

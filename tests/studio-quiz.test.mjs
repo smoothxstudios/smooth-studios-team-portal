@@ -28,6 +28,8 @@ test('a changed custom policy cannot inherit its old scenario or an unrelated ru
  assert.deepEqual(guidelineQuizBank({entries:[entry,...rules().entries.filter(e=>e.id!==entry.id)]}).filter(q=>q.prompt===scenario.prompt),[]);
 });
 test('unanswered legacy trivia is replaced once without resetting points, completed answers, or pacing',async t=>{
+ // The next quiz can reset at Eastern midnight; exercise pacing at a fixed daytime.
+ t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-11-10T17:00:00Z')});
  const f=await setup(t);
  const old=(await f.call('jordyn')).data;
  assert.ok(!old.currentQuestionId.includes(':guideline-v2-'));

@@ -211,4 +211,5 @@ export const payrollAccountRevision=sqliteTable("payroll_account_revision",{id:i
 export const teamRoster = sqliteTable("team_roster", {
   userId: text("user_id").primaryKey(), active: integer("active").notNull().default(1),
   revision: integer("revision").notNull().default(0), updatedAt: text("updated_at").notNull(),
+  rentalDeductionStart: text("rental_deduction_start"),
 }, table => [check("team_roster_active", sql`${table.active} IN (0, 1)`)]);

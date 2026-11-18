@@ -14,7 +14,7 @@ const rows = async (db, query, ...args) => (await db.prepare(query).bind(...args
 export async function paymentAccounts(db, user, now = Date.now()) {
   const employee = ['owner','sync'].includes(user) ? null : user;
   const revision = (await db.prepare('SELECT revision FROM payroll_account_revision WHERE id=1').first()).revision;
-  const [sources, imported, settlements, allocations, calendar, offers, consumed, creative, receipts] = await Promise.all([
+  const [sources, imported, settlements, allocations, calendar, offers, consumed, creative, receipts, policies] = await Promise.all([
     rows(db, 'SELECT * FROM payroll_sources WHERE (? IS NULL OR employee_id=?) ORDER BY earned_at,kind,id', employee, employee),
     rows(db, 'SELECT r.* FROM payroll_rental_earnings r JOIN payroll_state s ON s.generation=r.generation WHERE (? IS NULL OR r.employee_id=?)', employee, employee),
     rows(db, 'SELECT * FROM payroll_rental_settlements WHERE (? IS NULL OR employee_id=?)', employee, employee),
@@ -26,7 +26,10 @@ export async function paymentAccounts(db, user, now = Date.now()) {
     rows(db, 'SELECT * FROM payroll_rental_deductions WHERE (? IS NULL OR employee_id=?)', employee, employee),
     rows(db, 'SELECT data FROM team_creative_assignments WHERE (? IS NULL OR employee_id=?)', employee, employee),
     rows(db, 'SELECT data FROM payroll_receipts WHERE (? IS NULL OR employee_id=?) ORDER BY created_at DESC LIMIT 50', employee, employee),
+    rows(db, 'SELECT user_id, rental_deduction_start FROM team_roster WHERE rental_deduction_start IS NOT NULL AND (? IS NULL OR user_id=?)', employee, employee),
   ]);
+  const rentalPolicies = policies.map(row => ({ employeeId: row.user_id, startDate: row.rental_deduction_start }));
+  const deductionStart = employeeId => rentalPolicies.find(policy => policy.employeeId === employeeId)?.startDate ?? null;
   const appointments = calendar.map(row => JSON.parse(row.data)), assignments = offers.map(row => JSON.parse(row.data));
   const works = new Map(creative.map(row => { const item = JSON.parse(row.data); return [item.id,item]; }));
   const creditFor = (employeeId,kind,id) => allocations.find(a => a.employee_id===employeeId && a.source_kind===kind && a.source_id===id);
@@ -45,7 +48,7 @@ export async function paymentAccounts(db, user, now = Date.now()) {
       advanceAppliedCents:applied };
   });
   const charges=appointments.filter(a=>TEAM.some(p=>p.id!=='owner'&&p.id===a.teamRenterId) && (!employee || a.teamRenterId===employee) &&
-    rentalDeductionDateEligible(a.start) &&
+    rentalDeductionDateEligible(a.start, deductionStart(a.teamRenterId)) &&
     Date.parse(a.end)<=now && !appointmentCancelled(a,assignments,now)).map(a=>{
     // Payroll uses the original booking price, independently of customer payments.
     // Saved deductions are credits against that price, never charged a second time.
@@ -77,7 +80,7 @@ export async function paymentAccounts(db, user, now = Date.now()) {
   });
   const current=(await db.prepare('SELECT revision FROM payroll_account_revision WHERE id=1').first()).revision;
   if(current!==revision) throw new PayrollAccountConflict('Pay changed while loading. Review the current balance again.');
-  return {accountRevision:revision,accounts,earnings,rentalCharges:charges,rentalPayments,paymentReceipts:receipts.map(r=>JSON.parse(r.data))};
+  return {accountRevision:revision,accounts,earnings,rentalCharges:charges,rentalPayments,rentalPolicies,paymentReceipts:receipts.map(r=>JSON.parse(r.data))};
 }
 
 export async function paymentPreview(db, employeeId, through, fail) {

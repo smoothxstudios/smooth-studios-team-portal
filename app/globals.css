@@ -2366,3 +2366,9 @@ button { cursor: pointer; }
 .roster-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .roster-heading p{margin:0;color:var(--muted-foreground);font-size:13px;max-width:55ch}
 .team-active-control { display: flex; align-items: center; justify-content: space-between; gap: .75em; min-height: 2.75rem; padding: .625rem 0; margin: .5rem 0; border-bottom: 1px solid var(--border); font-size: .8125rem; font-weight: 600; }
+.team-rental-start { margin-top: .75rem; border-top: 1px solid var(--border); padding-top: .5rem; font-size: .8125rem; }
+.team-rental-start-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; font-weight: 600; }
+.team-rental-start p { margin: .25rem 0 .5rem; color: var(--muted-foreground); line-height: 1.5; }
+.team-rental-start form { display: grid; gap: .5rem; min-width: 0; }
+.team-rental-start input { width: 100%; min-width: 0; box-sizing: border-box; padding: .625em; border: 1px solid var(--border); border-radius: .625em; background: var(--background); color: var(--foreground); font: inherit; }
+.team-rental-start-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
