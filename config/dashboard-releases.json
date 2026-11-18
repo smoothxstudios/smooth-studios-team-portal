@@ -1,6 +1,23 @@
 {
-  "currentVersion": "2.52.5",
+  "currentVersion": "2.53.0",
   "releases": [
+    {
+      "id": "2026-11-17-paycheck-processed-notification",
+      "version": "2.53.0",
+      "date": "2026-11-17",
+      "category": "Payments",
+      "title": "Manual paycheck arrival notifications",
+      "changes": [
+        "Payouts includes Paycheck processed: choose team members and an expected arrival date, review the message, then send. The same option is in Send reminder.",
+        "Selected team members receive an alert that opens Earnings, with a push queued for enabled devices. Sending an ETA leaves payment records and balances unchanged."
+      ],
+      "employee": {
+        "title": "Paycheck arrival updates",
+        "changes": [
+          "Paycheck processed alerts show the expected arrival date supplied by Smooth. Tap an alert to open Earnings."
+        ]
+      }
+    },
     {
       "id": "2026-11-17-team-rental-start",
       "version": "2.52.5",

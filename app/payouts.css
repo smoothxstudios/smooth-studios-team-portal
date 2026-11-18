@@ -1,6 +1,8 @@
 /* One shared panel, aligned totals, and compact optional account details. */
 .panel.team-payout-breakdown { grid-column: 1 / -1; padding: 24px; background: var(--card); }
-.team-payout-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 20px; }
+.team-payout-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 20px; }
+.team-payout-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.team-payout-actions .team-notifications-controls { margin: 0; }
 .team-payout-heading > div { min-width: 0; }
 .team-payout-heading h2 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -.025em; }
 .team-payout-heading p { margin: 5px 0 0; color: var(--muted-foreground); font-size: 13px; }

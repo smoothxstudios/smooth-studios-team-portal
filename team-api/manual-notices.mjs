@@ -5,7 +5,7 @@ import { flushAlerts } from "./push.mjs";
 import { rentalAlertTargetId } from "../lib/alert-target.mjs";
 
 const employees = new Set(TEAM.filter(person => person.id !== "owner").map(person => person.id));
-const targets = new Set(["alerts", "settings", "scheduling", "creative", "availability"]);
+const targets = new Set(["alerts", "settings", "scheduling", "creative", "availability", "payouts"]);
 const uuid = value => typeof value === "string" && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
 const interval = 5 * 60_000;
 const queued = item => ({ sent: true, id: item.id, recipientCount: JSON.parse(item.recipient_ids).length,
@@ -56,7 +56,7 @@ export async function manualNoticesRoute({ request, env, user, body, fail, ctx }
     recipients = [...input.recipientIds].sort();
     title = clean(input.title, 80, "title", fail); message = clean(input.body, 360, "message", fail);
     target = input.target ?? "alerts";
-    if (!targets.has(target)) fail(400, "Choose Alerts, Settings, Schedule, Creative work, or Availability as the destination.");
+    if (!targets.has(target)) fail(400, "Choose Alerts, Settings, Schedule, Creative work, Availability, or Earnings as the destination.");
     if (input.context !== undefined) {
       const value = input.context;
       if (!value || Array.isArray(value) || value.type !== "rental" || typeof value.appointmentId !== "string" ||

@@ -32,8 +32,10 @@ export function PayoutPage({
   payroll,
   creative = [],
   addPay,
+  paycheckNotice,
 }: {
   addPay?: ReactNode;
+  paycheckNotice?: ReactNode;
   creative?: CreativeAssignment[];
   employeeId?: string;
   payroll?: PayrollState;
@@ -53,7 +55,7 @@ export function PayoutPage({
   const roster = useTeamRoster();
   return (
     <section className={`payout-layout${isOwner ? "" : " employee-payout-layout"}`}>
-      {isOwner && <article className="panel team-payout-breakdown"><div className="team-payout-heading"><div><h2>Pay by team member</h2><p>Earned pay and payments</p></div>{addPay}</div>
+      {isOwner && <article className="panel team-payout-breakdown"><div className="team-payout-heading"><div><h2>Pay by team member</h2><p>Earned pay and payments</p></div><div className="team-payout-actions">{addPay}{paycheckNotice}</div></div>
         <IncludeInactive /><p className="schedule-small">Inactive members with an outstanding payment balance remain visible.</p><div className="team-payout-people">{teamEarnings(employees, rentals, creative).filter(person => roster?.visible(person.id) !== false || (payroll?.accounts?.find(account => account.employeeId === person.id)?.payableCents ?? person.owed) > 0).map(person => {
           const account = payroll?.accounts?.find(item => item.employeeId === person.id);
           const rentalDeduction = account ? Math.min(account.grossOwedCents, account.rentalBalanceCents) : 0;

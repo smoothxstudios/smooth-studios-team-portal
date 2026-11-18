@@ -4,34 +4,39 @@ import { AppSelect } from "@/components/ui/app-controls";
 import { PersonAvatar } from "@/components/team-profile";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { BellPlus, CalendarCheck, CalendarClock, Link2, MessageSquare, Pencil, RefreshCw, Send, SlidersHorizontal, X } from "lucide-react";
+import { BellPlus, CalendarCheck, CalendarClock, Link2, MessageSquare, Pencil, RefreshCw, Send, Wallet, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useRefreshSource } from "@/components/dashboard-refresh";
+import { paycheckNotification } from "@/lib/paycheck-notification.mjs";
+import { studioLocal } from "@/lib/team-schedule.mjs";
 import { createNotificationDraft } from "@/lib/team-notification-draft.mjs";
 import { NOTIFICATION_PRESETS, createRentalReminderIntent, notificationPresetMessage, notificationRentalChoices, sameRentalReminder } from "@/lib/notification-presets.mjs";
 import { teamRequest, type TeamSchedule } from "@/lib/team-api";
 import { notificationTime } from "@/team-api/notification-content.mjs";
 import type { Employee } from "@/lib/dashboard-types";
 
-type Destination = "alerts" | "settings" | "scheduling" | "creative" | "availability";
-type Preset = "rental-response" | "upcoming-rental" | "availability" | "calendar" | "refresh" | "custom";
+type Destination = "alerts" | "settings" | "scheduling" | "creative" | "availability" | "payouts";
+type Preset = "rental-response" | "upcoming-rental" | "availability" | "calendar" | "refresh" | "paycheck-processed" | "custom";
 type Content = { title: string; body: string; target: Destination };
 type Rental = ReturnType<typeof notificationRentalChoices>["bookings"][number];
 type RentalOffer = ReturnType<typeof notificationRentalChoices>["responses"][number];
 type SentNotice = { id: string; recipientIds: string[]; title: string; body: string; target: Destination; createdAt: number };
 type SendResult = { sent: boolean; recipientCount: number; notification: string };
-const destinations: Record<Destination, string> = { alerts: "Inbox", settings: "Settings", scheduling: "Schedule", creative: "Creative work", availability: "Availability" };
-const presetIcons = { "rental-response": CalendarCheck, "upcoming-rental": CalendarClock, availability: SlidersHorizontal, calendar: Link2, refresh: RefreshCw, custom: MessageSquare };
+const destinations: Record<Destination, string> = { alerts: "Inbox", settings: "Settings", scheduling: "Schedule", creative: "Creative work", availability: "Availability", payouts: "Earnings" };
+const presetIcons = { "rental-response": CalendarCheck, "upcoming-rental": CalendarClock, availability: SlidersHorizontal, calendar: Link2, refresh: RefreshCw, custom: MessageSquare, "paycheck-processed": Wallet };
 const emptyContent: Content = { title: "", body: "", target: "alerts" };
 const sentTime = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
-export function TeamNotifications({ token, employees }: { token: string; employees: Employee[] }) {
+export function TeamNotifications({ token, employees, paycheck = false }: { token: string; employees: Employee[]; paycheck?: boolean }) {
   const roster = useTeamRoster();
   const people = employees.filter(person => person.id !== "owner" && roster?.visible(person.id) !== false);
-  const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [preset, setPreset] = useState<Preset | null>(null);
+  const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [preset, setPreset] = useState<Preset | null>(paycheck ? "paycheck-processed" : null);
+  const [etaDate, setEtaDate] = useState("");
+  const today = studioLocal(Date.now()).slice(0, 10);
+  const triggerLabel = paycheck ? "Paycheck processed" : "Send reminder";
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
   const [custom, setCustom] = useState<Content>(emptyContent), [edited, setEdited] = useState<Content | null>(null);
   const [rental, setRental] = useState<Rental | null>(null), [offer, setOffer] = useState<RentalOffer | null>(null);
@@ -48,7 +53,7 @@ export function TeamNotifications({ token, employees }: { token: string; employe
   const selected = preset === "rental-response" ? offer : rental;
   const currentSelection = preset === "rental-response" ? choices.responses.find(item => item.id === offer?.id) : choices.bookings.find(item => item.id === rental?.id);
   const staleRental = rentalMode && selected && !sameRentalReminder(selected, currentSelection);
-  const generated = notificationPresetMessage(preset, selected) as Content | null;
+  const generated = (preset === "paycheck-processed" ? paycheckNotification(etaDate) : notificationPresetMessage(preset, selected)) as Content | null;
   const content = preset === "custom" ? custom : edited ?? generated;
   const effectiveRecipients = preset === "rental-response" ? offer?.recipientIds ?? [] : recipientIds;
   const selectablePeople = preset === "upcoming-rental" ? people.filter(person => rental?.recipientIds.includes(person.id)) : people;
@@ -75,8 +80,9 @@ export function TeamNotifications({ token, employees }: { token: string; employe
     finally { if (id === scheduleSequence.current) setScheduleLoading(false); }
   }, [token]);
   useRefreshSource(refreshHistory, open);
-  useRefreshSource(refreshSchedule, open);
-  useEffect(() => { if (open) { void refreshHistory(); void refreshSchedule(); } }, [open, refreshHistory, refreshSchedule]);
+  useRefreshSource(refreshSchedule, open && rentalMode);
+  useEffect(() => { if (open) void refreshHistory(); }, [open, refreshHistory]);
+  useEffect(() => { if (open && rentalMode) void refreshSchedule(); }, [open, rentalMode, refreshSchedule]);
   useEffect(() => {
     operation.current = false; setBusy(false);
     return () => { lifetime.current++; historySequence.current++; scheduleSequence.current++; };
@@ -99,6 +105,7 @@ export function TeamNotifications({ token, employees }: { token: string; employe
         if (!offer) throw new Error("Choose a rental offer.");
         path = `/assignments/${offer.id}/remind`; data = { id: responseIntent.current.prepare(offer.id, offer).id };
       } else {
+        if (preset === "paycheck-processed" && (!generated || etaDate < studioLocal(Date.now()).slice(0, 10))) throw new Error("Choose today or a future ETA date.");
         if (preset === "upcoming-rental" && (!rental || invalidRentalRecipients)) throw new Error("Choose the rental’s confirmed team members.");
         path = "/notifications";
         data = intent.current.prepare({ recipientIds: effectiveRecipients, ...content,
@@ -124,7 +131,7 @@ export function TeamNotifications({ token, employees }: { token: string; employe
       setMessage(result.notification || `Reminder saved for ${result.recipientCount} team member${result.recipientCount === 1 ? "" : "s"}.`);
       intent.current.clear(); responseIntent.current.clear(); uncertainAttempt.current = null;
       if (preset === "custom") setCustom(emptyContent);
-      setPreset(null); setEdited(null); setRecipientIds([]); setRental(null); setOffer(null);
+      setPreset(paycheck ? "paycheck-processed" : null); setEtaDate(""); setEdited(null); setRecipientIds([]); setRental(null); setOffer(null);
       void refreshHistory();
     } catch (cause) {
       if (current === lifetime.current) {
@@ -136,14 +143,15 @@ export function TeamNotifications({ token, employees }: { token: string; employe
     } finally { if (current === lifetime.current) { operation.current = false; setBusy(false); } }
   };
   const canSend = Boolean(preset && content?.title.trim() && content.body.trim() && effectiveRecipients.length &&
-    (!rentalMode || selected) && (!staleRental || retryUncertain) && !invalidRentalRecipients);
+    (!rentalMode || selected) && (!staleRental || retryUncertain) && !invalidRentalRecipients &&
+    (preset !== "paycheck-processed" || (generated && (etaDate >= today || retryUncertain))));
 
   return <>
-    <div className="team-notifications-controls"><Button type="button" variant="outline" className="compact-control reminder-trigger" aria-label="Send reminder" title="Send reminder" onClick={() => setOpen(true)}><BellPlus size={17} aria-hidden="true" /><span>Send reminder</span></Button></div>
+    <div className="team-notifications-controls"><Button type="button" variant="outline" className={`compact-control${paycheck ? "" : " reminder-trigger"}`} aria-label={triggerLabel} title={triggerLabel} onClick={() => setOpen(true)}><BellPlus size={17} aria-hidden="true" /><span>{triggerLabel}</span></Button></div>
     <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent className="schedule-modal team-notifications-dialog" showCloseButton={false} onOpenAutoFocus={event => { event.preventDefault(); heading.current?.focus(); }}>
-      <DialogHeader className="team-notifications-header"><div><DialogTitle ref={heading} tabIndex={-1}>Send reminder</DialogTitle><DialogDescription>Choose a studio rental or a team task.</DialogDescription></div><Button type="button" variant="ghost" size="icon" disabled={busy} onClick={() => setOpen(false)} aria-label="Close reminder composer"><X size={20} aria-hidden="true" /></Button></DialogHeader>
+      <DialogHeader className="team-notifications-header"><div><DialogTitle ref={heading} tabIndex={-1}>{triggerLabel}</DialogTitle><DialogDescription>{paycheck ? "Choose who to notify and when their paycheck should arrive." : "Choose a rental, team task, or paycheck update."}</DialogDescription></div><Button type="button" variant="ghost" size="icon" disabled={busy} onClick={() => setOpen(false)} aria-label="Close notification composer"><X size={20} aria-hidden="true" /></Button></DialogHeader>
       <div className="team-notifications-body"><form id={formId} onSubmit={event => { event.preventDefault(); void send(); }}>
-        <div className="team-notification-presets" role="group" aria-label="Reminder type">{NOTIFICATION_PRESETS.map(option => { const id = option.id as Preset, Icon = presetIcons[id]; return <button key={id} type="button" disabled={busy} aria-pressed={preset === id} onClick={() => choosePreset(id)}><Icon size={17} aria-hidden="true" /><span><strong>{option.label}</strong><small>{option.detail}</small></span></button>; })}</div>
+        {!paycheck && <div className="team-notification-presets" role="group" aria-label="Reminder type">{NOTIFICATION_PRESETS.map(option => { const id = option.id as Preset, Icon = presetIcons[id]; return <button key={id} type="button" disabled={busy} aria-pressed={preset === id} onClick={() => choosePreset(id)}><Icon size={17} aria-hidden="true" /><span><strong>{option.label}</strong><small>{option.detail}</small></span></button>; })}</div>}
         {rentalMode && <div className="team-notification-rental-picker">
           {scheduleLoading && <p className="schedule-small" role="status">Updating rentals…</p>}{scheduleError && <p className="schedule-small" role="alert">{scheduleError}</p>}
           <label className="team-notification-field"><span>{preset === "rental-response" ? "Pending rental offer" : "Studio rental"}</span><AppSelect disabled={busy || !schedule} value={selected?.id ?? ""} onValueChange={value => { if (preset === "rental-response") { const next = choices.responses.find(item => item.id === value); if (next) chooseOffer(next); } else { const next = choices.bookings.find(item => item.id === value); if (next) chooseRental(next); } }}><option value="">Choose a rental{preset === "rental-response" ? " offer" : ""}</option>{preset === "rental-response" ? choices.responses.map(item => <option key={item.id} value={item.id}>{people.find(person => person.id === item.employeeId)?.name ?? "Team member"} · {item.bookingTitle} · {notificationTime(item.start, item.end)}</option>) : choices.bookings.map(item => <option key={item.id} value={item.id}>{item.title} · {notificationTime(item.start, item.end)}</option>)}</AppSelect></label>
@@ -155,10 +163,11 @@ export function TeamNotifications({ token, employees }: { token: string; employe
           {preset === "rental-response" ? <div className="team-notification-locked-recipient"><span>Send to</span><strong>{people.find(person => person.id === offer?.employeeId)?.name ?? "Assigned team member"}</strong><small>The reminder asks them to accept or decline this offer.</small></div> : <fieldset className="team-notification-recipients" disabled={busy}><legend>Send to{preset === "upcoming-rental" ? " · Confirmed team" : ""}</legend><div className="team-notification-recipient-controls"><button type="button" disabled={!selectablePeople.length} onClick={() => { setRecipientIds(selectablePeople.map(person => person.id)); edit(); }}>Select all</button><button type="button" disabled={!recipientIds.length} onClick={() => { setRecipientIds([]); edit(); }}>Clear</button><span>{recipientIds.length} selected</span></div>
             <div className="team-notification-person-list">{selectablePeople.map(person => <label key={person.id}><input type="checkbox" checked={recipientIds.includes(person.id)} onChange={event => { const checked = event.currentTarget.checked; setRecipientIds(previous => checked ? [...new Set([...previous, person.id])] : previous.filter(id => id !== person.id)); edit(); }} /><PersonAvatar personId={person.id} name={person.name} className="employee-avatar" /><span>{person.name}</span></label>)}</div>{preset === "upcoming-rental" && !selectablePeople.length && <p className="schedule-small">No confirmed team is recorded for this rental. Custom message lets you choose other recipients.</p>}
           </fieldset>}
+          {preset === "paycheck-processed" && <label className="team-notification-field"><span>ETA date</span><Input type="date" required min={retryUncertain ? undefined : today} max="9999-12-31" disabled={busy} value={etaDate} onChange={event => { setEtaDate(event.target.value); setEdited(null); edit(); }} /><small>Expected arrival date. Sending this update does not record a payment.</small></label>}
           {content && <>
             {(preset === "custom" || edited) && <><label className="team-notification-field"><span>Title <small id={titleCountId}>{content.title.length}/80</small></span><Input required maxLength={80} disabled={busy} value={content.title} aria-describedby={titleCountId} onChange={event => setContent({ title: event.target.value })} /></label><label className="team-notification-field"><span>Message <small id={bodyCountId}>{content.body.length}/360</small></span><Textarea required rows={3} maxLength={360} disabled={busy} value={content.body} aria-describedby={bodyCountId} onChange={event => setContent({ body: event.target.value })} /></label></>}
             {preset === "custom" && <label className="team-notification-field"><span>Open page</span><AppSelect value={content.target} disabled={busy} onValueChange={value => setContent({ target: value as Destination })}>{Object.entries(destinations).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</AppSelect></label>}
-            <div className="team-notification-preview"><div><span>Message preview</span>{preset !== "custom" && preset !== "rental-response" && !edited && <Button type="button" variant="ghost" disabled={busy} onClick={() => { setEdited(content); edit(); }}><Pencil size={14} aria-hidden="true" />Edit message</Button>}</div><strong>{content.title || "Add a title"}</strong><p>{content.body || "Write your message above."}</p><small>Opens {destinations[content.target]}</small></div>
+            <div className="team-notification-preview"><div><span>Message preview</span>{preset !== "custom" && preset !== "rental-response" && preset !== "paycheck-processed" && !edited && <Button type="button" variant="ghost" disabled={busy} onClick={() => { setEdited(content); edit(); }}><Pencil size={14} aria-hidden="true" />Edit message</Button>}</div><strong>{content.title || "Add a title"}</strong><p>{content.body || "Write your message above."}</p><small>Opens {destinations[content.target]}</small></div>
           </>}
         </>}
         {message && <p className="team-notification-message" role="status">{message}</p>}{error && <p className="team-notification-error" role="alert">{error}</p>}
