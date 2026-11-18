@@ -1,6 +1,23 @@
 {
-  "currentVersion": "2.53.0",
+  "currentVersion": "2.53.1",
   "releases": [
+    {
+      "id": "2026-11-18-date-picker-alignment",
+      "version": "2.53.1",
+      "date": "2026-11-18",
+      "category": "Appearance",
+      "title": "Centered date-picker icons",
+      "changes": [
+        "The paycheck ETA calendar icon stays centered within its date field.",
+        "Shared date and time fields keep their icons centered as the field resizes."
+      ],
+      "employee": {
+        "title": "Cleaner date and time fields",
+        "changes": [
+          "Calendar and clock icons stay centered within their fields."
+        ]
+      }
+    },
     {
       "id": "2026-11-17-paycheck-processed-notification",
       "version": "2.53.0",

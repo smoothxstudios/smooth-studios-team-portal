@@ -2077,7 +2077,7 @@ button { cursor: pointer; }
 .team-notification-person-list input { width: 18px; height: 18px; flex: 0 0 18px; accent-color: var(--primary); }
 .team-notification-person-list .employee-avatar { display: grid; place-items: center; flex: 0 0 24px; width: 24px; height: 24px; color: #fff; border-radius: 7px; font-size: 11px; box-shadow: none; }
 .team-notification-person-list > label > span:last-child { min-width: 0; overflow-wrap: anywhere; }
-.team-notification-field > span { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.team-notification-field > span:not(.app-date-control) { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .team-notification-field small { color: var(--muted-foreground); font-size: 12px; font-weight: 400; }
 .team-notification-field textarea { min-height: 96px; max-height: 220px; resize: vertical; }
 .team-notification-message, .team-notification-error { font-size: 13px; line-height: 1.5; }

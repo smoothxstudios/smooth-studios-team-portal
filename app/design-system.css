@@ -722,7 +722,7 @@ html[data-sidebar-motion="preview"] .sidebar-drag-shade { display: block; positi
 .app-picker-trigger:active:not(:disabled) { opacity: .8; }
 .app-date-control { position: relative; display: inline-flex; align-items: center; width: 100%; min-width: 0; max-width: 100%; min-height: var(--app-control-min); border: 1px solid transparent; border-radius: var(--app-field-radius); background: var(--secondary); color: var(--foreground); }
 .app-date-control > input[data-slot="input"] { position: relative; z-index: 1; box-sizing: border-box; display: block; width: 100%; min-width: 0; max-width: 100%; height: auto; min-height: var(--app-control-min); padding: .625em 2.375em .625em .75em; border: 0; border-radius: inherit; background: transparent; color: inherit; box-shadow: none; font-size: 1rem; line-height: 1.5; font-weight: 500; cursor: pointer; }
-.app-date-control > svg { position: absolute; right: .75em; width: 1.125em; height: 1.125em; color: var(--muted-foreground); pointer-events: none; }
+.app-date-control > svg { position: absolute; top: 50%; right: .75em; transform: translateY(-50%); width: 1.125em; height: 1.125em; color: var(--muted-foreground); pointer-events: none; }
 .app-date-control:focus-within { outline: 2px solid var(--primary); outline-offset: 3px; }
 .app-date-control > input[data-slot="input"]:focus-visible { outline: none; box-shadow: none; }
 .app-date-control[data-disabled] { opacity: .5; }
