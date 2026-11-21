@@ -1,6 +1,23 @@
 {
-  "currentVersion": "2.53.1",
+  "currentVersion": "2.54.0",
   "releases": [
+    {
+      "id": "2026-11-20-retrospective-studio-shifts",
+      "version": "2.54.0",
+      "date": "2026-11-20",
+      "category": "Scheduling",
+      "title": "Record past studio shifts",
+      "changes": [
+        "Schedule Work accepts past Studio Tasks dates. Confirm completed work and choose Record & Add Pay to save the shift and its earnings together.",
+        "Record an in-progress shift as confirmed, then add earnings after completion. Future shifts retain employee acceptance, and payment is recorded separately."
+      ],
+      "employee": {
+        "title": "Previously completed shifts",
+        "changes": [
+          "Smooth can record completed studio shifts and their agreed earnings. A completion alert opens Earnings without requiring acceptance of past work."
+        ]
+      }
+    },
     {
       "id": "2026-11-18-date-picker-alignment",
       "version": "2.53.1",

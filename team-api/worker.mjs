@@ -529,31 +529,40 @@ async function route(request, env, ctx) {
       try { taskPay = studioTaskPay(input.taskPay, start, end); } catch (error) { fail(400, error.message); }
     }
     const startedRental = Boolean(appointment && Date.parse(start) <= Date.now());
+    const startedTask = Boolean(taskPay && Date.parse(start) <= Date.now());
+    const finishedTask = startedTask && Date.parse(end) <= Date.now();
     if (input.confirmWorked !== undefined && typeof input.confirmWorked !== "boolean") fail(400, "Choose whether to confirm this work.");
-    if (startedRental) {
+    if (startedTask) {
+      if (input.confirmWorked !== true) fail(400, "Confirm that this person worked or is working this shift.");
+      if (input.confirmedStart !== start || input.confirmedEnd !== end) fail(409, "The shift time changed. Review it and confirm the work again.");
+      if (finishedTask && input.confirmCompleted !== true) fail(400, "Confirm this past shift was completed before adding its earnings.");
+      if (!finishedTask && input.confirmCompleted === true) fail(400, "This shift has not ended. Confirm completion after it ends.");
+    } else if (startedRental) {
       if (input.confirmWorked !== true) fail(400, "This rental has started or ended. Confirm that the selected person is working or worked it.");
       if (Date.parse(input.confirmedStart) !== Date.parse(start) || Date.parse(input.confirmedEnd) !== Date.parse(end)) fail(409, "The rental time changed. Review it and confirm the work again.");
       if (!Number.isFinite(Date.parse(end)) || Date.parse(end) <= Date.parse(start) || Date.parse(end) - Date.parse(start) > 7 * 86400_000) fail(400, "The rental must have a valid end after its start (up to 7 days).");
     } else {
-      if (input.confirmWorked === true) fail(400, "Only a started calendar rental can be recorded as confirmed work. Send an offer for upcoming work.");
+      if (input.confirmWorked === true) fail(400, "Only started work can be recorded as confirmed. Send an offer for upcoming work.");
       futurePeriod(start, end);
     }
-    if (s.assignments.filter(a => active(a) && Date.parse(a.end) > Date.now()).length >= 200) fail(400, "There are already 200 active offers. Finish or cancel old offers first.");
+    if (Date.parse(end) > Date.now() && s.assignments.filter(a => active(a) && Date.parse(a.end) > Date.now()).length >= 200) fail(400, "There are already 200 active offers. Finish or cancel old offers first.");
     if (input.overrideConflicts !== undefined && typeof input.overrideConflicts !== "boolean") fail(400, "Choose whether to allow time conflicts.");
     if (!input.overrideConflicts) checkConflicts(employeeId, { start, end, appointmentId }, s, existing?.id);
     const item = { id: existing?.id ?? (taskPay ? input.id : crypto.randomUUID()), employeeId, appointmentId,
       ...(taskPay ? { workType: "studio-task", taskPay } : {}),
       title: appointment ? appointment.title : text(input.title, 160),
       instructions: text(input.instructions || existing?.instructions || "", 2000, false), start, end,
-      status: startedRental ? "accepted" : "pending", createdAt: existing?.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString(),
+      status: startedRental || startedTask ? "accepted" : "pending", createdAt: existing?.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString(),
+      ...(startedTask ? { ownerConfirmation: { confirmedBy: "owner", confirmedAt: new Date().toISOString() }, note: "Smooth confirmed this person worked or is working this shift." } : {}),
       ...(startedRental ? { ownerConfirmation: { confirmedBy: "owner", confirmedAt: new Date().toISOString() }, note: "Smooth confirmed this person worked or is working this rental." } : {}),
       ...(input.overrideConflicts ? { conflictOverride: createConflictOverride({ id: existing?.id, employeeId, start, end }, s.assignments) } : {}) };
+    if (finishedTask) return completeStudioTask({ db, item, input, user, state: s.state, commit, saveAssignment, fail, env, ctx, flushAlerts });
     const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices WHERE user_id = ?").bind(employeeId).first();
     await commit(db, s.state, mutation => [saveAssignment(db, item, mutation),
-      ...(item.appointmentId ? [startedRental ? calendarTimeImportStatement(db, item, appointment, mutation) : calendarQueueStatement(db, item, mutation)] : [])], assignmentNotifications(item, startedRental ? "recorded" : "offered", [employeeId]));
+      ...(item.appointmentId ? [startedRental ? calendarTimeImportStatement(db, item, appointment, mutation) : calendarQueueStatement(db, item, mutation)] : [])], assignmentNotifications(item, startedRental || startedTask ? "recorded" : "offered", [employeeId]));
     ctx.waitUntil(flushAlerts(env));
     if (item.appointmentId && !startedRental) ctx.waitUntil(flushCalendarAssignments(env, { assignmentId: item.id, limit: 1 }));
-    return { saved: true, notification: startedRental ? "Person recorded as Confirmed by Smooth. Hours and rental earnings update on the next sync; no payment was recorded." : devices.count
+    return { saved: true, notification: startedTask ? "Shift recorded as Confirmed by Smooth. Confirm completion after it ends to add earnings." : startedRental ? "Person recorded as Confirmed by Smooth. Hours and rental earnings update on the next sync; no payment was recorded." : devices.count
       ? `${item.appointmentId ? "Offer" : "Shift"} saved. A notification was queued for their enabled devices.`
       : `${item.appointmentId ? "Offer" : "Shift"} saved. This employee has no devices enabled for notifications yet; they can see and accept it in their dashboard.` };
   }

@@ -136,3 +136,53 @@ test('hourly totals use actual Eastern duration across daylight saving and flat 
   assert.equal(studioTaskPay({ type: 'flat', rateCents: 4000 }, start, end).amountCents, 4000);
   assert.throws(() => localInstant('2027-03-14T02:30'));
 });
+
+const pastShift = () => ({ startLocal: '2026-11-15T12:00', endLocal: '2026-11-15T14:00', confirmWorked: true, confirmCompleted: true,
+  confirmedStart: localInstant('2026-11-15T12:00'), confirmedEnd: localInstant('2026-11-15T14:00') });
+test('past shifts require exact owner confirmation, then atomically record one earning and completion alert', async t => {
+  const f = await setup(t);
+  for (const change of [{confirmWorked:false},{confirmCompleted:false},{confirmedEnd:localInstant('2026-11-15T15:00')},{revision:-1}]) {
+    assert.ok([400,409].includes((await create(f,{...pastShift(),...change})).result.status));
+  }
+  assert.equal((await schedule(f)).assignments.length,0);
+  const {request,result}=await create(f,pastShift());
+  assert.equal(result.status,200,JSON.stringify(result.data));
+  const item=(await schedule(f)).assignments[0];
+  assert.equal(item.status,'accepted'); assert.equal(item.ownerConfirmation.confirmedBy,'owner'); assert.ok(item.completedAt);
+  const earnings=(await f.call('jordyn','/creative-work')).data.assignments;
+  assert.equal(earnings.length,1); assert.equal(earnings[0].amountCents,3000); assert.equal(earnings[0].earnedAt,request.confirmedEnd); assert.deepEqual(earnings[0].payments,[]);
+  assert.equal((await f.call('rayne','/creative-work')).data.assignments.length,0);
+  const alerts=(await f.call('jordyn','/alerts')).data.alerts;
+  assert.equal(alerts.filter(a=>a.title==='Shift completed').length,1); assert.ok(!alerts.some(a=>a.title==='New shift'));
+  assert.equal((await f.call('jordyn','/assignments',request)).status,403);
+  assert.equal((await f.call('owner','/assignments',request)).status,200);
+  assert.equal((await f.call('owner',`/assignments/${request.id}`,{action:'complete-task',confirmCompleted:true})).status,200);
+  assert.equal((await f.call('jordyn','/creative-work')).data.assignments.length,1);
+  assert.equal((await f.call('owner','/assignments',{...request,title:'Changed work'})).status,409);
+});
+test('concurrent past-shift retries cannot duplicate earnings and overlap still needs approval', async t=>{
+  const f=await setup(t), request={id:crypto.randomUUID(),employeeId:'jordyn',workType:'studio-task',title:'Past task',instructions:'Completed setup',taskPay:{type:'flat',rateCents:4500},revision:(await schedule(f)).revision,...pastShift()};
+  const results=await Promise.all([f.call('owner','/assignments',request),f.call('owner','/assignments',request)]);
+  assert.ok(results.some(r=>r.status===200)); assert.ok(results.every(r=>[200,409].includes(r.status)));
+  assert.equal((await f.call('owner','/assignments',request)).status,200);
+  assert.equal((await f.call('jordyn','/creative-work')).data.assignments.length,1);
+  assert.equal((await create(f,pastShift())).result.status,409);
+  assert.equal((await create(f,{...pastShift(),overrideConflicts:true})).result.status,200);
+});
+test('in-progress shifts are owner-confirmed without early earnings or an impossible acceptance request', async t=>{
+  const f=await setup(t), input={startLocal:'2026-11-16T10:00',endLocal:'2026-11-16T12:00',confirmWorked:true,confirmedStart:localInstant('2026-11-16T10:00'),confirmedEnd:localInstant('2026-11-16T12:00')};
+  assert.equal((await create(f,{...input,confirmCompleted:true})).result.status,400);
+  const {request,result}=await create(f,input); assert.equal(result.status,200);
+  assert.equal((await schedule(f)).assignments[0].status,'accepted');
+  assert.equal((await f.call('jordyn','/creative-work')).data.assignments.length,0);
+  assert.equal((await f.call('jordyn','/alerts')).data.alerts[0].title,'Shift confirmed by Smooth');
+  t.mock.timers.setTime(Date.parse('2026-11-16T18:00Z'));
+  assert.equal((await f.call('owner',`/assignments/${request.id}`,{revision:(await schedule(f)).revision,action:'complete-task',confirmCompleted:true})).status,200);
+  assert.equal((await f.call('jordyn','/creative-work')).data.assignments.length,1);
+});
+test('retrospective recording preserves shift duration, future-offer and work-type validation', async t=>{
+  const f=await setup(t);
+  assert.equal((await create(f,{...pastShift(),endLocal:'2026-11-17T14:00'})).result.status,400);
+  assert.equal((await create(f,{confirmWorked:true})).result.status,400);
+  assert.equal((await create(f,{...pastShift(),workType:undefined})).result.status,400);
+});

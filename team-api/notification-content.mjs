@@ -40,7 +40,7 @@ export function assignmentNotifications(item, event, recipients, options) {
   return [...new Set(recipients)].map(userId => {
     const owner = userId === "owner";
     const content = {
-      recorded: { title: "Rental work confirmed by Smooth", body: `${detail} Smooth recorded you as working this rental. View the saved record in your dashboard.` },
+      recorded: { title: item.appointmentId ? "Rental work confirmed by Smooth" : "Shift confirmed by Smooth", body: `${detail} Smooth recorded you as working this ${type}. View the saved record in your dashboard.` },
       offered: { title: item.appointmentId ? "New rental assignment" : "New shift", body: `${detail} Tap to accept or decline.` },
       accepted: { title: `${name} accepted a ${type}`, body: detail },
       declined: { title: `${name} declined a ${type}`, body: `${detail} Choose another team member.` },
