@@ -1,3 +1,4 @@
+import { canRemoveRentalStaff } from "../lib/rental-staff.mjs";
 import { readTeamRoster, teamRosterRoute } from "./team-roster.mjs";
 import { studioTaskPay } from "../lib/studio-tasks.mjs";
 import { completeStudioTask } from "./studio-tasks.mjs";
@@ -265,7 +266,7 @@ async function route(request, env, ctx) {
     const appointment = s.appointments.find(item => item.id === appointmentId);
     if (!appointment) fail(404, "This rental is no longer available. Refresh the schedule.");
     if (input.start !== appointment.start || input.end !== appointment.end) fail(409, "The rental time changed. Refresh and review it before removing anyone.");
-    futurePeriod(appointment.start, appointment.end);
+    if (!canRemoveRentalStaff(appointment)) fail(400, "People can be removed until the rental ends. Completed rentals are unchanged.");
     const offers = s.assignments.filter(item => item.appointmentId === appointmentId && item.employeeId === employeeId &&
       Date.parse(item.start) === Date.parse(appointment.start) && Date.parse(item.end) === Date.parse(appointment.end));
     const existing = offers.filter(item => item.removeCalendarGuest && item.status === "cancelled").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];

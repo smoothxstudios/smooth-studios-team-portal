@@ -300,3 +300,30 @@ test("explicit removal keeps the existing unrelated-guest and newer-offer safegu
   assert.equal((await other.deliver({ assignment: removed, assignments: [removed, { ...assignment, id: 'newer', createdAt: '2026-10-17T11:00:00Z' }] })).code, 'newer_assignment');
   assert.equal(other.calls.length, 0);
 });
+
+
+test("live staff removals reach Calendar and delayed retries remain safe after the event ends", async () => {
+  const removal = { ...assignment, status: 'cancelled', removeCalendarGuest: true,
+    createdAt: new Date(Date.parse(assignment.start) + 60000).toISOString() };
+  for (const now of [Date.parse(assignment.start) + 120000, Date.parse(assignment.end) + 3600000]) {
+    const f = fixture({ event: { attendees: [{ email: 'jordyn@example.invalid', responseStatus: 'accepted' }, { email: 'rayne@example.invalid', responseStatus: 'accepted' }] } });
+    assert.equal((await f.deliver({ assignment: removal, now })).code, 'person_removed');
+    assert.deepEqual(f.current().attendees.map(guest => guest.email), ['rayne@example.invalid']);
+    assert.equal(f.current().status, 'confirmed');
+    assert.equal((await f.deliver({ assignment: removal, now })).code, 'person_removed');
+    assert.equal(f.calls.filter(call => call.method === 'PATCH').length, 1);
+  }
+});
+
+test("allowing live removals does not replay started offers, late removal requests, or changed events", async () => {
+  const now = Date.parse(assignment.end) + 1000;
+  for (const item of [assignment, { ...assignment, status: 'accepted' }, { ...assignment, status: 'cancelled' },
+    { ...assignment, status: 'cancelled', removeCalendarGuest: true, createdAt: assignment.end }]) {
+    const f = fixture();
+    assert.equal((await f.deliver({ assignment: item, now })).code, 'event_started');
+    assert.equal(f.calls.length, 0);
+  }
+  const f = fixture({ event: { end: { dateTime: '2026-10-20T17:00:00Z' } } });
+  assert.equal((await f.deliver({ assignment: { ...assignment, status: 'cancelled', removeCalendarGuest: true }, now })).code, 'time_changed');
+  assert.equal(f.calls.filter(call => call.method === 'PATCH').length, 0);
+});

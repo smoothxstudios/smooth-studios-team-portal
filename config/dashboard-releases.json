@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.54.0",
+  "currentVersion": "2.54.1",
   "releases": [
+    {
+      "id": "2026-11-23-live-rental-staff-removal",
+      "version": "2.54.1",
+      "date": "2026-11-23",
+      "category": "Scheduling",
+      "title": "Remove people during live rentals",
+      "changes": [
+        "Remove person stays available after a rental starts, until its end time, for app assignments and Calendar-only invitations.",
+        "Removal updates current staffing and queues the Calendar guest removal while preserving previous responses and completed rental records."
+      ]
+    },
     {
       "id": "2026-11-20-retrospective-studio-shifts",
       "version": "2.54.0",

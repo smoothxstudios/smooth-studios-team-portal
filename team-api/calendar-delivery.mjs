@@ -108,8 +108,12 @@ function latestAssignment(assignment, assignments) {
 export async function deliverCalendarAssignment({ assignment, assignments = [assignment], config, ownerToken, employeeToken,
   fetcher = fetch, now = Date.now(), isCurrent = async () => true }) {
   if (!assignment?.appointmentId || !["pending", "accepted", "declined", "cancelled"].includes(assignment.status)) return outcome("stale", "assignment_unavailable");
+  // A removal authorized before the rental ended must still reach Calendar if
+  // delivery is delayed. Other invitations and responses keep their start cutoff.
+  const staffRemoval = assignment.status === "cancelled" && assignment.removeCalendarGuest === true &&
+    Number.isFinite(Date.parse(assignment.createdAt)) && Date.parse(assignment.createdAt) < Date.parse(assignment.end);
   if (!Number.isFinite(Date.parse(assignment.start)) || !Number.isFinite(Date.parse(assignment.end)) ||
-      Date.parse(assignment.start) <= now || Date.parse(assignment.end) <= Date.parse(assignment.start)) return outcome("stale", "event_started");
+      (!staffRemoval && Date.parse(assignment.start) <= now) || Date.parse(assignment.end) <= Date.parse(assignment.start)) return outcome("stale", "event_started");
   if (!latestAssignment(assignment, assignments)) return outcome("stale", "newer_assignment");
   if (!config?.calendarId) return outcome("needs_connection", "calendar_not_configured");
   const employee = config.employees.find(person => person.id === assignment.employeeId);

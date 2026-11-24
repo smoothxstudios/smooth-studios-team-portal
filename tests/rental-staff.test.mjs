@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { fixture } from './helpers/notification-fixture.mjs';
-import { rentalStaffRemovals, withoutRemovedRentalStaff } from '../lib/rental-staff.mjs';
+import { canRemoveRentalStaff, rentalStaffRemovals, withoutRemovedRentalStaff } from '../lib/rental-staff.mjs';
 
 const booking = { id: 'synthetic-removal-event', title: 'Studio A Rental', customer: 'Synthetic', priceCents: 0,
   start: new Date(Date.now() + 172800000).toISOString(), end: new Date(Date.now() + 176400000).toISOString(),
@@ -79,4 +79,39 @@ test('removal presentation never hides a newer active offer or a rescheduled ren
   assert.equal(rentalStaffRemovals(booking, [removed], null).length, 1);
   assert.equal(rentalStaffRemovals(booking, [removed, { ...removed, id: 'new', status: 'pending', removeCalendarGuest: false, createdAt: '2026-02-01' }], null).length, 0);
   assert.equal(withoutRemovedRentalStaff({ ...booking, start: new Date(Date.parse(booking.start) + 1000).toISOString() }, [removed], null).calendarInvitations.length, 2);
+});
+
+
+test('live rentals allow owner removal of accepted app staff and Calendar-only staff without ending the rental', async t => {
+  for (const appOffer of [false, true]) await t.test(appOffer ? 'accepted in app' : 'Calendar only', async t => {
+    const live = { ...booking, start: new Date(Date.now() - 1800000).toISOString(), end: new Date(Date.now() + 1800000).toISOString(), acceptedEmployeeIds: ['rayne', 'jordyn'] };
+    const f = await setup(t, live);
+    if (appOffer) {
+      const offer = { id: 'synthetic-live-offer', employeeId: 'rayne', appointmentId: live.id, title: live.title, status: 'accepted', start: live.start, end: live.end, createdAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: live.start };
+      f.DB.sqlite.prepare('INSERT INTO team_assignments(id,employee_id,data) VALUES(?,?,?)').run(offer.id, offer.employeeId, JSON.stringify(offer));
+    }
+    assert.equal((await f.remove({}, 'rayne')).status, 403);
+    assert.equal((await f.remove({ revision: -1 })).status, 409);
+    assert.equal((await f.remove({ end: new Date(Date.parse(live.end) + 1000).toISOString() })).status, 409);
+    assert.equal((await f.remove()).status, 200);
+    await Promise.allSettled(f.pending);
+    const saved = (await f.call('owner', '/schedule')).data;
+    assert.equal(saved.appointments.length, 1);
+    assert.equal(saved.appointments[0].id, live.id);
+    assert.equal(saved.appointments[0].end, live.end);
+    assert.deepEqual(saved.appointments[0].acceptedEmployeeIds, ['jordyn']);
+    assert.ok(saved.assignments.every(a => a.status === 'cancelled'));
+    assert.equal(saved.assignments.find(a => a.removeCalendarGuest).calendarSync.status, 'needs_connection');
+    assert.equal((await f.call('rayne', '/schedule')).data.appointments.length, 0);
+    assert.equal((await f.call('jordyn', '/schedule')).data.appointments.length, 1);
+    assert.equal((await f.remove()).status, 200);
+    assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM calendar_assignment_outbox').get().n, 1);
+  });
+});
+
+test('staff removal remains available through the live period, stops exactly at the end, and rejects invalid times', () => {
+  const start = Date.parse(booking.start), end = Date.parse(booking.end);
+  for (const now of [start - 1, start, start + 1, end - 1]) assert.equal(canRemoveRentalStaff(booking, now), true);
+  for (const now of [end, end + 1]) assert.equal(canRemoveRentalStaff(booking, now), false);
+  for (const item of [null, {}, { ...booking, start: 'invalid' }, { ...booking, end: booking.start }]) assert.equal(canRemoveRentalStaff(item, start - 1), false);
 });
