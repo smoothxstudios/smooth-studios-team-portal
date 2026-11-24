@@ -275,7 +275,7 @@ export function reconcileStripePayments(calendarEvents, stripeCharges = [], manu
   return { paymentsByEventId, matchedChargeIds, unmatchedPayments };
 }
 
-export function normalizeCalendarEvent(event, config, ledger, paymentOverrides = {}, stripePayment = null) {
+export function normalizeCalendarEvent(event, config, ledger, paymentOverrides = {}, stripePayment = null, portalRemovals = []) {
   if (!event || event.status === "cancelled") return null;
   const start = event.start?.dateTime;
   const end = event.end?.dateTime;
@@ -296,7 +296,9 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
         ? "calendar"
         : "none";
 
-  const calendarInvitations = config.employees.flatMap(employee => {
+  const removedIds = new Set(portalRemovals.filter(a => a.appointmentId === event.id &&
+    Date.parse(a.start) === Date.parse(start) && Date.parse(a.end) === Date.parse(end)).map(a => a.employeeId));
+  const calendarInvitations = config.employees.filter(employee => !removedIds.has(employee.id)).flatMap(employee => {
     const emails = new Set(employeeInvitationEmails(employee));
     const responses = (event.attendees ?? []).filter(guest => emails.has(guest.email?.trim().toLowerCase()))
       .map(guest => guest.responseStatus ?? "needsAction");
@@ -352,7 +354,7 @@ export function normalizeCalendarEvent(event, config, ledger, paymentOverrides =
   };
 }
 
-export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, stripeMatches = {}, source, ownerWorkflowToken, stripeSnapshot = null, rulebook, portalAssignments = [] }) {
+export function buildDashboardPayloads({ calendarEvents, config, ledger, overrides, stripeMatches = {}, source, ownerWorkflowToken, stripeSnapshot = null, rulebook, portalAssignments = [], portalRemovals = [] }) {
   initializePayAdjustments(config, ledger);
   const reconciliation = reconcileStripePayments(calendarEvents, stripeSnapshot?.charges ?? [], stripeMatches);
   const rentals = calendarEvents
@@ -362,6 +364,7 @@ export function buildDashboardPayloads({ calendarEvents, config, ledger, overrid
       ledger,
       overrides.events ?? {},
       reconciliation.paymentsByEventId[event.id] ?? null,
+      portalRemovals,
     ))
     .filter(Boolean)
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());

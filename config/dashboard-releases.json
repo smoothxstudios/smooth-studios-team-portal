@@ -1,6 +1,17 @@
 {
-  "currentVersion": "2.54.1",
+  "currentVersion": "2.54.2",
   "releases": [
+    {
+      "id": "2026-11-24-appointment-staff-corrections",
+      "version": "2.54.2",
+      "date": "2026-11-24",
+      "category": "Scheduling",
+      "title": "Correct staff on completed rentals",
+      "changes": [
+        "In Appointment details, choose Remove person under an assigned teammate, including someone who accepted in the app or was confirmed by Smooth. This also works after the rental ends.",
+        "The next sync updates the rental’s earnings using the corrected staff list."
+      ]
+    },
     {
       "id": "2026-11-23-live-rental-staff-removal",
       "version": "2.54.1",

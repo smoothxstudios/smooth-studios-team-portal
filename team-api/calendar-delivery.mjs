@@ -104,16 +104,16 @@ function latestAssignment(assignment, assignments) {
   return !latest || latest.id === assignment.id;
 }
 
+function canDeliverAfterStart(assignment) {
+  return assignment.status === "cancelled" && assignment.removeCalendarGuest === true && Number.isFinite(Date.parse(assignment.createdAt));
+}
+
 /** Network work is separate from queue storage so fixtures never send real invitations. */
 export async function deliverCalendarAssignment({ assignment, assignments = [assignment], config, ownerToken, employeeToken,
   fetcher = fetch, now = Date.now(), isCurrent = async () => true }) {
   if (!assignment?.appointmentId || !["pending", "accepted", "declined", "cancelled"].includes(assignment.status)) return outcome("stale", "assignment_unavailable");
-  // A removal authorized before the rental ended must still reach Calendar if
-  // delivery is delayed. Other invitations and responses keep their start cutoff.
-  const staffRemoval = assignment.status === "cancelled" && assignment.removeCalendarGuest === true &&
-    Number.isFinite(Date.parse(assignment.createdAt)) && Date.parse(assignment.createdAt) < Date.parse(assignment.end);
   if (!Number.isFinite(Date.parse(assignment.start)) || !Number.isFinite(Date.parse(assignment.end)) ||
-      (!staffRemoval && Date.parse(assignment.start) <= now) || Date.parse(assignment.end) <= Date.parse(assignment.start)) return outcome("stale", "event_started");
+      (!canDeliverAfterStart(assignment) && Date.parse(assignment.start) <= now) || Date.parse(assignment.end) <= Date.parse(assignment.start)) return outcome("stale", "event_started");
   if (!latestAssignment(assignment, assignments)) return outcome("stale", "newer_assignment");
   if (!config?.calendarId) return outcome("needs_connection", "calendar_not_configured");
   const employee = config.employees.find(person => person.id === assignment.employeeId);
@@ -255,7 +255,7 @@ export async function flushCalendarAssignments(env, { assignmentId, limit, fetch
         const employeeToken = ownerToken && assignment.status !== "cancelled" ? await calendarAccessToken(env, assignment.employeeId) : null;
         result = await deliverCalendarAssignment({ assignment, assignments: all, config, ownerToken, employeeToken, fetcher, now: Date.now(),
           isCurrent: async () => {
-            if (Date.parse(assignment.start) <= Date.now()) return false;
+            if (!canDeliverAfterStart(assignment) && Date.parse(assignment.start) <= Date.now()) return false;
             if (!await lease.current()) return false;
             const fresh = (await db.prepare("SELECT data FROM team_assignments WHERE json_extract(data, '$.appointmentId') = ? AND employee_id = ?")
               .bind(assignment.appointmentId, assignment.employeeId).all()).results.map(item => JSON.parse(item.data));

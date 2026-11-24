@@ -1,12 +1,11 @@
 "use client";
 import { useMemo, type Dispatch, type SetStateAction } from "react";
-import { Bell, CalendarDays, Check, X } from "lucide-react";
+import { Bell, CalendarDays, Check, UserMinus, X } from "lucide-react";
 import { PersonAvatar } from "@/components/team-profile";
 import { CalendarAssignmentStatus } from "@/components/calendar-assignment-status";
 import { RentalDescription } from "@/components/rental-description";
 import { ScheduleConfirmation } from "@/components/schedule-confirmation";
 import { Button } from "@/components/ui/button";
-import { canRemoveRentalStaff } from "@/lib/rental-staff.mjs";
 import { rentalAlertTargetId } from "@/lib/alert-target.mjs";
 import { assignmentConflicts, hasConflictOverride } from "@/lib/team-schedule.mjs";
 import { unapprovedAssignmentConflicts } from "@/lib/assignment-conflict-review.mjs";
@@ -50,7 +49,7 @@ export function AssignmentOffer({ item, compact = false, onRemove, schedule, isH
           <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "declined" }, description: `Decline ${item.title} on ${date(item.start)}? Smooth will see your response.` })}><X size={16} />Decline</Button>
         </>}
         {isOwner && ["pending", "accepted"].includes(item.status) && future(item.start) && busyConflicts.length > 0 && !conflictApproved && <Button disabled={busy || needsRefresh} variant="outline" onClick={() => setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { overrideConflicts: true }, description: `Allow ${personName(item.employeeId)} to accept ${item.title} despite the recorded conflicts for ${date(item.start)} at ${time(item.start)}? Their acceptance is still required. Changing the appointment time clears this approval.` })}>Allow time conflict</Button>}
-        {isOwner && onRemove && canRemoveRentalStaff(appointment ?? item) && <Button disabled={busy || needsRefresh} variant="ghost" onClick={onRemove}>Remove person</Button>}
+        {isOwner && onRemove && <Button disabled={busy || needsRefresh} variant="outline" aria-label={`Remove ${personName(item.employeeId)} from rental`} onClick={onRemove}><UserMinus size={16} />Remove person</Button>}
         {isOwner && !onRemove && !item.completedAt && ["pending", "accepted"].includes(item.status) && (future(item.start) || item.workType === "studio-task") && <Button disabled={busy || needsRefresh} variant="outline" haptic="light" onClick={() => { setError(""); setConfirm({ path: `/assignments/${item.id}`, method: "POST", data: { status: "cancelled" }, description: item.workType === "studio-task" ? `Cancel ${personName(item.employeeId)}’s shift for ${item.title}? No earnings will be added for it.` : `Cancel ${personName(item.employeeId)}’s app offer for ${item.title}? The app will also remove an invitation it created. Invitations added separately in Google Calendar stay available. Use Remove person to remove them from the rental completely.` }); }}>{item.appointmentId ? "Cancel offer" : "Cancel Shift"}</Button>}
       </div>
       {item.calendarSync && <details className="offer-calendar-status"><summary>Calendar sync</summary><CalendarAssignmentStatus delivery={item.calendarSync} /><p className="schedule-small">App responses save separately.</p></details>}

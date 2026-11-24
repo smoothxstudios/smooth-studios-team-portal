@@ -123,7 +123,7 @@ if (teamEnabled) {
     employees: config.employees.filter(employee => employee.accessReady).map(({ id, email, invitationEmails }) => ({ id, email, invitationEmails })) }, calendarReadAt);
   const calendarAssignmentSync = await syncCalendarAssignmentNotes({ calendarId, accessToken, calendarEvents,
     rentals: payloads.owner.rentals, assignments: portal.calendarAssignments, employees: config.employees });
-  payloads = buildDashboardPayloads({ ...payloadOptions, portalAssignments: portal.assignments });
+  payloads = buildDashboardPayloads({ ...payloadOptions, portalAssignments: portal.assignments, portalRemovals: portal.calendarAssignments.filter(a => a.staffRemoved) });
   // Owner-only, encrypted setup feedback. Failed note writes do not discard
   // accepted work or stop Calendar/Stripe and payroll refreshes.
   payloads.owner.calendarAssignmentSync = { ...calendarAssignmentSync,

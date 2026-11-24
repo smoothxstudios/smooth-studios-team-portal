@@ -55,6 +55,18 @@ AcuityID=1761525698`,
   ],
 };
 
+test("a staffing correction overrides a stale Calendar acceptance during dashboard and earnings sync", () => {
+  const removed = { appointmentId: event.id, employeeId: 'akiva', start: event.start.dateTime, end: event.end.dateTime };
+  const accepted = { ...removed, employeeId: 'rayne' };
+  const input = { calendarEvents: [event], config, ledger, overrides: {}, portalAssignments: [accepted] };
+  const corrected = buildDashboardPayloads({ ...input, portalRemovals: [removed] });
+  assert.deepEqual(corrected.owner.rentals[0].assignedEmployeeIds, ['rayne']);
+  assert.deepEqual(Object.keys(corrected.owner.rentals[0].employeePayouts), ['rayne']);
+  assert.equal(corrected.akiva.rentals.length, 0);
+  const moved = buildDashboardPayloads({ ...input, portalRemovals: [{ ...removed, end: removed.start }] });
+  assert.ok(moved.owner.rentals[0].assignedEmployeeIds.includes('akiva'));
+});
+
 test("accepted portal rentals merge without duplicate commissions or cross-employee data", () => {
   const common = { calendarEvents: [event], config, ledger, overrides: { events: {} }, source: "google-calendar" };
   const portalAssignments = [

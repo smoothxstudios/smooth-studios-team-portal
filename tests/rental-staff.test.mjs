@@ -57,11 +57,31 @@ test('removing a teammate cancels current offers but retains all prior responses
   assert.deepEqual(f.DB.sqlite.prepare('SELECT * FROM payroll_advances').all(), pay);
 });
 
-test('a past rental cannot be changed by staff removal', async t => {
-  const past = { ...booking, start: new Date(Date.now() - 7200000).toISOString(), end: new Date(Date.now() - 3600000).toISOString() };
+test('the owner can correct an ended rental with app-accepted and manually confirmed teammates', async t => {
+  const past = { ...booking, start: new Date(Date.now() - 7200000).toISOString(), end: new Date(Date.now() - 3600000).toISOString(),
+    acceptedEmployeeIds: ['rayne'], calendarInvitations: [{ employeeId: 'rayne', status: 'accepted' }] };
   const f = await setup(t, past);
-  assert.equal((await f.remove()).status, 400);
-  assert.equal(f.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM team_assignments').get().n, 0);
+  const read = async () => (await f.call('owner', '/schedule')).data;
+  const exported = async () => (await f.call('sync', '/sync/accepted')).data;
+  const accepted = { id: 'accepted-in-app', appointmentId: past.id, employeeId: 'rayne', start: past.start, end: past.end,
+    title: past.title, status: 'accepted', createdAt: past.start, updatedAt: past.start };
+  f.DB.sqlite.prepare('INSERT INTO team_assignments(id,employee_id,data) VALUES(?,?,?)')
+    .run(accepted.id, accepted.employeeId, JSON.stringify(accepted));
+  const record = await f.call('owner', '/assignments', { revision: (await read()).revision, employeeId: 'jordyn',
+    appointmentId: past.id, confirmWorked: true, confirmedStart: past.start, confirmedEnd: past.end });
+  assert.equal(record.status, 200);
+  assert.equal((await f.remove({}, 'rayne')).status, 403);
+  assert.equal((await f.remove()).status, 200);
+  const after = await read();
+  assert.equal(after.appointments[0].cancelled, false);
+  assert.deepEqual(after.appointments[0].acceptedEmployeeIds, []);
+  assert.deepEqual(after.assignments.filter(a => a.status === 'accepted').map(a => a.employeeId), ['jordyn']);
+  assert.equal((await exported()).calendarAssignments.filter(a => a.staffRemoved).length, 1);
+  assert.deepEqual((await exported()).assignments.map(a => a.employeeId), ['jordyn']);
+  assert.equal((await f.remove({ employeeId: 'jordyn' })).status, 200);
+  assert.deepEqual((await exported()).assignments, []);
+  assert.equal((await f.remove({ employeeId: 'jordyn' })).status, 200);
+  assert.equal((await read()).assignments.filter(a => a.removeCalendarGuest).length, 2);
 });
 
 test('a fresh Calendar invitation after verified removal is visible and can be removed again', async t => {
@@ -109,9 +129,7 @@ test('live rentals allow owner removal of accepted app staff and Calendar-only s
   });
 });
 
-test('staff removal remains available through the live period, stops exactly at the end, and rejects invalid times', () => {
-  const start = Date.parse(booking.start), end = Date.parse(booking.end);
-  for (const now of [start - 1, start, start + 1, end - 1]) assert.equal(canRemoveRentalStaff(booking, now), true);
-  for (const now of [end, end + 1]) assert.equal(canRemoveRentalStaff(booking, now), false);
-  for (const item of [null, {}, { ...booking, start: 'invalid' }, { ...booking, end: booking.start }]) assert.equal(canRemoveRentalStaff(item, start - 1), false);
+test('staff removal requires a valid rental time range', () => {
+  assert.equal(canRemoveRentalStaff(booking), true);
+  for (const item of [null, {}, { ...booking, start: 'invalid' }, { ...booking, end: booking.start }]) assert.equal(canRemoveRentalStaff(item), false);
 });

@@ -28,17 +28,17 @@ test('employee appointment renders backdrop and confirmed balance without owner 
 
 
 const { AssignmentOffer } = loadDashboardModule('components/scheduling/assignment-offer.tsx');
-test('owner appointment details retain Remove person during live work for app and Calendar staff only', () => {
-  for (const acceptedInApp of [false, true]) for (const isOwner of [false, true]) for (const ended of [false, true]) {
+test('only owners see removal in appointment details for live and completed rentals', () => {
+  for (const source of ["calendar", "app", "owner"]) for (const isOwner of [false, true]) for (const ended of [false, true]) {
     const rental = { ...appointment, start: new Date(Date.now() - 3600000).toISOString(), end: new Date(Date.now() + (ended ? -1000 : 3600000)).toISOString() };
-    const offer = { ...rental, id: 'synthetic-offer', employeeId: 'rayne', appointmentId: rental.id, status: 'accepted' };
-    const schedule = { appointments: [rental], assignments: acceptedInApp ? [offer] : [], blocks: [] };
+    const offer = { ...rental, id: 'synthetic-offer', employeeId: 'rayne', appointmentId: rental.id, status: 'accepted', ownerConfirmation: source === 'owner' ? { confirmedBy: 'owner' } : undefined };
+    const schedule = { appointments: [rental], assignments: source === "calendar" ? [] : [offer], blocks: [] };
     const html = renderToStaticMarkup(createElement(AppointmentDetail, {
       item: { ...rental, appointment: rental, assignments: schedule.assignments, confirmations: [{ employeeId: 'rayne', calendarAccepted: true }], pendingIds: [] },
       userId: isOwner ? 'owner' : 'rayne', token: 'synthetic-token', isOwner, busy: false, feedback: null,
       renderAssignment: (item, compact, onRemove) => createElement(AssignmentOffer, { item, compact, onRemove, schedule, isOwner, isHome: false, home: false, busy: false, needsRefresh: false, confirm: null }),
       onAssign: () => {}, onRemovePerson: async () => true,
     }));
-    assert.equal(/>Remove person<|aria-label="Remove rayne from rental"/.test(html), isOwner && !ended, `app=${acceptedInApp}, owner=${isOwner}, ended=${ended}`);
+    assert.equal(/>Remove person<|aria-label="Remove rayne from rental"/.test(html), isOwner, `source=${source}, owner=${isOwner}, ended=${ended}`);
   }
 });

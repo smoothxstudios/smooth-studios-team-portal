@@ -302,23 +302,23 @@ test("explicit removal keeps the existing unrelated-guest and newer-offer safegu
 });
 
 
-test("live staff removals reach Calendar and delayed retries remain safe after the event ends", async () => {
+test("live and retrospective staff removals reach Calendar, including delayed retries", async () => {
   const removal = { ...assignment, status: 'cancelled', removeCalendarGuest: true,
     createdAt: new Date(Date.parse(assignment.start) + 60000).toISOString() };
-  for (const now of [Date.parse(assignment.start) + 120000, Date.parse(assignment.end) + 3600000]) {
+  for (const [createdAt, now] of [[removal.createdAt, Date.parse(assignment.start) + 120000], [removal.createdAt, Date.parse(assignment.end) + 3600000], [assignment.end, Date.parse(assignment.end) + 1000]]) {
     const f = fixture({ event: { attendees: [{ email: 'jordyn@example.invalid', responseStatus: 'accepted' }, { email: 'rayne@example.invalid', responseStatus: 'accepted' }] } });
-    assert.equal((await f.deliver({ assignment: removal, now })).code, 'person_removed');
+    assert.equal((await f.deliver({ assignment: { ...removal, createdAt }, now })).code, 'person_removed');
     assert.deepEqual(f.current().attendees.map(guest => guest.email), ['rayne@example.invalid']);
     assert.equal(f.current().status, 'confirmed');
-    assert.equal((await f.deliver({ assignment: removal, now })).code, 'person_removed');
+    assert.equal((await f.deliver({ assignment: { ...removal, createdAt }, now })).code, 'person_removed');
     assert.equal(f.calls.filter(call => call.method === 'PATCH').length, 1);
   }
 });
 
-test("allowing live removals does not replay started offers, late removal requests, or changed events", async () => {
+test("removal support does not replay started offers, malformed removals, or changed events", async () => {
   const now = Date.parse(assignment.end) + 1000;
   for (const item of [assignment, { ...assignment, status: 'accepted' }, { ...assignment, status: 'cancelled' },
-    { ...assignment, status: 'cancelled', removeCalendarGuest: true, createdAt: assignment.end }]) {
+    { ...assignment, status: 'cancelled', removeCalendarGuest: true, createdAt: "invalid" }]) {
     const f = fixture();
     assert.equal((await f.deliver({ assignment: item, now })).code, 'event_started');
     assert.equal(f.calls.length, 0);

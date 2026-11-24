@@ -1,4 +1,4 @@
-import { canRemoveRentalStaff } from "../lib/rental-staff.mjs";
+import { canRemoveRentalStaff, rentalStaffRemovals } from "../lib/rental-staff.mjs";
 import { readTeamRoster, teamRosterRoute } from "./team-roster.mjs";
 import { studioTaskPay } from "../lib/studio-tasks.mjs";
 import { completeStudioTask } from "./studio-tasks.mjs";
@@ -266,7 +266,7 @@ async function route(request, env, ctx) {
     const appointment = s.appointments.find(item => item.id === appointmentId);
     if (!appointment) fail(404, "This rental is no longer available. Refresh the schedule.");
     if (input.start !== appointment.start || input.end !== appointment.end) fail(409, "The rental time changed. Refresh and review it before removing anyone.");
-    if (!canRemoveRentalStaff(appointment)) fail(400, "People can be removed until the rental ends. Completed rentals are unchanged.");
+    if (!canRemoveRentalStaff(appointment)) fail(400, "This rental needs a valid start and end time before its staffing can be changed.");
     const offers = s.assignments.filter(item => item.appointmentId === appointmentId && item.employeeId === employeeId &&
       Date.parse(item.start) === Date.parse(appointment.start) && Date.parse(item.end) === Date.parse(appointment.end));
     const existing = offers.filter(item => item.removeCalendarGuest && item.status === "cancelled").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
@@ -276,7 +276,7 @@ async function route(request, env, ctx) {
         (appointment.acceptedEmployeeIds.includes(employeeId) || appointment.calendarInvitations?.some(item => item.employeeId === employeeId));
       if (!reInvited) return { saved: true, removedAssignment: existing, notification: "Person removed from this rental in the app. Check the Google Calendar removal status below." };
     }
-    if (!offers.length && !appointment.acceptedEmployeeIds.includes(employeeId) &&
+    if (!offers.some(active) && !appointment.acceptedEmployeeIds.includes(employeeId) &&
         !appointment.calendarInvitations?.some(item => item.employeeId === employeeId)) fail(404, "This person is not on this rental.");
     const now = new Date(Math.max(Date.now(), ...offers.map(item => (Date.parse(item.createdAt) || 0) + 1))).toISOString();
     const removed = { id: crypto.randomUUID(), employeeId, appointmentId, title: appointment.title, instructions: "",
@@ -297,7 +297,15 @@ async function route(request, env, ctx) {
     return { ...await recordManifest(rows.map(calendarRecord), calendarKey), generation: state.generation, syncedAt: state.synced_at };
   }
   if (request.method === "GET" && url.pathname === "/sync/accepted") {
-    const assignments = await jsonRows(db, "SELECT data FROM team_assignments");
+    const s = await snapshot(db), assignments = s.assignments;
+    const affectedRentals = new Set(assignments.filter(a => a.removeCalendarGuest).map(a => a.appointmentId));
+    const effectiveRemovals = new Set();
+    if (affectedRentals.size) {
+      const deliveries = await calendarAssignments(db, s, "owner");
+      for (const rental of s.appointments.filter(a => affectedRentals.has(a.id))) {
+        for (const removed of rentalStaffRemovals(rental, deliveries, s.state.synced_at)) effectiveRemovals.add(removed.id);
+      }
+    }
     const devices = await db.prepare("SELECT COUNT(*) AS count FROM team_devices").first();
     const alerts = await db.prepare(`SELECT COUNT(*) AS count, COALESCE(SUM(CASE WHEN attempts > 0 THEN 1 ELSE 0 END), 0) AS retrying
       FROM (SELECT attempts FROM team_alerts UNION ALL SELECT attempts FROM team_notification_events)`).first();
@@ -305,7 +313,7 @@ async function route(request, env, ctx) {
       .filter(a => a.status === "accepted" && a.appointmentId)
       .map(({ appointmentId, employeeId, start, end }) => ({ appointmentId, employeeId, start, end })),
       calendarAssignments: assignments.filter(a => a.appointmentId)
-        .map(({ appointmentId, employeeId, start, end, status, ownerConfirmation }) => ({ appointmentId, employeeId, start, end, status, ...(ownerConfirmation?.confirmedBy === "owner" ? { ownerConfirmed: true } : {}) })),
+        .map(({ id, appointmentId, employeeId, start, end, status, ownerConfirmation }) => ({ appointmentId, employeeId, start, end, status, ...(effectiveRemovals.has(id) ? { staffRemoved: true } : {}), ...(ownerConfirmation?.confirmedBy === "owner" ? { ownerConfirmed: true } : {}) })),
       durationRecovery: { restored: assignments.filter(a => a.calendarChange?.kind === "duration_recovered").length,
         needsReview: assignments.filter(a => a.status === "cancelled" && a.note === LEGACY_PAST_NOTE && !a.calendarChange).length },
       pushDiagnostics: { registeredDevices: devices.count, queuedAlerts: alerts.count, retryingAlerts: alerts.retrying },

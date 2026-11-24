@@ -26,6 +26,7 @@ export function rentalTeamDescription(description, assignments, calendarResponse
   const otherNotes = original.replace(leadingSection, "").replace(section, "");
   if (otherNotes.includes(begin) || otherNotes.includes(end)) throw new Error("The rental team note markers were edited. Review the event description.");
   const people = TEAM.filter(p => teamIds.has(p.id)).flatMap(person => {
+    if (assignments.some(a => a.employeeId === person.id && a.staffRemoved)) return [];
     const matches = assignments.filter(a => a.employeeId === person.id && ["pending", "accepted"].includes(a.status));
     const calendarStatus = calendarResponses.find(response => response.employeeId === person.id)?.status;
     if (matches.some(a => a.status === "accepted" && a.ownerConfirmed)) return [`✅ ${person.name} — Confirmed by Smooth`];
